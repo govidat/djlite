@@ -1,3 +1,4 @@
+{% load static tailwind_tags %}
 {% load i18n %}
 {% load l10n %}
 
@@ -7,9 +8,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My DjLite</title>
+  {% tailwind_css %}
 </head>
 <body>
-  <h1>My Django Core Lite</h1>
+  <h1 class="text-4xl text-red-500">My Django Core Lite</h1>
+  <div class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400" role="alert">
+    <span class="font-medium">Success alert!</span> Change a few things up and try submitting again.
+  </div>
     {% get_current_language as LANGCODE %}
     <h2>This is in {{LANGCODE}} .</h2>
     {% block language_switcher %}
@@ -25,7 +30,7 @@
             <option value="{{ code }}" {% if current_language == code %}selected{% endif %}>{{ name }}</option>
           {% endfor %}
         </select>
-        <button class="btn btn-xs btn-success" type="submit">{% trans "Switch" %}</button>
+        <button class="btn btn-lg btn-warning" type="submit">{% trans "Switch" %}</button>
       </form>
       {% comment %}
         Though we are passing a list of integers from view, at this stage they are treated as strings.

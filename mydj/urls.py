@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
  
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -23,6 +24,12 @@ urlpatterns = [
     path("zapp/", include("zapp.urls")),  # zapp
     path('i18n/', include('django.conf.urls.i18n')),  # i18n
 ]
+
+if settings.DEBUG:
+    # Include django_browser_reload URLs only in DEBUG mode
+    urlpatterns += [
+        path("__reload__/", include("django_browser_reload.urls")),
+    ]
 
 """ for inserting language in urls 
 from django.conf.urls.i18n import i18n_patterns

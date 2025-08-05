@@ -41,7 +41,14 @@ INSTALLED_APPS = [
     'allauth', # allauth
     'allauth.account', # allauth
     'zapp', # zapp
+    'tailwind', # tailwind
+    'theme',  # tailwind
 ]
+TAILWIND_APP_NAME = 'theme'  # tailwind
+
+if DEBUG:  # tailwind
+    # Add django_browser_reload only in DEBUG mode
+    INSTALLED_APPS += ['django_browser_reload']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -54,6 +61,12 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',     # allauth
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if DEBUG:   # tailwind
+    # Add django_browser_reload middleware only in DEBUG mode
+    MIDDLEWARE += [
+        "django_browser_reload.middleware.BrowserReloadMiddleware",
+    ]
 
 ROOT_URLCONF = 'mydj.urls'
 
