@@ -21,4 +21,21 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("accounts/", include("allauth.urls")),  # allauth
     path("zapp/", include("zapp.urls")),  # zapp
+    path('i18n/', include('django.conf.urls.i18n')),  # i18n
 ]
+
+""" for inserting language in urls 
+from django.conf.urls.i18n import i18n_patterns
+
+urlpatterns = [
+    path('i18n/', include('django.conf.urls.i18n')),  # Language switcher
+]
+
+urlpatterns += i18n_patterns(
+    path('admin/', admin.site.urls),
+    path("accounts/", include("allauth.urls")),  # allauth
+    path("zapp/", include("zapp.urls")),  # zapp
+    path("", include("core.urls")),  # core    
+ #   path('i18n/', include('django.conf.urls.i18n')),  # i18n
+)
+"""

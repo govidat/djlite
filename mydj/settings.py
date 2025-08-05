@@ -46,6 +46,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.locale.LocaleMiddleware', # <=== i18n
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -112,6 +113,7 @@ LANGUAGE_CODE = 'en'
 TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
+USE_L10N = True  # Enable localization of formats (dates, numbers, etc.) ' L10N
 
 USE_TZ = True
 
@@ -137,3 +139,8 @@ SITE_ID = 1  # allauth
 ACCOUNT_EMAIL_VERIFICATION = "none"  # allauth
 
 LOGIN_REDIRECT_URL = "/"  # allauth
+
+LANGUAGES = [           # i18n
+    ('en', 'English'),
+    ('fr', 'French'),
+]

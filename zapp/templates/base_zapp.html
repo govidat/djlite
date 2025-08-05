@@ -1,8 +1,5 @@
-{% comment %}
 {% load i18n %}
-
 {% load l10n %}
-{% endcomment %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -13,6 +10,33 @@
 </head>
 <body>
   <h1>My Django Core Lite</h1>
+    {% get_current_language as LANGCODE %}
+    <h2>This is in {{LANGCODE}} .</h2>
+    {% block language_switcher %}
+      <form method="post" action="{% url 'set_language' %}">
+        {% csrf_token %}
+        <label for="language-select">{% trans "Choose your language" %}:</label>
+        {% get_current_language as current_language %}
+        {% load language_tags %}
+        <select id="language-select" name="language">
+          {% get_current_language as current_language %}
+          {% get_languages as languages %}
+          {% for code, name in languages %}
+            <option value="{{ code }}" {% if current_language == code %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-xs btn-success" type="submit">{% trans "Switch" %}</button>
+      </form>
+      {% comment %}
+        Though we are passing a list of integers from view, at this stage they are treated as strings.
+        Hence used xxx|add:"0" to convert the string xxx to a number.
+      {% endcomment %}
+      {% for strcount in counts %}
+        <p>{% blocktrans count strcount|add:"0" as count %}You have {{ count }} message.{% plural %}You have {{ count }} messages.{% endblocktrans %}</p>
+      {% endfor %}
+      {# Current Time using the locale format #}
+      <p>{% trans "The current date and time is:" %} {{ current_time|date:"DATETIME_FORMAT" }}</p> 
+    {% endblock %}
     <main>
       {% block content %}
       {% endblock %}
