@@ -1,0 +1,10 @@
+{% extends "base_zapp.html" %}
+{% block content %}
+    <h1>Hello World from Zapp</h1>
+    <p>Please choose an option:</p>
+    <ul>
+    <li><a href="{% url 'account_signup' %}">Sign Up</a></li>
+    <li><a href="{% url 'account_login' %}">Log In</a></li>
+    <li><a href="{% url 'account_reset_password' %}">Reset Password</a></li>
+    </ul>
+{% endblock %}
