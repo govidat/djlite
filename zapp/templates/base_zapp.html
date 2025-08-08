@@ -3,18 +3,81 @@
 {% load l10n %}
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My DjLite</title>
   {% tailwind_css %}
 </head>
+<body class="h-screen">
+
+<div class="grid grid-cols-[200px_1fr] grid-rows-[60px_1fr] grid-areas-template h-full">
+
+    <!-- Header -->
+    <header  class="bg-gray-800 text-white p-4 col-span-2 row-start-1 row-end-2">
+        <h1 class="text-xl font-bold">My Django Core Lite</h1>
+        {% block language_switcher %}
+        <form method="post" action="{% url 'set_language' %}">
+          {% csrf_token %}
+          <label for="language-select">{% trans "Choose your language" %}:</label>
+          {% get_current_language as current_language %}
+          {% load language_tags %}
+          <select id="language-select" name="language">
+            {% get_current_language as current_language %}
+            {% get_languages as languages %}
+            {% for code, name in languages %}
+              <option value="{{ code }}" {% if current_language == code %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-lg btn-warning" type="submit">{% trans "Switch" %}</button>
+        </form>
+    {% endblock %}
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="bg-gray-100 p-4 row-start-2 row-end-3 col-start-1 col-end-2">
+        <ul class="space-y-2">
+            <li><a href="#" class="text-gray-700 hover:text-gray-900">Dashboard</a></li>
+            <li><a href="#" class="text-gray-700 hover:text-gray-900">Settings</a></li>
+        </ul>
+        {% for strcount in counts %}
+          <p>{% blocktrans count strcount|add:"0" as count %}You have {{ count }} message.{% plural %}You have {{ count }} messages.{% endblocktrans %}</p>
+        {% endfor %}
+        {# Current Time using the locale format #}
+        <p>{% trans "The current date and time is:" %} {{ current_time|date:"DATETIME_FORMAT" }}</p> 
+
+    </aside>
+
+    <!-- Main Content -->
+    <main class="bg-white p-4 row-start-2 row-end-3 col-start-2 col-end-3">
+        <div class="flex flex-wrap gap-4">
+            <div class="bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]">
+              {% block content %}
+              {% endblock %}
+            </div>
+            <c-card title="Trees" url="account_signup" button_text = "Signup">We have the best trees</c-card>
+            <c-card classv1 = "!bg-warning" title="Spades" url="account_login" button_text = "Login">
+              <article class="prose lg:prose-xl">
+                <h1>My Article Title</h1>
+                <p>This content will have beautiful typography applied automatically.</p>
+              </article>
+            </c-card>
+            {% comment %}            
+            <div class="bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]">Card 2</div>
+            <div class="bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]">Card 3</div>
+            {% endcomment %}
+        </div>
+    </main>
+
+</div>
+
+</body>
+
+{% comment %}
+
 <body>
   <h1 class="text-4xl text-red-500">My Django Core Lite</h1>
-  <div class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400" role="alert">
-    <span class="font-medium">Success alert!</span> Change a few things up and try submitting again.
-  </div>
     {% get_current_language as LANGCODE %}
     <h2>This is in {{LANGCODE}} .</h2>
     {% block language_switcher %}
@@ -32,10 +95,7 @@
         </select>
         <button class="btn btn-lg btn-warning" type="submit">{% trans "Switch" %}</button>
       </form>
-      {% comment %}
-        Though we are passing a list of integers from view, at this stage they are treated as strings.
-        Hence used xxx|add:"0" to convert the string xxx to a number.
-      {% endcomment %}
+
       {% for strcount in counts %}
         <p>{% blocktrans count strcount|add:"0" as count %}You have {{ count }} message.{% plural %}You have {{ count }} messages.{% endblocktrans %}</p>
       {% endfor %}
@@ -48,4 +108,5 @@
     </main>
   </div>  
 </body>
+{% endcomment %}
 </html>

@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'zapp', # zapp
     'tailwind', # tailwind
     'theme',  # tailwind
+    'django_cotton.apps.SimpleAppConfig', # cotton
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 
@@ -73,13 +74,24 @@ ROOT_URLCONF = 'mydj.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
+        'DIRS': ['mydj/templates'], # cotton
+        'APP_DIRS': False, # cotton
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+            ],
+            "loaders": [(                   # cotton
+                "django.template.loaders.cached.Loader",
+                [
+                    "django_cotton.cotton_loader.Loader",
+                    "django.template.loaders.filesystem.Loader",
+                    "django.template.loaders.app_directories.Loader",
+                ],
+            )],
+            "builtins": [                   # cotton
+                "django_cotton.templatetags.cotton"
             ],
         },
     },
@@ -157,3 +169,5 @@ LANGUAGES = [           # i18n
     ('en', 'English'),
     ('fr', 'French'),
 ]
+
+# CLASSV2 = "bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]"
