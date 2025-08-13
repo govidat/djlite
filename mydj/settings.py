@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from .constants import PC_NAVBAR_ITEMS, PC_THEMES, PC_LANGUAGES
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -81,6 +82,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'mydj.context_processors.settings_constants', # context_processors
             ],
             "loaders": [(                   # cotton
                 "django.template.loaders.cached.Loader",
@@ -169,5 +171,10 @@ LANGUAGES = [           # i18n
     ('en', 'English'),
     ('fr', 'French'),
 ]
+
+# importing the constants from constants.py
+PC_NAVBAR_ITEMS = PC_NAVBAR_ITEMS 
+PC_THEMES = PC_THEMES 
+PC_LANGUAGES = PC_LANGUAGES
 
 # CLASSV2 = "bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]"

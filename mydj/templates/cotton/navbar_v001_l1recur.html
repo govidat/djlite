@@ -1,0 +1,19 @@
+{% load my_filters %}
+
+{% for item in items|dictsort:"order" %}
+
+    {% if item.children %}  <!-- if the children length > 0 -->
+    <li>
+        <details>
+            <summary>{{item.text|my_text}}</summary>
+
+            <ul class="p-2">
+                <c-navbar_v001_l1recur :items="item.children"></c-navbar_v001_l1recur>
+            </ul>
+        </details>
+    </li>
+
+    {% else %}
+    <li><a>{{item.text|my_text}}</a></li>
+    {% endif %}
+{% endfor %}

@@ -1,0 +1,12 @@
+{% load my_filters %}
+
+<div class="dropdown dropdown-bottom dropdown-end">
+  <div tabindex="0" role="button" class="btn m-1">{{dd_text}} ⬇️</div>
+  <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm">
+    {% for item in items|dictsort:"order" %}
+        <li><a>
+           {{item.text|my_text}}
+       </a></li>
+    {% endfor %}
+  </ul>
+</div>

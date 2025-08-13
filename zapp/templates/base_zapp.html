@@ -15,7 +15,11 @@
 <div class="grid grid-cols-[200px_1fr] grid-rows-[60px_1fr] grid-areas-template h-full">
 
     <!-- Header -->
-    <header  class="bg-gray-800 text-white p-4 col-span-2 row-start-1 row-end-2">
+    <header  class="p-4 col-span-2 row-start-1 row-end-2">
+      <!-- navbar -->
+      {% get_current_language as current_language %}      
+      <c-navbar_v001 nb_logo="{{nb_logo}}" nb_title="{{nb_title}}" :nb_items="{{nb_items}}" :current_language="{{current_language}}"></c-navbar_v001>
+      {% comment %}  
         <h1 class="text-xl font-bold">My Django Core Lite</h1>
         {% block language_switcher %}
         <form method="post" action="{% url 'set_language' %}">
@@ -32,8 +36,11 @@
           </select>
           <button class="btn btn-lg btn-warning" type="submit">{% trans "Switch" %}</button>
         </form>
+
     {% endblock %}
+    {% endcomment %}
     </header>
+
 
     <!-- Sidebar -->
     <aside class="bg-gray-100 p-4 row-start-2 row-end-3 col-start-1 col-end-2">

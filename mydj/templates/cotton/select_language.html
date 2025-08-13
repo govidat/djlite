@@ -1,0 +1,18 @@
+{% load my_filters %}
+
+{% block language_switcher %} 
+  <form method="post" action="{% url 'set_language' %}">
+    {% csrf_token %}
+    
+    <select class="select" id="language-select" name="language" onchange="this.form.submit()">
+      {% for item in languages %} 
+        
+        <option value="{{ item.code }}" {% if current_language == item.code %}selected{% endif %}>
+        
+  {{ item.code }}-{{item.text|my_text}}
+        </option>
+      {% endfor %}
+    </select>
+  </form>
+{% endblock %}
+

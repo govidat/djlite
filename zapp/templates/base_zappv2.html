@@ -1,0 +1,38 @@
+{% load static tailwind_tags %}
+{% load i18n %}
+{% load l10n %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My DjLite</title>
+  <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
+  {% tailwind_css %}
+</head>
+<body class="h-screen min-h-screen">
+
+ 
+  <!-- Header -->
+  <header  class="p-4 col-span-2 row-start-1 row-end-2">
+    <!-- navbar -->
+    <!-- {% get_current_language as current_language %} :current_language="{{current_language}}  -->    
+    <c-navbar_v001 :nb="{{nb}}" ></c-navbar_v001>
+  </header>
+  <!-- Sidebar -->
+  {% comment %} 
+  <aside class="bg-gray-100 p-4 row-start-2 row-end-3 col-start-1 col-end-2">
+  </aside>
+  {% endcomment %}
+  
+  <main class="container p-4 pt-16 pb-12">
+      {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->    
+  <c-footer_v001></c-footer_v001>
+
+</body>
+
+</html>

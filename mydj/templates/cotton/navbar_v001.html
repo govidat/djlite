@@ -1,0 +1,26 @@
+<div class="navbar bg-base-100 shadow-sm fixed top-0 left-0 w-full z-50">
+  <div class="navbar-start">
+    <div class="dropdown">
+      <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" /> </svg>
+      </div>
+      <ul
+        tabindex="0"
+        class="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
+        <c-navbar_v001_l1recur :items="nb.items_nested"></c-navbar_v001_l1recur>
+      </ul>
+    </div>
+    <a class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    <h1 class="text-xl font-bold">{{nb.title|default:"My default title" }}-{{current_language}}</h1>
+  </div>
+  <div class="navbar-center hidden lg:flex">
+    <ul class="menu menu-horizontal px-1">
+      
+      <c-navbar_v001_l1recur :items="nb.items_nested"></c-navbar_v001_l1recur>
+    </ul>
+  </div>
+  <div class="navbar-end flex xl:gap-1">
+    <c-select_theme></c-select_theme>
+    <c-select_language :languages="zclient.allowed_languages"></c-select_language>      
+  </div>
+</div>
