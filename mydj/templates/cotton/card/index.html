@@ -1,0 +1,88 @@
+{% load my_filters %}
+
+{% comment %}
+Input is of the form:
+SAMPLE_CARD = 
+        {
+            'order': 4,
+            'class': 'card-lg',
+            'body_class': 'items-center text-center',
+            'title': {
+                'class': '',
+                'items':
+            [
+    {'order': 1, 'type': 'svg', 'class': '', 'svg': 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z' },
+    {'order': 2, 'type': 'text', 'class': '', 'text': {'en': 'My Card', 'fr': 'frMy Card'} },
+    {'order': 3, 'type': 'badge', 'class': '', 'text': {'en': 'My Badge', 'fr': 'frMy Badge'} },
+            ]
+            },
+            'contents': {
+                'class': '', 
+                'items': 
+                    [
+    [
+    {'order': 1, 'type': 'svg', 'class': '', 'svg': 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z' },
+    {'order': 2, 'type': 'text', 'class': '', 'text': {'en': 'SubTitle', 'fr': 'frSubTitle'} },
+    {'order': 3, 'type': 'badge', 'class': '', 'text': {'en': 'STB', 'fr': 'fSTB'} },
+    ],
+    [
+    {'order': 1, 'type': 'svg', 'class': '', 'svg': 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z' },
+    {'order': 2, 'type': 'text', 'class': '', 'text': {'en': 'A card component has a figure, a body part, and inside body there are title and actions parts', 'fr': 'frA card component has a figure, a body part, and inside body there are title and actions parts'} },
+    {'order': 3, 'type': 'badge', 'class': '', 'text': {'en': 'TxB', 'fr': 'fTxB'} },
+    ],
+                    ]
+                },
+            'actions': {
+                'position': 'end', 
+                'class': '', 
+                'items': [
+                    {'text': {'en': 'Buy Now', 'fr': 'frBuy'}, 'class': '!btn-primary'}, 
+                    {'text': {'en': 'Call Us', 'fr': 'frCall'}, 'class': '!btn-warning'}
+                    ]
+                },
+            'img': {'position': 'start', 'src': 'https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp', 'alt': 'shoes', 'class': 'rounded-xl'},
+            'figure_class': 'px-0 pt-0',
+        }               
+
+{% endcomment %}
+
+
+{% if card %}
+
+    <div class="card bg-base-100 w-96 shadow-sm {{ card.class|default:"" }}">
+                        
+        {% if card.figure.position == 'start' %}  
+            <c-figure :figure="card.figure"></c-figure>
+        {% endif %}
+        
+        <div class="card-body {{ card.body_class|default:"" }}">
+            
+            {% if card.actions.position == 'start' %}
+                <c-card.actions></c-card.actions>
+            {% endif %}      
+            <h2 class="card-title {{ card.title.class|default:"" }}">
+                {% for id in card.title.stb_ids %} 
+                    <div class="flex">
+                        <c-svgtextbadge :id="id"></c-svgtextbadge>
+                    </div> 
+                {% endfor %}             
+            </h2>
+            {% for id in card.contents.stb_ids %}
+                <div class="flex">
+                    <c-svgtextbadge :id="id"></c-svgtextbadge>
+                </div>
+            {% endfor %}  
+            {% if card.actions.position == 'end' %}                        
+                <c-card.actions></c-card.actions>
+            {% endif %}  
+
+        </div>
+        {% if card.figure.position == 'end' %}  
+            <c-figure :figure="card.figure"></c-figure>
+        {% endif %}
+        
+
+    </div>
+        
+{% endif %}
+

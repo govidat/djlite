@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from .constants import PC_NAVBAR_ITEMS, PC_THEMES, PC_LANGUAGES
+from .constants import PC_NAVBAR_ITEMS, PC_THEMES, PC_LANGUAGES, SAMPLE_CARDS, SAMPLE_HEROS
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -176,5 +176,7 @@ LANGUAGES = [           # i18n
 PC_NAVBAR_ITEMS = PC_NAVBAR_ITEMS 
 PC_THEMES = PC_THEMES 
 PC_LANGUAGES = PC_LANGUAGES
+SAMPLE_CARDS = SAMPLE_CARDS
+SAMPLE_HEROS = SAMPLE_HEROS
 
 # CLASSV2 = "bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]"

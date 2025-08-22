@@ -37,3 +37,20 @@ def my_text(value={}, arg=""):
         return "ERR Z002"
 
 
+@register.filter
+def my_removetrue(value=[], arg=""):
+    """value is expected to be a list like [{hidden: True, a:x, b:y}, {hidden: False, a:p, b:q}] ; arg should be a key in the dictionary. This filter will remove records that have true  """
+    # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
+    return list(filter(lambda item: not item.get(arg), value))
+
+@register.filter
+def get_item(dictionary, key):
+    return dictionary.get(key)
+
+"""
+To return the first dictionary item that matches a key value;
+res = next(filter(lambda x: x['Author'] == "Mark", DICTARRAY), None)
+"""
+@register.filter
+def get_dictid(dict_array=[], arg=0):
+    return next(filter(lambda x: x['id'] == arg, dict_array), None)

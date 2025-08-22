@@ -1,0 +1,5 @@
+{% load my_filters %}
+
+<div class="justify-end {{ actions.class|default:"" }}">
+    <c-buttons :buttons="actions.buttons"></c-buttons>
+</div>

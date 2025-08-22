@@ -1,0 +1,5 @@
+{% load my_filters %}
+
+<div class="card-actions justify-end {{ card.actions.class|default:"" }}">
+    <c-buttons :buttons="card.actions.buttons"></c-buttons>
+</div>

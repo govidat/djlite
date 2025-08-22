@@ -1,0 +1,43 @@
+{% load my_filters %}
+{% comment %}
+This is to display a svg, text and badge in a single line.
+Input is an array like:
+items: [
+    {order: 1, type: 'svg', class: '', svg: 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z' },
+    {order: 2, type: 'text', class: '', 'text': {'en': 'My Card', 'fr': 'frMy Card'} },
+    {order: 3, type: 'badge', class: '', 'text': {'en': 'My Badge', 'fr': 'frMy Badge'} },
+]
+
+input is a svgitems id eg 1, 2, 3
+first get the svgitem for this input and then proceed as before
+
+
+{% endcomment %}
+
+{# first dict is brought from site_stbs using the link of stb_id #}
+{% with dict_stb=site_stbs|get_dictid:id %} 
+    {% with items=dict_stb.items|default:'[]' %}
+        {# this gives an array like [ {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' }, {'order': 2, 'type': 'text', 'class': '', 'link_id': 'mycard' },{'order': 3, 'type': 'badge', 'class': '', 'link_id': 'mybadge' },] #}
+        {% for item in items|dictsort:"order" %}
+            {% if item.type == 'svg' and item.link_id %}
+                {# svg is brought from raw_svgs using the link of link_id #}
+                {% with dict=raw_svgs|get_dictid:item.link_id %}        
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
+                        d="{{dict.svg}}" /></svg>
+                {% endwith %}        
+            {% endif %}
+            {% if item.type == 'text' and item.link_id %}
+                {# text is brought from raw_texts using the link of link_id #}
+                {% with dict=raw_texts|get_dictid:item.link_id %}    
+                    {{dict.text|my_text}}
+                {% endwith %}    
+            {% endif %}
+            {% if item.type == 'badge' and item.link_id %} 
+                {# text is brought from raw_texts using the link of link_id #}
+                {% with dict=raw_texts|get_dictid:item.link_id %}
+                    <div class="badge badge-secondary {{ item.class|default:"" }}">{{dict.text|my_text}}</div>
+                {% endwith %}
+            {% endif %}
+        {% endfor%}
+    {% endwith %}
+{% endwith %}    

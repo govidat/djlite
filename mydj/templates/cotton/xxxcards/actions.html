@@ -1,0 +1,7 @@
+{% load my_filters %}
+
+<div class="card-actions justify-end {{ card.actions.class|default:"" }}">
+    {% for item in card.actions.items %}
+        <button class="btn btn-primary {{ item.class|default:"" }}">{{item.text|my_text}}</button>
+    {% endfor %}
+</div>
