@@ -46,48 +46,76 @@ cards = settings.SAMPLE_CARDS
 heros = settings.SAMPLE_HEROS
 site_structure = [
     {
-    'id': 1,'parent_id': None, 'type': 'Full', 'page': 'home', 'client_id': 'ABC123',
+    'id':  1,'parent_id': None, 'order': 1, 'level': 10, 'type': 'Full', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class10': '', 'style10': "background-image: url('https://via.placeholder.com/1920x1080');",
-    'children': [2, 3, 4] 
+    'children': [2, 3, 4, 10] 
     },
     {
-    'id': 2,'parent_id': 1, 'order': 1, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'id':  2,'parent_id': 1, 'order': 1, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class20': '', 'style20': '',
     'class30': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3', 'style30': '',
     'children': [5, 6, 7] 
     },
     {
-    'id': 3,'parent_id': 1, 'order': 2, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'id':  3,'parent_id': 1, 'order': 2, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class20': '', 'style20': '',
     'class30': '', 'style30': '',
     'children': [8] 
     },
     {
-    'id': 4,'parent_id': 1, 'order': 3, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'id':  4,'parent_id': 1, 'order': 3, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class20': '', 'style20': '',
     'class30': '', 'style30': '',
-    'children': [] 
+    'children': [9] 
     },    
     {
-    'id': 5,'parent_id': 2, 'order': 1, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id': 10,'parent_id': 1, 'order': 4, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'class20': '', 'style20': '',
+    'class30': '', 'style30': '',
+    'children': [11] 
+    },    
+
+    {
+    'id':  5,'parent_id': 2, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class40': '', 'style40': '',
     'children': [] 
     },
     {
-    'id': 6,'parent_id': 2, 'order': 1, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  6,'parent_id': 2, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class40': '', 'style40': '',
     'children': [] 
     },
     {
-    'id': 7,'parent_id': 2, 'order': 1, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  7,'parent_id': 2, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class40': '', 'style40': '',
     'children': [] 
     }, 
     {
-    'id': 8,'parent_id': 3, 'order': 1, 'type': 'Hero', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  8,'parent_id': 3, 'order': 1, 'level': 40, 'type': 'Hero', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
     'class40': '', 'style40': '',
     'children': [] 
     },                        
+    {
+    'id':  9,'parent_id': 4, 'order': 1, 'level': 40, 'type': 'Accordion', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'class40': '', 'style40': '',
+    'children': [] 
+    },  
+    {
+    'id': 11,'parent_id': 4, 'order': 1, 'level': 40, 'type': 'Carousal', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'class40': '', 'style40': '',
+    'children': [] 
+    },         
 ]
 
 site_cards = [
@@ -95,12 +123,12 @@ site_cards = [
             'id': 1, 'client_id': 'ABC123', 'page': 'home',
             'class': 'card-lg',
             'body_class': 'items-center text-center',
-            'title': {'class': '', 'stb_ids': [1]},
-            'contents': {'class': '', 'stb_ids': [2, 3] },
+            'title': {'class': '', 'id_type': 'stb', 'ids': [1]},
+            'contents': {'class': '', 'id_type': 'stb', 'ids': [2, 3] },
             'actions': {'class': '', 'position': 'end', 
                 'buttons': [
-                    {'class': '!btn-primary', 'stb_ids': [4]},
-                    {'class': '!btn-warning', 'stb_ids': [5]}                    
+                    {'class': '!btn-primary', 'id_type': 'stb', 'ids': [4]},
+                    {'class': '!btn-warning', 'id_type': 'stb', 'ids': [5]}                    
                 ],
             },
             'figure': {'figure_class': 'px-0 pt-0', 'position': 'start', 'link_id': 'nike', 'class': 'rounded-xl'},
@@ -114,20 +142,20 @@ site_heros = [
             'class': '',
             'herocontent_class': '',
             'herocontents': [
-                {'hidden': True, 'type': 'figure', 'order': 2, 
+                {'hidden': False, 'type': 'figure', 'order': 2, 
                     'figure': {'figure_class': 'px-0 pt-0', 'position': 'start', 'link_id': 'spiderman', 'class': 'max-w-sm rounded-xl shadow-2xl'},  
                 },
                 {'hidden': False, 'type': 'text',  'order': 1, 'class': '', 
-                    'title':    {'class': '', 'stb_ids': [7]},
-                    'contents': {'class': '', 'stb_ids': [8, 9]},
+                    'title':    {'class': '', 'id_type': 'stb', 'ids': [7]},
+                    'contents': {'class': '', 'id_type': 'stb', 'ids': [8, 9]},
                     'actions':  {'class': '', 'position': 'end',                        
                         'buttons': [
-                            {'class': '!btn-primary', 'stb_ids': [4]},
-                            {'class': '!btn-warning', 'stb_ids': [5]}                    
+                            {'class': '!btn-primary', 'id_type': 'stb', 'ids': [4]},
+                            {'class': '!btn-warning', 'id_type': 'stb', 'ids': [5]}                    
                         ],
                     },                               
                 },
-                {'hidden': False, 'type': 'card',  'order': 3, 'link_id': 1 },
+                {'hidden': True, 'type': 'card',  'order': 3, 'link_id': 1 },
                 
             ],
             'overlay': False,
@@ -137,6 +165,67 @@ site_heros = [
  
 ]
 
+site_accordions = [
+            {
+            'id': 1, 'client_id': 'ABC123', 'page': 'home',
+            'classjoin': 'join join-vertical bg-base-100',
+            'class': 'collapse-plus join-item',
+            'accordioncontents': [
+                {
+                    'order': 1,
+                    'title': {'class': '', 'id_type': 'text', 'ids': ['acctit1']},
+                    'contents': {'class': '', 'id_type': 'text', 'ids': ['acctxt1'] },
+                },
+                {
+                    'order': 2,
+                    'title': {'class': '', 'id_type': 'text', 'ids': ['acctit2']},
+                    'contents': {'class': '', 'id_type': 'text', 'ids': ['acctxt2'] },
+                },                
+                {
+                    'order': 3,
+                    'title': {'class': '', 'id_type': 'text', 'ids': ['acctit3']},
+                    'contents': {'class': '', 'id_type': 'text', 'ids': ['acctxt3'] },
+                },                                
+            ]
+            },
+]
+
+site_carousals = [
+            {
+            'id': 1, 'client_id': 'ABC123', 'page': 'home',
+            'class_carousal': 'w-full', 'class_item': '', 
+            'prev_next': {
+                'hidden': False,
+                'class_anchor': '',
+                'class_item': '',
+                'prev' : {'class': '', 'mark': ''},
+                'next' : {'class': '', 'mark': ''},
+            },
+
+            'carousalitems': [
+                {
+                    'order': 3,
+                    'class': '',
+                    'contents': {'class': '', 'id_type': 'img', 'link_id': 'nike' },
+                },
+                {
+                    'order': 2,
+                    'class': '',
+                    'contents': {'class': '', 'id_type': 'img', 'link_id': 'spiderman' },
+                },
+                {
+                    'order': 1,
+                    'class': '',
+                    'contents': {'class': '', 'id_type': 'img', 'link_id': 'daisy1' },
+                },                
+            ]
+            },
+]
+
+# Options for accordions.class = collapse-plus/ collapse-arrow
+# joinitem is not working as per daisyui
+
+# Presently class in stbs is not used anywhere. To be evaluated for future use
 site_stbs = [
     {'id': 1, 'client_id': 'ABC123', 
      'items': [
@@ -200,6 +289,13 @@ raw_texts = [
             {'id': 'buynow', 'client_id': 'ABC123', 'text': {'en': 'Buy Now', 'fr': 'frBuy'}},
             {'id': 'callus', 'client_id': 'ABC123', 'text': {'en': 'Call Us', 'fr': 'frCall'}},
             {'id': 'myhero', 'client_id': 'ABC123', 'text': {'en': 'My Hero', 'fr': 'frMy Hero'}},            
+            {'id': 'acctit1', 'client_id': 'ABC123', 'text': {'en': 'How do I create an account?', 'fr': 'frHow do I create an account?'}},            
+            {'id': 'acctxt1', 'client_id': 'ABC123', 'text': {'en': 'Click the "Sign Up" button in the top right corner and follow the registration process.', 'fr': 'frClick the "Sign Up" button in the top right corner and follow the registration process.'}},            
+            {'id': 'acctit2', 'client_id': 'ABC123', 'text': {'en': 'I forgot my password. What should I do?', 'fr': 'frI forgot my password. What should I do?'}},            
+            {'id': 'acctxt2', 'client_id': 'ABC123', 'text': {'en': 'Click on "Forgot Password" on the login page and follow the instructions sent to your email.', 'fr': 'frClick on "Forgot Password" on the login page and follow the instructions sent to your email.'}},            
+            {'id': 'acctit3', 'client_id': 'ABC123', 'text': {'en': 'How do I update my profile information?', 'fr': 'frHow do I update my profile information?'}},            
+            {'id': 'acctxt3', 'client_id': 'ABC123', 'text': {'en': 'Go to "My Account" settings and select "Edit Profile" to make changes.', 'fr': 'frGo to "My Account" settings and select "Edit Profile" to make changes.'}},            
+
 ]
 
 # we can have texts of mother site like bahushira with a client id of ZZZ999 and that of ABC123. 
@@ -222,7 +318,13 @@ raw_images = [
             {
             'id': 'spiderman', 'client_id': 'ABC123', 'page': 'home',
             'src': 'https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp', 'alt': 'spiderman',
-            }            
+            },
+            {
+            'id': 'daisy1', 'client_id': 'ABC123', 'page': 'home',
+            'src': 'https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp', 'alt': 'daisy1',
+            }                                    
+
+
 ]
 
 nb = {}
@@ -258,7 +360,10 @@ class HomeZappView(TemplateView):
         context['raw_texts'] = sorted(raw_texts, key=lambda x: x['client_id'])
         context['raw_svgs'] = raw_svgs
         context['raw_images'] = raw_images  
-        context['site_stbs'] = site_stbs              
+        context['site_stbs'] = site_stbs    
+        context['site_accordions'] = site_accordions
+        context['site_carousals'] = site_carousals
+
         return context
 
 def home_zapp_fbv(request): # new

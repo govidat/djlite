@@ -1,0 +1,53 @@
+{% load my_filters %}
+
+<div class="carousel {{ carousal.class_carousal|default:'' }}">
+
+
+{# this is to get the previous and next href links. order_list os a list of ids #}
+{% with order_list=carousal.carousalitems|get_key_values:'order' %}
+
+{% for item in carousal.carousalitems|dictsort:"order" %}
+    <div id="{{item.order}}" class="carousel-item relative w-full {{ carousal.class_item|default:'' }} {{ item.class|default:'' }}">
+        {% if item.contents.id_type == 'img' %}
+            <c-rawimage class="{{item.contents.class}}" id="{{item.contents.link_id}}"></c-rawimage>
+        {% elif item.contents.id_type == 'Card' %}
+            {# Do something #}
+        {% endif %}
+        {# space for prev_next if applicable #}
+        {# using special filter get_previous_and_next_in_list to get the prev and next for carousal #}
+        {% if not carousal.prev_next.hidden %}
+            {% with href_list=order_list|get_previous_and_next_in_list:item.order %}
+               {# href_list is a list of two items, prev and next order id. They are extracted using |first and |last filters #}
+                <div class="absolute left-5 right-5 top-1/2 flex -translate-y-1/2 transform justify-between {{ carousal.prev_next.class_anchor|default:'' }}">
+                    <a href="#{{href_list|first}}" class="btn btn-circle {{ carousal.prev_next.class_item|default:'' }} {{ carousal.prev_next.prev.class|default:'' }}">{{ carousal.prev_next.prev.mark|default:'❮' }}</a>
+                    <a href="#{{href_list|last}}" class="btn btn-circle {{ carousal.prev_next.class_item|default:'' }} {{ carousal.prev_next.next.class|default:'' }}">{{ carousal.prev_next.next.mark|default:'❯' }}</a>
+                </div>                
+            {% endwith %}                
+        {% endif %}
+
+    </div>    
+
+{% endfor %}
+
+{% endwith %}
+{% comment %}    
+  <div id="slide1" class="carousel-item relative w-full">
+    <img
+      src="https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp"
+      class="w-full" />
+    <div class="absolute left-5 right-5 top-1/2 flex -translate-y-1/2 transform justify-between">
+      <a href="#slide4" class="btn btn-circle">❮</a>
+      <a href="#slide2" class="btn btn-circle">❯</a>
+    </div>
+  </div>
+  <div id="slide2" class="carousel-item relative w-full">
+    <img
+      src="https://img.daisyui.com/images/stock/photo-1609621838510-5ad474b7d25d.webp"
+      class="w-full" />
+    <div class="absolute left-5 right-5 top-1/2 flex -translate-y-1/2 transform justify-between">
+      <a href="#slide1" class="btn btn-circle">❮</a>
+      <a href="#slide3" class="btn btn-circle">❯</a>
+    </div>
+  </div>
+{% endcomment %}  
+</div>

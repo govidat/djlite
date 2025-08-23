@@ -1,0 +1,13 @@
+{% comment %}
+inputs are type='stb'/'text' and ids:[]
+{% endcomment %}
+
+{% for id in ids %} 
+    <div class="flex">
+        {% if type == 'stb' %}
+            <c-svgtextbadge :id="id"></c-svgtextbadge>
+        {% elif type == 'text' %}
+            <c-rawtext :id="id"></c-rawtext>
+        {% endif %}    
+    </div> 
+{% endfor %}

@@ -1,13 +1,11 @@
-{% load my_filters %}
+
 
 {% for button in buttons %}
+
     <button class="btn btn-primary {{ button.class|default:"" }}">
-        {% for id in button.stb_ids %} 
-            <div class="flex">
-                <c-svgtextbadge :id="id"></c-svgtextbadge>
-            </div> 
-        {% endfor %}
+        <c-textrouter :type="button.id_type" :ids="button.ids"></c-textrouter>
     </button>
+
 {% endfor %}
 
     {% comment %}

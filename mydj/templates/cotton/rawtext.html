@@ -1,0 +1,12 @@
+{% load my_filters %}
+{% comment %}
+This is to display a text.
+Input is an id:
+
+{% endcomment %}
+
+
+{# text is brought from raw_texts using id #}
+{% with dict=raw_texts|get_dictid:id %}    
+    {{dict.text|my_text}}
+{% endwith %}    

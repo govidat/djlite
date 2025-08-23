@@ -1,0 +1,15 @@
+{% load my_filters %}
+{% comment %}
+This is to display an image.
+Input is an id:
+input is class:'' id: 1
+
+{% endcomment %}
+
+{# image is brought from raw_imagess using id #}
+{% with dict=raw_images|get_dictid:id %}  
+    <img
+        class="{{class}}"
+        src={{dict.src}}
+        alt={{dict.alt}} />  
+{% endwith %}    

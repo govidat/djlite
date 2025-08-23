@@ -2,6 +2,9 @@
 
 <figure class={{ figure.figure_class|default:"" }}>
     {% if figure.link_id %}
+       
+        <c-rawimage class="{{figure.class}}" id="{{figure.link_id}}"></c-rawimage>
+        {% comment %}
         {# src and alt are brought from raw_images using the link of link_id #}
         {% with dict=raw_images|get_dictid:figure.link_id %}    
             <img
@@ -9,5 +12,7 @@
                 src={{dict.src}}
                 alt={{dict.alt}} />
         {% endwith %}
+        {% endcomment %}
+        
     {% endif %}              
 </figure>

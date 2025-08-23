@@ -28,7 +28,14 @@
                   {% with hero=site_heros|get_dictid:link_id %}
                     <c-hero :hero="hero"></c-hero>
                   {% endwith %}                       
-
+                {% elif type == "Accordion" %} 
+                  {% with accordion=site_accordions|get_dictid:link_id %}
+                    <c-accordion :accordion="accordion"></c-accordion>
+                  {% endwith %}
+                {% elif type == "Carousal" %} 
+                  {% with carousal=site_carousals|get_dictid:link_id %}
+                      <c-carousal :carousal="carousal"></c-carousal>
+                  {% endwith %}
                 {% endif %}
               {% endwith %}  
             {% endwith %}  

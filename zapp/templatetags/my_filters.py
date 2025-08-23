@@ -51,6 +51,55 @@ def get_item(dictionary, key):
 To return the first dictionary item that matches a key value;
 res = next(filter(lambda x: x['Author'] == "Mark", DICTARRAY), None)
 """
+
 @register.filter
 def get_dictid(dict_array=[], arg=0):
     return next(filter(lambda x: x['id'] == arg, dict_array), None)
+
+
+@register.filter
+def get_previous_and_next_in_list(input_list=[], target_item=""):
+    """
+    Finds the previous and next items of a target item in a list.
+
+    Args:
+        input_list (list): A list.
+        target_item (item): The item for which to find previous and next.
+
+    Returns:
+        list: A list containing (previous_item, next_item).
+               Returns (None, None) if the target_item is not found.
+               Returns (Last item, next_item) if target_item is the first element.
+               Returns (previous_item, first item) if target_item is the last element.
+    """
+    try:
+        index = input_list.index(target_item)
+    except ValueError:
+        return None, None  # Target number not found in the list
+
+    previous_item = input_list[-1]
+    next_item = input_list[0]
+
+    if index > 0:
+        previous_item = input_list[index - 1]
+
+    if index < len(input_list) - 1:
+        next_item = input_list[index + 1]
+
+    return [previous_item, next_item]
+
+
+@register.filter
+def get_key_values(list_of_dicts=[], key_to_extract=""):
+    """
+    Extracts a list of values for a specific key from a list of dictionaries.
+
+    Args:
+        list_of_dicts (list): A list of dictionary objects.
+        key_to_extract (str): The key whose values are to be extracted.
+
+    Returns:
+        list: A list containing the values of the specified key from each dictionary
+              where the key exists.
+    """
+    return sorted([d[key_to_extract] for d in list_of_dicts if key_to_extract in d])
