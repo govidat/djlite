@@ -44,77 +44,83 @@ allowed_languages = settings.PC_LANGUAGES
 cards = settings.SAMPLE_CARDS
 # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
 heros = settings.SAMPLE_HEROS
+# to evaluate dropping parent_id and type=full
 site_structure = [
     {
-    'id':  1,'parent_id': None, 'order': 1, 'level': 10, 'type': 'Full', 'page': 'home', 'client_id': 'ABC123',
-    'class': '', 'style': '',
-    'class10': '', 'style10': "background-image: url('https://via.placeholder.com/1920x1080');",
-    'children': [2, 3, 4, 10] 
+    'id':  1, 'parent_id': None, 'order': 1, 'level': 10, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': "background-image: url('https://via.placeholder.com/1920x1080');",
+    'hidden': False 
     },
     {
-    'id':  2,'parent_id': 1, 'order': 1, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'id':  2, 'parent_id': 1, 'order': 3, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class20': '', 'style20': '',
-    'class30': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3', 'style30': '',
-    'children': [5, 6, 7] 
+    'hidden': False  
     },
     {
-    'id':  3,'parent_id': 1, 'order': 2, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
-    'class': '', 'style': '',
-    'class20': '', 'style20': '',
-    'class30': '', 'style30': '',
-    'children': [8] 
-    },
-    {
-    'id':  4,'parent_id': 1, 'order': 3, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
-    'class': '', 'style': '',
-    'class20': '', 'style20': '',
-    'class30': '', 'style30': '',
-    'children': [9] 
+    'id': 12,'parent_id': 2, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'class': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3', 'style': '',
+    'hidden': False  
     },    
     {
-    'id': 10,'parent_id': 1, 'order': 4, 'level': 20, 'type': 'FullScreen', 'page': 'home', 'client_id': 'ABC123',
+    'id':  3, 'parent_id': 1, 'order': 2, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class20': '', 'style20': '',
-    'class30': '', 'style30': '',
-    'children': [11] 
+    'hidden': False  
+    },
+    {
+    'id': 13,'parent_id': 3, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'hidden': False  
+    },    
+    {
+    'id':  4, 'parent_id': 1, 'order': 1, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'hidden': False  
+    },    
+    {
+    'id': 14,'parent_id': 4, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'hidden': False  
+    },        
+    {
+    'id': 10, 'parent_id': 1, 'order': 4, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'hidden': False  
+    },    
+    {
+    'id': 15,'parent_id': 10, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'class': '', 'style': '',
+    'hidden': False  
     },    
 
     {
-    'id':  5,'parent_id': 2, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  5,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class40': '', 'style40': '',
-    'children': [] 
+    'hidden': False  
     },
     {
-    'id':  6,'parent_id': 2, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  6,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class40': '', 'style40': '',
-    'children': [] 
+    'hidden': False 
     },
     {
-    'id':  7,'parent_id': 2, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  7,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class40': '', 'style40': '',
-    'children': [] 
+    'hidden': False 
     }, 
     {
-    'id':  8,'parent_id': 3, 'order': 1, 'level': 40, 'type': 'Hero', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  8,'parent_id': 13, 'order': 1, 'level': 40, 'type': 'Hero', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class40': '', 'style40': '',
-    'children': [] 
+    'hidden': False 
     },                        
     {
-    'id':  9,'parent_id': 4, 'order': 1, 'level': 40, 'type': 'Accordion', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  9,'parent_id': 14, 'order': 1, 'level': 40, 'type': 'Accordion', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class40': '', 'style40': '',
-    'children': [] 
+    'hidden': False 
     },  
     {
-    'id': 11,'parent_id': 4, 'order': 1, 'level': 40, 'type': 'Carousal', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id': 11,'parent_id': 15, 'order': 1, 'level': 40, 'type': 'Carousal', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
-    'class40': '', 'style40': '',
-    'children': [] 
+    'hidden': False 
     },         
 ]
 
@@ -354,7 +360,7 @@ class HomeZappView(TemplateView):
         context['cards'] = cards
         context['heros'] = heros
         # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
-        context['page_structure'] = list(filter(lambda item: item.get('page')=='home', site_structure))
+        context['page_structure'] = list(filter(lambda item: item.get('page')=='home' and not item.get('hidden'), site_structure))
         context['site_cards'] = site_cards
         context['site_heros'] = site_heros        
         context['raw_texts'] = sorted(raw_texts, key=lambda x: x['client_id'])

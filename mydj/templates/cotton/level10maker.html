@@ -1,0 +1,44 @@
+{% load my_filters %}
+{# Full page - first the top level body class and style is derived. Expected is only one id at 10. Filter on 10 and take the first in the array/#}
+{# first get the list of ids, then get the first, then get the dict#}
+{% with id10=page_structure|get_dict_filtered_by_level:10|get_key_values:"id"|first %}
+{% with dict10=page_structure|get_dictid:id10 %}
+
+<body class="bg-cover bg-center {{ dict10.class|default:'' }}" style="{{ dict10.style|default:'' }}">
+  {# Level20 #}
+  {# For each full screen - Then level 20 items are derived from from available  #}
+  {# get the list of ids at level20 ; first filter on level20, then order them #}
+  {% with list_id20=page_structure|get_dict_filtered_by_level:20|dictsort:'order' %}
+  {% for id20 in list_id20 %}
+      <div class="h-screen flex items-center justify-center {{ id20.class|default:'' }}" style="{{ id20.style|default:'' }}">
+        {# Level30 #}
+        {# Level 30 items are derived from available  #}
+        {# get the list of ids with this parent_id; Then do an additional filter on Level=30.then order them #}
+        {# Expected is only one value, but keeping the same loop structure #}
+        {% with list_id30=page_structure|get_dict_filtered_by_parent_id:id20.id|get_dict_filtered_by_level:30|dictsort:'order' %}
+        {% for id30 in list_id30 %}        
+        <div class="grid gap-4 p-8 w-full  {{ id30.class|default:'' }}" style="{{ id30.style|default:'' }}">
+          {# Level40 #}
+          {# Level 40 items are derived from available  #}
+          {# get the list of ids with this parent_id; Then do an additional filter on Level=40.then order them #}
+          {% with list_id40=page_structure|get_dict_filtered_by_parent_id:id30.id|get_dict_filtered_by_level:40|dictsort:'order' %}
+          {% for id40 in list_id40 %}
+                            
+            {# This Level40 dict is passed on c-routerlevel40 for further processing #}
+            <c-level40splitter :dict40="id40"></c-level40splitter>
+
+          {% endfor %}
+          {% endwith %}                    
+        </div>
+        {% endfor %}
+        {% endwith %}
+      </div>
+
+  {% endfor %}
+  {% endwith %}
+
+</body>
+
+{% endwith %}
+{% endwith %}
+

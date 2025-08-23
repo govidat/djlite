@@ -1,0 +1,21 @@
+{% load my_filters %}
+{# Level40 Card/ Hero etc are routed in this step #}
+{% with type=dict40|get_item:"type" link_id=dict40|get_item:"link_id" %}
+    {% if type == "Card" %}  
+        {% with card=site_cards|get_dictid:link_id %}
+        <c-card :card="card"></c-card>
+        {% endwith %}                       
+    {% elif type == "Hero" %} 
+        {% with hero=site_heros|get_dictid:link_id %}
+        <c-hero :hero="hero"></c-hero>
+        {% endwith %}                       
+    {% elif type == "Accordion" %} 
+        {% with accordion=site_accordions|get_dictid:link_id %}
+        <c-accordion :accordion="accordion"></c-accordion>
+        {% endwith %}
+    {% elif type == "Carousal" %} 
+        {% with carousal=site_carousals|get_dictid:link_id %}
+            <c-carousal :carousal="carousal"></c-carousal>
+        {% endwith %}
+    {% endif %}
+{% endwith %} 

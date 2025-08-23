@@ -103,3 +103,15 @@ def get_key_values(list_of_dicts=[], key_to_extract=""):
               where the key exists.
     """
     return sorted([d[key_to_extract] for d in list_of_dicts if key_to_extract in d])
+
+@register.filter
+def get_dict_filtered_by_level(value=[], arg=0):
+    """value is expected to be a list like [{hidden: True, a:x, b:y}, {hidden: False, a:p, b:q}] ; arg should be a key in the dictionary. This filter will remove records that have true  """
+    # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
+    return list(filter(lambda item: item.get('level') == arg, value))
+
+@register.filter
+def get_dict_filtered_by_parent_id(value=[], arg=0):
+    """value is expected to be a list like [{hidden: True, a:x, b:y}, {hidden: False, a:p, b:q}] ; arg should be a key in the dictionary. This filter will remove records that have true  """
+    # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
+    return list(filter(lambda item: item.get('parent_id') == arg, value))
