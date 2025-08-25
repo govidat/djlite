@@ -7,9 +7,9 @@
     <select class="select" id="language-select" name="language" onchange="this.form.submit()">
       {% for item in languages %} 
         
-        <option value="{{ item.code }}" {% if current_language == item.code %}selected{% endif %}>
+        <option value="{{ item.id }}" {% if current_language == item.id %}selected{% endif %}>
         
-  {{ item.code }}-{{item.text|my_text}}
+        {{ item.id }}-{{item.text|my_text}}
         </option>
       {% endfor %}
     </select>

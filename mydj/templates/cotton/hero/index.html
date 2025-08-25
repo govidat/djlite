@@ -17,10 +17,10 @@
               {% endif %}
               {% if herocontent.type == 'text' %}
                 <h1 class="flex text-5xl font-bold mb-6 {{ title.class|default:"" }}">
-                  <c-textrouter :type="herocontent.title.id_type" :ids="herocontent.title.ids"></c-textrouter>
+                  <c-textrouter :type="herocontent.title.type" :ids="herocontent.title.ids"></c-textrouter>
                 </h1>       
                 <div class="flex flex-col text-2xl mb-6">
-                  <c-textrouter :type="herocontent.contents.id_type" :ids="herocontent.contents.ids"></c-textrouter>
+                  <c-textrouter :type="herocontent.contents.type" :ids="herocontent.contents.ids"></c-textrouter>
                 </div>  
                 {% if herocontent.actions.position == 'end' %}                        
                     <c-hero.actions :actions="herocontent.actions"></c-hero.actions>

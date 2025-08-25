@@ -8,9 +8,9 @@
 
 {% for item in carousal.carousalitems|dictsort:"order" %}
     <div id="{{item.order}}" class="carousel-item relative w-full {{ carousal.class_item|default:'' }} {{ item.class|default:'' }}">
-        {% if item.contents.id_type == 'img' %}
+        {% if item.contents.type == 'img' %}
             <c-rawimage class="{{item.contents.class}}" id="{{item.contents.link_id}}"></c-rawimage>
-        {% elif item.contents.id_type == 'Card' %}
+        {% elif item.contents.type == 'Card' %}
             {# Do something #}
         {% endif %}
         {# space for prev_next if applicable #}

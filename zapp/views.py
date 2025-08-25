@@ -33,17 +33,44 @@ def build_nested_hierarchy(flat_list):
 
     return nested_list
 
+# This is used to update the values in navbar
+def update_list_of_dictionaries(smaller_list, larger_list, key_field):
+    """
+    Updates dictionaries in the smaller_list with values from matching dictionaries
+    in the larger_list based on a common key.
+
+    Args:
+        smaller_list (list): The list of dictionaries to be updated.
+        larger_list (list): The list of dictionaries containing the source values.
+        key_field (str): The common key used for matching dictionaries in both lists.
+
+    Returns:
+        list: The updated smaller_list of dictionaries.
+    """
+    # Create a dictionary for efficient lookup in the larger_list
+    larger_dict_map = {d[key_field]: d for d in larger_list if key_field in d}
+
+    for smaller_dict in smaller_list:
+        if key_field in smaller_dict and smaller_dict[key_field] in larger_dict_map:
+            matching_larger_dict = larger_dict_map[smaller_dict[key_field]]
+            # Update the smaller dictionary with values from the larger one
+            smaller_dict.update(matching_larger_dict)
+    return smaller_list
+
+"""
 nb_items = settings.PC_NAVBAR_ITEMS
 
 items_nested = build_nested_hierarchy(nb_items)
 
 allowed_themes = settings.PC_THEMES
 
-allowed_languages = settings.PC_LANGUAGES
 
-cards = settings.SAMPLE_CARDS
+
+allowed_languages = settings.PC_LANGUAGES
+"""
+# cards = settings.SAMPLE_CARDS
 # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
-heros = settings.SAMPLE_HEROS
+# heros = settings.SAMPLE_HEROS
 # to evaluate dropping parent_id and type=full
 site_structure = [
     {
@@ -93,32 +120,32 @@ site_structure = [
     },    
 
     {
-    'id':  5,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  5,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },
     {
-    'id':  6,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  6,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },
     {
-    'id':  7,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'Card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  7,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     }, 
     {
-    'id':  8,'parent_id': 13, 'order': 1, 'level': 40, 'type': 'Hero', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  8,'parent_id': 13, 'order': 1, 'level': 40, 'type': 'hero', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },                        
     {
-    'id':  9,'parent_id': 14, 'order': 1, 'level': 40, 'type': 'Accordion', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  9,'parent_id': 14, 'order': 1, 'level': 40, 'type': 'accordion', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },  
     {
-    'id': 11,'parent_id': 15, 'order': 1, 'level': 40, 'type': 'Carousal', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id': 11,'parent_id': 15, 'order': 1, 'level': 40, 'type': 'carousal', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },         
@@ -129,12 +156,12 @@ site_cards = [
             'id': 1, 'client_id': 'ABC123', 'page': 'home',
             'class': 'card-lg',
             'body_class': 'items-center text-center',
-            'title': {'class': '', 'id_type': 'stb', 'ids': [1]},
-            'contents': {'class': '', 'id_type': 'stb', 'ids': [2, 3] },
+            'title': {'class': '', 'type': 'stb', 'ids': [1]},
+            'contents': {'class': '', 'type': 'stb', 'ids': [2, 3] },
             'actions': {'class': '', 'position': 'end', 
                 'buttons': [
-                    {'class': '!btn-primary', 'id_type': 'stb', 'ids': [4]},
-                    {'class': '!btn-warning', 'id_type': 'stb', 'ids': [5]}                    
+                    {'class': '!btn-primary', 'type': 'stb', 'ids': [4]},
+                    {'class': '!btn-warning', 'type': 'stb', 'ids': [5]}                    
                 ],
             },
             'figure': {'figure_class': 'px-0 pt-0', 'position': 'start', 'link_id': 'nike', 'class': 'rounded-xl'},
@@ -152,12 +179,12 @@ site_heros = [
                     'figure': {'figure_class': 'px-0 pt-0', 'position': 'start', 'link_id': 'spiderman', 'class': 'max-w-sm rounded-xl shadow-2xl'},  
                 },
                 {'hidden': False, 'type': 'text',  'order': 1, 'class': '', 
-                    'title':    {'class': '', 'id_type': 'stb', 'ids': [7]},
-                    'contents': {'class': '', 'id_type': 'stb', 'ids': [8, 9]},
+                    'title':    {'class': '', 'type': 'stb', 'ids': [7]},
+                    'contents': {'class': '', 'type': 'stb', 'ids': [8, 9]},
                     'actions':  {'class': '', 'position': 'end',                        
                         'buttons': [
-                            {'class': '!btn-primary', 'id_type': 'stb', 'ids': [4]},
-                            {'class': '!btn-warning', 'id_type': 'stb', 'ids': [5]}                    
+                            {'class': '!btn-primary', 'type': 'stb', 'ids': [4]},
+                            {'class': '!btn-warning', 'type': 'stb', 'ids': [5]}                    
                         ],
                     },                               
                 },
@@ -179,18 +206,18 @@ site_accordions = [
             'accordioncontents': [
                 {
                     'order': 1,
-                    'title': {'class': '', 'id_type': 'text', 'ids': ['acctit1']},
-                    'contents': {'class': '', 'id_type': 'text', 'ids': ['acctxt1'] },
+                    'title': {'class': '', 'type': 'text', 'ids': ['acctit1']},
+                    'contents': {'class': '', 'type': 'text', 'ids': ['acctxt1'] },
                 },
                 {
                     'order': 2,
-                    'title': {'class': '', 'id_type': 'text', 'ids': ['acctit2']},
-                    'contents': {'class': '', 'id_type': 'text', 'ids': ['acctxt2'] },
+                    'title': {'class': '', 'type': 'text', 'ids': ['acctit2']},
+                    'contents': {'class': '', 'type': 'text', 'ids': ['acctxt2'] },
                 },                
                 {
                     'order': 3,
-                    'title': {'class': '', 'id_type': 'text', 'ids': ['acctit3']},
-                    'contents': {'class': '', 'id_type': 'text', 'ids': ['acctxt3'] },
+                    'title': {'class': '', 'type': 'text', 'ids': ['acctit3']},
+                    'contents': {'class': '', 'type': 'text', 'ids': ['acctxt3'] },
                 },                                
             ]
             },
@@ -212,17 +239,17 @@ site_carousals = [
                 {
                     'order': 3,
                     'class': '',
-                    'contents': {'class': '', 'id_type': 'img', 'link_id': 'nike' },
+                    'contents': {'class': '', 'type': 'img', 'link_id': 'nike' },
                 },
                 {
                     'order': 2,
                     'class': '',
-                    'contents': {'class': '', 'id_type': 'img', 'link_id': 'spiderman' },
+                    'contents': {'class': '', 'type': 'img', 'link_id': 'spiderman' },
                 },
                 {
                     'order': 1,
                     'class': '',
-                    'contents': {'class': '', 'id_type': 'img', 'link_id': 'daisy1' },
+                    'contents': {'class': '', 'type': 'img', 'link_id': 'daisy1' },
                 },                
             ]
             },
@@ -301,7 +328,7 @@ raw_texts = [
             {'id': 'acctxt2', 'client_id': 'ABC123', 'text': {'en': 'Click on "Forgot Password" on the login page and follow the instructions sent to your email.', 'fr': 'frClick on "Forgot Password" on the login page and follow the instructions sent to your email.'}},            
             {'id': 'acctit3', 'client_id': 'ABC123', 'text': {'en': 'How do I update my profile information?', 'fr': 'frHow do I update my profile information?'}},            
             {'id': 'acctxt3', 'client_id': 'ABC123', 'text': {'en': 'Go to "My Account" settings and select "Edit Profile" to make changes.', 'fr': 'frGo to "My Account" settings and select "Edit Profile" to make changes.'}},            
-
+            {'id': 'nb_title', 'client_id': 'ABC123', 'text': {'en': 'v2My Django Core Lite-Client', 'fr': 'frV2My Django Core Lite-Client'}},
 ]
 
 # we can have texts of mother site like bahushira with a client id of ZZZ999 and that of ABC123. 
@@ -333,32 +360,71 @@ raw_images = [
 
 ]
 
+
+"""
 nb = {}
 nb['items_nested']=items_nested
 nb['logo']="mylogo" 
 nb['title']="My Django Core Lite"
-
+"""
 zroot = {}
-zclient = {}
+
 
 #zroot['current_language'] = get_language()
 zroot['counts'] = [1,4]
 zroot['current_time'] = localtime(now())
 
-zclient['allowed_themes']=allowed_themes
-zclient['allowed_languages']=allowed_languages
+# zclient['allowed_themes']=allowed_themes
+# get the client
+# zclient['allowed_languages']=allowed_languages
 
 class HomeZappView(TemplateView):
-    template_name = 'zapp/homezappv2.html'
+    template_name = 'base.html'    # We are using the base in theme/base.html
+#    template_name = 'zapp/homezappv2.html'
 # for adding some additional context
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
+        pkey = self.kwargs.get("pkey")   # <-- get it from URL
+
+        if pkey:
+            client_id = pkey
+        else:
+            client_id = 'ZZZ999'  # Default root client
+            # data = SomeModel.objects.filter(client_id=pkey)
+            # context["data"] = data
+        # else:
+            # context["data"] = SomeModel.objects.all()
+        # let us get the client theme ids and client languages in this step
+        client_language_ids = ['en', 'fr']
+        client_theme_ids = ['light', 'aqua', 'dark']
+        zclient = {}
+        zclient['allowed_languages'] = [d for d in settings.PC_LANGUAGES if d.get("id") in client_language_ids]
+        zclient['allowed_themes'] = [d for d in settings.PC_THEMES if d.get("id") in client_theme_ids]
+
+        client_nb_items = [
+            {"id": "id1", "parent_id": "",      "order": 3},
+            {"id": "id2", "parent_id": "",      "order": 2},
+            {"id": "id3", "parent_id": "",      "order": 1},
+            {"id": "id4", "parent_id": "id3",   "order": 2},
+            {"id": "id5", "parent_id": "id3",   "order": 1},
+            {"id": "id6", "parent_id": "id5",   "order": 1},     
+        ]
+        # the url values and text are updated from Project Constant PC_NAVBAR_ITEMS
+        client_nb_items_updated = update_list_of_dictionaries(client_nb_items, settings.PC_NAVBAR_ITEMS,'id')
+        client_nb_items_nested = build_nested_hierarchy(client_nb_items_updated)
+        nb = {}
+        nb['items_nested']=client_nb_items_nested
+        nb['logo']="mylogo" 
+        nb['title']={'class': '', 'type': 'text', 'ids': ['nb_title']} #"My Django Core Lite-Client"
+
+
+        context["client_id"] = client_id
         context['nb'] = nb
         context['zroot'] = zroot
         context['zclient'] = zclient
-        context['cards'] = cards
-        context['heros'] = heros
+        # context['cards'] = cards
+        # context['heros'] = heros
         # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
         context['page_structure'] = list(filter(lambda item: item.get('page')=='home' and not item.get('hidden'), site_structure))
         context['site_cards'] = site_cards
@@ -372,11 +438,24 @@ class HomeZappView(TemplateView):
 
         return context
 
-def home_zapp_fbv(request): # new
+def home_zapp_fbv(request, pkey=None): # new
+    client = None
+    # data = None
+
+    if pkey:
+        client_id = pkey
+    else:
+        client_id = 'ZZZ999'  # Default root client        
+        # client = get_object_or_404(Client, pk=pkey)
+        # data = SomeModel.objects.filter(client_id=pkey)
+    #else:
+        # fallback: maybe show default data or all data
+        #data = SomeModel.objects.all()
     context = {}
+    context['client_id'] = client_id
     context['nb'] = nb
     context['zroot'] = zroot
-    context['zclient'] = zclient
-    context['cards'] = cards
-    context['heros'] = heros
+    #context['zclient'] = zclient
+    # context['cards'] = cards
+    # context['heros'] = heros
     return render(request, 'zapp/homezapp.html', context)

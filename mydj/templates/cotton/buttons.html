@@ -3,7 +3,7 @@
 {% for button in buttons %}
 
     <button class="btn btn-primary {{ button.class|default:"" }}">
-        <c-textrouter :type="button.id_type" :ids="button.ids"></c-textrouter>
+        <c-textrouter :type="button.type" :ids="button.ids"></c-textrouter>
     </button>
 
 {% endfor %}

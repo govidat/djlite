@@ -24,10 +24,10 @@ input is an accordion from views
         <div class="collapse bg-base-100 border border-base-300 {{accordion.class|default:""}} ">
             <input type="radio" name="my-accordion-2" checked="checked" />
             <div class="collapse-title font-semibold {{item.title.class|default:""}}">
-                <c-textrouter :type="item.title.id_type" :ids="item.title.ids"></c-textrouter>
+                <c-textrouter :type="item.title.type" :ids="item.title.ids"></c-textrouter>
             </div>
             <div class="collapse-content text-sm {{item.contents.class|default:""}}">
-                <c-textrouter :type="item.contents.id_type" :ids="item.contents.ids"></c-textrouter>
+                <c-textrouter :type="item.contents.type" :ids="item.contents.ids"></c-textrouter>
             </div>
         </div>
     {% endfor %}

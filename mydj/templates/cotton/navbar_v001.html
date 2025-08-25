@@ -11,7 +11,13 @@
       </ul>
     </div>
     <a class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
-    <h1 class="text-xl font-bold">{{nb.title|default:"My default title" }}-{{current_language}}</h1>
+    <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
+      <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
+      {% comment %}
+      {{nb.title|default:"My default title" }}-{{current_language}} - {{client_id}}
+      {% endcomment %}
+    </h1>
+
   </div>
   <div class="navbar-center hidden lg:flex">
     <ul class="menu menu-horizontal px-1">
@@ -20,7 +26,7 @@
     </ul>
   </div>
   <div class="navbar-end flex xl:gap-1">
-    <c-select_theme></c-select_theme>
+    <c-select_theme :themes="zclient.allowed_themes"></c-select_theme>
     <c-select_language :languages="zclient.allowed_languages"></c-select_language>      
   </div>
 </div>
