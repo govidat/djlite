@@ -10,7 +10,12 @@
         <c-navbar_v001_l1recur :items="nb.items_nested"></c-navbar_v001_l1recur>
       </ul>
     </div>
-    <a class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    <a href="{% url 'client_page' client_id 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    {% comment %}
+
+    <a href="{% url 'home' client_id %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    {% endcomment %}
+
     <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
       <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
       {% comment %}
@@ -26,7 +31,7 @@
     </ul>
   </div>
   <div class="navbar-end flex xl:gap-1">
-    <c-select_theme :themes="zclient.allowed_themes"></c-select_theme>
-    <c-select_language :languages="zclient.allowed_languages"></c-select_language>      
+    <c-select_theme :themes="client_allowed_themes"></c-select_theme>
+    <c-select_language :languages="client_allowed_languages"></c-select_language>      
   </div>
 </div>

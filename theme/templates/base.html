@@ -7,7 +7,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>2My DjLite</title>
+  <title>{{client_id|title}}</title>
   <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
   {% tailwind_css %}
 </head>
@@ -27,14 +27,20 @@
   {% endcomment %}
   
   <main class="container p-4 pt-16 pb-12 h-screen max-w-full">
-    <c-level10maker></c-level10maker>
-    {% comment %}
+        {% comment %}
+
     {% block content %}{% endblock %}
-    {% endcomment %}
+        {% endcomment %}
+
+    <c-level10maker></c-level10maker>
   </main>
 
   <!-- Footer -->    
+     {% comment %} 
+
   <c-footer_v001></c-footer_v001>
+    {% endcomment %}
+
 
 </body>
 

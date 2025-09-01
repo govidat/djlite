@@ -8,70 +8,11 @@ from django.utils.timezone import localtime, now
 from django.utils.translation import get_language
 from django.conf import settings
 
+from utils.common_functions import build_nested_hierarchy, update_list_of_dictionaries
+
 project_base_language = settings.LANGUAGE_CODE   # 'en'
 
-def build_nested_hierarchy(flat_list):
-    # Create a dictionary for quick lookup of items by their ID
-    item_map = {item['id']: item for item in flat_list}
 
-    # Initialize a list to store the top-level items (roots)
-    nested_list = []
-
-    # Iterate through each item to build the hierarchy
-    for item in flat_list:
-        parent_id = item.get('parent_id')
-
-        # If the item has a parent, add it to the parent's children list
-        if parent_id is not None and parent_id in item_map:
-            parent_item = item_map[parent_id]
-            if 'children' not in parent_item:
-                parent_item['children'] = []
-            parent_item['children'].append(item)
-        # If the item has no parent, it's a top-level item
-        else:
-            nested_list.append(item)
-
-    return nested_list
-
-# This is used to update the values in navbar
-def update_list_of_dictionaries(smaller_list, larger_list, key_field):
-    """
-    Updates dictionaries in the smaller_list with values from matching dictionaries
-    in the larger_list based on a common key.
-
-    Args:
-        smaller_list (list): The list of dictionaries to be updated.
-        larger_list (list): The list of dictionaries containing the source values.
-        key_field (str): The common key used for matching dictionaries in both lists.
-
-    Returns:
-        list: The updated smaller_list of dictionaries.
-    """
-    # Create a dictionary for efficient lookup in the larger_list
-    larger_dict_map = {d[key_field]: d for d in larger_list if key_field in d}
-
-    for smaller_dict in smaller_list:
-        if key_field in smaller_dict and smaller_dict[key_field] in larger_dict_map:
-            matching_larger_dict = larger_dict_map[smaller_dict[key_field]]
-            # Update the smaller dictionary with values from the larger one
-            smaller_dict.update(matching_larger_dict)
-    return smaller_list
-
-"""
-nb_items = settings.PC_NAVBAR_ITEMS
-
-items_nested = build_nested_hierarchy(nb_items)
-
-allowed_themes = settings.PC_THEMES
-
-
-
-allowed_languages = settings.PC_LANGUAGES
-"""
-# cards = settings.SAMPLE_CARDS
-# filtered_data = list(filter(lambda item: not item.get('is_active'), data))
-# heros = settings.SAMPLE_HEROS
-# to evaluate dropping parent_id and type=full
 site_structure = [
     {
     'id':  1, 'parent_id': None, 'order': 1, 'level': 10, 'page': 'home', 'client_id': 'ABC123',
@@ -356,17 +297,9 @@ raw_images = [
             'id': 'daisy1', 'client_id': 'ABC123', 'page': 'home',
             'src': 'https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp', 'alt': 'daisy1',
             }                                    
-
-
 ]
 
 
-"""
-nb = {}
-nb['items_nested']=items_nested
-nb['logo']="mylogo" 
-nb['title']="My Django Core Lite"
-"""
 zroot = {}
 
 
@@ -379,9 +312,8 @@ zroot['current_time'] = localtime(now())
 # zclient['allowed_languages']=allowed_languages
 
 class HomeZappView(TemplateView):
-    template_name = 'base.html'    # We are using the base in theme/base.html
-#    template_name = 'zapp/homezappv2.html'
-# for adding some additional context
+    template_name = 'base.html'    
+    # We are using the base in theme/base.html
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -416,7 +348,8 @@ class HomeZappView(TemplateView):
         nb = {}
         nb['items_nested']=client_nb_items_nested
         nb['logo']="mylogo" 
-        nb['title']={'class': '', 'type': 'text', 'ids': ['nb_title']} #"My Django Core Lite-Client"
+        nb['title']={'class': '', 'type': 'text', 'ids': ['nb_title']} 
+
 
 
         context["client_id"] = client_id
