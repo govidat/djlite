@@ -22,10 +22,3 @@ class QuestionAdmin(admin.ModelAdmin):
     
 admin.site.register(Question, QuestionAdmin)
 """
-from .models import Client
-
-class ClientAdmin(admin.ModelAdmin):
-    list_display = ("client_id", "name", "parent")
-    search_fields = ("client_id", "name")
-
-admin.site.register(Client, ClientAdmin)

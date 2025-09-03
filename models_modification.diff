@@ -1,0 +1,385 @@
+diff --git a/mydj/settings.py b/mydj/settings.py
+index 181087d..5d2c1dc 100644
+--- a/mydj/settings.py
++++ b/mydj/settings.py
+@@ -49,6 +49,7 @@ INSTALLED_APPS = [
+     'theme',  # tailwind
+     'django_cotton.apps.SimpleAppConfig', # cotton
+     'mysite', # mysite
++    'admin_reorder' # admin-reorder
+ ]
+ TAILWIND_APP_NAME = 'theme'  # tailwind
+ 
+@@ -66,6 +67,7 @@ MIDDLEWARE = [
+     'django.contrib.messages.middleware.MessageMiddleware',
+     'allauth.account.middleware.AccountMiddleware',     # allauth
+     'django.middleware.clickjacking.XFrameOptionsMiddleware',
++    'admin_reorder.middleware.ModelAdminReorder', # admin-reorder
+ ]
+ 
+ #if DEBUG:   # tailwind
+@@ -200,4 +202,29 @@ if not TESTING:
+     MIDDLEWARE = [
+         "debug_toolbar.middleware.DebugToolbarMiddleware",
+         *MIDDLEWARE,
+-    ]
+\ No newline at end of file
++    ]
++
++"""
++ADMIN_REORDER = (          # admin-reorder
++    # Keep original label and models
++    'sites',
++
++    # Rename app
++    {'app': 'auth', 'label': 'Authorisation'},
++
++    # Reorder app models
++    {'app': 'auth', 'models': ('auth.User', 'auth.Group')},
++
++    # Exclude models
++    {'app': 'auth', 'models': ('auth.User', )},
++
++    # Cross-linked models
++    {'app': 'auth', 'models': ('auth.User', 'sites.Site')},
++
++    # models with custom name
++    {'app': 'auth', 'models': (
++        'auth.Group',
++        {'model': 'auth.User', 'label': 'Staff'},
++    )},
++)
++"""
+\ No newline at end of file
+diff --git a/mysite/admin.py b/mysite/admin.py
+index 5d253b1..57e2588 100644
+--- a/mysite/admin.py
++++ b/mysite/admin.py
+@@ -22,10 +22,81 @@ class QuestionAdmin(admin.ModelAdmin):
+     
+ admin.site.register(Question, QuestionAdmin)
+ """
+-from .models import Client
++from .models import TokenType, Token, MaxLanguage
++#Client, Theme, Language, TypedTokenForeignKey
+ 
++class TokenTypeAdmin(admin.ModelAdmin):
++    list_display = ("name", "code", "is_config")
++    search_fields = ("name", "code")
++
++class TokenAdmin(admin.ModelAdmin):
++    list_display = ("key", "type")
++    list_filter = ("type",)
++    search_fields = ("key",)   
++
++class MaxLanguageAdmin(admin.ModelAdmin):
++    list_display = ("language_id", "name")
++    list_filter = ("name",)
++    search_fields = ("language_id",)     
++"""
+ class ClientAdmin(admin.ModelAdmin):
+-    list_display = ("client_id", "name", "parent")
+-    search_fields = ("client_id", "name")
++    list_display = ("client_id", "name", "client_name_token", "parent_id", "get_languages", "get_themes", "get_parent_chain", "get_children_chain")
++    search_fields = ("client_id", "client_name_token")
++    filter_horizontal = ("languages", "themes")  
++    # 👆 makes a nice dual select box UI in admin    
++    def get_languages(self, obj):
++        # join language_id values as comma separated string
++        return ", ".join(str(lang.language_id) for lang in obj.languages.all())
++    get_languages.short_description = "Languages"
++
++    def get_themes(self, obj):
++        # join theme_id values as comma separated string
++        return ", ".join(str(theme.theme_id) for theme in obj.themes.all())
++    get_themes.short_description = "Themes"
++
++   
++    def get_parent_chain(self, obj):
++        #Show parent → grandparent → etc. as comma-separated IDs
++        ancestors = obj.get_ancestors()
++        return ", ".join(ancestors) if ancestors else "-"
++    get_parent_chain.short_description = "Parent Chain"
++
++    def get_children_chain(self, obj):
++        descendants = obj.get_descendants()
++        return ", ".join(descendants) if descendants else "-"
++    get_children_chain.short_description = "Children Chain"    
++
++    def formfield_for_foreignkey(self, db_field, request, **kwargs):
++        # If the field is a TypedTokenForeignKey, filter by its token_type_code
++        if isinstance(db_field, TypedTokenForeignKey) and db_field.token_type_code:
++            kwargs["queryset"] = Token.objects.filter(type__code=db_field.token_type_code)
++        return super().formfield_for_foreignkey(db_field, request, **kwargs)    
++
++        
++class LanguageAdmin(admin.ModelAdmin):
++    list_display = ("language_id", "name", "language_name_token")
++    search_fields = ("name", "language_name_token")
++    
++    def formfield_for_foreignkey(self, db_field, request, **kwargs):
++        if isinstance(db_field, TypedTokenForeignKey) and db_field.token_type_code:
++            kwargs["queryset"] = Token.objects.filter(type__code=db_field.token_type_code)
++        return super().formfield_for_foreignkey(db_field, request, **kwargs)
++    
++
++class ThemeAdmin(admin.ModelAdmin):
++    list_display = ("theme_id", "name", "theme_name_token")
++    search_fields = ("name", "theme_name_token",)
++    
++    def formfield_for_foreignkey(self, db_field, request, **kwargs):
++        if isinstance(db_field, TypedTokenForeignKey) and db_field.token_type_code:
++            kwargs["queryset"] = Token.objects.filter(type__code=db_field.token_type_code)
++        return super().formfield_for_foreignkey(db_field, request, **kwargs)
++    
++"""
++admin.site.register(TokenType)
++admin.site.register(Token)
++admin.site.register(MaxLanguage)
+ 
+-admin.site.register(Client, ClientAdmin)
+\ No newline at end of file
++#admin.site.register(Client, ClientAdmin)
++#admin.site.register(Language)
++#admin.site.register(Theme)
+\ No newline at end of file
+diff --git a/mysite/models.py b/mysite/models.py
+index eb93a32..2a143e5 100644
+--- a/mysite/models.py
++++ b/mysite/models.py
+@@ -1,17 +1,164 @@
+ from django.db import models
++from django.core.exceptions import ValidationError
+ 
+ # Create your models here.
++class LowercaseCharField(models.CharField):
++    def get_prep_value(self, value):
++        value = super().get_prep_value(value)
++        if value is not None:
++            return value.lower()
++        return value
++    
++class TokenType(models.Model):
++    
++    # Categorizes tokens: configured_text, language_name, theme_name, Country, State, City, Currency, etc.
++    
++    name = models.CharField(max_length=50, unique=True)   # e.g., "Country"
++    code = LowercaseCharField(max_length=20, unique=True)   # e.g., "country"
++    is_global = models.BooleanField(default=False)        # Global and it means it is centrally maintained? if True, then the Token name should be g_, else l_. g_ values can be part of the code itself.
++
++    def __str__(self):
++        return self.name
++    
++class Token(models.Model):
++    key = models.CharField(max_length=100, unique=True)   # user enters e.g. "c_india" or "l_client_name"
++    type = models.ForeignKey(TokenType, on_delete=models.PROTECT)
++
++    def clean(self):
++        #Validate prefix based on type.is_global
++        if self.type.is_global and not self.key.startswith("c_"):
++            raise ValidationError("Global tokens must start with 'g_'.")
++        if not self.type.is_global and not self.key.startswith("l_"):
++            raise ValidationError("Local tokens must start with 'l_'.")
++
++    def save(self, *args, **kwargs):
++        # Ensure validation runs also when saving programmatically
++        self.full_clean()
++        super().save(*args, **kwargs)
++
++    def __str__(self):
++        return self.key
++
++class MaxLanguage(models.Model):
++    language_id = LowercaseCharField(max_length=2, unique=True)
++    name = models.CharField(max_length=50)
++    def __str__(self):
++        return f"{self.name} ({self.language_id})"
++    
++
++class TypedTokenForeignKey(models.ForeignKey):
++    
++    #ForeignKey to Token that *remembers* which TokenType it should allow.
++    #This is used by admin to filter the dropdown dynamically.
++
++    #Usage:
++    #    country = TypedTokenForeignKey(
++    #        on_delete=models.SET_NULL, null=True, blank=True,
++    #        related_name="clients_country", token_type_code="country"
++    #    )
++    
++    #A ForeignKey to Token that also stores which TokenType it should allow.
++    
++    def __init__(self, to="Token", *args, token_type_code=None, **kwargs):
++        self.token_type_code = token_type_code
++        # Always point to Token model
++        super().__init__(to, *args, **kwargs)
++
++    def deconstruct(self):
++        
++        #Make migrations serializable by adding back 'token_type_code'
++        #and preserving the 'to' model properly.
++        
++        name, path, args, kwargs = super().deconstruct()
++        # Re-add our custom kwarg so migration files include it.
++        if self.token_type_code is not None:
++            kwargs["token_type_code"] = self.token_type_code
++        return name, path, args, kwargs
++
++"""
++class Language(models.Model):
++    language_id = models.ForeignKey(MaxLanguage, on_delete=models.PROTECT)
++    name = models.CharField(max_length=50)
++    language_name_token = TypedTokenForeignKey(
++        on_delete=models.SET_NULL, null=True, blank=True,
++        related_name="languages_name", token_type_code="language_name"
++    )
++    def __str__(self):
++        return f"{self.name} ({self.language_id})"
++
++
++class Theme(models.Model):
++    theme_id = LowercaseCharField(max_length=15, unique=True)
++    name = models.CharField(max_length=50)
++    theme_name_token = TypedTokenForeignKey(
++        on_delete=models.SET_NULL, null=True, blank=True,
++        related_name="themes_name", token_type_code="theme_name"
++    )
++    def __str__(self):
++        return f"{self.name} ({self.theme_id})"
+ 
+ class Client(models.Model):
+-    client_id = models.CharField(max_length=15, unique=True)
++    client_id = LowercaseCharField(max_length=15, unique=True)
++
+     name = models.CharField(max_length=100)
+-    parent = models.ForeignKey(
++    
++    #Client model with tokenized name and location.
++    
++    # Example: "t_client_name" points to translations in Translation table
++    client_name_token = TypedTokenForeignKey(
++        on_delete=models.SET_NULL, null=True, blank=True,
++        related_name="clients_name", token_type_code="configured_text"
++    )
++    parent_id = models.ForeignKey(
+         "self",
+-        on_delete=models.SET_NULL,
++        on_delete=models.CASCADE,
+         null=True,
+         blank=True,
+         related_name="children"
+     )
++    # Many-to-many fields (admin will show multi-select box)
++    languages = models.ManyToManyField("MaxLanguage", related_name="clients", blank=True)
++    themes = models.ManyToManyField("Theme", related_name="clients", blank=True)    
+ 
+     def __str__(self):
+         return f"{self.name} ({self.client_id})"
++
++    # if a Model has a recursive relationship and its parent_id is maintained in the same row
++    def get_ancestors(self):
++        #Return all ancestors (parent, grandparent, ...) as a list.#
++        ancestors = []
++        current = self.parent_id
++        while current is not None:
++            ancestors.append(str(current.client_id))
++            current = current.parent_id
++        return ancestors  
++     
++    def get_descendants(self):
++        #Return all descendants (children, grandchildren, ...) as a list of client_ids.
++        descendants = []
++
++        def collect_children(node):
++            for child in node.children.all():
++                descendants.append(str(child.client_id))
++                collect_children(child)
++
++        collect_children(self)
++        return descendants     
++
++
++
++    
++class Translation(models.Model):
++    
++    #Translations for tokens, one row per (token, language_code).
++    
++    token = models.ForeignKey(Token, on_delete=models.CASCADE, related_name="translations")
++    language_code = models.ForeignKey(Language, on_delete=models.CASCADE, related_name="languages")  # e.g. "en", "fr"
++    value = models.CharField(max_length=255)
++
++    class Meta:
++        unique_together = ("token", "language_code")
++
++    def __str__(self):
++        return f"{self.token.key} [{self.language_code}] = {self.value}"
++"""
+\ No newline at end of file
+diff --git a/mysite/views.py b/mysite/views.py
+index 9b9bce1..ece4196 100644
+--- a/mysite/views.py
++++ b/mysite/views.py
+@@ -524,7 +524,9 @@ class ClientPageView(TemplateView):
+         return context
+ 
+ 
+-class ClientBaseView(TemplateView):
++# In ClientBaseView option we have to define each View liek Home About etc. That means, we have to predefine
++# all the possible view values. In the Client PageView, we are not defining any separate view and the above preq is Not Needed.
++class zClientBaseView(TemplateView):
+     def get_context_data(self, **kwargs):
+         context = super().get_context_data(**kwargs)
+         # Add any common context data here that both views need
+@@ -584,7 +586,7 @@ class ClientBaseView(TemplateView):
+ 
+         return context
+ 
+-class HomeView(ClientBaseView):
++class zHomeView(zClientBaseView):
+     template_name = 'base.html'
+     #model = YourModel # Replace with your actual model
+ 
+@@ -594,7 +596,7 @@ class HomeView(ClientBaseView):
+         context['page_structure'] = list(filter(lambda item: item.get('page')=='home', context['site_structure']))
+         return context
+ 
+-class AboutView(ClientBaseView):
++class zAboutView(zClientBaseView):
+     template_name = 'base.html'
+     #model = YourModel # Replace with your actual model
+ 
+@@ -604,7 +606,7 @@ class AboutView(ClientBaseView):
+         context['page_structure'] = list(filter(lambda item: item.get('page')=='about', context['site_structure']))
+         return context    
+     
+-class ContactView(ClientBaseView):
++class zContactView(zClientBaseView):
+     template_name = 'base.html'
+     #model = YourModel # Replace with your actual model
+ 
+diff --git a/requirements.txt b/requirements.txt
+index a8ca2ec..13ad7c3 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -6,4 +6,5 @@ cookiecutter>=1.7.0 # tailwind
+ honcho==2.0.0   # tailwind
+ django-cotton==2.1.3 # cotton
+ # jinja2==3.1.6
+-django-debug-toolbar==6.0.0 # debug-toolbar
+\ No newline at end of file
++django-debug-toolbar==6.0.0 # debug-toolbar
++django-modeladmin-reorder==0.3.1  # admin-reorder
+\ No newline at end of file
+diff --git a/utils/common_functions.py b/utils/common_functions.py
+index bfde4a0..c835a47 100644
+--- a/utils/common_functions.py
++++ b/utils/common_functions.py
+@@ -48,4 +48,5 @@ def update_list_of_dictionaries(smaller_list, larger_list, key_field):
+ 
+ 
+ # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
+-#sorted_by_age = sorted(data, key=lambda x: x['age']) ;
+\ No newline at end of file
++#sorted_by_age = sorted(data, key=lambda x: x['age']) ;
++
