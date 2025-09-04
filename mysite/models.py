@@ -65,6 +65,7 @@ class Maxlanguage(models.Model):
     class Meta:
         verbose_name = "00-00 Maximum Project Language"
         #verbose_name_plural = "My Custom Models"
+        
 """
 class TypedTokenForeignKey(models.ForeignKey):
     
@@ -124,7 +125,7 @@ class Theme(models.Model):
     class Meta:
         verbose_name = "00-04 Project Theme"
         #verbose_name_plural = "My Custom Models"
-"""
+
 class Client(models.Model):
     id_client = LowercaseCharField(max_length=25, primary_key=True)
 
@@ -138,8 +139,8 @@ class Client(models.Model):
         related_name="children"
     )
     # Many-to-many fields (admin will show multi-select box)
-    languages = models.ManyToManyField("Language", related_name="clients", blank=True)
-    themes = models.ManyToManyField("Theme", related_name="clients", blank=True)    
+    client_languages = models.ManyToManyField("Language", related_name="clients", blank=True)
+    client_themes = models.ManyToManyField("Theme", related_name="clients", blank=True)    
 
     def __str__(self):
         return self.id_client
@@ -165,8 +166,11 @@ class Client(models.Model):
 
         collect_children(self)
         return descendants     
-"""
-
+    
+    # for usage in Admin Panel
+    class Meta:
+        verbose_name = "00-05 Client"
+        #verbose_name_plural = "My Custom Models"
 
 """
 class Translation(models.Model):
