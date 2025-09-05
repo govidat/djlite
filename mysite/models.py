@@ -52,6 +52,54 @@ class Token(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    # Optional convenience helper:
+    """
+    def resolve_value(self, client='default', language='en'):
+        v = Translation.objects.filter(id_client=client, id_token=self, id_language=language).values_list("value", flat=True).first()
+        return v
+        #if v:
+        #    return v
+        #else:            
+        #    return None  # last-resort fallback
+    """
+    def resolve_value(self, client="default", language="en"):
+        if isinstance(client, str):
+            client = Client.objects.get(id_client=client)
+        if isinstance(language, str):
+            language = Language.objects.get(id_language=language)
+
+        return Translation.objects.filter(
+            id_client=client, id_token=self, id_language=language
+        ).values_list("value", flat=True).first()        
+        
+    def resolve_all_values(self, client='default'):
+        if isinstance(client, str):
+            client = Client.objects.get(id_client=client)
+        #Return a dict {language_code: value} for this token for the given client,
+        #only including languages that actually have translations.
+        
+        qs = Translation.objects.filter(id_client=client, id_token=self)
+        values = {tr.id_language.id_language: tr.value for tr in qs.select_related("id_language")}
+
+        return values        
+    """
+    def resolve_value(self, client, language, default_client='default', default_language='en'):
+        
+        #Get translated value for this token for (client, language).
+        #If not found, and this token's type is global, tries default_client (if provided).
+        
+        if client and language:
+            v = Translation.objects.filter(id_client=client, id_token=self, id_language=language).values_list("value", flat=True).first()
+            if v:
+                return v
+        # Fallback value 
+        else:
+            v = Translation.objects.filter(id_client=default_client, id_token=self, id_language=default_language).values_list("value", flat=True).first()
+            if v:
+                return v
+        return self.id_token  # last-resort fallback
+    """
+
     def __str__(self):
         return self.id_token
 
@@ -108,7 +156,14 @@ class Language(models.Model):
     #)    
     def __str__(self):
         return self.id_language
-    
+
+    # to get the name maintained for default client
+    def display_name(self):
+        return self.language_name_token.resolve_value() if self.language_name_token else None
+
+    def display_all_names(self):
+        return self.language_name_token.resolve_all_values() if self.language_name_token else None
+
     # for usage in Admin Panel
     class Meta:
         verbose_name = "00-03 Project Language"
@@ -120,7 +175,14 @@ class Theme(models.Model):
 
     def __str__(self):
         return self.id_theme
-    
+
+    # to get the name maintained for default client
+    def display_name(self):
+        return self.theme_name_token.resolve_value() if self.theme_name_token else None
+
+    def display_all_names(self):
+        return self.theme_name_token.resolve_all_values() if self.theme_name_token else None
+        
     # for usage in Admin Panel
     class Meta:
         verbose_name = "00-04 Project Theme"
@@ -167,27 +229,31 @@ class Client(models.Model):
         collect_children(self)
         return descendants     
     
+    # to get the name maintained 
+
+    def display_name(self):
+        return self.client_name_token.resolve_value(self.id_client, "en") if self.client_name_token else None
+
+    def display_all_names(self):
+        return self.client_name_token.resolve_all_values(self.id_client) if self.client_name_token else None
     # for usage in Admin Panel
     class Meta:
         verbose_name = "00-05 Client"
         #verbose_name_plural = "My Custom Models"
 
-"""
 class Translation(models.Model):
-    
+    #id_translation = models.AutoField(primary_key=True)  # PK (Django requires a PK)
     #Stores translations of token values in different languages.
-    id_client = 
+    id_client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="translations") # default, bahushira... 
     id_token = models.ForeignKey(Token, on_delete=models.CASCADE, related_name="translations") # g_en, g_fr, g_client_name, g_light...
     id_language = models.ForeignKey(Language, on_delete=models.CASCADE)  # "en", "fr", etc.
     value = models.CharField(max_length=255)
 
     class Meta:
-        unique_together = ("token", "language_code")
+        unique_together = ("id_client", "id_token", "id_language")
+        verbose_name = "00-06 Translation"
+        #verbose_name_plural = "My Custom Models" 
 
     def __str__(self):
-        return f"{self.token.key} [{self.language_code}] = {self.value}"       
+        return f"{self.id_client} {self.id_token} [{self.id_language}] = {self.value}"       
         # for usage in Admin Panel
-    class Meta:
-        verbose_name = "00-04 Translation"
-        #verbose_name_plural = "My Custom Models"     
-"""        

@@ -22,7 +22,7 @@ class QuestionAdmin(admin.ModelAdmin):
     
 admin.site.register(Question, QuestionAdmin)
 """
-from .models import Tokentype, Token, Language, Theme, Client
+from .models import Tokentype, Token, Language, Theme, Client, Translation
 #TypedTokenForeignKey, Maxlanguage, 
 
 class TokentypeAdmin(admin.ModelAdmin):
@@ -40,14 +40,30 @@ class TokenAdmin(admin.ModelAdmin):
 #    search_fields = ("id_language")
 
 class LanguageAdmin(admin.ModelAdmin):
-    list_display = ("id_language", "language_name_token")
+    list_display = ("id_language", "language_name_token", "display_name_en", "display_names_obj")
 #    list_filter = ("id_language")
 #    search_fields = ("id_language")
 
+    def display_name_en(self, obj):
+        return obj.display_name()
+    display_name_en.short_description = "Name (en)"
+
+    def display_names_obj(self, obj):
+        return obj.display_all_names()
+    display_names_obj.short_description = "All Names"
+
 class ThemeAdmin(admin.ModelAdmin):
-    list_display = ("id_theme", "theme_name_token")
+    list_display = ("id_theme", "theme_name_token", "display_name_en", "display_names_obj")
 #    list_filter = ("id_theme")
 #    search_fields = ("id_theme")
+
+    def display_name_en(self, obj):
+        return obj.display_name()
+    display_name_en.short_description = "Name (en)"
+
+    def display_names_obj(self, obj):
+        return obj.display_all_names()
+    display_names_obj.short_description = "All Names"
 
     #def formfield_for_foreignkey(self, db_field, request, **kwargs):
     #    if isinstance(db_field, TypedTokenForeignKey) and db_field.id_tokentype:
@@ -60,7 +76,7 @@ class ThemeAdmin(admin.ModelAdmin):
     #    return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ("id_client", "client_name_token", "id_parent", "get_languages", "get_themes", "get_parent_chain", "get_children_chain")
+    list_display = ("id_client", "client_name_token", "id_parent", "get_languages", "get_themes", "get_parent_chain", "get_children_chain", "display_name_en", "display_names_obj")
     search_fields = ("id_client", "client_name_token")
     filter_horizontal = ("client_languages", "client_themes")  
     # 👆 makes a nice dual select box UI in admin    
@@ -84,7 +100,20 @@ class ClientAdmin(admin.ModelAdmin):
     def get_children_chain(self, obj):
         descendants = obj.get_descendants()
         return ", ".join(descendants) if descendants else "-"
-    get_children_chain.short_description = "Children Chain"    
+    get_children_chain.short_description = "Children Chain"   
+
+    def display_name_en(self, obj):
+        return obj.display_name()
+    display_name_en.short_description = "Name (en)"
+
+    def display_names_obj(self, obj):
+        return obj.display_all_names()
+    display_names_obj.short_description = "All Names"     
+
+class TranslationAdmin(admin.ModelAdmin):
+    list_display = ("id_client", "id_token", "id_language", "value")
+    list_filter = ("id_language", "id_client", "id_token")
+    search_fields = ("value", "id_token", "id_client", "id_language")
 
 admin.site.register(Tokentype, TokentypeAdmin)
 admin.site.register(Token, TokenAdmin)
@@ -92,3 +121,4 @@ admin.site.register(Token, TokenAdmin)
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(Theme, ThemeAdmin)
 admin.site.register(Client, ClientAdmin)
+admin.site.register(Translation, TranslationAdmin)
