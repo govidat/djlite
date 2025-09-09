@@ -15,9 +15,9 @@
 
     {% else %}
     {% comment %}
-    <li><a href="{% url item.id client_id %}">{{item.text|my_text}}</a></li>
+    <li><a href="{% url item.id id_client %}">{{item.text|my_text}}</a></li>
     {% endcomment %}
 
-    <li><a href="{% url 'client_page' client_id item.id %}">{{item.text|my_text}}</a></li>
+    <li><a href="{% url 'client_page' id_client item.id %}">{{item.text|my_text}}</a></li>
     {% endif %}
 {% endfor %}

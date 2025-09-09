@@ -51,7 +51,7 @@ def get_item(dictionary, key):
 @register.filter
 def get_dictid(dict_array=[], arg=0):
     return next(filter(lambda x: x['id'] == arg, dict_array), None)
-    """ To be deprecated and replaced with a combination of get_dict_filtered_by_id; get_dict_by_client_id_and_prioritized_values
+    """ To be deprecated and replaced with a combination of get_dict_filtered_by_id; get_dict_by_id_client_and_prioritized_values
     To return the first dictionary item that matches a key value;
     res = next(filter(lambda x: x['Author'] == "Mark", DICTARRAY), None)
     """
@@ -122,33 +122,41 @@ def get_dict_filtered_by_id(value=[], arg=0):
     return list(filter(lambda item: item.get('id') == arg, value))
 
 @register.filter
-def get_dict_by_client_id_and_prioritized_values(list_of_dicts=[], keyvals=""):
+def get_dict_by_id_client_and_prioritized_values(list_of_dicts=[], keyvals=""):
     """
-    Retrieves a dictionary from a list of dictionaries based on client_id
+    Retrieves a dictionary from a list of dictionaries based on id_client
     and a prioritized list of values to check for that key.
 
     Args:
         list_of_dicts: A list of dictionaries to search within.
-        'client_id': The key to check for in each dictionary.
-        keyvals: A comma separated string of values to check against the client_id value, in order of priority.
+        'id_client': The key to check for in each dictionary.
+        keyvals: A comma separated string of values to check against the id_client value, in order of priority.
 
     Returns:
-        The first dictionary found where the value associated with the key='client_id'
+        The first dictionary found where the value associated with the key='id_client'
         matches one of the values in value_priority_list, or None if no
         matching dictionary is found.
 
     """    
     value_priority_list=keyvals.split(',')
     # value_priority_list.append('default')
-    key='client_id'
+    key='id_client'
     for priority_value in value_priority_list:
         for d in list_of_dicts:
             if key in d and d[key] == priority_value:
                 return d
     return None
     """ Test Data
-    source_list = [{'client_id': 'store_porur', 'title': 'Saravana Porur'}, {'client_id': 'store_ho', 'title': 'Saravana HO'}, {'client_id': 'default', 'title': 'Defaut Title'} ]
+    source_list = [{'id_client': 'store_porur', 'title': 'Saravana Porur'}, {'id_client': 'store_ho', 'title': 'Saravana HO'}, {'id_client': 'default', 'title': 'Defaut Title'} ]
     keyvals = 'store_porur,store_ho'
-    result = get_dict_by_client_id_and_prioritized_values(source_list, keyvals)
+    result = get_dict_by_id_client_and_prioritized_values(source_list, keyvals)
     print(result)
+    """
+
+@register.filter
+def get_listdict_by_id_token(listdict=[], arg=''):
+    return list(filter(lambda x: x['id_token'] == arg, listdict))
+
+    """ 
+    Returns the listdict by filtering on key id_token;
     """

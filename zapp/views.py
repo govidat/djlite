@@ -15,78 +15,78 @@ project_base_language = settings.LANGUAGE_CODE   # 'en'
 
 site_structure = [
     {
-    'id':  1, 'parent_id': None, 'order': 1, 'level': 10, 'page': 'home', 'client_id': 'ABC123',
+    'id':  1, 'parent_id': None, 'order': 1, 'level': 10, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': "background-image: url('https://via.placeholder.com/1920x1080');",
     'hidden': False 
     },
     {
-    'id':  2, 'parent_id': 1, 'order': 3, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
+    'id':  2, 'parent_id': 1, 'order': 3, 'level': 20, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },
     {
-    'id': 12,'parent_id': 2, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'id': 12,'parent_id': 2, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'id_client': 'ABC123',
     'class': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3', 'style': '',
     'hidden': False  
     },    
     {
-    'id':  3, 'parent_id': 1, 'order': 2, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
+    'id':  3, 'parent_id': 1, 'order': 2, 'level': 20, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },
     {
-    'id': 13,'parent_id': 3, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'id': 13,'parent_id': 3, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },    
     {
-    'id':  4, 'parent_id': 1, 'order': 1, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
+    'id':  4, 'parent_id': 1, 'order': 1, 'level': 20, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },    
     {
-    'id': 14,'parent_id': 4, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'id': 14,'parent_id': 4, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },        
     {
-    'id': 10, 'parent_id': 1, 'order': 4, 'level': 20, 'page': 'home', 'client_id': 'ABC123',
+    'id': 10, 'parent_id': 1, 'order': 4, 'level': 20, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },    
     {
-    'id': 15,'parent_id': 10, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'client_id': 'ABC123',
+    'id': 15,'parent_id': 10, 'order': 1, 'level': 30, 'type': '', 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },    
 
     {
-    'id':  5,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  5,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False  
     },
     {
-    'id':  6,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  6,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },
     {
-    'id':  7,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  7,'parent_id': 12, 'order': 1, 'level': 40, 'type': 'card', 'link_id': 1, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     }, 
     {
-    'id':  8,'parent_id': 13, 'order': 1, 'level': 40, 'type': 'hero', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  8,'parent_id': 13, 'order': 1, 'level': 40, 'type': 'hero', 'link_id': 1, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },                        
     {
-    'id':  9,'parent_id': 14, 'order': 1, 'level': 40, 'type': 'accordion', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id':  9,'parent_id': 14, 'order': 1, 'level': 40, 'type': 'accordion', 'link_id': 1, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },  
     {
-    'id': 11,'parent_id': 15, 'order': 1, 'level': 40, 'type': 'carousal', 'link_id': 1, 'page': 'home', 'client_id': 'ABC123',
+    'id': 11,'parent_id': 15, 'order': 1, 'level': 40, 'type': 'carousal', 'link_id': 1, 'page': 'home', 'id_client': 'ABC123',
     'class': '', 'style': '',
     'hidden': False 
     },         
@@ -94,7 +94,7 @@ site_structure = [
 
 site_cards = [
             {
-            'id': 1, 'client_id': 'ABC123', 'page': 'home',
+            'id': 1, 'id_client': 'ABC123', 'page': 'home',
             'class': 'card-lg',
             'body_class': 'items-center text-center',
             'title': {'class': '', 'type': 'stb', 'ids': [1]},
@@ -112,7 +112,7 @@ site_cards = [
 site_heros = [
         
         {
-            'id': 1, 'client_id': 'ABC123', 'page': 'home',
+            'id': 1, 'id_client': 'ABC123', 'page': 'home',
             'class': '',
             'herocontent_class': '',
             'herocontents': [
@@ -141,7 +141,7 @@ site_heros = [
 
 site_accordions = [
             {
-            'id': 1, 'client_id': 'ABC123', 'page': 'home',
+            'id': 1, 'id_client': 'ABC123', 'page': 'home',
             'classjoin': 'join join-vertical bg-base-100',
             'class': 'collapse-plus join-item',
             'accordioncontents': [
@@ -166,7 +166,7 @@ site_accordions = [
 
 site_carousals = [
             {
-            'id': 1, 'client_id': 'ABC123', 'page': 'home',
+            'id': 1, 'id_client': 'ABC123', 'page': 'home',
             'class_carousal': 'w-full', 'class_item': '', 
             'prev_next': {
                 'hidden': False,
@@ -201,52 +201,52 @@ site_carousals = [
 
 # Presently class in stbs is not used anywhere. To be evaluated for future use
 site_stbs = [
-    {'id': 1, 'client_id': 'ABC123', 
+    {'id': 1, 'id_client': 'ABC123', 
      'items': [
             {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 2, 'type': 'text', 'class': '', 'link_id': 'mycard' },
             {'order': 3, 'type': 'badge', 'class': '', 'link_id': 'mybadge' },
             ]},
-    {'id': 2, 'client_id': 'ABC123',
+    {'id': 2, 'id_client': 'ABC123',
      'items': [
             {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 2, 'type': 'text', 'class': '', 'link_id': 'mysubtitle' },
             {'order': 3, 'type': 'badge', 'class': '', 'link_id': 'mybadge' },
             ]},            
-    {'id': 3, 'client_id': 'ABC123',
+    {'id': 3, 'id_client': 'ABC123',
      'items': [
             {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 2, 'type': 'text', 'class': '', 'link_id': 'mycardtext' },
             {'order': 3, 'type': 'badge', 'class': '', 'link_id': 'mybadge' },
             ]},
-    {'id': 4, 'client_id': 'ABC123',
+    {'id': 4, 'id_client': 'ABC123',
      'items': [
             {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 2, 'type': 'text', 'class': '', 'link_id': 'buynow' },
             ]},            
-    {'id': 5, 'client_id': 'ABC123',
+    {'id': 5, 'id_client': 'ABC123',
      'items': [
             {'order': 2, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 1, 'type': 'text', 'class': '', 'link_id': 'callus' },
             ]},
-    {'id': 6, 'client_id': 'ABC123',
+    {'id': 6, 'id_client': 'ABC123',
      'items': [
             {'order': 2, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 1, 'type': 'text', 'class': '', 'link_id': 'callus' },
             ]},     
-    {'id': 7, 'client_id': 'ABC123',
+    {'id': 7, 'id_client': 'ABC123',
      'items': [
             {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 2, 'type': 'text', 'class': '', 'link_id': 'myhero' },
             {'order': 3, 'type': 'badge', 'class': '', 'link_id': 'mybadge' },
             ]},     
-    {'id': 8, 'client_id': 'ABC123',
+    {'id': 8, 'id_client': 'ABC123',
      'items': [
             {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 2, 'type': 'text', 'class': '', 'link_id': 'mysubtitle' },
             {'order': 3, 'type': 'badge', 'class': '', 'link_id': 'mybadge' },
             ]},
-    {'id': 9, 'client_id': 'ABC123',
+    {'id': 9, 'id_client': 'ABC123',
      'items': [
             {'order': 1, 'type': 'svg', 'class': '', 'link_id': 'like' },
             {'order': 2, 'type': 'text', 'class': '', 'link_id': 'mycardtext' },
@@ -255,21 +255,21 @@ site_stbs = [
 
 ]
 raw_texts = [
-            {'id': 'mycard', 'client_id': 'ZZZ999', 'text': {'en': 'BahCard', 'fr': 'frMy Card'}},
-            {'id': 'mycard', 'client_id': 'ABC123', 'text': {'en': 'My Card', 'fr': 'frMy Card'}},
-            {'id': 'mybadge', 'client_id': 'ABC123', 'text': {'en': 'My Badge2', 'fr': 'frMy Badge'}},
-            {'id': 'mysubtitle', 'client_id': 'ABC123', 'text': {'en': 'My Subtitle', 'fr': 'frMy Subtitle'}},
-            {'id': 'mycardtext', 'client_id': 'ABC123', 'text': {'en': 'A card component has a figure, a body part, and inside body there are title and actions parts', 'fr': 'frA card component has a figure, a body part, and inside body there are title and actions parts'}},
-            {'id': 'buynow', 'client_id': 'ABC123', 'text': {'en': 'Buy Now', 'fr': 'frBuy'}},
-            {'id': 'callus', 'client_id': 'ABC123', 'text': {'en': 'Call Us', 'fr': 'frCall'}},
-            {'id': 'myhero', 'client_id': 'ABC123', 'text': {'en': 'My Hero', 'fr': 'frMy Hero'}},            
-            {'id': 'acctit1', 'client_id': 'ABC123', 'text': {'en': 'How do I create an account?', 'fr': 'frHow do I create an account?'}},            
-            {'id': 'acctxt1', 'client_id': 'ABC123', 'text': {'en': 'Click the "Sign Up" button in the top right corner and follow the registration process.', 'fr': 'frClick the "Sign Up" button in the top right corner and follow the registration process.'}},            
-            {'id': 'acctit2', 'client_id': 'ABC123', 'text': {'en': 'I forgot my password. What should I do?', 'fr': 'frI forgot my password. What should I do?'}},            
-            {'id': 'acctxt2', 'client_id': 'ABC123', 'text': {'en': 'Click on "Forgot Password" on the login page and follow the instructions sent to your email.', 'fr': 'frClick on "Forgot Password" on the login page and follow the instructions sent to your email.'}},            
-            {'id': 'acctit3', 'client_id': 'ABC123', 'text': {'en': 'How do I update my profile information?', 'fr': 'frHow do I update my profile information?'}},            
-            {'id': 'acctxt3', 'client_id': 'ABC123', 'text': {'en': 'Go to "My Account" settings and select "Edit Profile" to make changes.', 'fr': 'frGo to "My Account" settings and select "Edit Profile" to make changes.'}},            
-            {'id': 'nb_title', 'client_id': 'ABC123', 'text': {'en': 'v2My Django Core Lite-Client', 'fr': 'frV2My Django Core Lite-Client'}},
+            {'id': 'mycard', 'id_client': 'ZZZ999', 'text': {'en': 'BahCard', 'fr': 'frMy Card'}},
+            {'id': 'mycard', 'id_client': 'ABC123', 'text': {'en': 'My Card', 'fr': 'frMy Card'}},
+            {'id': 'mybadge', 'id_client': 'ABC123', 'text': {'en': 'My Badge2', 'fr': 'frMy Badge'}},
+            {'id': 'mysubtitle', 'id_client': 'ABC123', 'text': {'en': 'My Subtitle', 'fr': 'frMy Subtitle'}},
+            {'id': 'mycardtext', 'id_client': 'ABC123', 'text': {'en': 'A card component has a figure, a body part, and inside body there are title and actions parts', 'fr': 'frA card component has a figure, a body part, and inside body there are title and actions parts'}},
+            {'id': 'buynow', 'id_client': 'ABC123', 'text': {'en': 'Buy Now', 'fr': 'frBuy'}},
+            {'id': 'callus', 'id_client': 'ABC123', 'text': {'en': 'Call Us', 'fr': 'frCall'}},
+            {'id': 'myhero', 'id_client': 'ABC123', 'text': {'en': 'My Hero', 'fr': 'frMy Hero'}},            
+            {'id': 'acctit1', 'id_client': 'ABC123', 'text': {'en': 'How do I create an account?', 'fr': 'frHow do I create an account?'}},            
+            {'id': 'acctxt1', 'id_client': 'ABC123', 'text': {'en': 'Click the "Sign Up" button in the top right corner and follow the registration process.', 'fr': 'frClick the "Sign Up" button in the top right corner and follow the registration process.'}},            
+            {'id': 'acctit2', 'id_client': 'ABC123', 'text': {'en': 'I forgot my password. What should I do?', 'fr': 'frI forgot my password. What should I do?'}},            
+            {'id': 'acctxt2', 'id_client': 'ABC123', 'text': {'en': 'Click on "Forgot Password" on the login page and follow the instructions sent to your email.', 'fr': 'frClick on "Forgot Password" on the login page and follow the instructions sent to your email.'}},            
+            {'id': 'acctit3', 'id_client': 'ABC123', 'text': {'en': 'How do I update my profile information?', 'fr': 'frHow do I update my profile information?'}},            
+            {'id': 'acctxt3', 'id_client': 'ABC123', 'text': {'en': 'Go to "My Account" settings and select "Edit Profile" to make changes.', 'fr': 'frGo to "My Account" settings and select "Edit Profile" to make changes.'}},            
+            {'id': 'nb_title', 'id_client': 'ABC123', 'text': {'en': 'v2My Django Core Lite-Client', 'fr': 'frV2My Django Core Lite-Client'}},
 ]
 
 # we can have texts of mother site like bahushira with a client id of ZZZ999 and that of ABC123. 
@@ -280,21 +280,21 @@ raw_texts = [
 
 raw_svgs = [
             {
-            'id': 'like', 'client_id': 'ABC123', 'page': 'home',
+            'id': 'like', 'id_client': 'ABC123', 'page': 'home',
             'svg': 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z'
             },
 ]
 raw_images = [
             {
-            'id': 'nike', 'client_id': 'ABC123', 'page': 'home',
+            'id': 'nike', 'id_client': 'ABC123', 'page': 'home',
             'src': 'https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp', 'alt': 'shoes',
             },
             {
-            'id': 'spiderman', 'client_id': 'ABC123', 'page': 'home',
+            'id': 'spiderman', 'id_client': 'ABC123', 'page': 'home',
             'src': 'https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp', 'alt': 'spiderman',
             },
             {
-            'id': 'daisy1', 'client_id': 'ABC123', 'page': 'home',
+            'id': 'daisy1', 'id_client': 'ABC123', 'page': 'home',
             'src': 'https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp', 'alt': 'daisy1',
             }                                    
 ]
@@ -320,10 +320,10 @@ class HomeZappView(TemplateView):
         pkey = self.kwargs.get("pkey")   # <-- get it from URL
 
         if pkey:
-            client_id = pkey
+            id_client = pkey
         else:
-            client_id = 'ZZZ999'  # Default root client
-            # data = SomeModel.objects.filter(client_id=pkey)
+            id_client = 'ZZZ999'  # Default root client
+            # data = SomeModel.objects.filter(id_client=pkey)
             # context["data"] = data
         # else:
             # context["data"] = SomeModel.objects.all()
@@ -352,7 +352,7 @@ class HomeZappView(TemplateView):
 
 
 
-        context["client_id"] = client_id
+        context["id_client"] = id_client
         context['nb'] = nb
         context['zroot'] = zroot
         context['zclient'] = zclient
@@ -362,7 +362,7 @@ class HomeZappView(TemplateView):
         context['page_structure'] = list(filter(lambda item: item.get('page')=='home' and not item.get('hidden'), site_structure))
         context['site_cards'] = site_cards
         context['site_heros'] = site_heros        
-        context['raw_texts'] = sorted(raw_texts, key=lambda x: x['client_id'])
+        context['raw_texts'] = sorted(raw_texts, key=lambda x: x['id_client'])
         context['raw_svgs'] = raw_svgs
         context['raw_images'] = raw_images  
         context['site_stbs'] = site_stbs    
@@ -376,16 +376,16 @@ def home_zapp_fbv(request, pkey=None): # new
     # data = None
 
     if pkey:
-        client_id = pkey
+        id_client = pkey
     else:
-        client_id = 'ZZZ999'  # Default root client        
+        id_client = 'ZZZ999'  # Default root client        
         # client = get_object_or_404(Client, pk=pkey)
-        # data = SomeModel.objects.filter(client_id=pkey)
+        # data = SomeModel.objects.filter(id_client=pkey)
     #else:
         # fallback: maybe show default data or all data
         #data = SomeModel.objects.all()
     context = {}
-    context['client_id'] = client_id
+    context['id_client'] = id_client
     context['nb'] = nb
     context['zroot'] = zroot
     #context['zclient'] = zclient

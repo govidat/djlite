@@ -28,15 +28,25 @@ first get the svgitem for this input and then proceed as before
             {% endif %}
             {% if item.type == 'text' and item.link_id %}
                 {# text is brought from raw_texts using the link of link_id #}
+                <c-rawtext :id="item.link_id"></c-rawtext>
+                {% comment %}
                 {% with dict=raw_texts|get_dictid:item.link_id %}    
                     {{dict.text|my_text}}
-                {% endwith %}    
+                {% endwith %}
+                {% endcomment %}
+
             {% endif %}
             {% if item.type == 'badge' and item.link_id %} 
                 {# text is brought from raw_texts using the link of link_id #}
+                {% comment %}
                 {% with dict=raw_texts|get_dictid:item.link_id %}
                     <div class="badge badge-secondary {{ item.class|default:"" }}">{{dict.text|my_text}}</div>
                 {% endwith %}
+                {% endcomment %}
+                <div class="badge badge-secondary {{ item.class|default:"" }}">
+                    <c-rawtext :id="item.link_id"></c-rawtext>
+                </div>
+
             {% endif %}
         {% endfor%}
     {% endwith %}
