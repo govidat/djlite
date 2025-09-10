@@ -11,7 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from .constants import PC_THEMES, PC_LANGUAGES
+from .constants import ROOT_TRANSLATION
+# PC_THEMES, PC_LANGUAGES,
 import os  # debug-toolbar
 import sys # debug-toolbar
 
@@ -178,8 +179,9 @@ LANGUAGES = [           # i18n
 
 # importing the constants from constants.py
 # PC_NAVBAR_ITEMS = PC_NAVBAR_ITEMS 
-PC_THEMES = PC_THEMES 
-PC_LANGUAGES = PC_LANGUAGES
+#PC_THEMES = PC_THEMES 
+#PC_LANGUAGES = PC_LANGUAGES
+ROOT_TRANSLATION = ROOT_TRANSLATION
 
 
 # CLASSV2 = "bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]"

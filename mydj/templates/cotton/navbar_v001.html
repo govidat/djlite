@@ -1,3 +1,5 @@
+{% load my_filters %}
+
 <div class="navbar bg-base-100 shadow-sm fixed top-0 left-0 w-full z-50">
   <div class="navbar-start">
     <div class="dropdown">
@@ -18,7 +20,6 @@
 
     <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
       <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
-
       {% comment %}
       {{nb.title|default:"My default title" }}-{{current_language}} - {{id_client}}
       {% endcomment %}
@@ -32,7 +33,7 @@
     </ul>
   </div>
   <div class="navbar-end flex xl:gap-1">
-    <c-select_theme :themes="client_allowed_themes"></c-select_theme>
-    <c-select_language :languages="client_allowed_languages"></c-select_language>      
+    <c-select_theme :themes="client_theme_ids"></c-select_theme>
+    <c-select_language :languages="client_language_ids"></c-select_language>      
   </div>
 </div>

@@ -12,6 +12,6 @@ def settings_constants(request):
     return {
         'LANGUAGE_CODE': settings.LANGUAGE_CODE,
         # Add any other settings you want to access in templates
-        'PC_THEMES': settings.PC_THEMES,
+        # 'PC_THEMES': settings.PC_THEMES,
         #'PC_LANGUAGES': settings.PC_LANGUAGES,
     }

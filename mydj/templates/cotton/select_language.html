@@ -5,11 +5,14 @@
     {% csrf_token %}
     
     <select class="select" id="language-select" name="language" onchange="this.form.submit()">
-      {% for item in languages %} 
-        
-        <option value="{{ item.id }}" {% if current_language == item.id %}selected{% endif %}>
-        
-        {{ item.id }}-{{item.text|my_text}}
+      {% for item in languages %}    
+        {% comment %}
+        <option value="{{ item.id_token }}" {% if current_language == item.id_token %}selected{% endif %}>        
+        {{ item.id_token }}-{{item.text|my_text}}
+        {% endcomment %}
+        <option value="{{ item }}" {% if current_language == item %}selected{% endif %}>        
+        {{ item }}-<c-rawtext :id="item"></c-rawtext>
+
         </option>
       {% endfor %}
     </select>

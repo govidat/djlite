@@ -472,8 +472,8 @@ class ClientPageView(TemplateView):
         client_hierarchy_list = [id_client]
         client_hierarchy_list.append('default')
 
-        client_allowed_languages = [d for d in settings.PC_LANGUAGES if d.get("id") in client_language_ids]
-        client_allowed_themes = [d for d in settings.PC_THEMES if d.get("id") in client_theme_ids]        
+#        client_allowed_languages = [d for d in settings.PC_LANGUAGES if d.get("id_token") in client_language_ids]
+#        client_allowed_themes = [d for d in settings.PC_THEMES if d.get("id_token") in client_theme_ids]        
 
         client_nb_items = [
             {"id": "home", "parent_id": "",      "order": 1, 'text': {'en': 'Home', 'fr': 'frHome', 'hi': 'hiHome'}},
@@ -491,13 +491,17 @@ class ClientPageView(TemplateView):
         nb['items_nested']=client_nb_items_nested
         nb['logo']="mylogo" 
         nb['title']={'class': '', 'type': 'text', 'ids': ['g_nb_title']} 
-        raw_texts = fetch_translations(client_ids=client_hierarchy_list, as_dict=False)
+        raw_texts_v0 = settings.ROOT_TRANSLATION
+        raw_texts_v1 = fetch_translations(client_ids=client_hierarchy_list, as_dict=False)
+        raw_texts = raw_texts_v0 + raw_texts_v1
         context['raw_texts'] = raw_texts
         context["id_client"] = id_client
         context["client_hierarchy_list"] = client_hierarchy_list
         context["client_hierarchy_str"] = ','.join(client_hierarchy_list)        
-        context["client_allowed_languages"] = client_allowed_languages
-        context["client_allowed_themes"] = client_allowed_themes
+#        context["client_allowed_languages"] = client_allowed_languages
+#        context["client_allowed_themes"] = client_allowed_themes
+        context["client_language_ids"] = client_language_ids
+        context["client_theme_ids"] = client_theme_ids
         context['nb'] = nb
         #context['site_structure'] = list(filter(lambda item: item.get('id_client') in client_hierarchy_list and not item.get('hidden'), site_structure))
         context['site_cards'] = site_cards
@@ -542,8 +546,8 @@ class ZClientBaseView(TemplateView):
         client_hierarchy_list = [id_client]
         client_hierarchy_list.append('default')
 
-        client_allowed_languages = [d for d in settings.PC_LANGUAGES if d.get("id") in client_language_ids]
-        client_allowed_themes = [d for d in settings.PC_THEMES if d.get("id") in client_theme_ids]        
+#        client_allowed_languages = [d for d in settings.PC_LANGUAGES if d.get("id_token") in client_language_ids]
+#        client_allowed_themes = [d for d in settings.PC_THEMES if d.get("id_token") in client_theme_ids]        
 
         client_nb_items = [
             {"id": "home", "parent_id": "",      "order": 1, 'text': {'en': 'Home', 'fr': 'frHome', 'hi': 'hiHome'}},
@@ -566,8 +570,10 @@ class ZClientBaseView(TemplateView):
         context["id_client"] = id_client
         context["client_hierarchy_list"] = client_hierarchy_list
         context["client_hierarchy_str"] = ','.join(client_hierarchy_list)        
-        context["client_allowed_languages"] = client_allowed_languages
-        context["client_allowed_themes"] = client_allowed_themes
+#        context["client_allowed_languages"] = client_allowed_languages
+#        context["client_allowed_themes"] = client_allowed_themes
+        context["client_language_ids"] = client_language_ids
+        context["client_theme_ids"] = client_theme_ids        
         context['nb'] = nb
         context['site_structure'] = list(filter(lambda item: item.get('id_client') in client_hierarchy_list and not item.get('hidden'), site_structure))
         context['site_cards'] = site_cards
@@ -611,90 +617,3 @@ class ZContactView(ZClientBaseView):
         context['page_structure'] = list(filter(lambda item: item.get('page')=='contact', context['site_structure']))
         return context        
 
-class v2HomeView2(TemplateView):
-    template_name = 'mysite/home.html'    
-    # We are using the base in theme/base.html
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        pkey = self.kwargs.get("pkey")   # <-- get it from URL
-
-        if pkey:
-            id_client = pkey
-        else:
-            id_client = 'ZZZ999'  # Default root client
-            # data = SomeModel.objects.filter(id_client=pkey)
-            # context["data"] = data
-        # else:
-            # context["data"] = SomeModel.objects.all()
-        # let us get the client theme ids and client languages in this step
-        client_language_ids = ['en', 'fr']
-        client_theme_ids = ['light', 'aqua', 'dark']
-        # client hierarchy place holder. presently using just the client
-        client_hierarchy_list = [id_client]
-        client_hierarchy_list.append('default')
-
-        client_allowed_languages = [d for d in settings.PC_LANGUAGES if d.get("id") in client_language_ids]
-        client_allowed_themes = [d for d in settings.PC_THEMES if d.get("id") in client_theme_ids]        
-
-        client_nb_items = [
-            {"id": "home", "parent_id": "",      "order": 1, 'text': {'en': 'Home', 'fr': 'frHome', 'hi': 'hiHome'}},
-            {"id": "about", "parent_id": "",      "order": 1, 'text': {'en': 'About', 'fr': 'frAbout', 'hi': 'hiAbout'}},
-            {"id": "contact", "parent_id": "",      "order": 2, 'text': {'en': 'Contact', 'fr': 'frContact', 'hi': 'hiContact'}},
-            {"id": "team", "parent_id": "",      "order": 3, 'text': {'en': 'Team', 'fr': 'frTeam', 'hi': 'hiTeam'}},    
-            
-            #{"id": "id4", "parent_id": "id3",   "order": 2},
-            #{"id": "id5", "parent_id": "id3",   "order": 1},
-            #{"id": "id6", "parent_id": "id5",   "order": 1},     
-        ]
-        # the url values and text are updated from Project Constant PC_NAVBAR_ITEMS
-        #client_nb_items_updated = update_list_of_dictionaries(client_nb_items, settings.PC_NAVBAR_ITEMS,'id')
-        client_nb_items_nested = build_nested_hierarchy(client_nb_items)
-        nb = {}
-        nb['items_nested']=client_nb_items_nested
-        nb['logo']="mylogo" 
-        nb['title']={'class': '', 'type': 'text', 'ids': ['g_nb_title']} 
-
-
-        context["id_client"] = id_client
-        context["client_hierarchy_list"] = client_hierarchy_list
-        context["client_hierarchy_str"] = ','.join(client_hierarchy_list)        
-        context["client_allowed_languages"] = client_allowed_languages
-        context["client_allowed_themes"] = client_allowed_themes
-        context['nb'] = nb
-        context['page_structure'] = list(filter(lambda item: item.get('page')=='home' and item.get('id_client')==id_client and not item.get('hidden'), site_structure))
-        context['site_cards'] = site_cards
-        context['site_heros'] = site_heros        
-        context['raw_texts'] = list(filter(lambda item: item.get('id_client') in client_hierarchy_list, raw_texts))
-        context['raw_svgs'] = raw_svgs
-        context['raw_images'] = raw_images  
-        context['site_stbs'] = site_stbs    
-        context['site_accordions'] = site_accordions
-        context['site_carousals'] = site_carousals
-
-        return context
-
-
-"""
-def home_zapp_fbv(request, pkey=None): # new
-    client = None
-    # data = None
-
-    if pkey:
-        id_client = pkey
-    else:
-        id_client = 'ZZZ999'  # Default root client        
-        # client = get_object_or_404(Client, pk=pkey)
-        # data = SomeModel.objects.filter(id_client=pkey)
-    #else:
-        # fallback: maybe show default data or all data
-        #data = SomeModel.objects.all()
-    context = {}
-    context['id_client'] = id_client
-    context['nb'] = nb
-    context['zroot'] = zroot
-    #context['zclient'] = zclient
-    # context['cards'] = cards
-    # context['heros'] = heros
-    return render(request, 'zapp/homezapp.html', context)
-"""

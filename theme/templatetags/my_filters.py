@@ -122,6 +122,11 @@ def get_dict_filtered_by_id(value=[], arg=0):
     return list(filter(lambda item: item.get('id') == arg, value))
 
 @register.filter
+def get_list_filtered_by_id_token(value=[], arg=''):
+    # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
+    return list(filter(lambda item: item.get('id_token') == arg, value))
+
+@register.filter
 def get_dict_by_id_client_and_prioritized_values(list_of_dicts=[], keyvals=""):
     """
     Retrieves a dictionary from a list of dictionaries based on id_client
