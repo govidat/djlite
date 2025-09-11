@@ -22,7 +22,7 @@ class QuestionAdmin(admin.ModelAdmin):
     
 admin.site.register(Question, QuestionAdmin)
 """
-from .models import Tokentype, Token, Language, Theme, Client, Translation
+from .models import Tokentype, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
 #TypedTokenForeignKey, Maxlanguage, 
 
 class TokentypeAdmin(admin.ModelAdmin):
@@ -38,6 +38,7 @@ class TokenAdmin(admin.ModelAdmin):
 #    list_display = ("id_language", "name")
 #    list_filter = ("name")
 #    search_fields = ("id_language")
+
 
 class LanguageAdmin(admin.ModelAdmin):
     list_display = ("id_language", "language_name_token", "display_name_en", "display_names_obj")
@@ -75,10 +76,32 @@ class ThemeAdmin(admin.ModelAdmin):
     #        kwargs["queryset"] = Token.objects.filter(type__code=db_field.id_tokentype)
     #    return super().formfield_for_dbfield(db_field, request, **kwargs)
 
+#class ClientLanguageInline(admin.TabularInline):
+#    model = ClientLanguage
+#    extra = 1
+class ClientLanguageInline(admin.TabularInline):  # or StackedInline if you prefer
+    model = ClientLanguage
+    extra = 1  # number of blank rows to show
+    #autocomplete_fields = ["id_language"]  # optional: adds search for large language sets
+    ordering = ["order"]
+
+class ClientThemeInline(admin.TabularInline):
+    model = ClientTheme
+    extra = 1
+    #autocomplete_fields = ["id_theme"]
+    ordering = ["order"]
+
+#class ClientThemeInline(admin.TabularInline):
+#    model = ClientTheme
+#    extra = 1
+
+
 class ClientAdmin(admin.ModelAdmin):
     list_display = ("id_client", "client_name_token", "id_parent", "get_languages", "get_themes", "get_parent_chain", "get_children_chain", "display_name_en", "display_names_obj")
     search_fields = ("id_client", "client_name_token")
-    filter_horizontal = ("client_languages", "client_themes")  
+    inlines = [ClientLanguageInline, ClientThemeInline]
+
+    #filter_horizontal = ("client_languages_old", "client_themes_old")  
     # 👆 makes a nice dual select box UI in admin    
     def get_languages(self, obj):
         # join id_language values as comma separated string

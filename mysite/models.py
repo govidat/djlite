@@ -201,8 +201,17 @@ class Client(models.Model):
         related_name="children"
     )
     # Many-to-many fields (admin will show multi-select box)
-    client_languages = models.ManyToManyField("Language", related_name="clients", blank=True)
-    client_themes = models.ManyToManyField("Theme", related_name="clients", blank=True)    
+    #client_languages_old = models.ManyToManyField("Language", related_name="clients_old", blank=True)
+    #client_themes_old = models.ManyToManyField("Theme", related_name="clients_old", blank=True)    
+
+    # ManyToMany with ordering
+    client_languages = models.ManyToManyField(
+        "Language", through="ClientLanguage", related_name="clients"
+    )
+
+    client_themes = models.ManyToManyField(
+        "Theme", through="ClientTheme", related_name="clients"
+    )
 
     def __str__(self):
         return self.id_client
@@ -236,10 +245,59 @@ class Client(models.Model):
 
     def display_all_names(self):
         return self.client_name_token.resolve_all_values(self.id_client) if self.client_name_token else None
+
+    def get_ordered_language_ids(self):
+        """
+        Return a list of id_language values in the order defined by ClientLanguage.order
+        """
+        return list(
+            self.client_languages.through.objects.filter(id_client=self)
+            .order_by("order")
+            .values_list("id_language__id_language", flat=True)
+        )
+      
+    def get_ordered_theme_ids(self):
+        """
+        Return a list of id_theme values in the order defined by ClientTheme.order
+        """
+        return list(
+            self.client_themes.through.objects.filter(id_client=self)
+            .order_by("order")
+            .values_list("id_theme__id_theme", flat=True)
+        )     
     # for usage in Admin Panel
     class Meta:
         verbose_name = "00-05 Client"
         #verbose_name_plural = "My Custom Models"
+
+
+class ClientLanguage(models.Model):
+    id_client = models.ForeignKey("Client", on_delete=models.CASCADE, db_column="id_client")
+    id_language = models.ForeignKey("Language", on_delete=models.CASCADE, db_column="id_language")
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("id_client", "id_language")
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"{self.id_client} - {self.id_language} (order {self.order})"
+    
+
+
+class ClientTheme(models.Model):
+    id_client = models.ForeignKey("Client", on_delete=models.CASCADE, db_column="id_client")
+    id_theme = models.ForeignKey("Theme", on_delete=models.CASCADE, db_column="id_theme")
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("id_client", "id_theme")
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"{self.id_client} - {self.id_theme} (order {self.order})"
+
+
 
 class Translation(models.Model):
     #id_translation = models.AutoField(primary_key=True)  # PK (Django requires a PK)

@@ -7,6 +7,9 @@ from django.views.generic import TemplateView
 #from django.utils.timezone import localtime, now
 from django.utils.translation import get_language
 from django.conf import settings
+from django.shortcuts import get_object_or_404
+
+from .models import Client, ClientLanguage, ClientTheme
 
 from utils.common_functions import build_nested_hierarchy, update_list_of_dictionaries, fetch_translations
 
@@ -465,9 +468,30 @@ class ClientPageView(TemplateView):
         if not page:
             page = 'home'
 
+       # pk is the id_client from URL
+        client = get_object_or_404(Client, pk=pkey)
+
+        # Fetch related many-to-many values
+        #client_language_ids = list(client.client_languages_old.values_list("id_language", flat=True))
+        #client_theme_ids = list(client.client_themes_old.values_list("id_theme", flat=True))            
+
+        # ordered languages
+        #client_languages = client.client_languages.through.objects.filter(id_client=client).select_related("id_language").order_by("order")
+        client_language_ids = client.get_ordered_language_ids()
+        #client_language_ids = [d.get('id_language') for d in client_languages]
+        #        [cl.id_language for cl in client_languages]
+
+        # ordered themes
+        #client_themes = client.client_themes.through.objects.filter(id_client=client).select_related("id_theme").order_by("order")
+        client_theme_ids = client.get_ordered_theme_ids()
+        #client_theme_ids = [d.get('id_theme') for d in client_themes]
+
+        #client_theme_ids = [ct.id_theme for ct in client_themes]
+
+
         # let us get the client theme ids and client languages in this step
-        client_language_ids = ['en', 'fr']
-        client_theme_ids = ['light', 'aqua', 'dark']
+        #client_language_ids = ['en', 'fr']
+        #client_theme_ids = ['light', 'aqua', 'dark']
         # client hierarchy place holder. presently using just the client
         client_hierarchy_list = [id_client]
         client_hierarchy_list.append('default')
@@ -500,13 +524,15 @@ class ClientPageView(TemplateView):
         context["client_hierarchy_str"] = ','.join(client_hierarchy_list)        
 #        context["client_allowed_languages"] = client_allowed_languages
 #        context["client_allowed_themes"] = client_allowed_themes
+        #context["client_languages"] = client_languages
+        #context["client_themes"] = client_themes
+
         context["client_language_ids"] = client_language_ids
         context["client_theme_ids"] = client_theme_ids
         context['nb'] = nb
         #context['site_structure'] = list(filter(lambda item: item.get('id_client') in client_hierarchy_list and not item.get('hidden'), site_structure))
         context['site_cards'] = site_cards
         context['site_heros'] = site_heros        
-        #context['raw_texts'] = list(filter(lambda item: item.get('id_client') in client_hierarchy_list, raw_texts))
         context['raw_svgs'] = raw_svgs
         context['raw_images'] = raw_images  
         context['site_stbs'] = site_stbs    
@@ -578,7 +604,6 @@ class ZClientBaseView(TemplateView):
         context['site_structure'] = list(filter(lambda item: item.get('id_client') in client_hierarchy_list and not item.get('hidden'), site_structure))
         context['site_cards'] = site_cards
         context['site_heros'] = site_heros        
-        context['raw_texts'] = list(filter(lambda item: item.get('id_client') in client_hierarchy_list, raw_texts))
         context['raw_svgs'] = raw_svgs
         context['raw_images'] = raw_images  
         context['site_stbs'] = site_stbs    
