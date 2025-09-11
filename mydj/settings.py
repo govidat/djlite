@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'theme',  # tailwind
     'django_cotton.apps.SimpleAppConfig', # cotton
     'mysite', # mysite
+    "adminsortable2", # admin-sortable2
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 

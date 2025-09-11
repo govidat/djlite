@@ -272,31 +272,39 @@ class Client(models.Model):
 
 
 class ClientLanguage(models.Model):
+    #client = models.ForeignKey("Client", on_delete=models.CASCADE)
+    #language = models.ForeignKey("Language", on_delete=models.CASCADE)
+
     id_client = models.ForeignKey("Client", on_delete=models.CASCADE, db_column="id_client")
     id_language = models.ForeignKey("Language", on_delete=models.CASCADE, db_column="id_language")
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
+        #unique_together = ("client", "language")
         unique_together = ("id_client", "id_language")
         ordering = ["order"]
 
     def __str__(self):
         return f"{self.id_client} - {self.id_language} (order {self.order})"
-    
+        #return f"{self.language} ({self.order})"
 
 
 class ClientTheme(models.Model):
+    #client = models.ForeignKey("Client", on_delete=models.CASCADE)
+    #theme = models.ForeignKey("Theme", on_delete=models.CASCADE)
+
     id_client = models.ForeignKey("Client", on_delete=models.CASCADE, db_column="id_client")
     id_theme = models.ForeignKey("Theme", on_delete=models.CASCADE, db_column="id_theme")
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
+        #unique_together = ("client", "theme")        
         unique_together = ("id_client", "id_theme")
         ordering = ["order"]
 
     def __str__(self):
         return f"{self.id_client} - {self.id_theme} (order {self.order})"
-
+        #return f"{self.language} ({self.order})"
 
 
 class Translation(models.Model):

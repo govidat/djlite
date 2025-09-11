@@ -22,6 +22,7 @@ class QuestionAdmin(admin.ModelAdmin):
     
 admin.site.register(Question, QuestionAdmin)
 """
+from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 from .models import Tokentype, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
 #TypedTokenForeignKey, Maxlanguage, 
 
@@ -79,24 +80,26 @@ class ThemeAdmin(admin.ModelAdmin):
 #class ClientLanguageInline(admin.TabularInline):
 #    model = ClientLanguage
 #    extra = 1
-class ClientLanguageInline(admin.TabularInline):  # or StackedInline if you prefer
+class ClientLanguageInline(SortableInlineAdminMixin, admin.TabularInline):  # or StackedInline if you prefer
     model = ClientLanguage
     extra = 1  # number of blank rows to show
+    fields = ("id_language", ) #admin-sortable2 , "order"
     #autocomplete_fields = ["id_language"]  # optional: adds search for large language sets
-    ordering = ["order"]
+    #ordering = ["order"]
 
-class ClientThemeInline(admin.TabularInline):
+class ClientThemeInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ClientTheme
     extra = 1
+    fields = ("id_theme", ) #admin-sortable2 , "order"
     #autocomplete_fields = ["id_theme"]
-    ordering = ["order"]
+    #ordering = ["order"]
 
 #class ClientThemeInline(admin.TabularInline):
 #    model = ClientTheme
 #    extra = 1
 
 
-class ClientAdmin(admin.ModelAdmin):
+class ClientAdmin(SortableAdminBase, admin.ModelAdmin):
     list_display = ("id_client", "client_name_token", "id_parent", "get_languages", "get_themes", "get_parent_chain", "get_children_chain", "display_name_en", "display_names_obj")
     search_fields = ("id_client", "client_name_token")
     inlines = [ClientLanguageInline, ClientThemeInline]
