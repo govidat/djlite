@@ -102,7 +102,7 @@ class Token(models.Model):
 
     def __str__(self):
         return self.id_token
-
+"""
 class Maxlanguage(models.Model):
     id_language = LowercaseCharField(max_length=2, primary_key=True)
     name = models.CharField(max_length=50)
@@ -113,7 +113,7 @@ class Maxlanguage(models.Model):
     class Meta:
         verbose_name = "00-00 Maximum Project Language"
         #verbose_name_plural = "My Custom Models"
-        
+"""        
 """
 class TypedTokenForeignKey(models.ForeignKey):
     
@@ -287,7 +287,6 @@ class ClientLanguage(models.Model):
     def __str__(self):
         return f"{self.id_client} - {self.id_language} (order {self.order})"
         #return f"{self.language} ({self.order})"
-
 
 class ClientTheme(models.Model):
     #client = models.ForeignKey("Client", on_delete=models.CASCADE)

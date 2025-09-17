@@ -24,7 +24,7 @@ admin.site.register(Question, QuestionAdmin)
 """
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 from .models import Tokentype, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
-#TypedTokenForeignKey, Maxlanguage, 
+#TypedTokenForeignKey
 
 class TokentypeAdmin(admin.ModelAdmin):
     list_display = ("id_tokentype", "name", "is_global")
@@ -34,11 +34,6 @@ class TokenAdmin(admin.ModelAdmin):
     list_display = ("id_token", "id_tokentype", "id_parent")
 #    list_filter = ("id_tokentype" )
 #    search_fields = ("id_token")   
-
-#class MaxlanguageAdmin(admin.ModelAdmin):
-#    list_display = ("id_language", "name")
-#    list_filter = ("name")
-#    search_fields = ("id_language")
 
 
 class LanguageAdmin(admin.ModelAdmin):
