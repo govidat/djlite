@@ -11,11 +11,11 @@ def build_nested_hierarchy(flat_list):
 
     # Iterate through each item to build the hierarchy
     for item in flat_list:
-        parent_id = item.get('parent_id')
+        parent = item.get('parent')
 
         # If the item has a parent, add it to the parent's children list
-        if parent_id is not None and parent_id in item_map:
-            parent_item = item_map[parent_id]
+        if parent is not None and parent in item_map:
+            parent_item = item_map[parent]
             if 'children' not in parent_item:
                 parent_item['children'] = []
             parent_item['children'].append(item)
@@ -57,7 +57,7 @@ def update_list_of_dictionaries(smaller_list, larger_list, key_field):
 def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_dict=False, use_cache=True, timeout=3600):
     """
     Fetch translations with optional caching.
-    Works when id_client, id_token, id_language are text primary keys.
+    Works when client, token, language are text primary keys.
     """
     
     # Build cache key
@@ -69,33 +69,38 @@ def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_di
             return cached_data
     
     # Build query
-    qs = Translation.objects.select_related("id_client", "id_token", "id_language")
+    qs = Translation.objects.select_related("client", "token", "language")
 
     if client_ids:
-        qs = qs.filter(id_client__in=client_ids)
+        qs = qs.filter(client__in=client_ids)
 
     if token_ids:
-        qs = qs.filter(id_token__in=token_ids)
+        qs = qs.filter(token__in=token_ids)
 
     if language_ids:
-        qs = qs.filter(id_language__in=language_ids)
+        qs = qs.filter(language__in=language_ids)
 
     # Reshape result
     result = {}
     for t in qs:
+        """
         # Always fetch raw PK if possible, else fallback to object.pk
-        client = getattr(t, "id_client_id", None) or str(t.id_client.pk)
-        token = getattr(t, "id_token_id", None) or str(t.id_token.pk)
-        lang = getattr(t, "id_language_id", None) or str(t.id_language.pk)
+        client = getattr(t, "client_id", None) or str(t.client.pk)
+        token = getattr(t, "token_id", None) or str(t.token.pk)
+        lang = getattr(t, "language_id", None) or str(t.language.pk)
 
         # Since PKs are text, make sure we treat them as str
         client, token, lang = str(client), str(token), str(lang)
+        """
+        client = str(t.client.pk)
+        token = str(t.token.pk)
+        lang = str(t.language.pk)
 
         key = (client, token)
         if key not in result:
             result[key] = {
-                "id_client": client,
-                "id_token": token,
+                "client": client,
+                "token": token,
                 "text": {}
             }
         result[key]["text"][lang] = t.value
@@ -104,8 +109,8 @@ def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_di
     if as_dict:
         nested = defaultdict(lambda: defaultdict(dict))
         for entry in result.values():
-            client = entry["id_client"]
-            token = entry["id_token"]
+            client = entry["client"]
+            token = entry["token"]
             nested[client][token] = entry["text"]
         final_data = dict(nested)
     else:

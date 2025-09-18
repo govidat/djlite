@@ -12,16 +12,17 @@
         <c-navbar_v001_l1recur :items="nb.items_nested"></c-navbar_v001_l1recur>
       </ul>
     </div>
-    <a href="{% url 'client_page' id_client 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    <a href="{% url 'client_page' client 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
     {% comment %}
 
-    <a href="{% url 'home' id_client %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    <a href="{% url 'home' client %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
     {% endcomment %}
 
     <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
       <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
+
       {% comment %}
-      {{nb.title|default:"My default title" }}-{{current_language}} - {{id_client}}
+      {{nb.title|default:"My default title" }}-{{current_language}} - {{client}}
       {% endcomment %}
     </h1>
 

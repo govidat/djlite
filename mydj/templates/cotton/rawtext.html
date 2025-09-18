@@ -13,7 +13,7 @@ Input is an id:
 
 
 
-{# text is brought from raw_texts using id_token #}
-{% with dict=raw_texts|get_listdict_by_id_token:id|get_dict_by_id_client_and_prioritized_values:client_hierarchy_str %}    
+{# text is brought from raw_texts using token #}
+{% with dict=raw_texts|get_listdict_by_token:id|get_dict_by_client_and_prioritized_values:client_hierarchy_str %}    
     {{dict.text|my_text}}
 {% endwith %}    

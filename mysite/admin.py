@@ -23,23 +23,24 @@ class QuestionAdmin(admin.ModelAdmin):
 admin.site.register(Question, QuestionAdmin)
 """
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
-from .models import Tokentype, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
+from .models import TokenType, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
 #TypedTokenForeignKey
 
-class TokentypeAdmin(admin.ModelAdmin):
-    list_display = ("id_tokentype", "name", "is_global")
-    search_fields = ("id_tokentype", "name")
+class TokenTypeAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "is_global")
+    search_fields = ("id", "name")
+    list_filter = ("is_global",)
 
 class TokenAdmin(admin.ModelAdmin):
-    list_display = ("id_token", "id_tokentype", "id_parent")
-#    list_filter = ("id_tokentype" )
-#    search_fields = ("id_token")   
-
-
+    list_display = ("id", "tokentype", "parent")
+    list_filter = ("tokentype",)
+    search_fields = ("id", "tokentype__id", "tokentype__name")
+    autocomplete_fields = ("tokentype", "parent")
+ 
+    
 class LanguageAdmin(admin.ModelAdmin):
-    list_display = ("id_language", "language_name_token", "display_name_en", "display_names_obj")
-#    list_filter = ("id_language")
-#    search_fields = ("id_language")
+    list_display = ("id", "token", "display_name_en", "display_names_obj")
+    search_fields = ("id", "token__id", "token__name")
 
     def display_name_en(self, obj):
         return obj.display_name()
@@ -50,9 +51,8 @@ class LanguageAdmin(admin.ModelAdmin):
     display_names_obj.short_description = "All Names"
 
 class ThemeAdmin(admin.ModelAdmin):
-    list_display = ("id_theme", "theme_name_token", "display_name_en", "display_names_obj")
-#    list_filter = ("id_theme")
-#    search_fields = ("id_theme")
+    list_display = ("id", "token", "display_name_en", "display_names_obj")
+    search_fields = ("id", "token__id", "token__name")
 
     def display_name_en(self, obj):
         return obj.display_name()
@@ -62,31 +62,18 @@ class ThemeAdmin(admin.ModelAdmin):
         return obj.display_all_names()
     display_names_obj.short_description = "All Names"
 
-    #def formfield_for_foreignkey(self, db_field, request, **kwargs):
-    #    if isinstance(db_field, TypedTokenForeignKey) and db_field.id_tokentype:
-    #        kwargs["queryset"] = Token.objects.filter(type__code=db_field.id_tokentype)
-    #    return super().formfield_for_foreignkey(db_field, request, **kwargs)
-    
-    #def formfield_for_dbfield(self, db_field, request, **kwargs):
-    #    if isinstance(db_field, TypedTokenForeignKey) and db_field.id_tokentype:
-    #        kwargs["queryset"] = Token.objects.filter(type__code=db_field.id_tokentype)
-    #    return super().formfield_for_dbfield(db_field, request, **kwargs)
-
-#class ClientLanguageInline(admin.TabularInline):
-#    model = ClientLanguage
-#    extra = 1
 class ClientLanguageInline(SortableInlineAdminMixin, admin.TabularInline):  # or StackedInline if you prefer
     model = ClientLanguage
     extra = 1  # number of blank rows to show
-    fields = ("id_language", ) #admin-sortable2 , "order"
-    #autocomplete_fields = ["id_language"]  # optional: adds search for large language sets
+    fields = ("language", ) #admin-sortable2 , "order"
+    #autocomplete_fields = ["language"]  # optional: adds search for large language sets
     #ordering = ["order"]
 
 class ClientThemeInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ClientTheme
     extra = 1
-    fields = ("id_theme", ) #admin-sortable2 , "order"
-    #autocomplete_fields = ["id_theme"]
+    fields = ("theme", ) #admin-sortable2 , "order"
+    #autocomplete_fields = ["theme"]
     #ordering = ["order"]
 
 #class ClientThemeInline(admin.TabularInline):
@@ -95,22 +82,30 @@ class ClientThemeInline(SortableInlineAdminMixin, admin.TabularInline):
 
 
 class ClientAdmin(SortableAdminBase, admin.ModelAdmin):
-    list_display = ("id_client", "client_name_token", "id_parent", "get_languages", "get_themes", "get_parent_chain", "get_children_chain", "display_name_en", "display_names_obj")
-    search_fields = ("id_client", "client_name_token")
+    list_display = ("id", "token", "parent", "get_languages", "get_themes", "get_parent_chain", "get_children_chain", "display_name_en", "display_names_obj")
+    search_fields = ("id", "token__id")
     inlines = [ClientLanguageInline, ClientThemeInline]
 
     #filter_horizontal = ("client_languages_old", "client_themes_old")  
     # 👆 makes a nice dual select box UI in admin    
+    """
     def get_languages(self, obj):
-        # join id_language values as comma separated string
-        return ", ".join(str(lang.id_language) for lang in obj.client_languages.all())
+        # join language values as comma separated string
+        return ", ".join(str(lang.language) for lang in obj.client_languages.all())
     get_languages.short_description = "Languages"
 
     def get_themes(self, obj):
-        # join id_theme values as comma separated string
-        return ", ".join(str(theme.id_theme) for theme in obj.client_themes.all())
+        # join theme values as comma separated string
+        return ", ".join(str(theme.theme) for theme in obj.client_themes.all())
     get_themes.short_description = "Themes"
+    """
+    def get_languages(self, obj):
+        return ", ".join(lang.id for lang in obj.client_languages.all())
+    get_languages.short_description = "Languages"
 
+    def get_themes(self, obj):
+        return ", ".join(theme.id for theme in obj.client_themes.all())
+    get_themes.short_description = "Themes"
    
     def get_parent_chain(self, obj):
         #Show parent → grandparent → etc. as comma-separated IDs
@@ -131,12 +126,13 @@ class ClientAdmin(SortableAdminBase, admin.ModelAdmin):
         return obj.display_all_names()
     display_names_obj.short_description = "All Names"     
 
-class TranslationAdmin(admin.ModelAdmin):
-    list_display = ("id_client", "id_token", "id_language", "value")
-    list_filter = ("id_language", "id_client", "id_token")
-    search_fields = ("value", "id_token", "id_client", "id_language")
 
-admin.site.register(Tokentype, TokentypeAdmin)
+class TranslationAdmin(admin.ModelAdmin):
+    list_display = ("client", "token", "language", "value")
+    list_filter = ("client", "language", "token")
+    search_fields = ("token__id", "value")
+
+admin.site.register(TokenType, TokenTypeAdmin)
 admin.site.register(Token, TokenAdmin)
 #admin.site.register(Maxlanguage)
 admin.site.register(Language, LanguageAdmin)

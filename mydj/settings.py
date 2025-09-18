@@ -195,6 +195,7 @@ INTERNAL_IPS = [
 ]
 TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
 
+# # debug-toolbar
 if not TESTING:
     INSTALLED_APPS = [
         *INSTALLED_APPS,
@@ -222,3 +223,21 @@ CACHES = {
     }
 }
 """
+
+# # debug-toolbar
+DEBUG_TOOLBAR_PANELS = [
+    "debug_toolbar.panels.timer.TimerPanel",         # request timings
+    "debug_toolbar.panels.sql.SQLPanel",             # SQL queries (important for Postgres)
+    "debug_toolbar.panels.cache.CachePanel",         # cache usage (since you use caching for translations)
+    "debug_toolbar.panels.templates.TemplatesPanel", # template render info (Jinja2 / Django templates)
+    "debug_toolbar.panels.request.RequestPanel",     # request/response headers + cookies
+    "debug_toolbar.panels.settings.SettingsPanel",   # useful for checking Django settings
+]
+
+DEBUG_TOOLBAR_CONFIG = {
+    "INTERCEPT_REDIRECTS": False,  # don’t stop redirects
+    "DISABLE_PANELS": {
+        "debug_toolbar.panels.history.HistoryPanel",  # avoid the 404 issue
+        "debug_toolbar.panels.profiling.ProfilingPanel",  # heavy + rarely useful
+    },
+}

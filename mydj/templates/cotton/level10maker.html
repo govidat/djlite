@@ -13,15 +13,15 @@
       <div class="h-screen flex items-center justify-center {{ id20.class|default:'' }}" style="{{ id20.style|default:'' }}">
         {# Level30 #}
         {# Level 30 items are derived from available  #}
-        {# get the list of ids with this parent_id; Then do an additional filter on Level=30.then order them #}
+        {# get the list of ids with this parent; Then do an additional filter on Level=30.then order them #}
         {# Expected is only one value, but keeping the same loop structure #}
-        {% with list_id30=page_structure|get_dict_filtered_by_parent_id:id20.id|get_dict_filtered_by_level:30|dictsort:'order' %}
+        {% with list_id30=page_structure|get_dict_filtered_by_parent:id20.id|get_dict_filtered_by_level:30|dictsort:'order' %}
         {% for id30 in list_id30 %}        
         <div class="grid gap-4 p-8 w-full  {{ id30.class|default:'' }}" style="{{ id30.style|default:'' }}">
           {# Level40 #}
           {# Level 40 items are derived from available  #}
-          {# get the list of ids with this parent_id; Then do an additional filter on Level=40.then order them #}
-          {% with list_id40=page_structure|get_dict_filtered_by_parent_id:id30.id|get_dict_filtered_by_level:40|dictsort:'order' %}
+          {# get the list of ids with this parent; Then do an additional filter on Level=40.then order them #}
+          {% with list_id40=page_structure|get_dict_filtered_by_parent:id30.id|get_dict_filtered_by_level:40|dictsort:'order' %}
           {% for id40 in list_id40 %}
                             
             {# This Level40 dict is passed on c-routerlevel40 for further processing #}
