@@ -1,6 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
-from mysite.models import Translation, TextStatic2
+#from mysite.models import Translation, TextStatic2
+from mysite.models import TextStatic2
  
 def build_nested_hierarchy(flat_list):
     # Create a dictionary for quick lookup of items by their ID
@@ -53,12 +54,12 @@ def update_list_of_dictionaries(smaller_list, larger_list, key_field):
 
 # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
 #sorted_by_age = sorted(data, key=lambda x: x['age']) ;
-
+"""
 def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_dict=False, use_cache=True, timeout=3600):
-    """
-    Fetch translations with optional caching.
-    Works when client, token, language are text primary keys.
-    """
+    
+    #Fetch translations with optional caching.
+    #Works when client, token, language are text primary keys.
+    
     
     # Build cache key
     cache_key = None
@@ -83,15 +84,15 @@ def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_di
     # Reshape result
     result = {}
     for t in qs:
-        """
+        
         # Always fetch raw PK if possible, else fallback to object.pk
-        client = getattr(t, "client_id", None) or str(t.client.pk)
-        token = getattr(t, "token_id", None) or str(t.token.pk)
-        lang = getattr(t, "language_id", None) or str(t.language.pk)
+        #client = getattr(t, "client_id", None) or str(t.client.pk)
+        #token = getattr(t, "token_id", None) or str(t.token.pk)
+        #lang = getattr(t, "language_id", None) or str(t.language.pk)
 
         # Since PKs are text, make sure we treat them as str
-        client, token, lang = str(client), str(token), str(lang)
-        """
+        #client, token, lang = str(client), str(token), str(lang)
+        
         client = str(t.client.pk)
         token = str(t.token.pk)
         lang = str(t.language.pk)
@@ -121,6 +122,7 @@ def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_di
         cache.set(cache_key, final_data, timeout=timeout)
     
     return final_data
+"""
 
 def fetch_textstatic2(client_ids=None, as_dict=False, use_cache=True, timeout=3600):
     """

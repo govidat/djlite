@@ -9,7 +9,7 @@ class LowercaseCharField(models.CharField):
         if value is not None:
             return value.lower()
         return value
-    
+"""    
 class TokenType(models.Model):
     
     # Categorizes tokens: global_text, local_text, language_name, theme_name, Country, State, City, Currency, etc.
@@ -68,13 +68,6 @@ class Token(models.Model):
             client=client, token=self, language=language
         ).values_list("value", flat=True).first()        
     
-    """ alternative way 
-    def resolve_value(self, client_id="default", lang_id="en"):
-        try:
-            return self.translations.get(client__id=client_id, language__id=lang_id).value
-        except Translation.DoesNotExist:
-            return None   # or fallback to default client/lang    
-    """    
     def resolve_all_values(self, client='default'):
         if isinstance(client, str):
             client = Client.objects.get(pk=client)
@@ -92,36 +85,7 @@ class Token(models.Model):
 
 
 
-"""
-class TypedTokenForeignKey(models.ForeignKey):
-    
-    #A ForeignKey to Token that also stores which TokenType it should allow.
 
-    def __init__(self, to="Token", *args, tokentype=None, **kwargs):
-        self.tokentype = tokentype
-        # Always point to Token model
-        super().__init__(to, *args, **kwargs)
-
-
-class TypedTokenForeignKey(models.ForeignKey):
-    
-    #Custom ForeignKey to Token that remembers which TokenType it belongs to.
-    #This makes the Django admin dropdown automatically filter tokens.
-    
-    def __init__(self, to="Token", *args, tokentype=None, **kwargs):
-        self.tokentype = tokentype
-        # always point to Token
-        super().__init__(to, *args, **kwargs)
-
-    def deconstruct(self):
-        
-        #Needed so Django migrations know how to serialize this field.
-        
-        name, path, args, kwargs = super().deconstruct()
-        if self.tokentype is not None:
-            kwargs["tokentype"] = self.tokentype
-        return name, path, args, kwargs
-"""
 class Language(models.Model):
     id = LowercaseCharField(max_length=2, primary_key=True)
     token = models.ForeignKey(Token, on_delete=models.SET_NULL, null=True, blank=True)
@@ -130,13 +94,7 @@ class Language(models.Model):
         return self.id
 
     # to get the name maintained for default client
-    """
-    def display_name(self):
-        return self.token.resolve_value() if self.token else None
 
-    def display_all_names(self):
-        return self.token.resolve_all_values() if self.token else None
-    """
     def display_name(self, client="default", language="en"):
         return self.token.resolve_value(client=client, language=language) if self.token else None
 
@@ -159,13 +117,7 @@ class Theme(models.Model):
         return self.id
 
     # to get the name maintained for default client
-    """
-    def display_name(self):
-        return self.token.resolve_value() if self.token else None
 
-    def display_all_names(self):
-        return self.token.resolve_all_values() if self.token else None
-    """
     def display_name(self, client="default", language="en"):
         return self.token.resolve_value(client=client, language=language) if self.token else None
 
@@ -237,9 +189,7 @@ class Client(models.Model):
         return self.token.resolve_all_values(self.id) if self.token else None
 
     def get_ordered_language_ids(self):
-        """
-        Return a list of id values in the order defined by ClientLanguage.order
-        """
+
         return list(
             self.client_languages_rel.all()
             .order_by("order")
@@ -248,21 +198,13 @@ class Client(models.Model):
         
       
     def get_ordered_theme_ids(self):
-        """
-        Return a list of id values in the order defined by ClientTheme.order
-        """
+
         return list(
             self.client_themes_rel.all()
             .order_by("order")
             .values_list("theme__id", flat=True)
         )
-        """
-        return list(
-            self.client_themes.through.objects.filter(client=self)
-            .order_by("order")
-            .values_list("theme__id", flat=True)
-        )  
-        """      
+    
     # for usage in Admin Panel
     class Meta:
         verbose_name = "00-05 Client"
@@ -317,7 +259,8 @@ class Translation(models.Model):
     def __str__(self):
         return f"{self.client.id} {self.token.id} [{self.language.id}] = {self.value}"       
         # for usage in Admin Panel
-
+"""
+        
 class TokenType2(models.Model):
     
     # Categorizes tokens: global_text, local_text, language_name, theme_name, Country, State, City, Currency, etc.
