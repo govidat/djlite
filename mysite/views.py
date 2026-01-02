@@ -11,10 +11,10 @@ from django.shortcuts import get_object_or_404
 
 
 #from .models import Client, ClientLanguage, ClientTheme
-from .models import Client2
-#, ClientLanguage2, ClientTheme2, TextStatic2
+from .models import Client
+#, ClientLanguage, ClientTheme, TextStatic
 
-from utils.common_functions import build_nested_hierarchy, fetch_textstatic2
+from utils.common_functions import build_nested_hierarchy, fetch_textstatic
 # update_list_of_dictionaries, fetch_translations, 
 project_base_language = settings.LANGUAGE_CODE   # 'en'
 
@@ -456,26 +456,6 @@ class ClientPageView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        """
-        # Add any common context data here that both views need
-        pkey = self.kwargs.get("pkey")   # <-- get it from URL
-        page = self.kwargs.get('page')
-
-        if pkey:
-            client = pkey
-        else:
-            client = 'bahushira'  # Default root client
-            # data = SomeModel.objects.filter(client=pkey)
-            # context["data"] = data
-        # else:
-            # context["data"] = SomeModel.objects.all()
-
-        if not page:
-            page = 'home'
-
-       # pk is the client from URL
-        client = get_object_or_404(Client, pk=pkey)
-        """
         # Add any common context data here that both views need
         lv_client_id = self.kwargs.get("pkey")   # <-- get it from URL
         lv_page_id = self.kwargs.get('page')
@@ -486,8 +466,8 @@ class ClientPageView(TemplateView):
         if not lv_page_id:
             lv_page_id = 'home'
 
-       # pk is the client from URL
-        client = get_object_or_404(Client2, client_id=lv_client_id)
+        # pk is the client from URL
+        client = get_object_or_404(Client, client_id=lv_client_id)
 
         # Fetch related many-to-many values
         # ordered languages
@@ -520,7 +500,7 @@ class ClientPageView(TemplateView):
         raw_texts_v1 = fetch_translations(client_ids=client_hierarchy_list, as_dict=False)
         raw_texts = raw_texts_v0 + raw_texts_v1
         """
-        raw_texts_v2 = fetch_textstatic2(client_ids=client_hierarchy_list, as_dict=False)
+        raw_texts_v2 = fetch_textstatic(client_ids=client_hierarchy_list, as_dict=False)
         raw_texts = raw_texts_v2
 
         #context['raw_texts'] = raw_texts

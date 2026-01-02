@@ -9,259 +9,8 @@ class LowercaseCharField(models.CharField):
         if value is not None:
             return value.lower()
         return value
-"""    
+        
 class TokenType(models.Model):
-    
-    # Categorizes tokens: global_text, local_text, language_name, theme_name, Country, State, City, Currency, etc.
-    id = LowercaseCharField(max_length=20, primary_key=True)   # e.g., "country"
-    name = models.CharField(max_length=50, unique=True)   # e.g., "Country" 
-    is_global = models.BooleanField(default=False)        # Global and it means it is centrally maintained? if True, then the Token name should be g_, else l_. g_ values can be part of the code itself.
-    # for usage in Admin Panel
-    class Meta:
-        ordering = ["id"]
-        verbose_name = "00-01 Token Type"
-        #verbose_name_plural = "My Custom Models"
-
-    def __str__(self):
-        return f"{self.name} ({self.id})"
-   
-     
-class Token(models.Model):
-    id = LowercaseCharField(max_length=25, primary_key=True)   # user enters e.g. "g_india" or "l_client_name"
-    tokentype = models.ForeignKey(TokenType, on_delete=models.PROTECT)
-    # tokens can have a parent relationship like Chennai > Tamilnadu > India
-    parent = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="children"
-    )
-    # for usage in Admin Panel
-    class Meta:
-        verbose_name = "00-02 Token"
-        #verbose_name_plural = "My Custom Models"
-
-
-    def clean(self):
-        #Validate prefix based on type.is_global
-        if self.tokentype.is_global and not self.id.startswith("g_"):
-            raise ValidationError("Global tokens must start with 'g_'.")
-        if not self.tokentype.is_global and not self.id.startswith("l_"):
-            raise ValidationError("Local tokens must start with 'l_'.")
-
-    def save(self, *args, **kwargs):
-        # Ensure validation runs also when saving programmatically
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-
-    # Optional convenience helper:
-
-    def resolve_value(self, client="default", language="en"):
-        if isinstance(client, str):
-            client = Client.objects.get(pk=client)
-        if isinstance(language, str):
-            language = Language.objects.get(pk=language)
-
-        return Translation.objects.filter(
-            client=client, token=self, language=language
-        ).values_list("value", flat=True).first()        
-    
-    def resolve_all_values(self, client='default'):
-        if isinstance(client, str):
-            client = Client.objects.get(pk=client)
-        #Return a dict {language_code: value} for this token for the given client,
-        #only including languages that actually have translations.
-        
-        qs = Translation.objects.filter(client=client, token=self)
-        values = {tr.language.pk: tr.value for tr in qs}
-
-        return values        
-
-
-    def __str__(self):
-        return self.id
-
-
-
-
-class Language(models.Model):
-    id = LowercaseCharField(max_length=2, primary_key=True)
-    token = models.ForeignKey(Token, on_delete=models.SET_NULL, null=True, blank=True)
-
-    def __str__(self):
-        return self.id
-
-    # to get the name maintained for default client
-
-    def display_name(self, client="default", language="en"):
-        return self.token.resolve_value(client=client, language=language) if self.token else None
-
-    def display_all_names(self, client="default"):
-        return self.token.resolve_all_values(client=client) if self.token else None
-
-    # for usage in Admin Panel
-    class Meta:
-        verbose_name = "00-03 Project Language"
-        #verbose_name_plural = "My Custom Models"
-        ordering = ["id"]
-
-
-
-class Theme(models.Model):
-    id = LowercaseCharField(max_length=20, primary_key=True)
-    token = models.ForeignKey(Token, on_delete=models.SET_NULL, null=True, blank=True)
-
-    def __str__(self):
-        return self.id
-
-    # to get the name maintained for default client
-
-    def display_name(self, client="default", language="en"):
-        return self.token.resolve_value(client=client, language=language) if self.token else None
-
-    def display_all_names(self, client="default"):
-        return self.token.resolve_all_values(client=client) if self.token else None    
-        
-    # for usage in Admin Panel
-    class Meta:
-        verbose_name = "00-04 Project Theme"
-        #verbose_name_plural = "My Custom Models"
-        ordering = ["id"]
-
-
-
-class Client(models.Model):
-    id = LowercaseCharField(max_length=25, primary_key=True)
-
-    #Client model with tokenized name and location.
-    token = models.ForeignKey(Token, on_delete=models.SET_NULL, null=True, blank=True, default='g_client_name')
-    
-    parent = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="children"
-    )
-
-    # ManyToMany with ordering
-    client_languages = models.ManyToManyField(
-        "Language", through="ClientLanguage", related_name="clients"
-    )
-
-    client_themes = models.ManyToManyField(
-        "Theme", through="ClientTheme", related_name="clients"
-    )
-
-    def __str__(self):
-        return self.id
-
-    # if a Model has a recursive relationship and its parent is maintained in the same row
-    def get_ancestors(self):
-        #Return all ancestors (parent, grandparent, ...) as a list.#
-        ancestors = []
-        current = self.parent
-        while current is not None:
-            ancestors.append(str(current.id))
-            current = current.parent
-        return ancestors  
-     
-    def get_descendants(self):
-        #Return all descendants (children, grandchildren, ...) as a list of clients.
-        descendants = []
-
-        def collect_children(node):
-            for child in node.children.all():
-                descendants.append(str(child.id))
-                collect_children(child)
-
-        collect_children(self)
-        return descendants     
-    
-    # to get the name maintained 
-
-    def display_name(self):
-        return self.token.resolve_value(self.id, "en") if self.token else None
-
-    def display_all_names(self):
-        return self.token.resolve_all_values(self.id) if self.token else None
-
-    def get_ordered_language_ids(self):
-
-        return list(
-            self.client_languages_rel.all()
-            .order_by("order")
-            .values_list("language__id", flat=True)
-        )
-        
-      
-    def get_ordered_theme_ids(self):
-
-        return list(
-            self.client_themes_rel.all()
-            .order_by("order")
-            .values_list("theme__id", flat=True)
-        )
-    
-    # for usage in Admin Panel
-    class Meta:
-        verbose_name = "00-05 Client"
-        #verbose_name_plural = "My Custom Models"
-        ordering = ["id"]
-
-
-
-class ClientLanguage(models.Model):
-    client = models.ForeignKey("Client", on_delete=models.CASCADE, related_name="client_languages_rel")
-    language = models.ForeignKey("Language", on_delete=models.CASCADE, related_name="language_clients_rel")
-    
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        unique_together = ("client", "language")
-        ordering = ["order"]
-
-    def __str__(self):
-        return f"{self.client.id} - {self.language.id} (order {self.order})"
-        #return f"{self.language} ({self.order})"
-
-
-
-class ClientTheme(models.Model):
-    client = models.ForeignKey("Client", on_delete=models.CASCADE, related_name="client_themes_rel")
-    theme = models.ForeignKey("Theme", on_delete=models.CASCADE, related_name="theme_clients_rel")
-
-    order = models.PositiveIntegerField(default=0)
-
-    class Meta:
-        unique_together = ("client", "theme")        
-        ordering = ["order"]
-
-    def __str__(self):
-        return f"{self.client.id} - {self.theme.id} (order {self.order})"
-        #return f"{self.language} ({self.order})"
-
-
-
-class Translation(models.Model):
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="translations") # default, bahushira... 
-    token = models.ForeignKey(Token, on_delete=models.CASCADE, related_name="translations") # g_en, g_fr, g_client_name, g_light...
-    language = models.ForeignKey(Language, on_delete=models.CASCADE)  # "en", "fr", etc.
-    value = models.CharField(max_length=255)
-
-    class Meta:
-        unique_together = ("client", "token", "language")
-        verbose_name = "00-06 Translation"
-        #verbose_name_plural = "My Custom Models" 
-
-    def __str__(self):
-        return f"{self.client.id} {self.token.id} [{self.language.id}] = {self.value}"       
-        # for usage in Admin Panel
-"""
-        
-class TokenType2(models.Model):
     
     # Categorizes tokens: global_text, local_text, language_name, theme_name, Country, State, City, Currency, etc.
     # id = LowercaseCharField(max_length=20, primary_key=True)   # e.g., "country"
@@ -278,12 +27,12 @@ class TokenType2(models.Model):
     def __str__(self):
         return f"{self.ltext} ({self.tokentype_id})"
 
-class Token2(models.Model):
+class Token(models.Model):
     # id = LowercaseCharField(max_length=25, primary_key=True)   # user enters e.g. "g_india" or "l_client_name"
 
-    #tokentype = models.ForeignKey(TokenType2, on_delete=models.PROTECT)
+    #tokentype = models.ForeignKey(TokenType, on_delete=models.PROTECT)
     tokentype = models.ForeignKey(
-        TokenType2,
+        TokenType,
         to_field='tokentype_id', 
         on_delete=models.CASCADE,
         related_name='tokens'
@@ -294,19 +43,19 @@ class Token2(models.Model):
 
     # for usage in Admin Panel
     class Meta:
-        verbose_name = "00-02 Token2"
+        verbose_name = "00-02 Token"
         #verbose_name_plural = "My Custom Models"
 
     # Optional convenience helper:
 
-    def resolve_value2(self, client_id="default", language_id="en", page_id="global"):
-        return TextStatic2.objects.filter(
+    def resolve_value(self, client_id="default", language_id="en", page_id="global"):
+        return TextStatic.objects.filter(
             client__client_id=client_id, token__token_id=self.token_id, language__language_id=language_id, page__page_id=page_id
         ).values_list("value", flat=True).first()        
     
-    def resolve_all_values2(self, client_id='default', page_id="global"):
+    def resolve_all_values(self, client_id='default', page_id="global"):
 
-        qs = TextStatic2.objects.filter(client__client_id=client_id, token__token_id=self.token_id, page__page_id=page_id)
+        qs = TextStatic.objects.filter(client__client_id=client_id, token__token_id=self.token_id, page__page_id=page_id)
         values = {tr.language.language_id: tr.value for tr in qs}
 
         return values        
@@ -315,12 +64,12 @@ class Token2(models.Model):
     def __str__(self):
         return self.token_id
     
-class Language2(models.Model):
+class Language(models.Model):
     # id = LowercaseCharField(max_length=2, primary_key=True)
     language_id = LowercaseCharField(max_length=2, unique=True)    
-    #token = models.ForeignKey(Token2, on_delete=models.SET_NULL)
+    #token = models.ForeignKey(Token, on_delete=models.SET_NULL)
     token = models.ForeignKey(
-        Token2,
+        Token,
         to_field='token_id', 
         on_delete=models.CASCADE,
         related_name='languages'
@@ -337,23 +86,23 @@ class Language2(models.Model):
         return self.token.resolve_all_values() if self.token else None
     """
     def display_name(self, client_id="default", language_id="en", page_id="global"):
-        return self.token.resolve_value2(client_id=client_id, language_id=language_id, page_id=page_id) if self.token else None
+        return self.token.resolve_value(client_id=client_id, language_id=language_id, page_id=page_id) if self.token else None
 
     def display_all_names(self, client_id="default", page_id="global"):
-        return self.token.resolve_all_values2(client_id=client_id, page_id=page_id) if self.token else None
+        return self.token.resolve_all_values(client_id=client_id, page_id=page_id) if self.token else None
 
     # for usage in Admin Panel
     class Meta:
-        verbose_name = "00-03 Project Language2"
+        verbose_name = "00-03 Project Language"
         #verbose_name_plural = "My Custom Models"
         ordering = ["language_id"]    
 
-class Theme2(models.Model):
+class Theme(models.Model):
     #id = LowercaseCharField(max_length=20, primary_key=True)
     theme_id = LowercaseCharField(max_length=20, unique=True)    
-    #token = models.ForeignKey(Token2, on_delete=models.SET_NULL)
+    #token = models.ForeignKey(Token, on_delete=models.SET_NULL)
     token = models.ForeignKey(
-        Token2,
+        Token,
         to_field='token_id', 
         on_delete=models.CASCADE,
         related_name='themes'
@@ -371,25 +120,25 @@ class Theme2(models.Model):
     """
 
     def display_name(self, client_id="default", language_id="en", page_id="global"):
-        return self.token.resolve_value2(client_id=client_id, language_id=language_id, page_id=page_id) if self.token else None
+        return self.token.resolve_value(client_id=client_id, language_id=language_id, page_id=page_id) if self.token else None
 
     def display_all_names(self, client_id="default", page_id="global"):
-        return self.token.resolve_all_values2(client_id=client_id, page_id=page_id) if self.token else None
+        return self.token.resolve_all_values(client_id=client_id, page_id=page_id) if self.token else None
 
         
     # for usage in Admin Panel
     class Meta:
-        verbose_name = "00-04 Project Theme2"
+        verbose_name = "00-04 Project Theme"
         #verbose_name_plural = "My Custom Models"
         ordering = ["theme_id"]
 
-class Page2(models.Model):
+class Page(models.Model):
     #id = LowercaseCharField(max_length=20, primary_key=True)
     page_id = LowercaseCharField(max_length=10, unique=True)  
-    #token = models.ForeignKey(Token2, on_delete=models.SET_NULL, null=False, blank=False, default='page_name')      
-    #token = models.ForeignKey(Token2, on_delete=models.SET_NULL)
+    #token = models.ForeignKey(Token, on_delete=models.SET_NULL, null=False, blank=False, default='page_name')      
+    #token = models.ForeignKey(Token, on_delete=models.SET_NULL)
     token = models.ForeignKey(
-        Token2,
+        Token,
         to_field='token_id', 
         on_delete=models.CASCADE,
         default='page_name',
@@ -401,25 +150,25 @@ class Page2(models.Model):
 
     # to get the name maintained
     def display_name(self, client_id="default", language_id="en", page_id="global"):
-        return self.token.resolve_value2(client_id=client_id, language_id=language_id, page_id=page_id) if self.token else None
+        return self.token.resolve_value(client_id=client_id, language_id=language_id, page_id=page_id) if self.token else None
 
     def display_all_names(self, client_id="default", page_id="global"):
-        return self.token.resolve_all_values2(client_id=client_id, page_id=page_id) if self.token else None
+        return self.token.resolve_all_values(client_id=client_id, page_id=page_id) if self.token else None
 
         
     # for usage in Admin Panel
     class Meta:
-        verbose_name = "00-04 Project Page2"
+        verbose_name = "00-04 Project Page"
         #verbose_name_plural = "My Custom Models"
         ordering = ["page_id"]
 
-class Client2(models.Model):
+class Client(models.Model):
     #id = LowercaseCharField(max_length=25, primary_key=True)
     client_id = LowercaseCharField(max_length=25, unique=True)    
-    #token = models.ForeignKey(Token2, on_delete=models.SET_NULL, null=False, blank=False, default='client_name')
+    #token = models.ForeignKey(Token, on_delete=models.SET_NULL, null=False, blank=False, default='client_name')
 
     token = models.ForeignKey(
-        Token2,
+        Token,
         to_field='token_id', 
         on_delete=models.CASCADE,
         default='client_name',
@@ -449,12 +198,12 @@ class Client2(models.Model):
     )
 
     # ManyToMany with ordering
-    client_languages2 = models.ManyToManyField(
-        "Language2", through="ClientLanguage2", related_name="clients"
+    client_languages = models.ManyToManyField(
+        "Language", through="ClientLanguage", related_name="clients"
     )
 
-    client_themes2 = models.ManyToManyField(
-        "Theme2", through="ClientTheme2", related_name="clients"
+    client_themes = models.ManyToManyField(
+        "Theme", through="ClientTheme", related_name="clients"
     )
 
     def __str__(self):
@@ -485,17 +234,17 @@ class Client2(models.Model):
     # to get the name maintained 
     """
     def display_name(self):
-        return self.token.resolve_value2(self.client_id, "en", "global") if self.token else None
+        return self.token.resolve_value(self.client_id, "en", "global") if self.token else None
 
     def display_all_names(self):
-        return self.token.resolve_all_values2(self.client_id, "global" ) if self.token else None
+        return self.token.resolve_all_values(self.client_id, "global" ) if self.token else None
     """
     # to get the name maintained
     def display_name(self):
-        return self.token.resolve_value2(client_id=self.client_id, language_id="en", page_id="global") if self.token else None
+        return self.token.resolve_value(client_id=self.client_id, language_id="en", page_id="global") if self.token else None
 
     def display_all_names(self):
-        return self.token.resolve_all_values2(client_id=self.client_id, page_id="global") if self.token else None
+        return self.token.resolve_all_values(client_id=self.client_id, page_id="global") if self.token else None
 
 
 
@@ -528,22 +277,22 @@ class Client2(models.Model):
         """      
     # for usage in Admin Panel
     class Meta:
-        verbose_name = "00-05 Client2"
+        verbose_name = "00-05 Client"
         #verbose_name_plural = "My Custom Models"
         ordering = ["client_id"]
 
-class ClientLanguage2(models.Model):
-    # client = models.ForeignKey("Client2", on_delete=models.CASCADE, related_name="client_languages_rel")
-    # language = models.ForeignKey("Language2", on_delete=models.CASCADE, related_name="language_clients_rel")
+class ClientLanguage(models.Model):
+    # client = models.ForeignKey("Client", on_delete=models.CASCADE, related_name="client_languages_rel")
+    # language = models.ForeignKey("Language", on_delete=models.CASCADE, related_name="language_clients_rel")
 
     client = models.ForeignKey(
-        Client2,
+        Client,
         to_field='client_id', 
         on_delete=models.CASCADE,
         related_name='client_languages_rel'
         )
     language = models.ForeignKey(
-        Language2,
+        Language,
         to_field='language_id', 
         on_delete=models.CASCADE,
         related_name='language_clients_rel'
@@ -556,21 +305,21 @@ class ClientLanguage2(models.Model):
         ordering = ["order"]
 
     def __str__(self):
-        return f"{self.client__client_id} - {self.language__language_id} (order {self.order})"
+        return f"{self.client_id} - {self.language_id} (order {self.order})"
         #return f"{self.language} ({self.order})"
 
-class ClientTheme2(models.Model):
-    #client = models.ForeignKey("Client2", on_delete=models.CASCADE, related_name="client_themes_rel")
-    #theme = models.ForeignKey("Theme2", on_delete=models.CASCADE, related_name="theme_clients_rel")
+class ClientTheme(models.Model):
+    #client = models.ForeignKey("Client", on_delete=models.CASCADE, related_name="client_themes_rel")
+    #theme = models.ForeignKey("Theme", on_delete=models.CASCADE, related_name="theme_clients_rel")
 
     client = models.ForeignKey(
-        Client2,
+        Client,
         to_field='client_id', 
         on_delete=models.CASCADE,
         related_name='client_themes_rel'
         )
     theme = models.ForeignKey(
-        Theme2,
+        Theme,
         to_field='theme_id', 
         on_delete=models.CASCADE,
         related_name='theme_clients_rel'
@@ -583,33 +332,33 @@ class ClientTheme2(models.Model):
         ordering = ["order"]
 
     def __str__(self):
-        return f"{self.client__client_id} - {self.theme__theme_id} (order {self.order})"
+        return f"{self.client_id} - {self.theme_id} (order {self.order})"
         #return f"{self.language} ({self.order})"
 
-class TextStatic2(models.Model):
-    #client = models.ForeignKey(Client2, on_delete=models.CASCADE, related_name="translations") # default, bahushira... 
+class TextStatic(models.Model):
+    #client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="translations") # default, bahushira... 
     client = models.ForeignKey(
-        Client2,
+        Client,
         to_field='client_id', 
         on_delete=models.CASCADE,
         related_name='translations'
         )
-    #token = models.ForeignKey(Token2, on_delete=models.CASCADE, related_name="translations") # g_en, g_fr, g_client_name, g_light...
+    #token = models.ForeignKey(Token, on_delete=models.CASCADE, related_name="translations") # g_en, g_fr, g_client_name, g_light...
     token = models.ForeignKey(
-        Token2,
+        Token,
         to_field='token_id', 
         on_delete=models.CASCADE,
         related_name='translations'
         )    
-    #language = models.ForeignKey(Language2, on_delete=models.CASCADE)  # "en", "fr", etc.
+    #language = models.ForeignKey(Language, on_delete=models.CASCADE)  # "en", "fr", etc.
     language = models.ForeignKey(
-        Language2,
+        Language,
         to_field='language_id', 
         on_delete=models.CASCADE,
         related_name='translations'
         )        
     page = models.ForeignKey(
-        Page2,
+        Page,
         to_field='page_id', 
         on_delete=models.CASCADE,
         related_name='translations'
@@ -618,7 +367,7 @@ class TextStatic2(models.Model):
 
     class Meta:
         unique_together = ("client", "token", "language", "page")
-        verbose_name = "00-06 TextStatic2"
+        verbose_name = "00-06 TextStatic"
         #verbose_name_plural = "My Custom Models" 
 
     def __str__(self):

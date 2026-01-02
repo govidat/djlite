@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
-#from mysite.models import Translation, TextStatic2
-from mysite.models import TextStatic2
+#from mysite.models import Translation, TextStatic
+from mysite.models import TextStatic
  
 def build_nested_hierarchy(flat_list):
     # Create a dictionary for quick lookup of items by their ID
@@ -54,77 +54,9 @@ def update_list_of_dictionaries(smaller_list, larger_list, key_field):
 
 # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
 #sorted_by_age = sorted(data, key=lambda x: x['age']) ;
-"""
-def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_dict=False, use_cache=True, timeout=3600):
-    
-    #Fetch translations with optional caching.
-    #Works when client, token, language are text primary keys.
-    
-    
-    # Build cache key
-    cache_key = None
-    if use_cache and client_ids:
-        cache_key = f"translations:{','.join(map(str, client_ids))}:{as_dict}"
-        cached_data = cache.get(cache_key)
-        if cached_data is not None:
-            return cached_data
-    
-    # Build query
-    qs = Translation.objects.select_related("client", "token", "language")
 
-    if client_ids:
-        qs = qs.filter(client__in=client_ids)
 
-    if token_ids:
-        qs = qs.filter(token__in=token_ids)
-
-    if language_ids:
-        qs = qs.filter(language__in=language_ids)
-
-    # Reshape result
-    result = {}
-    for t in qs:
-        
-        # Always fetch raw PK if possible, else fallback to object.pk
-        #client = getattr(t, "client_id", None) or str(t.client.pk)
-        #token = getattr(t, "token_id", None) or str(t.token.pk)
-        #lang = getattr(t, "language_id", None) or str(t.language.pk)
-
-        # Since PKs are text, make sure we treat them as str
-        #client, token, lang = str(client), str(token), str(lang)
-        
-        client = str(t.client.pk)
-        token = str(t.token.pk)
-        lang = str(t.language.pk)
-
-        key = (client, token)
-        if key not in result:
-            result[key] = {
-                "client": client,
-                "token": token,
-                "text": {}
-            }
-        result[key]["text"][lang] = t.value
-
-    # Return format
-    if as_dict:
-        nested = defaultdict(lambda: defaultdict(dict))
-        for entry in result.values():
-            client = entry["client"]
-            token = entry["token"]
-            nested[client][token] = entry["text"]
-        final_data = dict(nested)
-    else:
-        final_data = list(result.values())
-    
-    # Cache it
-    if cache_key:
-        cache.set(cache_key, final_data, timeout=timeout)
-    
-    return final_data
-"""
-
-def fetch_textstatic2(client_ids=None, as_dict=False, use_cache=True, timeout=3600):
+def fetch_textstatic(client_ids=None, as_dict=False, use_cache=True, timeout=3600):
     """
     Fetch textstatic with optional caching.
     Works when client_id as primary key.
@@ -141,7 +73,7 @@ def fetch_textstatic2(client_ids=None, as_dict=False, use_cache=True, timeout=36
     # Build query
     # qs = Translation.objects.select_related("client", "token", "language")
     if client_ids:    
-        qs = TextStatic2.objects.filter(client_id__in=client_ids)
+        qs = TextStatic.objects.filter(client_id__in=client_ids)
 
     # Reshape result
     result = {}
