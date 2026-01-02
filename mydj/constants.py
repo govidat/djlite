@@ -1,6 +1,6 @@
 # These are Project Level Constants that can be pulled into settings.py and from there into any views
 
-
+"""
 ROOT_TRANSLATION = [
     {"client": "default", "token": "light",     "order": 3, "text": {"en": "Light", "fr": "Light-fr" }},
     {"client": "default", "token": "dark",      "order": 2, "text": {"en": "Dark", "fr": "Dark-fr" }},
@@ -18,3 +18,4 @@ ROOT_TRANSLATION = [
     {"client": "default", "token": "l_home_title_01", "order": 0, "text": {"en": "Default Home Title", "fr": "FrDefault Home Title" }},
 
 ]
+"""

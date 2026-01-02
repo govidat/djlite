@@ -9,10 +9,13 @@ from django.utils.translation import get_language
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 
-from .models import Client, ClientLanguage, ClientTheme
 
-from utils.common_functions import build_nested_hierarchy, update_list_of_dictionaries, fetch_translations
+#from .models import Client, ClientLanguage, ClientTheme
+from .models import Client2
+#, ClientLanguage2, ClientTheme2, TextStatic2
 
+from utils.common_functions import build_nested_hierarchy, fetch_textstatic2
+# update_list_of_dictionaries, fetch_translations, 
 project_base_language = settings.LANGUAGE_CODE   # 'en'
 
 
@@ -388,15 +391,15 @@ site_stbs = [
             ]},   
     {'id': 10, 'client': 'bahushira',
      'items': [
-            {'order': 2, 'type': 'text', 'class': '', 'link_id': 'l_home_title_01' },
+            {'order': 2, 'type': 'text', 'class': '', 'link_id': '01_01_01_01_title' },
             ]},                         
     {'id': 11, 'client': 'bahushira',
      'items': [
-            {'order': 2, 'type': 'text', 'class': '', 'link_id': 'l_about_title_01' },
+            {'order': 2, 'type': 'text', 'class': '', 'link_id': '01_01_01_01_title' },
             ]},                         
     {'id': 12, 'client': 'bahushira',
      'items': [
-            {'order': 2, 'type': 'text', 'class': '', 'link_id': 'l_contact_title_01' },
+            {'order': 2, 'type': 'text', 'class': '', 'link_id': '01_01_01_01_title' },
             ]},                                     
 ]
 """
@@ -446,12 +449,14 @@ raw_images = [
             'src': 'https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp', 'alt': 'daisy1',
             }                                    
 ]
-
+ 
 # Assuming url of form path("<int:pk>/<str:page>/", ClientPageView.as_view(), name="client_page")
 class ClientPageView(TemplateView):
     template_name = 'base.html'
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
+        """
         # Add any common context data here that both views need
         pkey = self.kwargs.get("pkey")   # <-- get it from URL
         page = self.kwargs.get('page')
@@ -470,13 +475,27 @@ class ClientPageView(TemplateView):
 
        # pk is the client from URL
         client = get_object_or_404(Client, pk=pkey)
+        """
+        # Add any common context data here that both views need
+        lv_client_id = self.kwargs.get("pkey")   # <-- get it from URL
+        lv_page_id = self.kwargs.get('page')
+
+        if not lv_client_id:
+            lv_client_id = 'bahushira'
+
+        if not lv_page_id:
+            lv_page_id = 'home'
+
+       # pk is the client from URL
+        client = get_object_or_404(Client2, client_id=lv_client_id)
 
         # Fetch related many-to-many values
         # ordered languages
         client_language_ids = client.get_ordered_language_ids()
         # ordered themes
         client_theme_ids = client.get_ordered_theme_ids()
-        client_hierarchy_list = [client.id]
+        # future get a hierarchy of client ids using the parent child relationship
+        client_hierarchy_list = [client.client_id]
         client_hierarchy_list.append('default')
 
 
@@ -495,12 +514,16 @@ class ClientPageView(TemplateView):
         nb = {}
         nb['items_nested']=client_nb_items_nested
         nb['logo']="mylogo" 
-        nb['title']={'class': '', 'type': 'text', 'ids': ['g_nb_title']} 
+        nb['title']={'class': '', 'type': 'text', 'ids': ['nb_title']} 
+        """
         raw_texts_v0 = settings.ROOT_TRANSLATION
         raw_texts_v1 = fetch_translations(client_ids=client_hierarchy_list, as_dict=False)
         raw_texts = raw_texts_v0 + raw_texts_v1
-        #context['raw_texts_v1'] = raw_texts_v1
-        context['raw_texts'] = raw_texts
+        """
+        raw_texts_v2 = fetch_textstatic2(client_ids=client_hierarchy_list, as_dict=False)
+        raw_texts = raw_texts_v2
+
+        #context['raw_texts'] = raw_texts
         context["client"] = client
         context["client_hierarchy_list"] = client_hierarchy_list
         context["client_hierarchy_str"] = ','.join(client_hierarchy_list)        
@@ -518,12 +541,20 @@ class ClientPageView(TemplateView):
 
         site_structure_filtered = list(filter(lambda item: item.get('client') in client_hierarchy_list and not item.get('hidden'), site_structure))
 
+        """
         if page == 'about':
             context['page_structure'] = list(filter(lambda item: item.get('page')=='about', site_structure_filtered))    
         elif page == 'contact':
             context['page_structure'] = list(filter(lambda item: item.get('page')=='contact', site_structure_filtered))
         else:
             context['page_structure'] = list(filter(lambda item: item.get('page')=='home', site_structure_filtered))
+        """
+        # filter page_structure based on lv_page_id
+        context['page_structure'] = list(filter(lambda item: item.get('page')==lv_page_id, site_structure_filtered))
+        # filter raw_texts based on [lv_page_id, 'global'] both global and specific page related static texts to be made available
+        # filtered_people = list(filter(lambda person: person['id'] in valid_ids, people))
+
+        context['raw_texts'] = list(filter(lambda item: item.get('page_id') in [lv_page_id, 'global'], raw_texts))
 
         return context
 
@@ -560,7 +591,7 @@ class ZClientBaseView(TemplateView):
         nb = {}
         nb['items_nested']=client_nb_items_nested
         nb['logo']="mylogo" 
-        nb['title']={'class': '', 'type': 'text', 'ids': ['g_nb_title']} 
+        nb['title']={'class': '', 'type': 'text', 'ids': ['nb_title']} 
 
 
         context["client"] = client

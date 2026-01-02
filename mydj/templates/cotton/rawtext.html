@@ -6,14 +6,12 @@ Input is an id:
 {% endcomment %}
 
 
-{# text is brought from raw_texts using id #}
 {% comment %}
-{% with dict=raw_texts|get_dictid:id %}    
 {% endcomment %}
 
 
 
 {# text is brought from raw_texts using token #}
-{% with dict=raw_texts|get_listdict_by_token:id|get_dict_by_client_and_prioritized_values:client_hierarchy_str %}    
+{% with dict=raw_texts|get_listdict_by_token_id:id|get_dict_by_client_id_and_prioritized_values:client_hierarchy_str %}    
     {{dict.text|my_text}}
 {% endwith %}    

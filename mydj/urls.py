@@ -17,7 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from debug_toolbar.toolbar import debug_toolbar_urls  # debug-toolbar
+#from django.conf.urls.static import static # debug-toolbar
+#from debug_toolbar.toolbar import debug_toolbar_urls  # debug-toolbar
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -25,8 +26,16 @@ urlpatterns = [
     path("zapp/", include("zapp.urls")),  # zapp
     path('i18n/', include('django.conf.urls.i18n')),  # i18n
     path("", include("mysite.urls")),  # zapp
-] + debug_toolbar_urls() # # debug-toolbar
+] 
+# + debug_toolbar_urls() 
 
+#+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns  # Placing it first can help prevent conflicts
 
 #if settings.DEBUG:
 #    # Include django_browser_reload URLs only in DEBUG mode

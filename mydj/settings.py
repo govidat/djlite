@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from .constants import ROOT_TRANSLATION
+#from .constants import ROOT_TRANSLATION
 # PC_THEMES, PC_LANGUAGES,
 import os  # debug-toolbar
 import sys # debug-toolbar
@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'django_cotton.apps.SimpleAppConfig', # cotton
     'mysite', # mysite
     "adminsortable2", # admin-sortable2
+    'django_extensions', # django_extensions for orm scripts
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 
@@ -73,7 +74,8 @@ MIDDLEWARE = [
 #if DEBUG:   # tailwind
 #    # Add django_browser_reload middleware only in DEBUG mode
 #    MIDDLEWARE += [
-#        "django_browser_reload.middleware.BrowserReloadMiddleware",
+#        
+#        # "django_browser_reload.middleware.BrowserReloadMiddleware",
 #    ]
 
 ROOT_URLCONF = 'mydj.urls'
@@ -176,13 +178,14 @@ LOGIN_REDIRECT_URL = "/"  # allauth
 LANGUAGES = [           # i18n
     ('en', 'English'),
     ('fr', 'French'),
+    ('hi', 'Hindi')
 ]
 
 # importing the constants from constants.py
 # PC_NAVBAR_ITEMS = PC_NAVBAR_ITEMS 
 #PC_THEMES = PC_THEMES 
 #PC_LANGUAGES = PC_LANGUAGES
-ROOT_TRANSLATION = ROOT_TRANSLATION
+#ROOT_TRANSLATION = ROOT_TRANSLATION
 
 
 # CLASSV2 = "bg-gray-200 p-6 rounded-md flex-1 min-w-[200px]"
@@ -196,14 +199,15 @@ INTERNAL_IPS = [
 TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
 
 # # debug-toolbar
+
 if not TESTING:
     INSTALLED_APPS = [
         *INSTALLED_APPS,
         "debug_toolbar",
     ]
     MIDDLEWARE = [
-        "debug_toolbar.middleware.DebugToolbarMiddleware",
         *MIDDLEWARE,
+        "debug_toolbar.middleware.DebugToolbarMiddleware",      
     ]
 
 
@@ -241,3 +245,5 @@ DEBUG_TOOLBAR_CONFIG = {
         "debug_toolbar.panels.profiling.ProfilingPanel",  # heavy + rarely useful
     },
 }
+
+LOCALE_PATHS = (os.path.join(os.path.dirname(__file__), '../locale/'),)

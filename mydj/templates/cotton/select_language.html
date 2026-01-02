@@ -6,10 +6,7 @@
     
     <select class="select" id="language-select" name="language" onchange="this.form.submit()">
       {% for item in languages %}    
-        {% comment %}
-        <option value="{{ item.token }}" {% if current_language == item.token %}selected{% endif %}>        
-        {{ item.token }}-{{item.text|my_text}}
-        {% endcomment %}
+
         <option value="{{ item }}" {% if current_language == item %}selected{% endif %}>        
         {{ item }}-<c-rawtext :id="item"></c-rawtext>
 
@@ -18,4 +15,4 @@
     </select>
   </form>
 {% endblock %}
-
+        

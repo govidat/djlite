@@ -40,6 +40,10 @@
     </svg>
   </div>
     {% endcomment %}
+
+  {% comment %}  
+  {% endcomment %}
+
   <ul tabindex="0" class="dropdown-content bg-base-300 rounded-box z-1 w-52 p-2 shadow-2xl">
     {% for theme in themes %}
         <li>
@@ -47,10 +51,11 @@
             type="radio"
             name="theme-dropdown"
             class="theme-controller w-full btn btn-sm btn-block btn-ghost justify-start"
-            aria-label={{raw_texts|get_list_filtered_by_token:theme|get_dict_by_client_and_prioritized_values:client_hierarchy_str|get_item:"text"|my_text}}
+            aria-label={{raw_texts|get_list_filtered_by_token_id:theme|get_dict_by_client_id_and_prioritized_values:client_hierarchy_str|get_item:"text"|my_text}}
             value={{theme}} />
         </li>        
     {% endfor %}
 
   </ul>
+
 </div>

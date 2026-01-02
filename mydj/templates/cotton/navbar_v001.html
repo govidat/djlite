@@ -19,10 +19,13 @@
     {% endcomment %}
 
     <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
+      {% comment %}
+            {{client_language_ids}} - {{current_language}}
+      {% endcomment %}
+
       <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
 
       {% comment %}
-      {{nb.title|default:"My default title" }}-{{current_language}} - {{client}}
       {% endcomment %}
     </h1>
 

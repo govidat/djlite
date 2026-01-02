@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
-from mysite.models import Translation
-
+from mysite.models import Translation, TextStatic2
+ 
 def build_nested_hierarchy(flat_list):
     # Create a dictionary for quick lookup of items by their ID
     item_map = {item['id']: item for item in flat_list}
@@ -112,6 +112,70 @@ def fetch_translations(client_ids=None, token_ids=None, language_ids=None, as_di
             client = entry["client"]
             token = entry["token"]
             nested[client][token] = entry["text"]
+        final_data = dict(nested)
+    else:
+        final_data = list(result.values())
+    
+    # Cache it
+    if cache_key:
+        cache.set(cache_key, final_data, timeout=timeout)
+    
+    return final_data
+
+def fetch_textstatic2(client_ids=None, as_dict=False, use_cache=True, timeout=3600):
+    """
+    Fetch textstatic with optional caching.
+    Works when client_id as primary key.
+    """
+    
+    # Build cache key
+    cache_key = None
+    if use_cache and client_ids:
+        cache_key = f"translations:{','.join(map(str, client_ids))}:{as_dict}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+    
+    # Build query
+    # qs = Translation.objects.select_related("client", "token", "language")
+    if client_ids:    
+        qs = TextStatic2.objects.filter(client_id__in=client_ids)
+
+    # Reshape result
+    result = {}
+    for t in qs:
+        """
+        # Always fetch raw PK if possible, else fallback to object.pk
+        client = getattr(t, "client_id", None) or str(t.client.pk)
+        token = getattr(t, "token_id", None) or str(t.token.pk)
+        lang = getattr(t, "language_id", None) or str(t.language.pk)
+
+        # Since PKs are text, make sure we treat them as str
+        client, token, lang = str(client), str(token), str(lang)
+        """
+        client = str(t.client_id)
+        token = str(t.token_id)
+        page = str(t.page_id)        
+        lang = str(t.language_id)
+
+        key = (client, token, page)
+        if key not in result:
+            result[key] = {
+                "client_id": client,
+                "token_id": token,
+                "page_id": page,
+                "text": {}
+            }
+        result[key]["text"][lang] = t.value
+
+    # Return format
+    if as_dict:
+        nested = defaultdict(lambda: defaultdict(dict))
+        for entry in result.values():
+            client = entry["client_id"]
+            token = entry["token_id"]
+            page = entry["page_id"]
+            nested[client][token][page] = entry["text"]
         final_data = dict(nested)
     else:
         final_data = list(result.values())
