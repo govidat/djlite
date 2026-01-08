@@ -1,13 +1,14 @@
 {% comment %}
 inputs are type='stb'/'text' and ids:[]
 {% endcomment %}
+{% load my_tags %}
 
 {% for id in ids %} 
     <div class="flex">
         {% if type == 'stb' %}
             <c-svgtextbadge :id="id"></c-svgtextbadge>
         {% elif type == 'text' %}
-            <c-rawtext :id="id"></c-rawtext>
+            {% mytext_static_tag id %}
         {% endif %}    
     </div> 
 {% endfor %}

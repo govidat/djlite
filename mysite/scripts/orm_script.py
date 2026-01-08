@@ -6,22 +6,29 @@ from mysite.models import Page
 from mysite.models import Client
 from mysite.models import ClientLanguage
 from mysite.models import ClientTheme
+from mysite.models import ClientNavbar
 from mysite.models import TextStatic
 
 
 from django.utils import timezone
 from django.db import connection
+from django.db.models.functions import Lower
+
 from pprint import pprint
 
 def run():
-    """
-    tokens = Token.objects.all()
-    print(tokens)
-
-    pprint(connection.queries)
+    lv_client_id = 'bahushira'
+    #result = ClientLanguage.objects.filter(client_id="bahushira").order_by("-order").values_list('language_id', flat=True)
+    #result = ClientLanguage.objects.filter(client_id='bahushira').values_list('language_id', flat=True).order_by('order')
+    #print(connection.queries)    
+    result = ClientNavbar.objects.filter(client_id=lv_client_id).values('id', 'page_id', 'parent', 'order').order_by('order')
+    print(result)
+    #print(result.exists())
+    #print(client.first())
+    #pprint(connection.queries)
 
     # print("Hello from runscript")
-    """
+    
     
     """
     # tokentype = TokenType()
@@ -178,7 +185,7 @@ def run():
         client_id = 'bahushira',
         theme_id = 'dark',
         order = 2)        
-    """    
+      
 
     TextStatic.objects.create(
         client_id = 'bahushira',
@@ -577,5 +584,5 @@ def run():
         value = 'frContact Bahushira'
         ) 
 
-
+    """ 
 

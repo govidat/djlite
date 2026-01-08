@@ -1,0 +1,16 @@
+{% load my_filters %}
+{% comment %}
+Input is a lv_token
+Output is a text. 
+This has to be derived from texts_static_dict which is of form:
+texts_static_dict - {token_id: {client_id: {page_id: {en: val1, fr: val2}}}}
+client_hierarchy_list = ['bahushira', parent, grandparent, 'default']
+LANGUAGE_CODE 
+CURRENT_LANGUAGE_CODE
+page_id
+
+first check if there is a value in token - 
+{% endcomment %}
+
+    {{lv_token|mytext_static:'en'}}
+

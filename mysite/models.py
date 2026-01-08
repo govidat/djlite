@@ -280,6 +280,9 @@ class Client(models.Model):
         verbose_name = "00-05 Client"
         #verbose_name_plural = "My Custom Models"
         ordering = ["client_id"]
+        indexes = [
+            models.Index(fields=["client_id"]),
+        ]
 
 class ClientLanguage(models.Model):
     # client = models.ForeignKey("Client", on_delete=models.CASCADE, related_name="client_languages_rel")
@@ -302,10 +305,11 @@ class ClientLanguage(models.Model):
 
     class Meta:
         unique_together = ("client", "language")
-        ordering = ["order"]
+        ordering = ["client", "order"]
+        verbose_name = "01-01 Client Language"
 
     def __str__(self):
-        return f"{self.client_id} - {self.language_id} (order {self.order})"
+        return f"{self.client} - {self.language} (order {self.order})"
         #return f"{self.language} ({self.order})"
 
 class ClientTheme(models.Model):
@@ -329,11 +333,45 @@ class ClientTheme(models.Model):
 
     class Meta:
         unique_together = ("client", "theme")        
-        ordering = ["order"]
+        ordering = ["client", "order"]
+        verbose_name = "01-02 Client Theme"
 
     def __str__(self):
-        return f"{self.client_id} - {self.theme_id} (order {self.order})"
+        return f"{self.client.client_id} - {self.theme.theme_id} (order {self.order})"
         #return f"{self.language} ({self.order})"
+
+class ClientNavbar(models.Model):
+
+    client = models.ForeignKey(
+        Client,
+        to_field='client_id', 
+        on_delete=models.CASCADE,
+        related_name='client_navbar_rel'
+        )
+    page = models.ForeignKey(
+        Page,
+        to_field='page_id', 
+        on_delete=models.CASCADE,
+        related_name='page_navbar_rel'
+        )
+
+    order = models.PositiveIntegerField(default=0)
+
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = ("client", "page")        
+        ordering = ["client", "order"]
+        verbose_name = "01-03 Client Navbar item"
+
+    def __str__(self):
+        return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
 
 class TextStatic(models.Model):
     #client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="translations") # default, bahushira... 
@@ -369,7 +407,9 @@ class TextStatic(models.Model):
         unique_together = ("client", "token", "language", "page")
         verbose_name = "00-06 TextStatic"
         #verbose_name_plural = "My Custom Models" 
-
+        indexes = [
+            models.Index(fields=["client"]),
+        ]
     def __str__(self):
-        return f"{self.client_id} {self.token_id} {self.page_id} [{self.language_id}] = {self.value}"       
+        return f"{self.client.client_id} {self.token_id} {self.page_id} [{self.language_id}] = {self.value}"       
         # for usage in Admin Panel

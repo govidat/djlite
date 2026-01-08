@@ -1,4 +1,4 @@
-{% load my_filters %}
+{% load my_tags %}
 
 {% block language_switcher %} 
   <form method="post" action="{% url 'set_language' %}">
@@ -8,8 +8,7 @@
       {% for item in languages %}    
 
         <option value="{{ item }}" {% if current_language == item %}selected{% endif %}>        
-        {{ item }}-<c-rawtext :id="item"></c-rawtext>
-
+        {{ item }}-{% mytext_static_tag item %}
         </option>
       {% endfor %}
     </select>

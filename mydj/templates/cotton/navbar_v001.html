@@ -1,5 +1,6 @@
 {% load my_filters %}
 
+
 <div class="navbar bg-base-100 shadow-sm fixed top-0 left-0 w-full z-50">
   <div class="navbar-start">
     <div class="dropdown">
@@ -12,7 +13,7 @@
         <c-navbar_v001_l1recur :items="nb.items_nested"></c-navbar_v001_l1recur>
       </ul>
     </div>
-    <a href="{% url 'client_page' client 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    <a href="{% url 'client_page' client_id 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
     {% comment %}
 
     <a href="{% url 'home' client %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
@@ -20,10 +21,10 @@
 
     <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
       {% comment %}
-            {{client_language_ids}} - {{current_language}}
       {% endcomment %}
 
       <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
+      
 
       {% comment %}
       {% endcomment %}

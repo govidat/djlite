@@ -157,11 +157,69 @@ def get_dict_by_client_id_and_prioritized_values(list_of_dicts=[], keyvals=""):
     result = get_dict_by_client_id_and_prioritized_values(source_list, keyvals)
     print(result)
     """
+@register.filter (needs_context=True)
+def mytext_static(context, lv_token_id=''):
+    client_id = context.get("client_id")
+    """
+    Input is a lv_token; optional arg = "en', 'hi'...
+    Output is a text. 
+    This has to be derived from texts_static_dict which is of form:
+    texts_static_dict - {token_id: {client_id: {page_id: {en: val1, fr: val2}}}}
+    client_hierarchy_list = ['bahushira', parent, grandparent, 'default']
+    LANGUAGE_CODE 
+    CURRENT_LANGUAGE_CODE
+    page_id
+
+    """    
+
+    """
+    Attempts to retrieve a value from a 4-level nested dictionary 
+    using predefined paths in order of preference.
+    
+    Returns the value found or None if no valid path exists.
+    token > client > page > ln
+    token > client > general > ln
+    token > client > page > baseln
+    token > client > general > baseln     
+    token > client_parent...
+    token > default ....
+
+
+    # Path 1: ['a'=, 'b', 'c', 'target_key_1']
+    try:
+        return data_dict['a']['b']['c']['target_key_1']
+    except KeyError:
+        pass  # If this fails, move to the next path
+
+    # Path 2: ['x', 'y', 'z', 'target_key_2']
+    try:
+        return data_dict['x']['y']['z']['target_key_2']
+    except KeyError:
+        pass  # If this fails, move to the next path
+
+    # Path 3: ['p', 'q', 'r', 'target_key_3']
+    try:
+        return data_dict['p']['q']['r']['target_key_3']
+    except KeyError:
+        pass
+        
+    # If none of the paths are found
+    return None
+    """
+
+    #data_dict = texts_static_dict
+    return client_id
 
 @register.filter
 def get_listdict_by_token_id(listdict=[], arg=''):
-    return list(filter(lambda x: x['token_id'] == arg, listdict))
 
+    # Add print statements to see exactly what is being passed
+    # print(f"DEBUG: arg received: {arg!r}, type: {type(arg)}")
+
+    result = list(filter(lambda x: x['token_id'] == arg, listdict))
+    return result if result else []
+
+    #return arg
     """ 
     Returns the listdict by filtering on key token;
     """

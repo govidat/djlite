@@ -5,8 +5,10 @@
   <option value="pink">Pink</option>
   <option value="light">Light</option>  
 </select>
-{% endcomment %}
 {% load my_filters %}
+{% endcomment %}
+
+{% load my_tags %}
 
 <div class="dropdown">
   <div tabindex="0" role="button" class="btn group btn-sm gap-1.5 px-1.5 btn-ghost" aria-label="Change Theme">
@@ -42,6 +44,7 @@
     {% endcomment %}
 
   {% comment %}  
+              aria-label={{raw_texts|get_list_filtered_by_token_id:theme|get_dict_by_client_id_and_prioritized_values:client_hierarchy_str|get_item:"text"|my_text}}
   {% endcomment %}
 
   <ul tabindex="0" class="dropdown-content bg-base-300 rounded-box z-1 w-52 p-2 shadow-2xl">
@@ -51,7 +54,7 @@
             type="radio"
             name="theme-dropdown"
             class="theme-controller w-full btn btn-sm btn-block btn-ghost justify-start"
-            aria-label={{raw_texts|get_list_filtered_by_token_id:theme|get_dict_by_client_id_and_prioritized_values:client_hierarchy_str|get_item:"text"|my_text}}
+            aria-label={% mytext_static_tag theme %}
             value={{theme}} />
         </li>        
     {% endfor %}

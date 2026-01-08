@@ -9,12 +9,12 @@ from django.utils.translation import get_language
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 
-
+from django.db.models import Prefetch
 #from .models import Client, ClientLanguage, ClientTheme
-from .models import Client
+from .models import Client, ClientLanguage, ClientTheme, ClientNavbar
 #, ClientLanguage, ClientTheme, TextStatic
 
-from utils.common_functions import build_nested_hierarchy, fetch_textstatic
+from utils.common_functions import build_nested_hierarchy, fetch_clientstatic
 # update_list_of_dictionaries, fetch_translations, 
 project_base_language = settings.LANGUAGE_CODE   # 'en'
 
@@ -456,7 +456,7 @@ class ClientPageView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Add any common context data here that both views need
+        # Add any common context data here that all views need
         lv_client_id = self.kwargs.get("pkey")   # <-- get it from URL
         lv_page_id = self.kwargs.get('page')
 
@@ -466,19 +466,47 @@ class ClientPageView(TemplateView):
         if not lv_page_id:
             lv_page_id = 'home'
 
+        client_static = fetch_clientstatic(lv_client_id=lv_client_id)
+        """
+        # refactored to get all static data in one go and cache the sql call
+        if lv_client_id:
+            # do many sql calls and update the list
+            if Client.objects.filter(client_id=lv_client_id).exists():
+                client_static['client'] = Client.objects.get(client_id=lv_client_id)
+                # If the code reaches here, the object exists, and you have it in 'obj'
+                # TODO if Client Model has some more values that we want to pull in, then we will have to add code here
+
+                # get other client specific support model data
+                client_static['client_language_ids'] = ClientLanguage.objects.filter(client__client_id=lv_client_id).values_list('language_id', flat=True).order_by('order')
+                client_static['client_theme_ids'] = ClientTheme.objects.filter(client__client_id=lv_client_id).values_list('theme_id', flat=True).order_by('order')
+                client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'parent', 'order').order_by('order')
+            else:
+                # push some content into this to display an error message
+                client_static = {}
+        else:
+            # push some content into this to display an error message
+            client_static = {}
+        """
+        # start a cache key    
+
         # pk is the client from URL
-        client = get_object_or_404(Client, client_id=lv_client_id)
+        #client = get_object_or_404(Client, client_id=lv_client_id)
 
         # Fetch related many-to-many values
         # ordered languages
-        client_language_ids = client.get_ordered_language_ids()
+        #client_language_ids2 = client.get_ordered_language_ids()
+        #client_language_ids = client_language_ids2
         # ordered themes
-        client_theme_ids = client.get_ordered_theme_ids()
+        # client_theme_ids = client.get_ordered_theme_ids()
         # future get a hierarchy of client ids using the parent child relationship
-        client_hierarchy_list = [client.client_id]
-        client_hierarchy_list.append('default')
 
 
+        # 260106 client_hierarchy_list = [lv_client_id]
+        # 260106 client_hierarchy_list.append('default')
+        # if I do not give value list, the result is not as expected
+
+
+        """
         client_nb_items = [
             {"id": "home", "parent": "",      "order": 1, 'text': {'en': 'Home', 'fr': 'frHome', 'hi': 'hiHome'}},
             {"id": "about", "parent": "",      "order": 2, 'text': {'en': 'About', 'fr': 'frAbout', 'hi': 'hiAbout'}},
@@ -488,28 +516,36 @@ class ClientPageView(TemplateView):
             #{"id": "id5", "parent": "id3",   "order": 1},
             #{"id": "id6", "parent": "id5",   "order": 1},     
         ]
+        """
+        """
+        from model ClientNavbar items will give a result like below:
+        [
+            {"id": 1, "page_id": "home",  "parent": "",  "order": 1},
+            {"id": 2, "page_id": "about", "parent": "",  "order": 2},
+            {"id": 3, "page_id": "team", "parent": "",  "order": 3},
+            {"id": 4, "page_id": "contacct", "parent": 3,  "order": 4}
+        ]
+        """
         # the url values and text are updated from Project Constant PC_NAVBAR_ITEMS
         #client_nb_items_updated = update_list_of_dictionaries(client_nb_items, settings.PC_NAVBAR_ITEMS,'id')
-        client_nb_items_nested = build_nested_hierarchy(client_nb_items)
+        # 260106 client_nb_items_nested = build_nested_hierarchy(client_static['client_nb_items'])
+        #client_nb_items = client_static['client_nb_items']
+        #client_nb_items_nested = build_nested_hierarchy(client_nb_items)
+        client_nb_items_nested = client_static['client_nb_items_nested']        
         nb = {}
-        nb['items_nested']=client_nb_items_nested
+        nb['items_nested'] = client_nb_items_nested
         nb['logo']="mylogo" 
         nb['title']={'class': '', 'type': 'text', 'ids': ['nb_title']} 
-        """
-        raw_texts_v0 = settings.ROOT_TRANSLATION
-        raw_texts_v1 = fetch_translations(client_ids=client_hierarchy_list, as_dict=False)
-        raw_texts = raw_texts_v0 + raw_texts_v1
-        """
-        raw_texts_v2 = fetch_textstatic(client_ids=client_hierarchy_list, as_dict=False)
-        raw_texts = raw_texts_v2
+        context['texts_static_dict'] = client_static['texts_static_dict'] 
+        #raw_texts = client_static['raw_texts']
 
         #context['raw_texts'] = raw_texts
-        context["client"] = client
-        context["client_hierarchy_list"] = client_hierarchy_list
-        context["client_hierarchy_str"] = ','.join(client_hierarchy_list)        
+        context["client_id"] = lv_client_id
+        context["client_hierarchy_list"] = client_static['client_hierarchy_list']
+        context["client_hierarchy_str"] = ','.join(client_static['client_hierarchy_list'])        
 
-        context["client_language_ids"] = client_language_ids
-        context["client_theme_ids"] = client_theme_ids
+        context["client_language_ids"] = client_static['client_language_ids']
+        context["client_theme_ids"] = client_static['client_theme_ids']
         context['nb'] = nb
         context['site_cards'] = site_cards
         context['site_heros'] = site_heros        
@@ -518,8 +554,8 @@ class ClientPageView(TemplateView):
         context['site_stbs'] = site_stbs    
         context['site_accordions'] = site_accordions
         context['site_carousals'] = site_carousals
-
-        site_structure_filtered = list(filter(lambda item: item.get('client') in client_hierarchy_list and not item.get('hidden'), site_structure))
+        #context['page_id'] = lv_page_id
+        site_structure_filtered = list(filter(lambda item: item.get('client') in client_static['client_hierarchy_list'] and not item.get('hidden'), site_structure))
 
         """
         if page == 'about':
@@ -534,7 +570,7 @@ class ClientPageView(TemplateView):
         # filter raw_texts based on [lv_page_id, 'global'] both global and specific page related static texts to be made available
         # filtered_people = list(filter(lambda person: person['id'] in valid_ids, people))
 
-        context['raw_texts'] = list(filter(lambda item: item.get('page_id') in [lv_page_id, 'global'], raw_texts))
+        #context['raw_texts'] = list(filter(lambda item: item.get('page_id') in [lv_page_id, 'global'], raw_texts))
 
         return context
 

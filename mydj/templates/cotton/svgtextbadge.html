@@ -1,4 +1,6 @@
 {% load my_filters %}
+{% load my_tags %}
+
 {% comment %}
 This is to display a svg, text and badge in a single line.
 Input is an array like:
@@ -27,16 +29,13 @@ first get the svgitem for this input and then proceed as before
                 {% endwith %}        
             {% endif %}
             {% if item.type == 'text' and item.link_id %}
-                <c-rawtext :id="item.link_id"></c-rawtext>
-                {% comment %}
-                {% endcomment %}
-
+                {% mytext_static_tag item.link_id %}
             {% endif %}
             {% if item.type == 'badge' and item.link_id %} 
                 {% comment %}
                 {% endcomment %}
                 <div class="badge badge-secondary {{ item.class|default:"" }}">
-                    <c-rawtext :id="item.link_id"></c-rawtext>
+                    {% mytext_static_tag item.link_id %}
                 </div>
 
             {% endif %}

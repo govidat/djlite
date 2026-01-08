@@ -1,0 +1,20 @@
+{% load my_filters %}
+{% comment %}
+This is to display a text.
+Input is an id:
+{% with lv_id=id %}
+
+{% endwith %}
+A redundant with is required for the template to work. else it gives error
+{% endcomment %}
+
+{% with zlv_token=lv_token %}
+    {% with dict=raw_texts|get_listdict_by_token_id:zlv_token|get_dict_by_client_id_and_prioritized_values:client_hierarchy_str %}    
+        {{dict.text|my_text}}
+    {% endwith %}    
+{% endwith %}
+
+
+{% comment %}
+
+{% endcomment %}

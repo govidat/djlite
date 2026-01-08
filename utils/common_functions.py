@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
 #from mysite.models import Translation, TextStatic
-from mysite.models import TextStatic
+from mysite.models import Client, ClientLanguage, ClientTheme, ClientNavbar, TextStatic
  
 def build_nested_hierarchy(flat_list):
     # Create a dictionary for quick lookup of items by their ID
@@ -25,6 +25,7 @@ def build_nested_hierarchy(flat_list):
             nested_list.append(item)
 
     return nested_list
+
 
 
 # This is used to update the values in navbar
@@ -55,12 +56,12 @@ def update_list_of_dictionaries(smaller_list, larger_list, key_field):
 # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
 #sorted_by_age = sorted(data, key=lambda x: x['age']) ;
 
-
+"""
 def fetch_textstatic(client_ids=None, as_dict=False, use_cache=True, timeout=3600):
-    """
-    Fetch textstatic with optional caching.
-    Works when client_id as primary key.
-    """
+    
+    # Fetch textstatic with optional caching.
+    # Works when client_id as primary key.
+    
     
     # Build cache key
     cache_key = None
@@ -78,15 +79,6 @@ def fetch_textstatic(client_ids=None, as_dict=False, use_cache=True, timeout=360
     # Reshape result
     result = {}
     for t in qs:
-        """
-        # Always fetch raw PK if possible, else fallback to object.pk
-        client = getattr(t, "client_id", None) or str(t.client.pk)
-        token = getattr(t, "token_id", None) or str(t.token.pk)
-        lang = getattr(t, "language_id", None) or str(t.language.pk)
-
-        # Since PKs are text, make sure we treat them as str
-        client, token, lang = str(client), str(token), str(lang)
-        """
         client = str(t.client_id)
         token = str(t.token_id)
         page = str(t.page_id)        
@@ -119,3 +111,140 @@ def fetch_textstatic(client_ids=None, as_dict=False, use_cache=True, timeout=360
         cache.set(cache_key, final_data, timeout=timeout)
     
     return final_data
+
+"""
+
+def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout=3600):
+    """
+    Fetch clientstatic with optional caching.
+    Works when client_id as primary key.
+    """
+    
+    # Build cache key
+    cache_key = None
+    if use_cache and lv_client_id:
+        cache_key = f"clientstatic:{lv_client_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+    
+    # Build query
+    client_static = {}
+    # refactored to get all static data in one go and cache the sql call
+    if lv_client_id:
+        # do many sql calls and update the list
+        if Client.objects.filter(client_id=lv_client_id).exists():
+            client_static['client'] = Client.objects.get(client_id=lv_client_id)
+            # If the code reaches here, the object exists, and you have it in 'obj'
+            # TODO if Client Model has some more values that we want to pull in, then we will have to add code here
+
+            # get other client specific support model data
+            client_static['client_language_ids'] = ClientLanguage.objects.filter(client__client_id=lv_client_id).values_list('language_id', flat=True).order_by('order')
+            client_static['client_theme_ids'] = ClientTheme.objects.filter(client__client_id=lv_client_id).values_list('theme_id', flat=True).order_by('order')
+            client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'parent', 'order').order_by('order')        
+
+            client_ancestors=client_static['client'].get_ancestors()
+            client_static['client_hierarchy_list'] = [lv_client_id] + client_ancestors + ['default']
+            # expected value is a list of client_ids
+            client_static['client_nb_items_nested'] = build_nested_hierarchy(client_static['client_nb_items'])
+
+            # Build query for textstatic
+            # qs = Translation.objects.select_related("client", "token", "language")
+            #qs = TextStatic.objects.filter(client_id__in=client_static['client_hierarchy_list'])
+            qs = TextStatic.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("token_id").values("token_id", "client_id", "page_id", "language_id", "value")
+
+            # Reshape result2
+            """
+            Expected result:
+            {
+                "page_title": {
+                    "abc123": {
+                        "en": {
+                            "general": "Home",
+                            "about": "About"
+                        }
+                    }
+                }
+            }
+            """
+            reshaped_data = {}
+
+            for item in qs:
+                token_id = item['token_id']
+                client_id = item['client_id']
+                page_id = item['page_id']
+                language_id = item['language_id']
+                value = item['value']
+
+                # Check and create nested dictionaries as needed
+                if token_id not in reshaped_data:
+                    reshaped_data[token_id] = {}
+                if client_id not in reshaped_data[token_id]:
+                    reshaped_data[token_id][client_id] = {}
+                if language_id not in reshaped_data[token_id][client_id]:
+                    reshaped_data[token_id][client_id][language_id] = {}
+                
+                # Assign the final value
+                reshaped_data[token_id][client_id][language_id][page_id] = value
+            client_static['texts_static_dict'] = reshaped_data
+
+        else:
+            # push some content into this to display an error message
+            client_static = {}
+    else:
+        # push some content into this to display an error message
+        client_static = {}
+
+    
+    # Cache it
+    if cache_key:
+        cache.set(cache_key, client_static, timeout=timeout)
+
+    
+    return client_static
+
+"""
+def fetch_textstatic_dict(client_ids=None, use_cache=True, timeout=3600):
+    
+    # Build cache key
+    cache_key = None
+    if use_cache and client_ids:
+        cache_key = f"translations_dict:{','.join(map(str, client_ids))}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+    
+    # Build query
+    # qs = Translation.objects.select_related("client", "token", "language")
+    if client_ids:    
+        qs = TextStatic.objects.filter(client_id__in=client_ids).order_by("token_id").values("token_id", "client_id", "page_id", "language_id", "value")
+
+    # Reshape result
+
+    reshaped_data = {}
+
+    for item in qs:
+        token_id = item['token_id']
+        client_id = item['client_id']
+        page_id = item['page_id']
+        language_id = item['language_id']
+        value = item['value']
+
+        # Check and create nested dictionaries as needed
+        if token_id not in reshaped_data:
+            reshaped_data[token_id] = {}
+        if client_id not in reshaped_data[token_id]:
+            reshaped_data[token_id][client_id] = {}
+        if language_id not in reshaped_data[token_id][client_id]:
+            reshaped_data[token_id][client_id][language_id] = {}
+        
+        # Assign the final value
+        reshaped_data[token_id][client_id][language_id][page_id] = value
+
+    
+    # Cache it
+    if cache_key:
+        cache.set(cache_key, reshaped_data, timeout=timeout)
+    
+    return reshaped_data
+"""
