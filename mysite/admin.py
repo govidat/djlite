@@ -139,6 +139,7 @@ class ClientThemeAdmin(admin.ModelAdmin):
 class ClientNavbarAdmin(admin.ModelAdmin):
     list_display = ("client", "page", "parent", "order")
     search_fields = ("client__client_id",)
+
 """
 admin.site.register(TokenType, TokenTypeAdmin)
 admin.site.register(Token, TokenAdmin)

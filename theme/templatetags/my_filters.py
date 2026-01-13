@@ -4,6 +4,7 @@ from django.utils.translation import get_language
 
 register = template.Library()
 
+# TO BE DROPPED
 @register.filter
 def my_text(value={}, arg=""):
     """value is expected to be an object like {"en": text-en, "fr": text-fr...}  arg will be like "en" which is forced fit """
@@ -36,7 +37,7 @@ def my_text(value={}, arg=""):
     else:
         return "ERR Z002"
 
-
+# used obly in hero template. to be refactored and removed
 @register.filter
 def my_removetrue(value=[], arg=""):
     """value is expected to be a list like [{hidden: True, a:x, b:y}, {hidden: False, a:p, b:q}] ; arg should be a key in the dictionary. This filter will remove records that have true  """

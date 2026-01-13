@@ -8,24 +8,3 @@
 
 {% endfor %}
 
-    {% comment %}
-<div class="{{ buttons.class|default:"" }}">
-    {% for item in buttons.items|dictsort:"order" %}
-        <button class="flex-row btn btn-xs sm:btn-sm md:btn-md lg:btn-lg xl:btn-xl {{ item.class|default:"" }}">
-            {% if item.svg %}
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
-                    d="{{item.svg}}" /></svg>
-            {% endif %}    
-            {{item.text|my_text}}
-
-        </button>
-    {% endfor %}
-</div>
-{% endcomment %}
-{% comment %}
-
-            {% if item.suffix_svg %}
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
-                    d="{{item.suffix_svg}}" /></svg>
-            {% endif %}  
-{% endcomment %}

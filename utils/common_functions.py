@@ -2,8 +2,9 @@ from collections import defaultdict
 from django.core.cache import cache
 #from mysite.models import Translation, TextStatic
 from mysite.models import Client, ClientLanguage, ClientTheme, ClientNavbar, TextStatic
- 
-def build_nested_hierarchy(flat_list):
+
+""" 
+def build_nested_hierarchy_old(flat_list):
     # Create a dictionary for quick lookup of items by their ID
     item_map = {item['id']: item for item in flat_list}
 
@@ -25,8 +26,31 @@ def build_nested_hierarchy(flat_list):
             nested_list.append(item)
 
     return nested_list
+"""
 
+# This is a modified version and takes the key_name or the field on which the relationship is built.
+def build_nested_hierarchy(flat_list, key_name: str):
+    # Create a dictionary for quick lookup of items by their ID
+    item_map = {item[key_name]: item for item in flat_list}
 
+    # Initialize a list to store the top-level items (roots)
+    nested_list = []
+
+    # Iterate through each item to build the hierarchy
+    for item in flat_list:
+        parent = item.get('parent')
+
+        # If the item has a parent, add it to the parent's children list
+        if parent is not None and parent in item_map:
+            parent_item = item_map[parent]
+            if 'children' not in parent_item:
+                parent_item['children'] = []
+            parent_item['children'].append(item)
+        # If the item has no parent, it's a top-level item
+        else:
+            nested_list.append(item)
+
+    return nested_list
 
 # This is used to update the values in navbar
 def update_list_of_dictionaries(smaller_list, larger_list, key_field):
@@ -141,12 +165,12 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
             # get other client specific support model data
             client_static['client_language_ids'] = ClientLanguage.objects.filter(client__client_id=lv_client_id).values_list('language_id', flat=True).order_by('order')
             client_static['client_theme_ids'] = ClientTheme.objects.filter(client__client_id=lv_client_id).values_list('theme_id', flat=True).order_by('order')
-            client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'parent', 'order').order_by('order')        
+            client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'client_page', 'parent', 'order').order_by('order')        
 
             client_ancestors=client_static['client'].get_ancestors()
             client_static['client_hierarchy_list'] = [lv_client_id] + client_ancestors + ['default']
             # expected value is a list of client_ids
-            client_static['client_nb_items_nested'] = build_nested_hierarchy(client_static['client_nb_items'])
+            client_static['client_nb_items_nested'] = build_nested_hierarchy(client_static['client_nb_items'], 'client_page')
 
             # Build query for textstatic
             # qs = Translation.objects.select_related("client", "token", "language")

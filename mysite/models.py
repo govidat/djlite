@@ -340,6 +340,7 @@ class ClientTheme(models.Model):
         return f"{self.client.client_id} - {self.theme.theme_id} (order {self.order})"
         #return f"{self.language} ({self.order})"
 
+"""
 class ClientNavbar(models.Model):
 
     client = models.ForeignKey(
@@ -354,15 +355,16 @@ class ClientNavbar(models.Model):
         on_delete=models.CASCADE,
         related_name='page_navbar_rel'
         )
-
     order = models.PositiveIntegerField(default=0)
 
     parent = models.ForeignKey(
         "self",
+        to_field="page_id",
+        db_column="parent_page_id",
         null=True,
         blank=True,
         related_name="children",
-        on_delete=models.CASCADE,
+        on_delete=models.CASCADE
     )
 
     class Meta:
@@ -371,7 +373,67 @@ class ClientNavbar(models.Model):
         verbose_name = "01-03 Client Navbar item"
 
     def __str__(self):
+        #return f"{self.client_page} (order {self.order})"
         return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
+"""
+# A new auto filled field of client-page is created. parent child relationship is created on this field
+class ClientNavbar(models.Model):
+
+    client = models.ForeignKey(
+        Client,
+        to_field='client_id', 
+        on_delete=models.CASCADE,
+        related_name='client_navbar_rel'
+        )
+    page = models.ForeignKey(
+        Page,
+        to_field='page_id', 
+        on_delete=models.CASCADE,
+        related_name='page_navbar_rel'
+        )
+    
+    client_page = models.CharField(
+        max_length=40, 
+        unique=True, blank=True, null=True
+        ) # Needs to be nullable/blank if not generated on every save
+
+    order = models.PositiveIntegerField(default=0)
+
+    parent = models.ForeignKey(
+        "self",
+        to_field="client_page",
+        db_column="parent_client_page",
+        null=True,
+        blank=True,
+        related_name="children2",
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        unique_together = ("client", "page")        
+        ordering = ["client", "order"]
+        verbose_name = "01-03 Client Navbar item"
+
+    def __str__(self):
+        return f"{self.client_page} (order {self.order})"
+        #return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
+    
+    def save(self, *args, **kwargs):
+        # Combine the fields. Adding a UUID can help ensure uniqueness if inputs are similar
+        combined_value = f"{self.client.client_id}-{self.page.page_id}" 
+        self.client_page = combined_value
+
+        # The super().save() call will attempt to save to the database.
+        # If the combined_field value is not unique, an IntegrityError will be raised.
+        try:
+            super().save(*args, **kwargs)
+        except models.IntegrityError:
+            # Handle the error if a duplicate is found
+            # You might want to retry with a new UUID or raise a ValidationError
+            # For simplicity, we just reraise here.
+            from django.core.exceptions import ValidationError
+            raise ValidationError("The combined client_page value already exists.")
+    
 
 class TextStatic(models.Model):
     #client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="translations") # default, bahushira... 
