@@ -376,6 +376,7 @@ class ClientNavbar(models.Model):
         #return f"{self.client_page} (order {self.order})"
         return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
 """
+
 # A new auto filled field of client-page is created. parent child relationship is created on this field
 class ClientNavbar(models.Model):
 
@@ -392,7 +393,7 @@ class ClientNavbar(models.Model):
         related_name='page_navbar_rel'
         )
     
-    client_page = models.CharField(
+    comp_unique = models.CharField(
         max_length=40, 
         unique=True, blank=True, null=True
         ) # Needs to be nullable/blank if not generated on every save
@@ -401,11 +402,11 @@ class ClientNavbar(models.Model):
 
     parent = models.ForeignKey(
         "self",
-        to_field="client_page",
-        db_column="parent_client_page",
+        to_field="comp_unique",
+        db_column="parent_comp_unique",
         null=True,
         blank=True,
-        related_name="children2",
+        related_name="children",
         on_delete=models.CASCADE
     )
 
@@ -415,13 +416,13 @@ class ClientNavbar(models.Model):
         verbose_name = "01-03 Client Navbar item"
 
     def __str__(self):
-        return f"{self.client_page} (order {self.order})"
+        return f"{self.comp_unique} (order {self.order})"
         #return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
     
     def save(self, *args, **kwargs):
         # Combine the fields. Adding a UUID can help ensure uniqueness if inputs are similar
         combined_value = f"{self.client.client_id}-{self.page.page_id}" 
-        self.client_page = combined_value
+        self.comp_unique = combined_value
 
         # The super().save() call will attempt to save to the database.
         # If the combined_field value is not unique, an IntegrityError will be raised.
@@ -432,9 +433,65 @@ class ClientNavbar(models.Model):
             # You might want to retry with a new UUID or raise a ValidationError
             # For simplicity, we just reraise here.
             from django.core.exceptions import ValidationError
-            raise ValidationError("The combined client_page value already exists.")
-    
+            raise ValidationError("The combined comp_unique value already exists.")
+"""   
+class ClientNavbar2(models.Model):
 
+    client = models.ForeignKey(
+        Client,
+        to_field='client_id', 
+        on_delete=models.CASCADE,
+        related_name='client_navbar_rel2'
+        )
+    page = models.ForeignKey(
+        Page,
+        to_field='page_id', 
+        on_delete=models.CASCADE,
+        related_name='page_navbar_rel2'
+        )
+    
+    comp_unique = models.CharField(
+        max_length=40, 
+        unique=True, blank=True, null=True
+        ) # Needs to be nullable/blank if not generated on every save
+
+    order = models.PositiveIntegerField(default=0)
+
+    parent = models.ForeignKey(
+        "self",
+        to_field="comp_unique",
+        db_column="parent_comp_unique",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        unique_together = ("client", "page")        
+        ordering = ["client", "order"]
+        verbose_name = "01-03 Client Navbar2 item"
+
+    def __str__(self):
+        return f"{self.comp_unique} (order {self.order})"
+        #return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
+    
+    def save(self, *args, **kwargs):
+        # Combine the fields. Adding a UUID can help ensure uniqueness if inputs are similar
+        combined_value = f"{self.client.client_id}-{self.page.page_id}" 
+        self.comp_unique = combined_value
+
+        # The super().save() call will attempt to save to the database.
+        # If the combined_field value is not unique, an IntegrityError will be raised.
+        try:
+            super().save(*args, **kwargs)
+        except models.IntegrityError:
+            # Handle the error if a duplicate is found
+            # You might want to retry with a new UUID or raise a ValidationError
+            # For simplicity, we just reraise here.
+            from django.core.exceptions import ValidationError
+            raise ValidationError("The combined comp_unique value already exists.")
+"""    
 class TextStatic(models.Model):
     #client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="translations") # default, bahushira... 
     client = models.ForeignKey(
@@ -510,3 +567,102 @@ class ImageStatic(models.Model):
     def __str__(self):
         return f"{self.client.client_id} {self.image_id} {self.page_id} {self.alt}"       
         # for usage in Admin Panel        
+
+class SvgStatic(models.Model):
+    client = models.ForeignKey(
+        Client,
+        to_field='client_id', 
+        on_delete=models.CASCADE,
+        related_name='svgs',
+        default='default'
+        )
+
+    svg_id = LowercaseCharField(max_length=25, null=False)    
+    #language = models.ForeignKey(Language, on_delete=models.CASCADE)  # "en", "fr", etc.
+
+    page = models.ForeignKey(
+        Page,
+        to_field='page_id', 
+        on_delete=models.CASCADE,
+        default='global'
+        )        
+
+    svg_text = models.CharField(max_length=500, null=False)
+
+    class Meta:
+        unique_together = ("client", "svg_id", "page")
+        verbose_name = "00-08 SvgStatic"
+        #verbose_name_plural = "My Custom Models" 
+        indexes = [
+            models.Index(fields=["svg_id", "client"]),
+        ]
+    def __str__(self):
+        return f"{self.client.client_id} {self.svg_id} {self.page_id} {self.svg_text}"       
+        # for usage in Admin Panel        
+"""
+# A new auto filled field of client-page is created. parent child relationship is created on this field
+class SiteStructure(models.Model):
+
+    client = models.ForeignKey(
+        Client,
+        to_field='client_id', 
+        on_delete=models.CASCADE,
+        related_name='client_sitestructure_rel'
+        )
+    page = models.ForeignKey(
+        Page,
+        to_field='page_id', 
+        on_delete=models.CASCADE,
+        related_name='page_sitestructure_rel'
+        )
+    CHOICES = (
+        (10, '10'),
+        (20, '20'),
+        (30, '30'),
+        (40, '40'),
+    )
+    order = models.PositiveIntegerField(default=0)
+
+    level = models.IntegerField(choices=CHOICES, default=10)
+    
+    calc_field = models.CharField(
+        max_length=40, 
+        unique=True, blank=True, null=True
+        ) # Needs to be nullable/blank if not generated on every save
+
+    parent = models.ForeignKey(
+        "self",
+        to_field="calc_field",
+        db_column="parent_calc_field",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        unique_together = ("client", "page")        
+        ordering = ["client", "order"]
+        verbose_name = "01-03 Client Navbar item"
+
+    def __str__(self):
+        return f"{self.client_page} (order {self.order})"
+        #return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
+    
+    def save(self, *args, **kwargs):
+        # Combine the fields. Adding a UUID can help ensure uniqueness if inputs are similar
+        combined_value = f"{self.client.client_id}-{self.page.page_id}" 
+        self.client_page = combined_value
+
+        # The super().save() call will attempt to save to the database.
+        # If the combined_field value is not unique, an IntegrityError will be raised.
+        try:
+            super().save(*args, **kwargs)
+        except models.IntegrityError:
+            # Handle the error if a duplicate is found
+            # You might want to retry with a new UUID or raise a ValidationError
+            # For simplicity, we just reraise here.
+            from django.core.exceptions import ValidationError
+            raise ValidationError("The combined client_page value already exists.")
+    
+"""

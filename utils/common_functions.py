@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
 #from mysite.models import Translation, TextStatic
-from mysite.models import Client, ClientLanguage, ClientTheme, ClientNavbar, TextStatic, ImageStatic
+from mysite.models import Client, ClientLanguage, ClientTheme, ClientNavbar,TextStatic, ImageStatic, SvgStatic
 
 """ 
 def build_nested_hierarchy_old(flat_list):
@@ -165,12 +165,37 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
             # get other client specific support model data
             client_static['client_language_ids'] = ClientLanguage.objects.filter(client__client_id=lv_client_id).values_list('language_id', flat=True).order_by('order')
             client_static['client_theme_ids'] = ClientTheme.objects.filter(client__client_id=lv_client_id).values_list('theme_id', flat=True).order_by('order')
-            client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'client_page', 'parent', 'order').order_by('order')        
 
             client_ancestors=client_static['client'].get_ancestors()
             client_static['client_hierarchy_list'] = [lv_client_id] + client_ancestors + ['default']
             # expected value is a list of client_ids
-            client_static['client_nb_items_nested'] = build_nested_hierarchy(client_static['client_nb_items'], 'client_page')
+
+            # Build query for client_nb_items
+            #client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'client_page', 'parent', 'order').order_by('order')        
+            #client_static['client_nb_items_nested'] = build_nested_hierarchy(client_static['client_nb_items'], 'client_page')
+
+            qsnb = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'comp_unique', 'parent', 'order').order_by('order')
+            # reshape result
+                # Create a dictionary for quick lookup of items by their client_page
+            item_map = {item['comp_unique']: item for item in qsnb}
+
+            # Initialize a list to store the top-level items (roots)
+            nested_list = []
+
+            # Iterate through each item to build the hierarchy
+            for item in qsnb:
+                parent = item.get('parent')
+
+                # If the item has a parent, add it to the parent's children list
+                if parent is not None and parent in item_map:
+                    parent_item = item_map[parent]
+                    if 'children' not in parent_item:
+                        parent_item['children'] = []
+                    parent_item['children'].append(item)
+                # If the item has no parent, it's a top-level item
+                else:
+                    nested_list.append(item)
+            client_static['nb_items_nested'] = nested_list
 
             # Build query for textstatic
             # qs = Translation.objects.select_related("client", "token", "language")
@@ -213,8 +238,6 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
             client_static['texts_static_dict'] = reshaped_data
 
             # Build query for imagestatic
-            # qs = Translation.objects.select_related("client", "token", "language")
-            #qs = TextStatic.objects.filter(client_id__in=client_static['client_hierarchy_list'])
             qsi = ImageStatic.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("image_id").values("image_id", "client_id", "page_id", "image_url", "alt")
 
             # Reshape result2
@@ -252,6 +275,41 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                 reshaped_data[image_id][client_id][page_id] = {'image_url': image_url, 'alt': alt}
             client_static['images_static_dict'] = reshaped_data
 
+            # Build query for svgstatic
+            qss = SvgStatic.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("svg_id").values("svg_id", "client_id", "page_id", "svg_text")
+
+            # Reshape result2
+            """
+            Expected result:
+            {
+                "like": {
+                    "bahushira": {
+                        "global": {
+                            "svg_text": 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z',                            
+                        }
+                    }
+                }
+            }
+            """
+            reshaped_data = {}
+
+            for item in qss:
+                svg_id = item['svg_id']
+                client_id = item['client_id']
+                page_id = item['page_id']
+                svg_text = item['svg_text']
+                
+                # Check and create nested dictionaries as needed
+                if svg_id not in reshaped_data:
+                    reshaped_data[svg_id] = {}
+                if client_id not in reshaped_data[svg_id]:
+                    reshaped_data[svg_id][client_id] = {}
+                #if page_id not in reshaped_data[svg_id][client_id]:
+                #    reshaped_data[token_id][client_id][page_id] = {}
+                
+                # Assign the final value
+                reshaped_data[svg_id][client_id][page_id] = {'svg_text': svg_text}
+            client_static['svgs_static_dict'] = reshaped_data
         else:
             # push some content into this to display an error message
             client_static = {}

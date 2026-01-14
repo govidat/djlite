@@ -24,7 +24,7 @@ admin.site.register(Question, QuestionAdmin)
 """
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 #from .models import TokenType, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
-from .models import TokenType, Token, Language, Theme, Client, TextStatic, ClientLanguage, ClientTheme, Page, ClientNavbar, ImageStatic
+from .models import TokenType, Token, Language, Theme, Client, TextStatic, ClientLanguage, ClientTheme, Page, ClientNavbar, ImageStatic, SvgStatic
 
 #TypedTokenForeignKey
 
@@ -143,6 +143,10 @@ class ClientNavbarAdmin(admin.ModelAdmin):
 class ImageStaticAdmin(admin.ModelAdmin):
     list_display = ("client", "page", "image_id", "image_url", "alt")
     search_fields = ("client__client_id",)
+
+class SvgStaticAdmin(admin.ModelAdmin):
+    list_display = ("client", "page", "svg_id", "svg_text")
+    search_fields = ("client__client_id",)    
 """
 admin.site.register(TokenType, TokenTypeAdmin)
 admin.site.register(Token, TokenAdmin)
@@ -163,3 +167,4 @@ admin.site.register(ClientLanguage, ClientLanguageAdmin)
 admin.site.register(ClientTheme, ClientThemeAdmin)
 admin.site.register(ClientNavbar, ClientNavbarAdmin)
 admin.site.register(ImageStatic, ImageStaticAdmin)
+admin.site.register(SvgStatic, SvgStaticAdmin)

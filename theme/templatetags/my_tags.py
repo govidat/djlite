@@ -159,3 +159,60 @@ def myimage_static_tag(context, lv_token_id=''):
                             
     # If no value was found after checking all priorities
     return {'image_url': '', 'alt': 'ERR001'}    
+
+@register.simple_tag(takes_context=True)
+def mysvg_static_tag(context, lv_token_id=''):
+
+    
+    """
+    Input is a svg_id
+    Output is an object of form {svg_text: xyz}. 
+    This has to be derived from svgs_static_dict which is of form:
+    svgs_static_dict - {svg_id: {client_id: {page_id: {svg_text: xyz}}}}
+    client_hierarchy_list = ['bahushira', parent, grandparent, 'default']
+    page_id
+
+    """    
+    cv_client_hier_list = context.get("client_hierarchy_list")
+    cv_data_dict = context.get("svgs_static_dict")
+    cv_page_id = context.get("page")
+
+    # a hierarchy of page is with current_page followed by global
+    cv_page_hier_list = [cv_page_id, 'global']
+    """
+    Attempts to retrieve a value from a 4-level nested dictionary 
+    using predefined paths in order of preference.
+    
+    Returns the value found or None if no valid path exists.
+    token > client > page 
+    token > client > general 
+    token > client2 > page 
+    token > client2 > general 
+
+    token > client_parent...
+    token > default ....
+      
+    # If none of the paths are found
+    return None
+    """
+
+    # Check if the target token_id exists in the main dictionary
+    if lv_token_id not in cv_data_dict:
+        return {'svg_text': ''}
+
+    # Get the dictionary for the specific token
+    client_dict = cv_data_dict[lv_token_id]
+
+    # Iterate through the client priorities
+    for client_id in cv_client_hier_list:
+        if client_id in client_dict:
+            page_dict = client_dict[client_id]
+                        
+            # Iterate through the page priorities
+            for page_id in cv_page_hier_list:
+                if page_id in page_dict:
+                    # Found the first prioritized value
+                    return page_dict[page_id]
+                            
+    # If no value was found after checking all priorities
+    return {'svg_text': ''}

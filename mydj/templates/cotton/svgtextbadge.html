@@ -16,6 +16,7 @@ first get the svgitem for this input and then proceed as before
 
 {% endcomment %}
 
+
 {# first dict is brought from site_stbs using the link of stb_id #}
 {% with dict_stb=site_stbs|get_dictid:id %} 
     {% with items=dict_stb.items|default:'[]' %}
@@ -23,10 +24,16 @@ first get the svgitem for this input and then proceed as before
         {% for item in items|dictsort:"order" %}
             {% if item.type == 'svg' and item.link_id %}
                 {# svg is brought from raw_svgs using the link of link_id #}
+                {% mysvg_static_tag item.link_id as dict %}
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
+                    d="{{dict.svg_text}}" /></svg>
+
+                {% comment %}
                 {% with dict=raw_svgs|get_dictid:item.link_id %}        
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
                         d="{{dict.svg}}" /></svg>
-                {% endwith %}        
+                {% endwith %}
+                {% endcomment %}        
             {% endif %}
             {% if item.type == 'text' and item.link_id %}
                 {% mytext_static_tag item.link_id %}
