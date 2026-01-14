@@ -336,6 +336,8 @@ raw_svgs = [
             'svg': 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z'
             },
 ]
+"""
+This is moved to context['images_static_dict']
 raw_images = [
             {
             'id': 'nike', 'client': 'ABC123', 'page': 'home',
@@ -350,6 +352,7 @@ raw_images = [
             'src': 'https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp', 'alt': 'daisy1',
             }                                    
 ]
+"""
  
 # Assuming url of form path("<int:pk>/<str:page>/", ClientPageView.as_view(), name="client_page")
 class ClientPageView(TemplateView):
@@ -386,6 +389,7 @@ class ClientPageView(TemplateView):
         nb['logo']="mylogo" 
         nb['title']={'class': '', 'type': 'text', 'ids': ['nb_title']} 
         context['texts_static_dict'] = client_static['texts_static_dict'] 
+        context['images_static_dict'] = client_static['images_static_dict']
 
         context["client_id"] = lv_client_id
         context["client_hierarchy_list"] = client_static['client_hierarchy_list']
@@ -397,7 +401,7 @@ class ClientPageView(TemplateView):
         context['site_cards'] = site_cards
         context['site_heros'] = site_heros        
         context['raw_svgs'] = raw_svgs
-        context['raw_images'] = raw_images  
+        #context['raw_images'] = raw_images  
         context['site_stbs'] = site_stbs    
         context['site_accordions'] = site_accordions
         context['site_carousals'] = site_carousals

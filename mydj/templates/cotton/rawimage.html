@@ -1,15 +1,25 @@
-{% load my_filters %}
+
 {% comment %}
+{% load my_filters %}
 This is to display an image.
 Input is an id:
 input is class:'' id: 1
 
 {% endcomment %}
+{% load my_tags %}
+{# image is brought from context['images_static_dict'] using id #}
+{% myimage_static_tag id as dict %}
 
-{# image is brought from raw_imagess using id #}
+<img
+    class="{{class}}"
+    src={{dict.image_url}}
+    alt={{dict.alt}} />
+{% comment %}
+
 {% with dict=raw_images|get_dictid:id %}  
     <img
         class="{{class}}"
         src={{dict.src}}
         alt={{dict.alt}} />  
 {% endwith %}    
+{% endcomment %}

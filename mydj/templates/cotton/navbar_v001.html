@@ -21,8 +21,9 @@
 
     <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
       {% comment %}
+      {{images_static_dict}}
       {% endcomment %}
-
+      
       <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
       
 

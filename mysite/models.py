@@ -475,3 +475,38 @@ class TextStatic(models.Model):
     def __str__(self):
         return f"{self.client.client_id} {self.token_id} {self.page_id} [{self.language_id}] = {self.value}"       
         # for usage in Admin Panel
+
+
+class ImageStatic(models.Model):
+    client = models.ForeignKey(
+        Client,
+        to_field='client_id', 
+        on_delete=models.CASCADE,
+        related_name='images',
+        default='default'
+        )
+
+    image_id = LowercaseCharField(max_length=25, null=False)    
+    #language = models.ForeignKey(Language, on_delete=models.CASCADE)  # "en", "fr", etc.
+
+    page = models.ForeignKey(
+        Page,
+        to_field='page_id', 
+        on_delete=models.CASCADE,
+        default='global'
+        )        
+
+    image_url = models.URLField(max_length=500)
+    # image_field = models.ImageField()    # pillow needs to e installed for this. to be revisited
+    alt = models.CharField(max_length=100, null=False)
+
+    class Meta:
+        unique_together = ("client", "image_id", "page")
+        verbose_name = "00-07 ImageStatic"
+        #verbose_name_plural = "My Custom Models" 
+        indexes = [
+            models.Index(fields=["image_id", "client"]),
+        ]
+    def __str__(self):
+        return f"{self.client.client_id} {self.image_id} {self.page_id} {self.alt}"       
+        # for usage in Admin Panel        

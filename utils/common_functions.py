@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
 #from mysite.models import Translation, TextStatic
-from mysite.models import Client, ClientLanguage, ClientTheme, ClientNavbar, TextStatic
+from mysite.models import Client, ClientLanguage, ClientTheme, ClientNavbar, TextStatic, ImageStatic
 
 """ 
 def build_nested_hierarchy_old(flat_list):
@@ -184,7 +184,7 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                 "page_title": {
                     "abc123": {
                         "en": {
-                            "general": "Home",
+                            "global": "Home",
                             "about": "About"
                         }
                     }
@@ -211,6 +211,46 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                 # Assign the final value
                 reshaped_data[token_id][client_id][language_id][page_id] = value
             client_static['texts_static_dict'] = reshaped_data
+
+            # Build query for imagestatic
+            # qs = Translation.objects.select_related("client", "token", "language")
+            #qs = TextStatic.objects.filter(client_id__in=client_static['client_hierarchy_list'])
+            qsi = ImageStatic.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("image_id").values("image_id", "client_id", "page_id", "image_url", "alt")
+
+            # Reshape result2
+            """
+            Expected result:
+            {
+                "nike": {
+                    "bahushira": {
+                        "global": {
+                            "image_url": "https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp",
+                            "alt": "shoes"
+                        }
+                    }
+                }
+            }
+            """
+            reshaped_data = {}
+
+            for item in qsi:
+                image_id = item['image_id']
+                client_id = item['client_id']
+                page_id = item['page_id']
+                image_url = item['image_url']
+                alt = item['alt']
+
+                # Check and create nested dictionaries as needed
+                if image_id not in reshaped_data:
+                    reshaped_data[image_id] = {}
+                if client_id not in reshaped_data[image_id]:
+                    reshaped_data[image_id][client_id] = {}
+                #if page_id not in reshaped_data[image_id][client_id]:
+                #    reshaped_data[token_id][client_id][page_id] = {}
+                
+                # Assign the final value
+                reshaped_data[image_id][client_id][page_id] = {'image_url': image_url, 'alt': alt}
+            client_static['images_static_dict'] = reshaped_data
 
         else:
             # push some content into this to display an error message
