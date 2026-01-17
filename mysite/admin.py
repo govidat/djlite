@@ -24,7 +24,7 @@ admin.site.register(Question, QuestionAdmin)
 """
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 #from .models import TokenType, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
-from .models import TokenType, Token, Language, Theme, Client, TextStatic, ClientLanguage, ClientTheme, Page, ClientNavbar, ImageStatic, SvgStatic
+from .models import TokenType, Token, Language, Theme, Client, TextStatic, ClientLanguage, ClientTheme, Page, ClientPage, ImageStatic, SvgStatic
 
 #TypedTokenForeignKey
 
@@ -53,28 +53,6 @@ class ThemeAdmin(admin.ModelAdmin):
 class PageAdmin(admin.ModelAdmin):
     list_display = ("page_id", "token_id")
     search_fields = ("page_id",)
-
-
-"""
-class ClientLanguageInline(SortableInlineAdminMixin, admin.TabularInline):  # or StackedInline if you prefer
-    model = ClientLanguage
-    extra = 1  # number of blank rows to show
-    fields = ("language_id", ) #admin-sortable2 , "order"
-    #autocomplete_fields = ["language"]  # optional: adds search for large language sets
-    #ordering = ["order"]
-
-class ClientThemeInline(SortableInlineAdminMixin, admin.TabularInline):
-    model = ClientTheme
-    extra = 1
-    fields = ("theme_id", ) #admin-sortable2 , "order"
-    #autocomplete_fields = ["theme"]
-    #ordering = ["order"]
-
-class ClientNavbarInline(SortableInlineAdminMixin, admin.TabularInline):
-    model = ClientNavbar
-    extra = 1
-    fields = ("page_id", "parent", "order" ) #admin-sortable2 , "order"
-"""
 
 
 class ClientAdmin(SortableAdminBase, admin.ModelAdmin):
@@ -136,7 +114,7 @@ class ClientThemeAdmin(admin.ModelAdmin):
     list_display = ("client", "theme", "order")
     search_fields = ("client__client_id",)
 
-class ClientNavbarAdmin(admin.ModelAdmin):
+class ClientPageAdmin(admin.ModelAdmin):
     list_display = ("client", "page", "parent", "order")
     search_fields = ("client__client_id",)
 
@@ -165,6 +143,6 @@ admin.site.register(Page, PageAdmin)
 admin.site.register(TextStatic, TextStaticAdmin)
 admin.site.register(ClientLanguage, ClientLanguageAdmin)
 admin.site.register(ClientTheme, ClientThemeAdmin)
-admin.site.register(ClientNavbar, ClientNavbarAdmin)
+admin.site.register(ClientPage, ClientPageAdmin)
 admin.site.register(ImageStatic, ImageStaticAdmin)
 admin.site.register(SvgStatic, SvgStaticAdmin)

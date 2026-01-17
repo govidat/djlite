@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
 #from mysite.models import Translation, TextStatic
-from mysite.models import Client, ClientLanguage, ClientTheme, ClientNavbar,TextStatic, ImageStatic, SvgStatic
+from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, ImageStatic, SvgStatic
 
 """ 
 def build_nested_hierarchy_old(flat_list):
@@ -29,7 +29,7 @@ def build_nested_hierarchy_old(flat_list):
 """
 
 # This is a modified version and takes the key_name or the field on which the relationship is built.
-def build_nested_hierarchy(flat_list, key_name: str):
+def build_nested_hierarchy(flat_list, key_name="id"):
     # Create a dictionary for quick lookup of items by their ID
     item_map = {item[key_name]: item for item in flat_list}
 
@@ -174,10 +174,11 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
             #client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'client_page', 'parent', 'order').order_by('order')        
             #client_static['client_nb_items_nested'] = build_nested_hierarchy(client_static['client_nb_items'], 'client_page')
 
-            qsnb = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'comp_unique', 'parent', 'order').order_by('order')
+            # using a function module here leads to some async errors, hence explicitly doing the reshape here
+            qsnb = ClientPage.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'comp_unique', 'parent', 'order').order_by('order')
             # reshape result
                 # Create a dictionary for quick lookup of items by their client_page
-            item_map = {item['comp_unique']: item for item in qsnb}
+            item_map = {item['id']: item for item in qsnb}
 
             # Initialize a list to store the top-level items (roots)
             nested_list = []
