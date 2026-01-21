@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
 #from mysite.models import Translation, TextStatic
-from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, ImageStatic, SvgStatic
+from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, Image, Svg
 
 """ 
 def build_nested_hierarchy_old(flat_list):
@@ -238,8 +238,8 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                 reshaped_data[token_id][client_id][language_id][page_id] = value
             client_static['texts_static_dict'] = reshaped_data
 
-            # Build query for imagestatic
-            qsi = ImageStatic.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("image_id").values("image_id", "client_id", "page_id", "image_url", "alt")
+            # Build query for Image
+            qsi = Image.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("image_id").values("image_id", "client_id", "page_id", "image_url", "alt")
 
             # Reshape result2
             """
@@ -276,8 +276,8 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                 reshaped_data[image_id][client_id][page_id] = {'image_url': image_url, 'alt': alt}
             client_static['images_static_dict'] = reshaped_data
 
-            # Build query for svgstatic
-            qss = SvgStatic.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("svg_id").values("svg_id", "client_id", "page_id", "svg_text")
+            # Build query for Svg
+            qss = Svg.objects.filter(client_id__in=client_static['client_hierarchy_list']).order_by("svg_id").values("svg_id", "client_id", "page_id", "svg_text")
 
             # Reshape result2
             """

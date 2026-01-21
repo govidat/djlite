@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator
+import json
 
 # Create your models here
 
@@ -341,104 +342,6 @@ class ClientTheme(models.Model):
         return f"{self.client.client_id} - {self.theme.theme_id} (order {self.order})"
         #return f"{self.language} ({self.order})"
 
-"""
-class ClientNavbar(models.Model):
-
-    client = models.ForeignKey(
-        Client,
-        to_field='client_id', 
-        on_delete=models.CASCADE,
-        related_name='client_navbar_rel'
-        )
-    page = models.ForeignKey(
-        Page,
-        to_field='page_id', 
-        on_delete=models.CASCADE,
-        related_name='page_navbar_rel'
-        )
-    order = models.PositiveIntegerField(default=0)
-
-    parent = models.ForeignKey(
-        "self",
-        to_field="page_id",
-        db_column="parent_page_id",
-        null=True,
-        blank=True,
-        related_name="children",
-        on_delete=models.CASCADE
-    )
-
-    class Meta:
-        unique_together = ("client", "page")        
-        ordering = ["client", "order"]
-        verbose_name = "01-03 Client Navbar item"
-
-    def __str__(self):
-        #return f"{self.client_page} (order {self.order})"
-        return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
-"""
-
-# A new auto filled field of client-page is created. parent child relationship is created on this field
-# this is changes to ClientPage
-"""
-class ClientNavbar(models.Model):
-
-    client = models.ForeignKey(
-        Client,
-        to_field='client_id', 
-        on_delete=models.CASCADE,
-        related_name='client_navbar_rel'
-        )
-    page = models.ForeignKey(
-        Page,
-        to_field='page_id', 
-        on_delete=models.CASCADE,
-        related_name='page_navbar_rel'
-        )
-    
-    comp_unique = models.CharField(
-        max_length=40, 
-        unique=True, blank=True, null=True
-        ) # Needs to be nullable/blank if not generated on every save
-
-    order = models.PositiveIntegerField(default=0)
-
-    parent = models.ForeignKey(
-        "self",
-        to_field="comp_unique",
-        db_column="parent_comp_unique",
-        null=True,
-        blank=True,
-        related_name="children",
-        on_delete=models.CASCADE
-    )
-
-    class Meta:
-        unique_together = ("client", "page")        
-        ordering = ["client", "order"]
-        verbose_name = "01-03 Client Navbar item"
-
-    def __str__(self):
-        return f"{self.comp_unique} (order {self.order})"
-        #return f"{self.client.client_id} - {self.page.page_id} (order {self.order})"
-    
-    def save(self, *args, **kwargs):
-        # Combine the fields. Adding a UUID can help ensure uniqueness if inputs are similar
-        combined_value = f"{self.client.client_id}-{self.page.page_id}" 
-        self.comp_unique = combined_value
-
-        # The super().save() call will attempt to save to the database.
-        # If the combined_field value is not unique, an IntegrityError will be raised.
-        try:
-            super().save(*args, **kwargs)
-        except models.IntegrityError:
-            # Handle the error if a duplicate is found
-            # You might want to retry with a new UUID or raise a ValidationError
-            # For simplicity, we just reraise here.
-            from django.core.exceptions import ValidationError
-            raise ValidationError("The combined comp_unique value already exists.")
-"""
-
 class ClientPage(models.Model):
 
     client = models.ForeignKey(
@@ -537,7 +440,7 @@ class TextStatic(models.Model):
         # for usage in Admin Panel
 
 
-class ImageStatic(models.Model):
+class Image(models.Model):
     client = models.ForeignKey(
         Client,
         to_field='client_id', 
@@ -562,7 +465,7 @@ class ImageStatic(models.Model):
 
     class Meta:
         unique_together = ("client", "image_id", "page")
-        verbose_name = "00-07 ImageStatic"
+        verbose_name = "00-07 Image"
         #verbose_name_plural = "My Custom Models" 
         indexes = [
             models.Index(fields=["image_id", "client"]),
@@ -571,7 +474,7 @@ class ImageStatic(models.Model):
         return f"{self.client.client_id} {self.image_id} {self.page_id} {self.alt}"       
         # for usage in Admin Panel        
 
-class SvgStatic(models.Model):
+class Svg(models.Model):
     client = models.ForeignKey(
         Client,
         to_field='client_id', 
@@ -594,7 +497,7 @@ class SvgStatic(models.Model):
 
     class Meta:
         unique_together = ("client", "svg_id", "page")
-        verbose_name = "00-08 SvgStatic"
+        verbose_name = "00-08 Svg"
         #verbose_name_plural = "My Custom Models" 
         indexes = [
             models.Index(fields=["svg_id", "client"]),
@@ -603,9 +506,10 @@ class SvgStatic(models.Model):
         return f"{self.client.client_id} {self.svg_id} {self.page_id} {self.svg_text}"       
         # for usage in Admin Panel        
 
-"""
-# This is for level 10 to 30 captured as struct_id eg a, ab, abc...
-# level 40 to be maintained separately as a cellStructure with a foreign key to SiteStructrue
+
+# This is for level 10 to 40 captured as shell_id eg a, aa, aaa, aaaa, ...
+# Components like card, accordion to have a foreign key link to SiteStructure
+""" This is deprecated
 class SiteStructure(models.Model):
 
     client = models.ForeignKey(
@@ -623,7 +527,8 @@ class SiteStructure(models.Model):
         blank=False, null=False
         )
         
-    struct_id = models.CharField(max_length=3,blank=False, null=False)
+    # plan is 1 alpha for level 10, 20, 30 each and 2 alpha for 40    
+    shell_id = models.CharField(max_length=5,blank=False, null=False)
 
     order = models.PositiveIntegerField(default=1,
         blank=False, null=False)
@@ -631,34 +536,50 @@ class SiteStructure(models.Model):
     comp_unique = models.CharField(
         max_length=40, 
         unique=True, blank=True, null=True
-        ) # Needs to be nullable/blank if not generated on every save
+        ) # for reference and programmatic upload of data
 
     parent = models.ForeignKey(
         "self",
-        to_field="comp_unique",
-        db_column="parent_comp_unique",
         null=True,
         blank=True,
         related_name="children",
         on_delete=models.CASCADE
     )
 
+    # type_id is used at level 40
+    TYPE_CHOICES = (
+        ('hero', 'hero'),
+        ('card', 'card'),
+        ('accordion', 'accordion' ),
+    )    
     
+    type_id = models.CharField(
+        max_length=30,choices=TYPE_CHOICES, 
+        blank=True, null=True
+    )  # hero / card / accordion / etc
+
     css_class = models.CharField(max_length=255,blank=True, null=True)
     style = models.CharField(max_length=255,blank=True, null=True)
     hidden = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ("client", "page", "struct_id")        
-        ordering = ["client", "page", "struct_id", "order"]
+        unique_together = ("client", "page", "shell_id")        
+        ordering = ["client", "page", "shell_id", "order"]
         verbose_name = "01-04 Client Site Structure"
 
     def __str__(self):
-        return f"{self.comp_unique}"
-    
+        return f"{self.client.client_id} - {self.page.page_id} - {self.shell_id}"
+
+    def clean(self):
+        if self.type_id and len(self.shell_id) < 4:
+            raise ValidationError("Only level 40 nodes can have type")
+
+        if len(self.shell_id) > 3 and not self.type_id:
+            raise ValidationError("Level 40 nodes must have a type")
+
     def save(self, *args, **kwargs):
         # Combine the fields. Adding a UUID can help ensure uniqueness if inputs are similar
-        combined_value = f"{self.client.client_id}-{self.page.page_id} - {self.struct_id}" 
+        combined_value = f"{self.client.client_id}-{self.page.page_id} - {self.shell_id}" 
         self.comp_unique = combined_value
 
         # The super().save() call will attempt to save to the database.
@@ -672,75 +593,59 @@ class SiteStructure(models.Model):
             from django.core.exceptions import ValidationError
             raise ValidationError("The combined comp_unique value already exists.")
 
-# level 40 maintained as a cellStructure with a foreign key to SiteStructrue
-class CellStructure(models.Model):
-
+class Hero(models.Model):
     client = models.ForeignKey(
         Client,
         to_field='client_id', 
         on_delete=models.CASCADE,
-        related_name='client_sitestructure_rel',
+        related_name='heros',
         blank=False, null=False
         )
-    page = models.ForeignKey(
-        Page,
-        to_field='page_id', 
+    sitestructure = models.OneToOneField(
+        SiteStructure,
         on_delete=models.CASCADE,
-        related_name='page_sitestructure_rel',
-        blank=False, null=False
-        )
-        
-    cell_id = models.PositiveIntegerField(validators=[MaxValueValidator(9999)], 
-        blank=False, null=True)
+        related_name="heros"
+    )
 
-    order = models.PositiveIntegerField(default=1,
-        blank=False, null=False)
-     
+    css_class = models.CharField(max_length=255,blank=True, null=True)
+    herocontent_css_class = models.CharField(max_length=255,blank=True, null=True)
+
+    overlay = models.BooleanField(default=False)
+    overlay_style = models.CharField(max_length=255,blank=True, null=True)
+
+    class Meta:
+        unique_together = ("client", "sitestructure")        
+        ordering = ["client", "sitestructure"]
+        verbose_name = "01-05 Hero Structure"
+   
+    def __str__(self):
+        return f"{self.sitestructure.comp_unique}"
+
     comp_unique = models.CharField(
         max_length=40, 
         unique=True, blank=True, null=True
-        ) # Needs to be nullable/blank if not generated on every save
+        ) # for reference and programmatic upload of data    
 
-    TYPE_CHOICES = (
-        ('hero', 'hero'),
-        ('card', 'card'),
-        ('accordion', 'accordion' ),
-    )    
+    @property
+    def level(self):
+        lv_length = len(self.shell_id)
+        if lv_length == 1:
+            return 10
+        if lv_length == 2:
+            return 20
+        if lv_length == 3:
+            return 30
+        return 40
     
-    type = models.CharField(
-        max_length=30,choices=TYPE_CHOICES, 
-        blank=False, null=False
-    )  # hero / card / accordion / etc
+    def clean(self):
+        if self.level != 40:
+            raise ValidationError("Can have a foreign key relationship only with Level 40 SiteStructure")
 
-    link_id = models.PositiveIntegerField(validators=[MaxValueValidator(9999)], 
-        blank=False, null=False
-    )  # points to component instance    
-        
-    sitestructure = models.ForeignKey(
-        SiteStructure,
-        to_field='comp_unique', 
-        on_delete=models.CASCADE,
-        related_name='cellstructure_rel',
-        blank=False, null=False
-        )
+        if self.client_id != self.sitestructure.client_id:
+            raise ValidationError("SiteStructure Foreign key to be of same Client")    
 
-    
-    css_class = models.CharField(max_length=255,blank=True, null=True)
-    style = models.CharField(max_length=255,blank=True, null=True)
-    hidden = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ("client", "page", "cell_id")        
-        ordering = ["client", "page", "order"]
-        verbose_name = "01-05 Cell Structure"
-
-    def __str__(self):
-        return f"{self.comp_unique}"
-    
     def save(self, *args, **kwargs):
-        # Combine the fields. Adding a UUID can help ensure uniqueness if inputs are similar
-        combined_value = f"{self.client.client_id}-{self.page.page_id} - {self.cell_id:04d}" 
-        self.comp_unique = combined_value
+        self.comp_unique = self.sitestructure.comp_unique
 
         # The super().save() call will attempt to save to the database.
         # If the combined_field value is not unique, an IntegrityError will be raised.
@@ -751,24 +656,389 @@ class CellStructure(models.Model):
             # You might want to retry with a new UUID or raise a ValidationError
             # For simplicity, we just reraise here.
             from django.core.exceptions import ValidationError
-            raise ValidationError("The combined comp_unique value already exists.")
-
-
-"""
-"""
-    TYPE_CHOICES = (
-        ('hero', 'hero'),
-        ('card', 'card'),
-        ('accordion', 'accordion' ),
+            raise ValidationError("The combined comp_unique value already exists.")            
+        
+class HeroContent(models.Model):
+    client = models.ForeignKey(
+        Client,
+        to_field="client_id",
+        on_delete=models.CASCADE,
+        related_name="herocontents"
     )    
-    
-    type = models.CharField(
-        max_length=30,choices=TYPE_CHOICES, 
-        blank=True, null=True
-    )  # hero / card / accordion / etc
 
-    link_id = models.PositiveIntegerField(
-        blank=True, null=True
-    )  # points to component instance    
+    hero = models.ForeignKey(
+        Hero,
+        on_delete=models.CASCADE,
+        related_name="herocontents"
+    )
+    CONTENT_TYPES = (
+        ("text", "Text"),
+        ("figure", "Figure"),
+        ("card", "Card"),
+    )
+    type_id = models.CharField(max_length=10, choices=CONTENT_TYPES)
+    order = models.PositiveIntegerField(default=1,
+        blank=False, null=False)
+    hidden = models.BooleanField(default=False)
+
+    css_class = models.CharField(max_length=255, blank=True, null=True)
+    comp_unique = models.CharField(
+        max_length=40, 
+        unique=True, blank=True, null=True
+        ) # for reference and programmatic upload of data 
+
+    # If type is Card, then only additional piece of info required is card_id. hence including this field here itself    \
+    # TBD Whether this should be a foreign key on Card Model is a decision point
+    card_id = models.PositiveIntegerField(blank=True, null=True)
+        
+        
+    class Meta:
+        ordering = ["client", "hero"]
+        verbose_name = "01-05b Hero Content"
+   
+    def __str__(self):
+        return f"{self.client.client_id} - {self.hero.sitestructure.shell_id} - {self.type_id} - {self.order}" 
+
+    def clean(self):
+        if self.client_id != self.hero.client_id:
+            raise ValidationError("Hero Foreign key to be of same Client")   
+        if self.type_id == 'card' and not self.card_id:
+           raise ValidationError("Card Type needs to have a card_id value")
+
+    def save(self, *args, **kwargs):
+        # Combine the fields. 
+        combined_value = f"{self.hero.comp_unique} - {self.hidden} - {self.order}" 
+        self.comp_unique = combined_value    
+
+        # The super().save() call will attempt to save to the database.
+        # If the combined_field value is not unique, an IntegrityError will be raised.
+        try:
+            super().save(*args, **kwargs)
+        except models.IntegrityError:
+            # Handle the error if a duplicate is found
+            # You might want to retry with a new UUID or raise a ValidationError
+            # For simplicity, we just reraise here.
+            from django.core.exceptions import ValidationError
+            raise ValidationError("The combined comp_unique value already exists.") 
+                    
+class HeroFigure(models.Model):
+    client = models.ForeignKey(
+        Client,
+        to_field="client_id",
+        on_delete=models.CASCADE,
+        related_name="herofigures"
+    )    
+    herocontent = models.OneToOneField(
+        HeroContent,
+        on_delete=models.CASCADE,
+        related_name="herofigures"
+    )
+
+    figure_class = models.CharField(max_length=255, blank=True, null=True)
+    POSITION_TYPES = (
+        ("start", "Start"),
+        ("end", "End"),
+    )    
+    position_id = models.CharField(max_length=20, choices=POSITION_TYPES)
+    
+    image = models.ForeignKey(
+        Image,
+        on_delete=models.CASCADE,
+        related_name="heroimages"
+    )
+    
+    css_class = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        ordering = ["client", "herocontent"]
+        verbose_name = "01-05ba Hero Content Figure"
+
+    def __str__(self):
+        return f"{self.client.client_id} - {self.herocontent.hero.sitestructure.shell_id} - {self.image.image_id}" 
+
+    def clean(self):
+        if self.client_id != self.herocontent.client_id:
+            raise ValidationError("HeroContent Foreign key to be of same Client")        
+        if self.client_id != self.image.client_id:
+            raise ValidationError("Image Foreign key to be of same Client")        
+
+class HeroText(models.Model):
+    client = models.ForeignKey(
+        Client,
+        to_field="client_id",
+        on_delete=models.CASCADE,
+        related_name="herotexts"
+    )    
+    herocontent = models.OneToOneField(
+        HeroContent,
+        on_delete=models.CASCADE,
+        related_name="herotexts"
+    )
+
+    title_class = models.CharField(max_length=255, blank=True, null=True)
+    title_stb_ids = models.JSONField(default=list)
+    contents_class = models.CharField(max_length=255, blank=True, null=True)
+    contents_stb_ids = models.JSONField(default=list)
+
+    actions_class = models.CharField(max_length=255, blank=True, null=True)        
+    POSITION_TYPES = (
+        ("start", "Start"),
+        ("end", "End"),
+    )    
+    actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES)
+
+    # a max of 4 buttons possible
+    button01_class = models.CharField(max_length=255, blank=True, null=True)
+    button01_stb_ids = models.JSONField(default=list)
+    button02_class = models.CharField(max_length=255, blank=True, null=True)
+    button02_stb_ids = models.JSONField(default=list)
+    button03_class = models.CharField(max_length=255, blank=True, null=True)
+    button03_stb_ids = models.JSONField(default=list)
+    button04_class = models.CharField(max_length=255, blank=True, null=True)
+    button04_stb_ids = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ["client", "herocontent"]
+        verbose_name = "01-05bc Hero Content Text"
+
+    def __str__(self):
+        return f"{self.client.client_id} - {self.herocontent.hero.sitestructure.shell_id}" 
+        
+    def clean(self):
+        if self.client_id != self.herocontent.client_id:
+            raise ValidationError("HeroContent Foreign key to be of same Client")  
 
 """
+"""
+class ComposedText(models.Model):
+    #ltext = models.CharField(max_length=50, null=True)   # e.g., "Country"
+
+    title_class = models.CharField(max_length=255, blank=True, null=True)
+    title_stb_ids = models.JSONField(default=list)
+    contents_class = models.CharField(max_length=255, blank=True, null=True)
+    contents_stb_ids = models.JSONField(default=list)
+
+    actions_class = models.CharField(max_length=255, blank=True, null=True)        
+    POSITION_TYPES = (
+        ("start", "Start"),
+        ("end", "End"),
+    )    
+    actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES)
+
+    # a max of 4 buttons possible
+    button01_class = models.CharField(max_length=255, blank=True, null=True)
+    button01_stb_ids = models.JSONField(default=list)
+    button02_class = models.CharField(max_length=255, blank=True, null=True)
+    button02_stb_ids = models.JSONField(default=list)
+    button03_class = models.CharField(max_length=255, blank=True, null=True)
+    button03_stb_ids = models.JSONField(default=list)
+    button04_class = models.CharField(max_length=255, blank=True, null=True)
+    button04_stb_ids = models.JSONField(default=list)
+
+class ComposedFigure(models.Model):
+    #ltext = models.CharField(max_length=50, null=True)   # e.g., "Country"
+    figure_class = models.CharField(max_length=255, blank=True, null=True)
+
+    POSITION_TYPES = (
+        ("start", "Start"),
+        ("end", "End"),
+    )    
+    position_id = models.CharField(max_length=20, choices=POSITION_TYPES)
+    
+    image = models.ForeignKey(
+        Image,
+        on_delete=models.CASCADE,
+        related_name="heroimages"
+    )
+    
+    css_class = models.CharField(max_length=255, blank=True, null=True)
+
+class Card(models.Model):
+    client = models.ForeignKey(
+        Client,
+        to_field='client_id', 
+        on_delete=models.CASCADE,
+        related_name='cardststics'
+        )
+
+    card_id = LowercaseCharField(max_length=25, null=False)    
+    #language = models.ForeignKey(Language, on_delete=models.CASCADE)  # "en", "fr", etc.
+
+    page = models.ForeignKey(
+        Page,
+        to_field='page_id', 
+        on_delete=models.CASCADE,
+        default='global'
+        )        
+    ltext = models.CharField(max_length=50, null=True)   # e.g., "Country"
+
+    class Meta:
+        unique_together = ("client", "page", "card_id")
+        verbose_name = "00-08 Card"
+        #verbose_name_plural = "My Custom Models" 
+        indexes = [
+            models.Index(fields=["card_id", "client"]),
+        ]
+    def __str__(self):
+        return f"{self.client.client_id} / {self.page_id} / {self.card_id} / {self.ltext}"       
+        # for usage in Admin Panel   
+
+class CardText(models.Model):
+    card = models.OneToOneField(
+        Card,
+        on_delete=models.CASCADE,
+        related_name="cardtexts"
+    )
+    composedtext = models.OneToOneField(
+        ComposedText,
+        on_delete=models.CASCADE,
+        related_name="cardtexts"
+    )    
+    #ltext = models.CharField(max_length=50, null=True)   # e.g., "Country"
+
+class CardFigure(models.Model):
+    card = models.OneToOneField(
+        Card,
+        on_delete=models.CASCADE,
+        related_name="cardfigures"
+    )
+    composedfigure = models.OneToOneField(
+        ComposedFigure,
+        on_delete=models.CASCADE,
+        related_name="cardfigures"
+    )    
+
+    #ltext = models.CharField(max_length=50, null=True)   # e.g., "Country"
+
+class LayoutNode(models.Model):
+
+    client = models.ForeignKey(Client, to_field='client_id', on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, to_field='page_id', on_delete=models.CASCADE)
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE
+    )
+
+    order = models.PositiveIntegerField(default=1)
+
+    LEVEL_CHOICES = (
+        (10, "Section"),
+        (20, "Row"),
+        (30, "Col"),
+        (40, "Cell"),
+    )
+    level = models.PositiveSmallIntegerField(choices=LEVEL_CHOICES)
+
+    css_class = models.CharField(max_length=255, blank=True)
+    style = models.CharField(max_length=255, blank=True)
+    hidden = models.BooleanField(default=False)
+
+    slug = models.SlugField()  # for bulk upload / human reference
+
+    class Meta:
+        ordering = ("client", "page", "level", "order")
+        unique_together = ("client", "page", "level", "slug")
+
+    def __str__(self):
+        return f"{self.client.client_id} / {self.page.page_id} / {self.level} / {self.slug}"
+    
+class Component(models.Model):
+    layoutnode = models.OneToOneField(
+        LayoutNode,
+        on_delete=models.CASCADE,
+        related_name="component"
+    )
+
+    COMPONENT_TYPES = (
+        ("hero", "Hero"),
+        ("card", "Card"),
+        ("accordion", "Accordion"),
+        ("carousel", "Carousel"),
+    )
+    type = models.CharField(max_length=30, choices=COMPONENT_TYPES)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(layout__level=40),
+                name="component_only_on_level_40",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.type} @ {self.layout.slug}"
+    
+class Hero(models.Model):
+    component = models.OneToOneField(
+        Component,
+        on_delete=models.CASCADE,
+        related_name="hero"
+    )
+
+    css_class = models.CharField(max_length=255, blank=True)
+    overlay = models.BooleanField(default=False)
+    overlay_style = models.CharField(max_length=255, blank=True)
+
+class HeroContent(models.Model):
+    hero = models.ForeignKey(
+        Hero,
+        on_delete=models.CASCADE,
+        related_name="herocontents"
+    )
+
+    order = models.PositiveIntegerField()
+    hidden = models.BooleanField(default=False)
+
+    CONTENT_TYPES = (
+        ("text", "Text"),
+        ("figure", "Figure"),
+        ("card", "Card"),
+    )
+    type = models.CharField(max_length=10, choices=CONTENT_TYPES)
+    # TBD Whether this should be a foreign key on Card Model is a decision point
+    #card_id = models.PositiveIntegerField(blank=True, null=True)
+
+    card = models.ForeignKey(
+        Card,
+        on_delete=models.CASCADE,
+        related_name="herocards"
+    )
+
+    def clean(self):
+        if self.type_id == 'card' and not self.card:
+           raise ValidationError("Card Type needs to have a Card value")
+
+        if self.hero.component.layoutnode.client.client_id != self.card.client.client_id:
+            raise ValidationError("Card Foreign key to be of same Client")  
+
+    class Meta:
+        ordering = ("order",)
+
+class HeroText(models.Model):
+    herocontent = models.OneToOneField(
+        HeroContent,
+        on_delete=models.CASCADE,
+        related_name="herotexts"
+    )
+    composedtext = models.OneToOneField(
+        ComposedText,
+        on_delete=models.CASCADE,
+        related_name="herotexts"
+    )    
+
+
+class HeroFigure(models.Model):
+    herocontent = models.OneToOneField(
+        HeroContent,
+        on_delete=models.CASCADE,
+        related_name="herofigures"
+    )
+    composedfigure = models.OneToOneField(
+        ComposedFigure,
+        on_delete=models.CASCADE,
+        related_name="herofigures"
+    )  
+"""      

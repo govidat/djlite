@@ -24,7 +24,8 @@ admin.site.register(Question, QuestionAdmin)
 """
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 #from .models import TokenType, Token, Language, Theme, Client, Translation, ClientLanguage, ClientTheme
-from .models import TokenType, Token, Language, Theme, Client, TextStatic, ClientLanguage, ClientTheme, Page, ClientPage, ImageStatic, SvgStatic
+from .models import TokenType, Token, Language, Theme, Client, TextStatic, ClientLanguage, ClientTheme, Page, ClientPage, Image, Svg
+#, SiteStructure, Hero, HeroContent, HeroText, HeroFigure
 
 #TypedTokenForeignKey
 
@@ -118,20 +119,99 @@ class ClientPageAdmin(admin.ModelAdmin):
     list_display = ("client", "page", "parent", "order")
     search_fields = ("client__client_id",)
 
-class ImageStaticAdmin(admin.ModelAdmin):
+class ImageAdmin(admin.ModelAdmin):
     list_display = ("client", "page", "image_id", "image_url", "alt")
     search_fields = ("client__client_id",)
 
-class SvgStaticAdmin(admin.ModelAdmin):
+class SvgAdmin(admin.ModelAdmin):
     list_display = ("client", "page", "svg_id", "svg_text")
-    search_fields = ("client__client_id",)    
+    search_fields = ("client__client_id",)  
 """
-admin.site.register(TokenType, TokenTypeAdmin)
-admin.site.register(Token, TokenAdmin)
-admin.site.register(Language, LanguageAdmin)
-admin.site.register(Theme, ThemeAdmin)
-admin.site.register(Client, ClientAdmin)
-admin.site.register(Translation, TranslationAdmin)
+class HeroInline(admin.StackedInline):
+    model = Hero
+    extra = 0
+    max_num = 1
+    can_delete = True
+    show_change_link = True
+
+@admin.register(SiteStructure)
+class SiteStructureAdmin(admin.ModelAdmin):
+    list_display = (
+        "client",
+        "page",
+        "shell_id",
+        "parent",
+        "type_id",
+        "order",
+        "hidden",
+    )
+    list_filter = ("client", "page", "type_id")
+    search_fields = ("shell_id", "comp_unique")
+    ordering = ("client", "page", "shell_id", "order")
+
+    inlines = [HeroInline]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("parent", "client", "page")
+
+class HeroContentInline(admin.TabularInline):
+    model = HeroContent
+    extra = 0
+    ordering = ("order",)
+    show_change_link = True
+
+@admin.register(Hero)
+class HeroAdmin(admin.ModelAdmin):
+    list_display = (
+        "sitestructure",
+        "overlay",
+    )
+    inlines = [HeroContentInline]
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "sitestructure",
+                "sitestructure__client",
+                "sitestructure__page",
+            )
+        )
+
+class HeroTextInline(admin.StackedInline):
+    model = HeroText
+    extra = 0
+    max_num = 1
+
+class HeroFigureInline(admin.StackedInline):
+    model = HeroFigure
+    extra = 0
+    max_num = 1
+
+@admin.register(HeroContent)
+class HeroContentAdmin(admin.ModelAdmin):
+    list_display = (
+        "hero",
+        "type_id",
+        "order",
+        "hidden",
+    )
+    list_filter = ("type_id", "hidden")
+    ordering = ("hero", "order")
+
+    inlines = [HeroTextInline, HeroFigureInline]
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "hero",
+                "hero__sitestructure",
+            )
+        )
 """
 
 admin.site.register(TokenType, TokenTypeAdmin)
@@ -144,5 +224,5 @@ admin.site.register(TextStatic, TextStaticAdmin)
 admin.site.register(ClientLanguage, ClientLanguageAdmin)
 admin.site.register(ClientTheme, ClientThemeAdmin)
 admin.site.register(ClientPage, ClientPageAdmin)
-admin.site.register(ImageStatic, ImageStaticAdmin)
-admin.site.register(SvgStatic, SvgStaticAdmin)
+admin.site.register(Image, ImageAdmin)
+admin.site.register(Svg, SvgAdmin)
