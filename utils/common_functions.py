@@ -1,7 +1,8 @@
 from collections import defaultdict
 from django.core.cache import cache
 #from mysite.models import Translation, TextStatic
-from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, Image, Svg
+from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, Image, Svg, Layout, Hero, Card
+from django.db.models import Prefetch
 
 """ 
 def build_nested_hierarchy_old(flat_list):
@@ -311,6 +312,29 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                 # Assign the final value
                 reshaped_data[svg_id][client_id][page_id] = {'svg_text': svg_text}
             client_static['svgs_static_dict'] = reshaped_data
+
+            # for getting the layout data of the client across all pages
+            client_static['layouts'] = (
+                Layout.objects
+                .filter(
+                    client__client_id=lv_client_id, hidden=False)
+                .select_related(
+                    "parent",
+                    # Level 40 components (OneToOne)
+                    "hero",
+                    "hero__herotext",
+                    "hero__herofigure",
+                    "hero__herocard",
+                    "hero__herocard__herocardtext",
+                    "hero__herocard__herocardfigure",
+                    #"hero__herocard__herocardfigure__image",
+                    "card",
+                    "card__cardtext",
+                    "card__cardfigure",
+                    #"card__cardfigure__image",                    
+                )
+                .order_by("page_id", "level", "order")
+            )
         else:
             # push some content into this to display an error message
             client_static = {}
@@ -318,6 +342,19 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
         # push some content into this to display an error message
         client_static = {}
 
+    """
+    select_related(
+        "hero",
+        "hero__herotext__textcontent",
+        "hero__herocard__herocardtext__textcontent",
+        "card__cardtext__textcontent",
+    ).prefetch_related(
+        "hero__herotext__textcontent__blocks__items__values",
+        "hero__herocard__herocardtext__textcontent__blocks__items__values",
+        "card__cardtext__textcontent__blocks__items__values",
+    )
+
+    """
     
     # Cache it
     if cache_key:
@@ -326,48 +363,188 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
     
     return client_static
 
+def serialize_instance(
+    obj,
+    *,
+    fields=None,
+    rename=None,
+    nested=None,
+):
+    """
+    Generic Django model serializer.
+
+    fields: list[str]              → fields to include
+    rename: dict[str, str]         → rename output keys
+    nested: dict[str, callable]    → nested serializers
+    """
+    if not obj:
+        return None
+
+    rename = rename or {}
+    nested = nested or {}
+
+    data = {}
+
+    for field in fields or []:
+        key = rename.get(field, field)
+        data[key] = getattr(obj, field)
+
+    for key, fn in nested.items():
+        data[key] = fn(obj)
+
+    return data
+
 """
-def fetch_textstatic_dict(client_ids=None, use_cache=True, timeout=3600):
+def serialize_image(img):
+    if not img:
+        return None
+
+    return {
+        "image_id": img.image_id,
+        "image_url": img.image_url if img.image_url else None,
+        "alt": img.alt,
+    }
+"""
+def get_attr(obj, attr):
+    try:
+        return getattr(obj, attr)
+    except Exception:
+        return None
+
+def visible(obj):
+    return obj if obj and not getattr(obj, "hidden", False) else None
+
+#Phase 4: Recursive tree builder
+def build_layout_tree(layouts):
+    nodes = {}
+    roots = []
+
+    for l in layouts:
+        node = {
+            "id": l.id,
+            "level": l.level,
+            "slug": l.slug,
+            "order": l.order,
+            "css_class": l.css_class,
+            "style": l.style,
+            "hidden": l.hidden,
+            "children": [],
+        }
+
+        if l.level == 40:
+            node["component"] = build_layout_component(l)
+
+        nodes[l.id] = node
+
+    for l in layouts:
+        node = nodes[l.id]
+
+        if l.parent_id:
+            nodes[l.parent_id]["children"].append(node)
+        else:
+            roots.append(node)
+
+    return roots
+
+
+   
+def build_layout_component(layout):
+
+    IMAGE_FIELDS = ["image_id", "image_url", "alt"]
+    CARD_TEXT_FIELDS = ["hidden", "ltext",
+                   "title_class", "title_stb_ids", "contents_class", "contents_stb_ids",
+                   "actions_class", "actions_position_id", 
+                   "button01_class", "button01_stb_ids",
+                   "button02_class", "button02_stb_ids",
+                   "button03_class", "button03_stb_ids",
+                   "button04_class", "button04_stb_ids",
+                   ]    
+    HERO_TEXT_FIELDS = ["order", "hidden", "type_id"] + CARD_TEXT_FIELDS
+
+    CARD_FIGURE_FIELDS = ["hidden", "ltext", "figure_class", "position_id", "css_class", "image_url", "alt"]
+
+
+    HERO_FIGURE_FIELDS = ["order", "hidden", "type_id"] + CARD_FIGURE_FIELDS
     
-    # Build cache key
-    cache_key = None
-    if use_cache and client_ids:
-        cache_key = f"translations_dict:{','.join(map(str, client_ids))}"
-        cached_data = cache.get(cache_key)
-        if cached_data is not None:
-            return cached_data
-    
-    # Build query
-    # qs = Translation.objects.select_related("client", "token", "language")
-    if client_ids:    
-        qs = TextStatic.objects.filter(client_id__in=client_ids).order_by("token_id").values("token_id", "client_id", "page_id", "language_id", "value")
+    if layout.comp_id == "hero":
+        #hero = get_attr(layout, "hero")
+        hero = visible(get_attr(layout, "hero"))
+        herotext = visible(get_attr(hero, "herotext"))
+        herofigure = visible(get_attr(hero, "herofigure"))  
+        herocard = visible(get_attr(hero, "herocard"))
 
-    # Reshape result
+        serialized_herotext = serialize_instance(herotext, fields= HERO_TEXT_FIELDS, rename={}) if herotext else None
+        serialized_herofigure = serialize_instance(herofigure, 
+                            fields= HERO_FIGURE_FIELDS, 
+                            rename={},
+                            nested={"image": lambda o: serialize_instance(o.image, fields = IMAGE_FIELDS, rename={})},
+                            ) if herofigure else None
+        serialized_herocard = serialize_instance(
+                            herocard,
+                            fields=["id","order", "hidden", "type_id", "ltext", "ltext", "css_class", "body_class"],
+                            nested={
+                                "text": lambda o: serialize_instance(
+                                    o.herocardtext,
+                                    fields=CARD_TEXT_FIELDS,
+                                    rename={},
+                                ),
+                                "figure": lambda o: serialize_instance(
+                                    o.herocardfigure,
+                                    fields=CARD_FIGURE_FIELDS,
+                                    rename={},
+                                    nested={"image": lambda o: serialize_instance(o.image, fields = IMAGE_FIELDS, rename={})},
+                                ),
+                            },
+                            )   if herocard else None
+        herocontents = []
+        if serialized_herotext:
+            herocontents.append(serialized_herotext)
+        if serialized_herofigure:
+            herocontents.append(serialized_herofigure)
+        if serialized_herocard:
+            herocontents.append(serialized_herocard)
 
-    reshaped_data = {}
+        return {
+            "type": "hero",            
+            "css_class": hero.css_class,
+            "herocontent_class": hero.herocontent_class,
+            "overlay": hero.overlay,
+            "overlay_style": hero.overlay_style,
+            "herocontents" : herocontents,
+        }
 
-    for item in qs:
-        token_id = item['token_id']
-        client_id = item['client_id']
-        page_id = item['page_id']
-        language_id = item['language_id']
-        value = item['value']
-
-        # Check and create nested dictionaries as needed
-        if token_id not in reshaped_data:
-            reshaped_data[token_id] = {}
-        if client_id not in reshaped_data[token_id]:
-            reshaped_data[token_id][client_id] = {}
-        if language_id not in reshaped_data[token_id][client_id]:
-            reshaped_data[token_id][client_id][language_id] = {}
+    if layout.comp_id == "card":
+        card = visible(get_attr(layout, "card"))
+        cardtext = visible(get_attr(card, "cardtext"))
+        cardfigure = visible(get_attr(card, "cardfigure"))        
+        serialized_cardtext = { lambda o: serialize_instance(
+                    o.cardtext,
+                    fields=CARD_TEXT_FIELDS,
+                    rename={},
+                    )
+                    } if cardtext else None
         
-        # Assign the final value
-        reshaped_data[token_id][client_id][language_id][page_id] = value
+        serialized_cardfigure = { lambda o: serialize_instance(
+                    o.cardfigure,
+                    fields=CARD_FIGURE_FIELDS,
+                    rename={},
+                    nested={"image": lambda o: serialize_instance(o.image, fields = IMAGE_FIELDS, rename={})},
+                    )
+                    } if cardfigure else None
+        carddata = []
+        if serialized_cardtext:
+            carddata.append(serialized_cardtext)
+        if serialized_cardfigure:
+            carddata.append(serialized_cardfigure)
 
-    
-    # Cache it
-    if cache_key:
-        cache.set(cache_key, reshaped_data, timeout=timeout)
-    
-    return reshaped_data
-"""
+        return serialize_instance(
+            card,
+            fields=["ltext", "css_class", "body_class"],
+            nested={
+                "data": carddata
+            },
+        )
+
+
+    return None
+

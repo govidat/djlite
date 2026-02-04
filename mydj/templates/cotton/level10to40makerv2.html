@@ -1,0 +1,58 @@
+{% comment %}
+
+Input is of form :
+page_tree
+[{'id': 1, 'level': 10, 'slug': 'a', 'order': 1, 'css_class': '', 'style': '', 'hidden': False, 
+  'children': [{'id': 2, 'level': 20, 'slug': 'a', 'order': 1, 'css_class': '', 'style': '', 'hidden': False, 
+    'children': [{'id': 3, 'level': 30, 'slug': 'a', 'order': 3, 'css_class': '', 'style': '', 'hidden': False, 
+      'children': [{'id': 5, 'level': 40, 'slug': 'a', 'order': 1, 'css_class': '', 'style': '', 'hidden': False, 'children': [], 
+      'component': {'type': 'hero', 
+        'css_class': '', 'herocontent_class': '', 'overlay': False, 'overlay_style': '', 
+        'herocontents': [
+        {'order': 1, 'hidden': False, 'type_id': 'text', 'ltext': None, 'title_class': None, 'title_stb_ids': [10], 'contents_class': None, 'contents_stb_ids': [], 'actions_class': None, 'actions_position_id': 'end', 'button01_class': '!btn-primary', 'button01_stb_ids': [], 'button02_class': '!btn-primary', 'button02_stb_ids': [], 'button03_class': None, 'button03_stb_ids': [], 'button04_class': None, 'button04_stb_ids': []}, 
+        {'order': 2, 'hidden': False, 'type_id': 'figure', 'ltext': None, 'figure_class': 'px-0 pt-0', 'position_id': 'start', 'css_class': 'max-w-sm rounded-xl shadow-2xl', 'image': {'image_id': 'spiderman', 'image_url': 'https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp', 'alt': 'spiderman'}
+        }]}}]}]}]}]   
+{% endcomment %}
+
+{# {% load my_filters %} #}
+
+<body>
+  
+
+  {# Level10 #}  
+  {# For each full screen - Then level 20 items are derived from from available  #}
+  {% for id10 in page_tree %}
+    <div class="bg-cover bg-center {{ id10.css_class|default:'' }}" style="{{ id10.style|default:'' }}">  
+      {# Level20 #}
+      {# For each full screen - Then level 20 items are derived from from available  #}
+      {# get the list of ids at level20 ; first filter on level20, then order them #}
+      {% for id20 in id10.children %}
+          <div class="h-screen flex items-center justify-center {{ id20.css_class|default:'' }}" style="{{ id20.style|default:'' }}">
+            {# Level30 #}
+            {# Level 30 items are derived from available  #}
+            {# get the list of ids with this parent; Then do an additional filter on Level=30.then order them #}
+            {# Expected is only one value, but keeping the same loop structure #}
+            {% for id30 in id20.children %}        
+            <div class="grid gap-4 p-8 w-full  {{ id30.css_class|default:'' }}" style="{{ id30.style|default:'' }}">
+              {# Level40 #}
+              {# Level 40 items are derived from available  #}
+              {# get the list of ids with this parent; Then do an additional filter on Level=40.then order them #}
+              {% for id40 in id30.children %}
+                <div class="{{ id40.css_class|default:'' }}" style="{{ id40.style|default:'' }}">                                
+                  {# This Level40 dict is passed on c-routerlevel40 for further processing #}
+                  {{id40.component}}
+                  {# <c-level40splitter :dict40="id40.component"></c-level40splitter> #}
+                </div>  
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+
+      {% endfor %}
+    </div>  
+
+  {% endfor %}
+
+</body>
+
+

@@ -26,6 +26,7 @@ urlpatterns = [
     path("zapp/", include("zapp.urls")),  # zapp
     path('i18n/', include('django.conf.urls.i18n')),  # i18n
     path("", include("mysite.urls")),  # zapp
+    path('_nested_admin/', include('nested_admin.urls')),
 ] 
 # + debug_toolbar_urls() 
 

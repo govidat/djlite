@@ -9,12 +9,13 @@ from django.utils.translation import get_language
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 
-from django.db.models import Prefetch
+#from django.db.models import Prefetch
+from collections import defaultdict
 #from .models import Client, ClientLanguage, ClientTheme
 #from .models import Client, ClientLanguage, ClientTheme, ClientNavbar
 #, ClientLanguage, ClientTheme, TextStatic
 
-from utils.common_functions import fetch_clientstatic, build_nested_hierarchy
+from utils.common_functions import fetch_clientstatic, build_nested_hierarchy, build_layout_tree
 # update_list_of_dictionaries, fetch_translations, build_nested_hierarchy, build_nested_hierarchy_v2
 project_base_language = settings.LANGUAGE_CODE   # 'en'
 
@@ -414,8 +415,26 @@ class ClientPageView(TemplateView):
         # filter page_structure based on lv_page_id
         context['page_structure'] = list(filter(lambda item: item.get('page')==lv_page_id, site_structure_filtered))
 
+        # code to get the required layout data from context['layout']
+        layouts = client_static.get('layouts', [])
+        page_layouts = [l for l in layouts if l.page_id == lv_page_id]
+        context['page_tree'] = page_layouts
+        #context['page_tree'] = build_layout_tree(page_layouts)    
+
         return context
 
 
     
+"""
+The golden rule
 
+select_related → OneToOneField, ForeignKey
+
+prefetch_related → ForeignKey(many), reverse relations
+
+ITBA/COM/F/17/2023-24/1060976020(1) dated
+15/02/2024.
+
+ITBA/COM/F/17/2025-26/1085174246(1) 27/01/2026
+
+"""

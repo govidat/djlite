@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'mysite', # mysite
     "adminsortable2", # admin-sortable2
     'django_extensions', # django_extensions for orm scripts
+    'nested_admin',# this is for nested inline in admin
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 
