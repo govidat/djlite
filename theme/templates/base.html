@@ -17,8 +17,9 @@
   <!-- Header -->
   <header  class="p-4 col-span-2 row-start-1 row-end-2">
     <!-- navbar -->
-    <!-- {% get_current_language as current_language %} :current_language="{{current_language}}  -->    
+    {% comment %}
     <c-navbar_v001 :nb="{{nb}}" ></c-navbar_v001>
+  {% endcomment %}    
   </header>
   <!-- Sidebar -->
   {% comment %} 
@@ -27,6 +28,12 @@
   {% endcomment %}
   
   <main class="container p-4 pt-16 pb-12 h-screen max-w-full">
+    
+    {{client}}
+    
+    
+    {% comment %}     
+
     <c-level10maker></c-level10maker>
     {% comment %}     
 

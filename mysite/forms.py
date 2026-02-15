@@ -1,11 +1,11 @@
 # forms.py
 from django import forms
-from .models import Language2, Theme2, Client2
+from .models import Language, Theme, Client
 
 class ClientForm(forms.ModelForm):
     # This field fetches choices from Language
     language_choices = forms.ModelMultipleChoiceField(
-        queryset=Language2.objects.all(),
+        queryset=Language.objects.all(),
         widget=forms.SelectMultiple(attrs={'class': 'select-multiple'}),
         # Ensure 'required=False' if the JSON array can be empty
         required=False, 
@@ -14,7 +14,7 @@ class ClientForm(forms.ModelForm):
 
     # This field fetches choices from Theme
     theme_choices = forms.ModelMultipleChoiceField(
-        queryset=Theme2.objects.all(),
+        queryset=Theme.objects.all(),
         widget=forms.SelectMultiple(attrs={'class': 'select-multiple'}),
         # Ensure 'required=False' if the JSON array can be empty
         required=False, 
@@ -22,7 +22,7 @@ class ClientForm(forms.ModelForm):
     )
 
     class Meta:
-        model = Client2
+        model = Client
         fields = ['client_id', 'parent', 'language_list', 'theme_list'] # Include all fields
 
     def __init__(self, *args, **kwargs):
@@ -30,12 +30,12 @@ class ClientForm(forms.ModelForm):
         # If an instance already exists, populate the form field with current data
         if self.instance and self.instance.language_list:
             # Filter the queryset based on the values stored in the JSON field
-            self.fields['language_choices'].initial = Language2.objects.filter(
+            self.fields['language_choices'].initial = Language.objects.filter(
                 language_id__in=self.instance.language_list
             )
         if self.instance and self.instance.theme_list:
             # Filter the queryset based on the values stored in the JSON field
-            self.fields['theme_choices'].initial = Theme2.objects.filter(
+            self.fields['theme_choices'].initial = Theme.objects.filter(
                 theme_id__in=self.instance.theme_list
             )
 
