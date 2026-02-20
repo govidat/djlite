@@ -1,16 +1,18 @@
 from collections import defaultdict
 from django.core.cache import cache
-#from mysite.models import Translation, TextStatic
+
 #from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, Image, Svg, Layout, Hero, Card, Client2
-from mysite.models import Language, Theme, Client, TextContent, TextBlock, TextBlockItem, TextItemValue, Card, Hero, Layout, Page, HeroText, HeroCardText
+from mysite.models import Language, Theme, Client, Card, Hero, Layout, Page, HeroText, HeroCardText, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 from django.db.models import Prefetch
 #from django.http import JsonResponse
-import json
+#import json
 #from functools import lru_cache
 
 from django.contrib.contenttypes.models import ContentType
 
-# This is a modified version and takes the key_name or the field on which the relationship is built.
+
+# This is NOT USED a modified version and takes the key_name or the field on which the relationship is built.
+# But used in ZAPP - to evaluate ZAPP
 def build_nested_hierarchy(flat_list, key_name="id"):
     # Create a dictionary for quick lookup of items by their ID
     item_map = {item[key_name]: item for item in flat_list}
@@ -34,7 +36,7 @@ def build_nested_hierarchy(flat_list, key_name="id"):
 
     return nested_list
 
-# This is used to update the values in navbar
+# This is NOT USED used to update the values in navbar
 def update_list_of_dictionaries(smaller_list, larger_list, key_field):
     """
     Updates dictionaries in the smaller_list with values from matching dictionaries
@@ -60,30 +62,35 @@ def update_list_of_dictionaries(smaller_list, larger_list, key_field):
 
 
 #Step 1: Universal Prefetch for TextContent Tree
-
-textcontent_prefetch = Prefetch(
-    "textcontents",
-    queryset=TextContent.objects.prefetch_related(
+# Universal Text Block Tree
+stbitem_prefetch = Prefetch(
+    "textstbitems",
+    queryset=TextstbItem.objects.prefetch_related(
         Prefetch(
-            "blocks",
-            queryset=TextBlock.objects.prefetch_related(
-                Prefetch(
-                    "items",
-                    queryset=TextBlockItem.objects.prefetch_related(
-                        Prefetch(
-                            "translations",
-                            queryset=TextItemValue.objects.select_related("language"),
-                            #queryset=TextItemValue.objects.all(),
-                        ),
-                    ),
-                )
-            ),
+            "svgtextbadgevalue_set",
+            queryset=SvgtextbadgeValue.objects.select_related("language"),
         )
-    ),
+    ).order_by("order"),
 )
+
+comptextblock_prefetch = Prefetch(
+    "comptextblocks",
+    queryset=ComptextBlock.objects.prefetch_related(
+        stbitem_prefetch
+    ).order_by("order"),
+)
+
+gentextblock_prefetch = Prefetch(
+    "gentextblocks",
+    queryset=GentextBlock.objects.prefetch_related(
+        stbitem_prefetch
+    ).order_by("order"),
+)
+
 
 #Step 2: Component-Level Prefetch
 # Hero subtree
+
 hero_prefetch = Prefetch(
     "hero",
     queryset=Hero.objects.select_related(
@@ -94,19 +101,18 @@ hero_prefetch = Prefetch(
         "herocard__herocardfigure"
     ).prefetch_related(
         Prefetch(
-            "herotext__textcontents",
-            queryset=textcontent_prefetch.queryset,
-            #to_attr="prefetched_textcontents"
+            "herotext__comptextblocks",
+            queryset=comptextblock_prefetch.queryset,
         ),
         Prefetch(
-            "herocard__herocardtext__textcontents",
-            queryset=textcontent_prefetch.queryset,
-            #to_attr="prefetched_textcontents"
+            "herocard__herocardtext__comptextblocks",
+            queryset=comptextblock_prefetch.queryset,
         ),
     ),
 )
 
 # Card subtree
+
 card_prefetch = Prefetch(
     "card",
     queryset=Card.objects.select_related(
@@ -114,12 +120,12 @@ card_prefetch = Prefetch(
         "cardfigure",
     ).prefetch_related(
         Prefetch(
-            "cardtext__textcontents",
-            queryset=textcontent_prefetch.queryset,
-            #to_attr="prefetched_textcontents"
+            "cardtext__comptextblocks",
+            queryset=comptextblock_prefetch.queryset,
         )
     ),
 )
+
 
 #Step 3: Layout Tree (Single Fetch, Ordered)
 layout_prefetch = Prefetch(
@@ -132,366 +138,434 @@ layout_prefetch = Prefetch(
     ).order_by("level", "order"),
 )
 
-# following code for converting a qs to json
-# Target JSON
-"""
-{
 
-    "client_id": "acme",
-    "languages": ["en", "fr"],
-    "themes": ["default"],
-    "translations": {
-      "en": { "stext": "...", "ltext": "..." }
-    },
-
-    "pages": [
-      {
-        "page_id": "home",
-        "ltext": "Home",
-        "order": 1,
-        "hidden": false,
-        "translations": { "en": { "stext": "...", "ltext": "..." } },
-
-        "layout_tree": [
-          {
-            "id": 12,
-            "level": 10,
-            "slug": "section-1",
-            "order": 1,
-            "css_class": "",
-            "style": "",
-            "hidden": false,
-            "children": [
-              {
-                "id": 13,
-                "level": 20,
-                "slug": "row-1",
-                "order": 1,
-                "children": [
-                  {
-                    "id": 14,
-                    "level": 30,
-                    "slug": "col-1",
-                    "order": 1,
-                    "children": [
-                      {
-                        "id": 15,
-                        "level": 40,
-                        "slug": "cell-hero",
-                        "order": 1,
-                        "component": {
-                          "type": "hero",
-
-                          "hero": {
-                            "css_class": "",
-                            "overlay": false,
-                            "overlay_style": "",
-
-                            "text": {
-                              "order": 1,
-                              "hidden": false,
-                              "ltext": "",
-                              "actions": {
-                                "class": "",
-                                "position": "start"
-                              },
-                              "contents": [TEXT_CONTENT]
-                            },
-
-                            "figure": {
-                              "order": 2,
-                              "hidden": false,
-                              "image_url": "",
-                              "alt": "",
-                              "position": "end"
-                            },
-
-                            "card": {
-                              "order": 3,
-                              "hidden": false,
-                              "ltext": "",
-                              "css_class": "",
-                              "body_class": "",
-
-                              "text": {
-                                "hidden": false,
-                                "actions": {
-                                  "class": "",
-                                  "position": "start"
-                                },
-                                "contents": [TEXT_CONTENT]
-                              },
-
-                              "figure": {
-                                "hidden": false,
-                                "image_url": "",
-                                "alt": "",
-                                "position": "end"
-                              }
-                            }
-                          }
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  
-}
-"""
-# Text_Content
-"""
-{
-  "id": 91,
-  "hidden": false,
-  "ltext": "Main Title",
-
-  "blocks": [
-    {
-      "block_id": "title",
-      "hidden": false,
-      "css_class": "",
-      "items": [
-        {
-          "item_id": "text",
-          "hidden": false,
-          "order": 1,
-          "css_class": "",
-          "svg_text": null,
-
-          "translations": {
-            "en": { "stext": "Welcome", "ltext": "Welcome" },
-            "fr": { "stext": "Bienvenue", "ltext": "Bienvenue" }
-          }
-        }
-      ]
-    }
-  ]
-}
-"""
 def get_attr(obj, attr):
-    try:
-        return getattr(obj, attr)
-    except Exception:
-        return None
+    return getattr(obj, attr, None)
 
 def visible(obj):
     return obj if obj and not getattr(obj, "hidden", False) else None
 
-# A. Translation helper
 
 
-def build_translations(qs):
-    return {    
-        t.language.language_id: {
-            "stext": t.stext,
-            "ltext": t.ltext,
+# 1️⃣ Lowest Layer — SvgtextbadgeValue
+def build_values(item):
+    return {
+        val.language.language_id: {
+            "stext": val.stext,
+            "ltext": val.ltext,
         }
-        for t in qs
+        for val in item.svgtextbadgevalue_set.all()
     }
 
-# B. TextContent builder (core reusable unit)
-def build_textcontent(tc):
-    return {
-        "id": tc.id,
-        "hidden": tc.hidden,
-        "ltext": tc.ltext,
-        "blocks": [
-            {
-                "block_id": b.block_id,
-                "hidden": b.hidden,
-                "css_class": b.css_class,
-                "items": [
-                    {
-                        "item_id": i.item_id,
-                        "hidden": i.hidden,
-                        "order": i.order,
-                        "css_class": i.css_class,
-                        "svg_text": i.svg_text,
-                        "translations": build_translations(i.translations.all()),
-                    }
-                    for i in b.items.all()
-                ],
-            }
-            for b in tc.blocks.all()
-        ],
+# 2️⃣ TextstbItem Builder
+def build_stb_item(item):
+    if not visible(item):
+        return None
+
+    data = {
+        "type": item.item_id,
+        "order": item.order,
+        "css_class": item.css_class,
     }
 
-# C. Hero builder (fully drilled)
-def build_hero(hero):
-    herotext = visible(get_attr(hero, "herotext"))
-    herofigure = visible(get_attr(hero, "herofigure"))  
-    herocard = visible(get_attr(hero, "herocard"))
-    herocardtext = visible(get_attr(herocard, "herocardtext"))
-    herocardfigure = visible(get_attr(herocard, "herocardfigure"))  
-
-    return {
-        "css_class": hero.css_class,
-        "overlay": hero.overlay,
-        "overlay_style": hero.overlay_style,
-
-        "text": (
-            {
-                "order": hero.herotext.order,
-                "hidden": hero.herotext.hidden,
-                "ltext": hero.herotext.ltext,
-                "actions": {
-                    "class": hero.herotext.actions_class,
-                    "position": hero.herotext.actions_position_id,
-                },
-                "contents": [
-                    build_textcontent(tc)
-                    for tc in hero.herotext.textcontents.all()
-                ],
+    if item.item_id == "svg":
+        data["svg"] = item.svg_text
+    else:
+        data["values"] = {
+            val.language.language_id: {
+                "stext": val.stext,
+                "ltext": val.ltext,
             }
-            if herotext else None            
-        ),
-
-        "figure": (
-            {
-                "order": hero.herofigure.order,
-                "hidden": hero.herofigure.hidden,
-                "image_url": hero.herofigure.image_url,
-                "alt": hero.herofigure.alt,
-                "position": hero.herofigure.position_id,
-            }
-            if herofigure else None
-        ),
-
-        "card": (
-            {
-                "order": hero.herocard.order,
-                "hidden": hero.herocard.hidden,
-                "ltext": hero.herocard.ltext,
-                "css_class": hero.herocard.css_class,
-                "body_class": hero.herocard.body_class,
-                "text": (
-                    {
-                        "hidden": hero.herocard.herocardtext.hidden,
-                        "actions": {
-                            "class": hero.herocard.herocardtext.actions_class,
-                            "position": hero.herocard.herocardtext.actions_position_id,
-                        },
-                        "contents": [
-                            build_textcontent(tc)
-                            for tc in hero.herocard.herocardtext.textcontents.all()
-                        ],
-                    }
-                    if herocardtext else None
-                ),
-
-                "figure": (
-                    {
-                        "hidden": hero.herocard.herocardfigure.hidden,
-                        "image_url": hero.herocard.herocardfigure.image_url,
-                        "alt": hero.herocard.herocardfigure.alt,
-                        "position": hero.herocard.herocardfigure.position_id,
-                    }
-                    if herocardfigure else None
-                ),
-            }
-            if herocard else None
-        ),
-    }
-
-# D. Card builder
-def build_card(card):
-    cardtext = visible(get_attr(card, "cardtext"))
-    cardfigure = visible(get_attr(card, "cardfigure"))  
-
-    return {
-        "ltext": card.ltext,
-        "css_class": card.css_class,
-        "body_class": card.body_class,
-
-        "text": (
-            {
-                "hidden": card.cardtext.hidden,
-                "actions": {
-                    "class": card.cardtext.actions_class,
-                    "position": card.cardtext.actions_position_id,
-                },
-                "contents": [
-                    build_textcontent(tc)
-                    for tc in card.cardtext.textcontents.all()
-                ],
-            }
-            if cardtext else None
-        ),
-
-        "figure": (
-            {
-                "hidden": card.cardfigure.hidden,
-                "image_url": card.cardfigure.image_url,
-                "alt": card.cardfigure.alt,
-                "position": card.cardfigure.position_id,
-            }
-            if cardfigure else None
-        ),
-    }
-
-# E. Layout tree builder (critical)
-def build_layout_tree(layouts):
-    by_parent = {}
-    for l in layouts:
-        by_parent.setdefault(l.parent_id, []).append(l)
-
-    def build_node(l):
-        node = {
-            "id": l.id,
-            "level": l.level,
-            "slug": l.slug,
-            "order": l.order,
-            "css_class": l.css_class,
-            "style": l.style,
-            "hidden": l.hidden,
-            "children": [],
+            for val in item.svgtextbadgevalue_set.all()
         }
 
-        if l.level == 40:
-            if l.comp_id == "hero":
-                node["component"] = {
-                    "type": "hero",
-                    "hero": build_hero(l.hero),
-                }
-            elif l.comp_id == "card":
-                node["component"] = {
-                    "type": "card",
-                    "card": build_card(l.card),
-                }
+    return data
 
-        node["children"] = [
-            build_node(c)
-            for c in by_parent.get(l.id, [])
+# 3️⃣ Generic Block Builder
+# (Works for both ComptextBlock and GentextBlock)
+def build_blocks(blocks_queryset):
+    result = {}
+
+    for block in blocks_queryset:
+        if not visible(block):
+            continue
+
+        items = [
+            build_stb_item(item)
+            for item in block.textstbitems.all()
         ]
-        return node
 
-    return [
-        build_node(l)
-        for l in by_parent.get(None, [])
+        # Remove None items
+        items = [i for i in items if i]
+
+        if not items:
+            continue  # skip empty blocks
+
+        block_data = {
+            "order": block.order,
+            "css_class": block.css_class,
+            "ltext": block.ltext,
+            "items": items,
+        }
+
+        result.setdefault(block.block_id, []).append(block_data)
+
+    return result
+
+
+# 4️⃣ Component Builders
+# HeroText
+def build_hero_text(ht):
+    ht = visible(ht)
+    if not ht:
+        return None
+
+    textblocks = build_blocks(ht.comptextblocks.all())
+    if not textblocks:
+        return None
+
+    return {
+        "hidden": ht.hidden,
+        "type_id": "text",
+        "order": ht.order,
+        "ltext": ht.ltext,
+        "actions_class": ht.actions_class,
+        "actions_position": ht.actions_position_id,
+        "textblocks": textblocks,
+    }
+# HeroFigure
+def build_hero_figure(hf):
+    hf = visible(hf)
+    if not hf:
+        return None
+
+    return {
+        "hidden": hf.hidden,
+        "type_id": "figure",
+        "order": hf.order,
+        "ltext": hf.ltext,
+        "figure_class": hf.figure_class,
+        "position_id": hf.position_id,
+        "image_url": hf.image_url if hf.image_url else None,
+        "css_class": hf.css_class,
+        "alt": hf.alt,
+    }
+
+
+
+# HeroCardText
+def build_herocard_text(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    return {
+        "hidden": obj.hidden,
+        "type_id": "text",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "actions_class": obj.actions_class,
+        "actions_position": obj.actions_position_id,
+        "textblocks": build_blocks(obj.comptextblocks.all()),
+    }
+
+# HeroCardFigure
+def build_herocard_figure(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    return {
+        "hidden": obj.hidden,
+        "type_id": "figure",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "figure_class": obj.figure_class,
+        "position_id": obj.position_id,
+        "image_url": obj.image_url if obj.image_url else None,
+        "css_class": obj.css_class,
+        "alt": obj.alt,
+    }
+
+# HeroCard
+def build_herocard(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    contents = []
+
+    figure = build_herocard_figure(get_attr(obj, "herocardfigure"))
+    if figure:
+        contents.append(figure)
+
+    text = build_herocard_text(get_attr(obj, "herocardtext"))
+    if text:
+        contents.append(text)
+
+    contents.sort(key=lambda x: x["order"])
+
+    return {
+        "hidden": obj.hidden,
+        "type_id": "herocard",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "css_class": obj.css_class,
+        "contents": contents,
+    }
+
+# Hero
+def build_hero(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    contents = []
+
+    figure = build_hero_figure(get_attr(obj, "herofigure"))
+    if figure:
+        contents.append(figure)
+
+    text = build_hero_text(get_attr(obj, "herotext"))
+    if text:
+        contents.append(text)
+
+    herocard = build_herocard(get_attr(obj, "herocard"))
+    if herocard:
+        contents.append(herocard)
+
+    contents.sort(key=lambda x: x["order"])
+
+    return {
+        "css_class": obj.css_class,
+        "herocontent_class": obj.herocontent_class,
+        "overlay": obj.overlay,
+        "overlay_style": obj.overlay_style,
+        "herocontents": contents,
+        "comp_id": "hero",
+    }
+
+
+# CardFigure
+def build_card_figure(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    return {
+        "hidden": obj.hidden,
+        "type_id": "figure",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "figure_class": obj.figure_class,
+        "position_id": obj.position_id,
+        "image_url": obj.image_url if obj.image_url else None,
+        "css_class": obj.css_class,
+        "alt": obj.alt,
+    }
+
+# CardText
+def build_card_text(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    return {
+        "hidden": obj.hidden,
+        "type_id": "text",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "actions_class": obj.actions_class,
+        "actions_position": obj.actions_position_id,
+        "textblocks": build_blocks(obj.comptextblocks.all()),
+    }
+
+
+# Card
+def build_card(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    contents = []
+
+    figure = build_card_figure(get_attr(obj, "cardfigure"))
+    if figure:
+        contents.append(figure)
+
+    text = build_card_text(get_attr(obj, "cardtext"))
+    if text:
+        contents.append(text)
+
+    contents.sort(key=lambda x: x["order"])
+
+    return {
+        "hidden": obj.hidden,
+        "comp_id": "card",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "css_class": obj.css_class,
+        "contents": contents,
+    }
+
+# 5️⃣ Layout Builder
+
+def build_layout(layout, layout_map):
+    layout = visible(layout)
+    if not layout:
+        return None
+
+    layout_data = {
+        "level": layout.level,
+        "slug": layout.slug,
+        "order": layout.order,
+        "css_class": layout.css_class,
+        "comp_id": layout.comp_id
+    }
+
+    component = None
+
+    if layout.comp_id == "hero":
+      component = build_hero(get_attr(layout, "hero"))
+
+    elif layout.comp_id == "card":
+        component = build_card(get_attr(layout, "card"))
+
+    if component:
+        layout_data["component"] = component
+
+    # 🔥 Build children recursively
+    children = [
+        build_layout(child, layout_map)
+        for child in layout_map.get(layout.id, [])
     ]
 
-# F. Page tree for Navigation bar
+    children = [c for c in children if c]
+
+    if children:
+        layout_data["children"] = children
+
+    return layout_data
+"""
+def build_layout(layout):
+    layout = visible(layout)
+    if not layout:
+        return None
+
+    layout_data = {
+        "level": layout.level,
+        "slug": layout.slug,
+        "order": layout.order,
+        "css_class": layout.css_class,
+    }
+
+    component = None
+
+    if layout.comp_id == "hero":
+        hero = visible(get_attr(layout, "hero"))
+        if hero:
+            component = {
+                "type": "hero",
+                "herotext": build_herotext(
+                    visible(get_attr(hero, "herotext"))
+                ),
+            }
+
+    elif layout.comp_id == "card":
+        card = visible(get_attr(layout, "card"))
+        if card:
+            component = {
+                "type": "card",
+                "cardtext": build_cardtext(
+                    visible(get_attr(card, "cardtext"))
+                ),
+            }
+
+    if not component:
+        return None
+
+    layout_data["component"] = component
+    return layout_data
+"""
+
+# 6️⃣ Page Builder
+
+def build_page(page):
+    page = visible(page)
+    if not page:
+        return None
+
+    all_layouts = list(page.layouts.all())
+
+    # 🔥 Build parent-child lookup
+    layout_map = {}
+    root_layouts = []
+
+    for layout in all_layouts:
+        if layout.parent_id:
+            layout_map.setdefault(layout.parent_id, []).append(layout)
+        else:
+            root_layouts.append(layout)
+
+    # 🔥 Build tree from roots
+    layouts = [
+        build_layout(layout, layout_map)
+        for layout in root_layouts
+    ]
+
+    layouts = [l for l in layouts if l]
+
+    return {
+        "page_id": page.page_id,
+        "order": page.order,
+        "textblocks": build_blocks(page.gentextblocks.all()),
+        "layouts": layouts,
+    }
+"""
+def build_page(page):
+    page = visible(page)
+    if not page:
+        return None
+
+    layouts = [
+        build_layout(layout)
+        for layout in page.layouts.all()
+    ]
+
+    layouts = [l for l in layouts if l]
+
+    return {
+        "page_id": page.page_id,
+        "order": page.order,
+        "textblocks": build_blocks(page.gentextblocks.all()),
+        "layouts": layouts,
+    }
+"""
+# 6️⃣B Page tree for Navigation bar
 def build_page_tree(pages):
     node_map = {}
     roots = []
     
     # Step 1: create flat nodes
     for page in pages:
+        page_vis = visible(page)
+        if not page_vis:
+            return None        
+
         node_map[page.id] = {
             "client_id": page.client.client_id,
             "page_id": page.page_id,
-            "translations": build_translations(page.translations.all()),
+            "order": page.order,
+            "textblocks": build_blocks(page.gentextblocks.all()),
             "children": []
         }
 
     # Step 2: attach children
     for page in pages:
+        page_vis = visible(page)
+        if not page_vis:
+            return None         
+
         node = node_map[page.id]
 
         if page.parent_id:
@@ -503,47 +577,65 @@ def build_page_tree(pages):
 
     return roots
 
-
-# G. Final client assembler
+# 7️⃣ FINAL: build_client_payload()
 def build_client_payload(client):
+
     # Create a lookup dictionary
+    """
     master_language = {c.language_id: c.label_obj for c in Language.objects.filter(language_id__in=client.language_list)}
     master_theme = {c.theme_id: c.label_obj for c in Theme.objects.filter(theme_id__in=client.theme_list)}
+    """
+    languages_qs = Language.objects.filter(
+        language_id__in=client.language_list
+    )
 
+    themes_qs = Theme.objects.filter(
+        theme_id__in=client.theme_list
+    )
+
+    # Preserve client order
+    language_lookup = {l.language_id: l for l in languages_qs}
+    theme_lookup = {t.theme_id: t for t in themes_qs}
+    lv_languages = [
+        {
+            "language_id": lang_id,
+            "labels": language_lookup[lang_id].label_obj 
+        }
+        for lang_id in client.language_list
+        if lang_id in language_lookup
+    ]
+
+    lv_themes = [
+        {
+            "theme_id": theme_id,
+            "labels": theme_lookup[theme_id].label_obj
+        }
+        for theme_id in client.theme_list
+        if theme_id in theme_lookup
+    ]
+    
     return {
-            "client_id": client.client_id,
-            "languages": {
-              lang_id: master_language[lang_id]
-              for lang_id in client.language_list
-            },
-            "themes": {
-              theme_id: master_theme[theme_id]
-              for theme_id in client.theme_list
-            },            
-            "translations": build_translations(client.translations.all()),
-            # this is flat and mainly for layout_tree of a page
-            "pages": [
-                {
-                    "page_id": p.page_id,
-                    "ltext": p.ltext,
-                    "order": p.order,
-                    "hidden": p.hidden,
-                    "translations": build_translations(p.translations.all()),
-                    "layout_tree": build_layout_tree(
-                        [l for l in p.layouts.all() if not l.hidden]
-                    ) # xyz.all() without filter works with prefetch
+        "client_id": client.client_id,
+        "languages": lv_languages,
+        "themes": lv_themes,
+    
+        "parent": client.parent.client_id if client.parent else None,
 
-                }
-                #for p in client.pages.filter(hidden=False)
-                for p in [px for px in client.pages.all() if not px.hidden] # xyz.all() without filter works with prefetch
+        "textblocks": build_blocks(client.gentextblocks.all()),
 
-            ],
-            "page_tree": build_page_tree(
-                [l for l in client.pages.all() if not l.hidden]
-            ) # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
-            # this is for navigation bar requirement. this is nested
-            #"page_tree" : build_page_tree(client.pages.all()) #filter(hidden=False))
+        "pages": [
+            build_page(page)
+            for page in client.pages.all()
+        ],
+        "page_tree": build_page_tree(
+            [l for l in client.pages.all() if not l.hidden]
+        ), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
+        # this is for navigation bar requirement. this is nested
+        "client_theme": "light"
+
     }
+
+
 
 def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout=3600):
     """
@@ -565,30 +657,23 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
     #Step 4: Page + Client Query (The Entry Point)
     if lv_client_id:
         try:
-          ContentType.objects.get_for_models(
-            Client,
-            Page,
-            HeroText,
-            HeroCardText,
-            TextBlockItem,
-          )
+          #ContentType.objects.get_for_models(
+          #  Client,
+          #  Page,
+          #  HeroText,
+          #  HeroCardText,
+          #)
           qs_client = (
             Client.objects
             .select_related("parent")  # Add this if you access parent
             .prefetch_related(
-                Prefetch(
-                    "translations",
-                    queryset=TextItemValue.objects.select_related("language")
-                ),
+                gentextblock_prefetch,
                 Prefetch(
                     "pages",
                     queryset=Page.objects.select_related(
                         "parent"
                     ).prefetch_related(
-                        Prefetch(
-                            "translations",
-                            queryset=TextItemValue.objects.select_related("language")
-                        ),
+                        gentextblock_prefetch,
                         layout_prefetch,
                     ).order_by("order"),
                 ),
@@ -657,154 +742,216 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
 """
 {
   "client_id": "bahushira",
-  "languages": {
-    "en": {
-      "en": "English",
-      "fr": "frEnglish",
-      "hi": "hiEnglish"
+  "languages": [
+    {
+      "language_id": "en",
+      "labels": {
+        "en": "English",
+        "fr": "frEnglish",
+        "hi": "hiEnglish"
+      }
     },
-    "fr": {
-      "en": "French",
-      "fr": "frFrench",
-      "hi": "hiFrench"
+    {
+      "language_id": "fr",
+      "labels": {
+        "en": "French",
+        "fr": "frFrench",
+        "hi": "hiFrench"
+      }
     },
-    "hi": {
-      "en": "Hindi",
-      "fr": "frHindi",
-      "hi": "hiHindi"
+    {
+      "language_id": "hi",
+      "labels": {
+        "en": "Hindi",
+        "fr": "frHindi",
+        "hi": "hiHindi"
+      }
     }
-  },
-  "themes": {
-    "aqua": {
-      "en": "Aqua",
-      "fr": "frAqua",
-      "hi": "hiAqua"
+  ],
+  "themes": [
+    {
+      "theme_id": "aqua",
+      "labels": {
+        "en": "Aqua",
+        "fr": "frAqua",
+        "hi": "hiAqua"
+      }
     },
-    "dark": {
-      "en": "Dark",
-      "fr": "frDark",
-      "hi": "hiDark"
+    {
+      "theme_id": "dark",
+      "labels": {
+        "en": "Dark",
+        "fr": "frDark",
+        "hi": "hiDark"
+      }
     },
-    "light": {
-      "en": "Light",
-      "fr": "frLight",
-      "hi": "hiLight"
+    {
+      "theme_id": "light",
+      "labels": {
+        "en": "Light",
+        "fr": "frLight",
+        "hi": "hiLight"
+      }
     }
-  },
-  "translations": {
-    "en": {
-      "stext": "Bahushira",
-      "ltext": "Bahushira Technologies LLP"
-    },
-    "fr": {
-      "stext": "Bahushira",
-      "ltext": "frBahushira Technologies LLP"
-    },
-    "hi": {
-      "stext": "Bahushira",
-      "ltext": "Bahushira Technologies LLP"
-    }
+  ],
+  "parent": "None",
+  "textblocks": {
+    "name": [
+      {
+        "order": 1,
+        "css_class": "None",
+        "ltext": "None",
+        "items": [
+          {
+            "type": "text",
+            "order": 1,
+            "css_class": "None",
+            "values": {
+              "en": {
+                "stext": "Bahushira",
+                "ltext": "ltBahushira"
+              },
+              "fr": {
+                "stext": "frBahushira",
+                "ltext": "ltfrBahushira"
+              },
+              "hi": {
+                "stext": "hiBahushira",
+                "ltext": "lthiBahushira"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "nb_title": [
+      {
+        "order": 1,
+        "css_class": "None",
+        "ltext": "None",
+        "items": [
+          {
+            "type": "text",
+            "order": 1,
+            "css_class": "None",
+            "values": {
+              "en": {
+                "stext": "Bahushira Nav Bar",
+                "ltext": ""
+              },
+              "fr": {
+                "stext": "frBahushira Nav Bar",
+                "ltext": ""
+              },
+              "hi": {
+                "stext": "hiBahushira Nav Bar",
+                "ltext": ""
+              }
+            }
+          }
+        ]
+      }
+    ]
   },
   "pages": [
     {
       "page_id": "home",
-      "ltext": "Home",
       "order": 1,
-      "hidden": "False",
-      "translations": {
-        "en": {
-          "stext": "Home",
-          "ltext": "Home"
-        },
-        "fr": {
-          "stext": "frHome",
-          "ltext": "frHome"
-        },
-        "hi": {
-          "stext": "hiHome",
-          "ltext": "hiHome"
-        }
+      "textblocks": {
+        "name": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "Home",
+                    "ltext": ""
+                  },
+                  "fr": {
+                    "stext": "frHome",
+                    "ltext": ""
+                  },
+                  "hi": {
+                    "stext": "hiHome",
+                    "ltext": ""
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
-      "layout_tree": [
-        {
-          "id": 10,
-          "level": 10,
-          "slug": "a",
-          "order": 1,
-          "css_class": "",
-          "style": "",
-          "hidden": "False",
-          "children": [
-            {
-              "id": 11,
-              "level": 20,
-              "slug": "a",
-              "order": 1,
-              "css_class": "",
-              "style": "",
-              "hidden": "False",
-              "children": [
-                {
-                  "id": 12,
-                  "level": 30,
-                  "slug": "a",
-                  "order": 1,
-                  "css_class": "",
-                  "style": "",
-                  "hidden": "False",
-                  "children": [
-                    {
-                      "id": 13,
-                      "level": 40,
-                      "slug": "a",
-                      "order": 1,
-                      "css_class": "",
-                      "style": "",
-                      "hidden": "False",
-                      "children": [],
-                      "component": {
-                        "type": "hero",
-                        "hero": {
+      "layouts": 
+        [
+          {
+            "level": 10,
+            "slug": "a",
+            "order": 1,
+            "css_class": "",
+            "comp_id": "",
+            "children": [
+              {
+                "level": 20,
+                "slug": "a",
+                "order": 1,
+                "css_class": "",
+                "comp_id": "",
+                "children": [
+                  {
+                    "level": 30,
+                    "slug": "a",
+                    "order": 1,
+                    "css_class": "",
+                    "comp_id": "",
+                    "children": [
+                      {
+                        "level": 40,
+                        "slug": "a",
+                        "order": 1,
+                        "css_class": "",
+                        "comp_id": "hero",
+                        "component": {
                           "css_class": "",
+                          "herocontent_class": "",
                           "overlay": "False",
                           "overlay_style": "",
-                          "text": {
-                            "order": 1,
-                            "hidden": "False",
-                            "ltext": "",
-                            "actions": {
-                              "class": "",
-                              "position": "end"
-                            },
-                            "contents": [
-                              {
-                                "id": 1,
-                                "hidden": "False",
-                                "ltext": "",
-                                "blocks": [
+                          "herocontents": [
+                            {
+                              "hidden": "False",
+                              "type_id": "text",
+                              "order": 1,
+                              "ltext": "None",
+                              "actions_class": "None",
+                              "actions_position": "end",
+                              "textblocks": {
+                                "title": [
                                   {
-                                    "block_id": "title",
-                                    "hidden": "False",
-                                    "css_class": "",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "ltext": "None",
                                     "items": [
                                       {
-                                        "item_id": "text",
-                                        "hidden": "False",
+                                        "type": "text",
                                         "order": 1,
-                                        "css_class": "",
-                                        "svg_text": "",
-                                        "translations": {
+                                        "css_class": "None",
+                                        "values": {
                                           "en": {
-                                            "stext": "Welcome to Bahushira Home Page",
-                                            "ltext": "ltext Welcome to Bahushira Home Page"
+                                            "stext": "Bahushira Home Page Hero",
+                                            "ltext": "ltBahushira Home Page Hero"
                                           },
                                           "fr": {
-                                            "stext": "frWelcome to Bahushira Home Page",
-                                            "ltext": "fr ltext Welcome to Bahushira Home Page"
+                                            "stext": "frBahushira Home Page Hero",
+                                            "ltext": "ltfrBahushira Home Page Hero"
                                           },
                                           "hi": {
-                                            "stext": "hi Welcome to Bahushira Home Page",
-                                            "ltext": "hi ltxt Welcome to Bahushira Home Page"
+                                            "stext": "hiBahushira Home Page Hero",
+                                            "ltext": "lthiBahushira Home Page Hero"
                                           }
                                         }
                                       }
@@ -812,164 +959,277 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                                   }
                                 ]
                               }
-                            ]
-                          },
-                          "figure": {
-                            "order": 2,
-                            "hidden": "False",
-                            "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
-                            "alt": "Spiderman",
-                            "position": "start"
-                          },
-                          "card": ""
+                            },
+                            {
+                              "hidden": "False",
+                              "type_id": "figure",
+                              "order": 2,
+                              "ltext": "None",
+                              "figure_class": "px-0 pt-0",
+                              "position_id": "start",
+                              "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                              "css_class": "None",
+                              "alt": "Spiderman"
+                            }
+                          ],
+                          "comp_id": "hero"
                         }
                       }
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
     },
     {
       "page_id": "about",
-      "ltext": "About",
       "order": 2,
-      "hidden": "False",
-      "translations": {
-        "en": {
-          "stext": "About",
-          "ltext": "About"
-        },
-        "fr": {
-          "stext": "frAbout",
-          "ltext": "frAbout"
-        },
-        "hi": {
-          "stext": "hiAbout",
-          "ltext": "hiAbout"
-        }
+      "textblocks": {
+        "name": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "About",
+                    "ltext": "ltAbout"
+                  },
+                  "fr": {
+                    "stext": "frAbout",
+                    "ltext": "ltfrAbout"
+                  },
+                  "hi": {
+                    "stext": "hiAbout",
+                    "ltext": "lthiAbout"
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
-      "layout_tree": []
+      "layouts": []
     },
     {
       "page_id": "team",
-      "ltext": "Team",
       "order": 3,
-      "hidden": "False",
-      "translations": {
-        "en": {
-          "stext": "Team",
-          "ltext": "Team"
-        },
-        "fr": {
-          "stext": "frTeam",
-          "ltext": "frTeam"
-        },
-        "hi": {
-          "stext": "hiTeam",
-          "ltext": "hiTeam"
-        }
+      "textblocks": {
+        "name": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "Team",
+                    "ltext": "ltTeam"
+                  },
+                  "fr": {
+                    "stext": "frTeam",
+                    "ltext": "ltfrTeam"
+                  },
+                  "hi": {
+                    "stext": "hiTeam",
+                    "ltext": "lthiTeam"
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
-      "layout_tree": []
+      "layouts": []
     },
     {
       "page_id": "contact",
-      "ltext": "Contact",
       "order": 4,
-      "hidden": "False",
-      "translations": {
-        "en": {
-          "stext": "Contact",
-          "ltext": "Contact"
-        },
-        "fr": {
-          "stext": "frContact",
-          "ltext": "frContact"
-        },
-        "hi": {
-          "stext": "hiContact",
-          "ltext": "hiContact"
-        }
+      "textblocks": {
+        "name": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "Contact",
+                    "ltext": "ltContact"
+                  },
+                  "fr": {
+                    "stext": "frContact",
+                    "ltext": "ltfrContact"
+                  },
+                  "hi": {
+                    "stext": "hiContact",
+                    "ltext": "lthiContact"
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
-      "layout_tree": []
+      "layouts": []
     }
   ],
   "page_tree": [
     {
       "client_id": "bahushira",
       "page_id": "home",
-      "translations": {
-        "en": {
-          "stext": "Home",
-          "ltext": "Home"
-        },
-        "fr": {
-          "stext": "frHome",
-          "ltext": "frHome"
-        },
-        "hi": {
-          "stext": "hiHome",
-          "ltext": "hiHome"
-        }
+      "order": 1,
+      "textblocks": {
+        "name": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "Home",
+                    "ltext": ""
+                  },
+                  "fr": {
+                    "stext": "frHome",
+                    "ltext": ""
+                  },
+                  "hi": {
+                    "stext": "hiHome",
+                    "ltext": ""
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
       "children": []
     },
     {
       "client_id": "bahushira",
       "page_id": "about",
-      "translations": {
-        "en": {
-          "stext": "About",
-          "ltext": "About"
-        },
-        "fr": {
-          "stext": "frAbout",
-          "ltext": "frAbout"
-        },
-        "hi": {
-          "stext": "hiAbout",
-          "ltext": "hiAbout"
-        }
+      "order": 2,
+      "textblocks": {
+        "name": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "About",
+                    "ltext": "ltAbout"
+                  },
+                  "fr": {
+                    "stext": "frAbout",
+                    "ltext": "ltfrAbout"
+                  },
+                  "hi": {
+                    "stext": "hiAbout",
+                    "ltext": "lthiAbout"
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
       "children": []
     },
     {
       "client_id": "bahushira",
       "page_id": "team",
-      "translations": {
-        "en": {
-          "stext": "Team",
-          "ltext": "Team"
-        },
-        "fr": {
-          "stext": "frTeam",
-          "ltext": "frTeam"
-        },
-        "hi": {
-          "stext": "hiTeam",
-          "ltext": "hiTeam"
-        }
+      "order": 3,
+      "textblocks": {
+        "name": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "Team",
+                    "ltext": "ltTeam"
+                  },
+                  "fr": {
+                    "stext": "frTeam",
+                    "ltext": "ltfrTeam"
+                  },
+                  "hi": {
+                    "stext": "hiTeam",
+                    "ltext": "lthiTeam"
+                  }
+                }
+              }
+            ]
+          }
+        ]
       },
       "children": [
         {
           "client_id": "bahushira",
           "page_id": "contact",
-          "translations": {
-            "en": {
-              "stext": "Contact",
-              "ltext": "Contact"
-            },
-            "fr": {
-              "stext": "frContact",
-              "ltext": "frContact"
-            },
-            "hi": {
-              "stext": "hiContact",
-              "ltext": "hiContact"
-            }
+          "order": 4,
+          "textblocks": {
+            "name": [
+              {
+                "order": 1,
+                "css_class": "None",
+                "ltext": "None",
+                "items": [
+                  {
+                    "type": "text",
+                    "order": 1,
+                    "css_class": "None",
+                    "values": {
+                      "en": {
+                        "stext": "Contact",
+                        "ltext": "ltContact"
+                      },
+                      "fr": {
+                        "stext": "frContact",
+                        "ltext": "ltfrContact"
+                      },
+                      "hi": {
+                        "stext": "hiContact",
+                        "ltext": "lthiContact"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "children": []
         }
@@ -980,296 +1240,3 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
 """
 
 
-"""
-def serialize_instance(
-    obj,
-    *,
-    fields=None,
-    rename=None,
-    nested=None,
-):
-    
-    #Generic Django model serializer.
-
-    #fields: list[str]              → fields to include
-    #rename: dict[str, str]         → rename output keys
-    #nested: dict[str, callable]    → nested serializers
-    
-    if not obj:
-        return None
-
-    rename = rename or {}
-    nested = nested or {}
-
-    data = {}
-
-    for field in fields or []:
-        key = rename.get(field, field)
-        data[key] = getattr(obj, field)
-
-    for key, fn in nested.items():
-        data[key] = fn(obj)
-
-    return data
-
-def get_attr(obj, attr):
-    try:
-        return getattr(obj, attr)
-    except Exception:
-        return None
-
-def visible(obj):
-    return obj if obj and not getattr(obj, "hidden", False) else None
-"""    
-"""
-#Phase 4: Recursive tree builder
-def build_layout_tree(layouts):
-    nodes = {}
-    roots = []
-
-    for l in layouts:
-        node = {
-            "id": l.id,
-            "level": l.level,
-            "slug": l.slug,
-            "order": l.order,
-            "css_class": l.css_class,
-            "style": l.style,
-            "hidden": l.hidden,
-            "children": [],
-        }
-
-        if l.level == 40:
-            node["component"] = build_layout_component(l)
-
-        nodes[l.id] = node
-
-    for l in layouts:
-        node = nodes[l.id]
-
-        if l.parent_id:
-            nodes[l.parent_id]["children"].append(node)
-        else:
-            roots.append(node)
-
-    return roots
-
-
-   
-def build_layout_component(layout):
-
-    IMAGE_FIELDS = ["image_id", "image_url", "alt"]
-    CARD_TEXT_FIELDS = ["hidden", "ltext",
-                   "title_class", "title_stb_ids", "contents_class", "contents_stb_ids",
-                   "actions_class", "actions_position_id", 
-                   "button01_class", "button01_stb_ids",
-                   "button02_class", "button02_stb_ids",
-                   "button03_class", "button03_stb_ids",
-                   "button04_class", "button04_stb_ids",
-                   ]    
-    HERO_TEXT_FIELDS = ["order", "hidden", "type_id"] + CARD_TEXT_FIELDS
-
-    CARD_FIGURE_FIELDS = ["hidden", "ltext", "figure_class", "position_id", "css_class", "image_url", "alt"]
-
-
-    HERO_FIGURE_FIELDS = ["order", "hidden", "type_id"] + CARD_FIGURE_FIELDS
-    
-    if layout.comp_id == "hero":
-        #hero = get_attr(layout, "hero")
-        hero = visible(get_attr(layout, "hero"))
-        herotext = visible(get_attr(hero, "herotext"))
-        herofigure = visible(get_attr(hero, "herofigure"))  
-        herocard = visible(get_attr(hero, "herocard"))
-
-        serialized_herotext = serialize_instance(herotext, fields= HERO_TEXT_FIELDS, rename={}) if herotext else None
-        serialized_herofigure = serialize_instance(herofigure, 
-                            fields= HERO_FIGURE_FIELDS, 
-                            rename={},
-                            nested={"image": lambda o: serialize_instance(o.image, fields = IMAGE_FIELDS, rename={})},
-                            ) if herofigure else None
-        serialized_herocard = serialize_instance(
-                            herocard,
-                            fields=["id","order", "hidden", "type_id", "ltext", "ltext", "css_class", "body_class"],
-                            nested={
-                                "text": lambda o: serialize_instance(
-                                    o.herocardtext,
-                                    fields=CARD_TEXT_FIELDS,
-                                    rename={},
-                                ),
-                                "figure": lambda o: serialize_instance(
-                                    o.herocardfigure,
-                                    fields=CARD_FIGURE_FIELDS,
-                                    rename={},
-                                    nested={"image": lambda o: serialize_instance(o.image, fields = IMAGE_FIELDS, rename={})},
-                                ),
-                            },
-                            )   if herocard else None
-        herocontents = []
-        if serialized_herotext:
-            herocontents.append(serialized_herotext)
-        if serialized_herofigure:
-            herocontents.append(serialized_herofigure)
-        if serialized_herocard:
-            herocontents.append(serialized_herocard)
-
-        return {
-            "type": "hero",            
-            "css_class": hero.css_class,
-            "herocontent_class": hero.herocontent_class,
-            "overlay": hero.overlay,
-            "overlay_style": hero.overlay_style,
-            "herocontents" : herocontents,
-        }
-
-    if layout.comp_id == "card":
-        card = visible(get_attr(layout, "card"))
-        cardtext = visible(get_attr(card, "cardtext"))
-        cardfigure = visible(get_attr(card, "cardfigure"))        
-        serialized_cardtext = { lambda o: serialize_instance(
-                    o.cardtext,
-                    fields=CARD_TEXT_FIELDS,
-                    rename={},
-                    )
-                    } if cardtext else None
-        
-        serialized_cardfigure = { lambda o: serialize_instance(
-                    o.cardfigure,
-                    fields=CARD_FIGURE_FIELDS,
-                    rename={},
-                    nested={"image": lambda o: serialize_instance(o.image, fields = IMAGE_FIELDS, rename={})},
-                    )
-                    } if cardfigure else None
-        carddata = []
-        if serialized_cardtext:
-            carddata.append(serialized_cardtext)
-        if serialized_cardfigure:
-            carddata.append(serialized_cardfigure)
-
-        return serialize_instance(
-            card,
-            fields=["ltext", "css_class", "body_class"],
-            nested={
-                "data": carddata
-            },
-        )
-
-
-    return None
-
-"""
-"""
-#from Claude
-
-def fetch_clientstatic2(lv_client_id):
-    # Pre-fetch all ContentTypes we'll need
-    #ct_client = ContentType.objects.get_for_model(Client)
-    #ct_page = ContentType.objects.get_for_model(Page)
-    #ct_herotext = ContentType.objects.get_for_model(HeroText)
-    #ct_herocardtext = ContentType.objects.get_for_model(HeroCardText)
-    #ct_textblockitem = ContentType.objects.get_for_model(TextBlockItem)
-    
-    # Pre-fetch ALL languages once (they're reused everywhere)
-    #all_languages = {lang.id: lang for lang in Language.objects.all()}
-    
-    # Optimized TextContent prefetch with single language join
-    textcontent_prefetch = Prefetch(
-        "textcontents",
-        queryset=TextContent.objects.prefetch_related(
-            Prefetch(
-                "blocks",
-                queryset=TextBlock.objects.prefetch_related(
-                    Prefetch(
-                        "items",
-                        queryset=TextBlockItem.objects.select_related(
-                            "translations__language"  # Single join instead of repeated queries
-                        ).prefetch_related(
-                            Prefetch(
-                                "translations",
-                                queryset=TextItemValue.objects.select_related("language")
-                            )
-                        )
-                    )
-                )
-            )
-        ),
-        to_attr="prefetched_textcontents"
-    )
-    
-    # Hero with optimized textcontent prefetch
-    hero_prefetch = Prefetch(
-        "hero",
-        queryset=Hero.objects.select_related(
-            "herotext",
-            "herofigure", 
-            "herocard__herocardtext",
-            "herocard__herocardfigure"
-        ).prefetch_related(
-            Prefetch(
-                "herotext__textcontents",
-                queryset=textcontent_prefetch.queryset,
-                to_attr="prefetched_textcontents"
-            ),
-            Prefetch(
-                "herocard__herocardtext__textcontents",
-                queryset=textcontent_prefetch.queryset,
-                to_attr="prefetched_textcontents"
-            ),
-        ),
-    )
-    
-
-    # Card with optimized textcontent prefetch
-    card_prefetch = Prefetch(
-        "card",
-        queryset=Card.objects.select_related(
-            "cardtext",
-            "cardfigure",
-        ).prefetch_related(
-            Prefetch(
-                "cardtext__textcontents",
-                queryset=textcontent_prefetch.queryset,
-                to_attr="prefetched_textcontents"
-            )
-        ),
-    )
-    
-    # Layout prefetch
-    layout_prefetch = Prefetch(
-        "layouts",
-        queryset=Layout.objects.select_related(
-            "parent",
-        ).prefetch_related(
-            hero_prefetch,
-            card_prefetch,
-        ).order_by("level", "order"),
-    )
-    
-    # Main query
-    qs_client = (
-        Client.objects
-        .filter(client_id=lv_client_id)
-        .select_related("parent")  # Add this if you access parent
-        .prefetch_related(
-            Prefetch(
-                "translations",
-                queryset=TextItemValue.objects.select_related("language")
-            ),
-            Prefetch(
-                "pages",
-                queryset=Page.objects.select_related(
-                    "parent"
-                ).prefetch_related(
-                    Prefetch(
-                        "translations",
-                        queryset=TextItemValue.objects.select_related("language")
-                    ),
-                    layout_prefetch,
-                ).order_by("order"),
-            ),
-        )
-        .get()
-    )
-    
-    return qs_client
-
-"""    

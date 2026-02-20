@@ -1,0 +1,141 @@
+{% comment %}
+
+Input is of form :
+      "layouts": 
+        [
+          {
+            "level": 10,
+            "slug": "a",
+            "order": 1,
+            "css_class": "",
+            "comp_id": "",
+            "children": [
+              {
+                "level": 20,
+                "slug": "a",
+                "order": 1,
+                "css_class": "",
+                "comp_id": "",
+                "children": [
+                  {
+                    "level": 30,
+                    "slug": "a",
+                    "order": 1,
+                    "css_class": "",
+                    "comp_id": "",
+                    "children": [
+                      {
+                        "level": 40,
+                        "slug": "a",
+                        "order": 1,
+                        "css_class": "",
+                        "comp_id": "hero",
+                        "component": {
+                          "css_class": "",
+                          "herocontent_class": "",
+                          "overlay": "False",
+                          "overlay_style": "",
+                          "herocontents": [
+                            {
+                              "hidden": "False",
+                              "type_id": "text",
+                              "order": 1,
+                              "ltext": "None",
+                              "actions_class": "None",
+                              "actions_position": "end",
+                              "textblocks": {
+                                "title": [
+                                  {
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "ltext": "None",
+                                    "items": [
+                                      {
+                                        "type": "text",
+                                        "order": 1,
+                                        "css_class": "None",
+                                        "values": {
+                                          "en": {
+                                            "stext": "Bahushira Home Page Hero",
+                                            "ltext": "ltBahushira Home Page Hero"
+                                          },
+                                          "fr": {
+                                            "stext": "frBahushira Home Page Hero",
+                                            "ltext": "ltfrBahushira Home Page Hero"
+                                          },
+                                          "hi": {
+                                            "stext": "hiBahushira Home Page Hero",
+                                            "ltext": "lthiBahushira Home Page Hero"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            },
+                            {
+                              "hidden": "False",
+                              "type_id": "figure",
+                              "order": 2,
+                              "ltext": "None",
+                              "figure_class": "px-0 pt-0",
+                              "position_id": "start",
+                              "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                              "css_class": "None",
+                              "alt": "Spiderman"
+                            }
+                          ],
+                          "comp_id": "hero"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+{% endcomment %}
+
+{# {% load my_filters %} #}
+
+<body>
+  
+  {# Level10 #}  
+  {# For each full screen - Then level 20 items are derived from from available  #}
+  {% for id10 in page.layouts %}
+    <div class="bg-cover bg-center {{ id10.css_class|default:'' }}" style="{{ id10.style|default:'' }}">  
+      {# Level20 #}
+      {# For each full screen - Then level 20 items are derived from from available  #}
+      {# get the list of ids at level20 ; first filter on level20, then order them #}
+      {% for id20 in id10.children %}
+          <div class="h-screen flex items-center justify-center {{ id20.css_class|default:'' }}" style="{{ id20.style|default:'' }}">
+            {# Level30 #}
+            {# Level 30 items are derived from available  #}
+            {# get the list of ids with this parent; Then do an additional filter on Level=30.then order them #}
+            {# Expected is only one value, but keeping the same loop structure #}
+            {% for id30 in id20.children %}        
+            <div class="grid gap-4 p-8 w-full  {{ id30.css_class|default:'' }}" style="{{ id30.style|default:'' }}">
+              {# Level40 #}
+              {# Level 40 items are derived from available  #}
+              {# get the list of ids with this parent; Then do an additional filter on Level=40.then order them #}
+              {% for id40 in id30.children %}
+                <div class="{{ id40.css_class|default:'' }}" style="{{ id40.style|default:'' }}">                                
+                  {# This Level40 dict is passed on c-routerlevel40 for further processing #}
+                  {# {{id40.component}} #}
+                  <c-level40splitter :component="id40.component"></c-level40splitter> 
+                </div>  
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+
+      {% endfor %}
+    </div>  
+
+  {% endfor %}
+
+</body>
+
+

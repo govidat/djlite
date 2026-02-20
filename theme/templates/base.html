@@ -3,23 +3,32 @@
 {% load l10n %}
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ client.client_theme|lower }}">
 <head>
+  {% comment %} 
+  <script>
+    // Apply stored theme BEFORE page renders (prevents flash)
+    const storedTheme = localStorage.getItem("theme");
+    if (storedTheme) {
+        document.documentElement.setAttribute("data-theme", storedTheme);
+    }
+  </script>
+  {% endcomment %}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{client|title}}</title>
+  {% comment %} 
   <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
+  {% endcomment %}
   {% tailwind_css %}
 </head>
 <body class="h-screen min-h-screen">
-
+  
  
   <!-- Header -->
   <header  class="p-4 col-span-2 row-start-1 row-end-2">
     <!-- navbar -->
-    {% comment %}
-    <c-navbar_v001 :nb="{{nb}}" ></c-navbar_v001>
-  {% endcomment %}    
+    <c-navbar_v001></c-navbar_v001> 
   </header>
   <!-- Sidebar -->
   {% comment %} 
@@ -28,55 +37,26 @@
   {% endcomment %}
   
   <main class="container p-4 pt-16 pb-12 h-screen max-w-full">
-    
-    {{client}}
-    
-    
-    {% comment %}     
 
-    <c-level10maker></c-level10maker>
     {% comment %}     
-
-    <c-level10to40makerv2></c-level10to40makerv2>
-    {% endcomment %}
+    {% endcomment %}    
+    
+    <c-level10to40maker></c-level10to40maker>
+    
   </main>
 
   <!-- Footer -->    
-     {% comment %} 
-
+  {% comment %} 
   <c-footer_v001></c-footer_v001>
-    {% endcomment %}
+  {% endcomment %}
 
-
+  {% comment %}
+  <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
+  <script>
+    themeChange(false);
+  </script>
+  {% endcomment %}
 </body>
 
 </html>
 
-{% comment %}
-{% load static tailwind_tags %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Django Tailwind</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    {% tailwind_css %}
-</head>
-
-<body class="bg-gray-50 text-black font-serif leading-normal tracking-normal">
-
-    <div class="toast toast-top toast-end">
-        <div class="alert alert-info">
-            <span>Hello from daisyUi 👋</span>
-        </div>
-    </div>
-
-<div class="container mx-auto">
-    <section class="flex items-center justify-center h-screen">
-        <h1 class="text-5xl">Django + Tailwind = ❤️</h1>
-    </section>
-</div>
-</body>
-</html>
-{% endcomment %}

@@ -248,3 +248,6 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 LOCALE_PATHS = (os.path.join(os.path.dirname(__file__), '../locale/'),)
+
+# with nested inlines we are hitting limits sometimes
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000

@@ -1,0 +1,27 @@
+{% comment %}
+{% load my_tags %}
+  <script>
+  function changeTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }
+  </script>
+{% endcomment %}  
+  
+<form method="post" action="{% url 'set_theme' %}">
+  {% csrf_token %}
+  <select name="theme" onchange="this.form.submit()">
+    {% for theme in themes %}
+      <option value="{{ theme.theme_id }}"
+        {% if request.session.theme == theme.theme_id %}selected{% endif %}>
+        {% mytext_labelv2 theme.labels %}
+      </option>
+    {% endfor %}
+  </select>
+
+
+</form>
+
+
+
+        

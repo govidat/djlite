@@ -11,45 +11,45 @@ from django.contrib.contenttypes.fields import GenericRelation
 Language
 Theme
 Client
-    ├── TextItemValue
+    ├── TextItemValue to replaced by GentextBlock    
     ├── Page
-        ├── TextItemValue    
+        ├── TextItemValue to replaced by GentextBlock    
         ├── Layout @level 40
             ├── Hero
             │         ├── HeroText   (only if type=text)
-            │             └── TextContent
+            │             └── TextContent to replaced by ComptextBlock
             │         ├── HeroFigure (only if type=figure)
             │         └── HeroCard
             │              ├── HeroCardFigure
             │              └── HeroCardText
-            │                 └── TextContent
+            │                 └── TextContent to replaced by ComptextBlock
             │
             └── Card
                 ├── CardFigure
                 └── CardText
-                        └── TextContent  
-TextContent (content_type)
+                        └── TextContent to replaced by ComptextBlock 
+
+                        TextContent (content_type) To be depreacted
  └── TextBlock (title / content / actbut)
       └── TextBlockItem (text / svg / badge)
            └── TextItemValue (per language)
 
            
-GentextBlock (name / nb_title / nb_logo) # used in Client, Page
-└──TextItem (content_type) (text / svg / badge)
-    └── TextItemValue (per language)
+GentextBlock (content_type) (name / nb_title / nb_logo) # used in Client, Page
+└──TextstbItem (content_type) (text / svg / badge)
+    └── SvgtextbadgeValue (per language)
 
                       
-ComptextBlock (title / content / actbut)  # used in HeroText, CardText, HeroCardText
-└──TextItem (content_type) (text / svg / badge)
-    └── TextItemValue (per language)
+ComptextBlock (content_type) (title / content / actbut)  # used in HeroText, CardText, HeroCardText
+└──TextstbItem (content_type) (text / svg / badge)
+    └── SvgtextbadgeValue (per language)
            
            
-TextItem (content_type) (text / svg / badge)
-└── TextItemValue (per language)
-
+TextstbItem (content_type) (text / svg / badge)
+└── SvgtextbadgeValue (per language)
                       
 
-TextItemValue (content_type)                                   
+TextItemValue (content_type) - To be deprecated                                   
 """
 class LowercaseCharField(models.CharField):
     def get_prep_value(self, value):
@@ -60,7 +60,7 @@ class LowercaseCharField(models.CharField):
 
 class Language(models.Model):
     # id = LowercaseCharField(max_length=2, primary_key=True)
-    language_id = LowercaseCharField(max_length=2, unique=True)    
+    language_id = LowercaseCharField(max_length=2, unique=True, db_index=True)    
     label_obj = models.JSONField(null = True, blank = True, default=dict)
 
     def __str__(self):
@@ -73,7 +73,7 @@ class Language(models.Model):
 
 class Theme(models.Model):
     # id = LowercaseCharField(max_length=2, primary_key=True)
-    theme_id = LowercaseCharField(max_length=2, unique=True)    
+    theme_id = LowercaseCharField(max_length=50, unique=True, db_index=True)    
     label_obj = models.JSONField(null = True, blank = True, default=dict)
 
     def __str__(self):
@@ -84,6 +84,7 @@ class Theme(models.Model):
         verbose_name = "00-02 Project Theme"
         ordering = ["theme_id"]
 
+"""
 class TextItemValue(models.Model):
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -96,6 +97,8 @@ class TextItemValue(models.Model):
         return f"{self.stext} / ({self.ltext})"
     class Meta:
         unique_together = ("content_type", "object_id", "language")
+        verbose_name = "01-06d Text Item value"    
+
 
 class TextContent(models.Model):
     hidden = models.BooleanField(default=False)
@@ -106,6 +109,8 @@ class TextContent(models.Model):
     content_object = GenericForeignKey('content_type', 'object_id')
     def __str__(self):
         return f"{self.id} {self.ltext}" 
+    class Meta:
+        verbose_name = "01-06a Text Content"    
 
 class TextBlock(models.Model):
     textcontent = models.ForeignKey(TextContent, related_name="blocks", on_delete=models.CASCADE)
@@ -120,6 +125,7 @@ class TextBlock(models.Model):
     css_class = models.CharField(max_length=255, blank=True, null=True)
     class Meta:
         unique_together = ("textcontent", "block_id")
+        verbose_name = "01-06b Text Block"        
     def __str__(self):
         return f"{self.block_id} {self.ltext}"        
 
@@ -143,17 +149,135 @@ class TextBlockItem(models.Model):
         if self.item_id == 'svg' and self.translations.exists():
             raise ValidationError("SVG items must not have translations")
     def __str__(self):
-        return f"{self.item_id} {self.ltext} ({self.block.block_id})"                
+        return f"{self.item_id} {self.ltext} ({self.block.block_id})"       
+    class Meta:
+        verbose_name = "01-06c Text Block Item"              
+"""
+# below two are new tries
+"""           
+GentextBlock (content_type) (name / nb_title / nb_logo) # used in Client, Page
+└──TextstbItem (content_type) (text / svg / badge)
+    └── SvgtextbadgeValue (per language)
 
+                      
+ComptextBlock (content_type) (title / content / actbut)  # used in HeroText, CardText, HeroCardText
+└──TextstbItem (content_type) (text / svg / badge)
+    └── SvgtextbadgeValue (per language)
+           
+           
+TextstbItem (content_type) (text / svg / badge)
+└── SvgtextbadgeValue (per language)
+"""
+
+class TextstbItem(models.Model):
+    #block = models.ForeignKey(TextBlock, related_name="items", on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')    
+    STB_ITEM_TYPES = (
+        ("text", "Text"),
+        ("svg", "SVG"),
+        ("badge", "Badge"),
+    )    
+    item_id = models.CharField(max_length=20, choices=STB_ITEM_TYPES, blank=False, null=False) 
+    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    hidden = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(default=1)
+    css_class = models.CharField(max_length=255, blank=True, null=True)
+    svg_text = models.CharField(max_length=500, blank=True, null=True)
+    #translations = GenericRelation(TextItemValue)
+    
+    def clean(self):
+        if self.svg_text and not self.item_id == 'svg':
+            raise ValidationError("SVG text is relevanr only if item_id is SVG")
+        #if self.item_id == 'svg' and self.translations.exists():
+        #    raise ValidationError("SVG items must not have translations")
+    def __str__(self):
+        return f"{self.item_id} {self.ltext}"   
+    class Meta:
+        unique_together = ("content_type", "object_id", "item_id", "order")
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]        
+        verbose_name = "01-06b Text SVG/Text/Badge item"                
+
+
+class SvgtextbadgeValue(models.Model):
+    textstbitem = models.ForeignKey(TextstbItem, on_delete=models.CASCADE)
+    language = models.ForeignKey(Language, on_delete=models.CASCADE)    
+    stext = models.CharField(max_length=255, null=True, blank=True)
+    ltext = models.TextField(null=True, blank=True)
+    def __str__(self):
+        return f"{self.stext} / ({self.ltext})"
+    class Meta:
+        unique_together = ("textstbitem", "language")
+        verbose_name = "01-06c Svg Text Badge(STB) Item value"
+
+
+class ComptextBlock(models.Model):
+    #textcontent = models.ForeignKey(TextContent, related_name="blocks", on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')    
+
+    BLOCK_TYPES = (
+        ("title", "Title"),
+        ("content", "Content"),
+        ("actbut", "ActionButtons"),
+    )    
+    block_id = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
+    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    hidden = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(default=1)  # same block_id can be repeated
+    css_class = models.CharField(max_length=255, blank=True, null=True)
+    textstbitems = GenericRelation(TextstbItem)
+    class Meta:
+        unique_together = ("content_type", "object_id", "block_id", "order")
+        verbose_name = "01-06a Component Text Block" 
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["content_type", "object_id", "order"]),
+        ]        
+    def __str__(self):
+        return f"{self.block_id} {self.ltext}"    
+               
+
+class GentextBlock(models.Model):
+    #textcontent = models.ForeignKey(TextContent, related_name="blocks", on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')    
+    BLOCK_TYPES = (
+        ("name", "Name"),
+        ("nb_title", "Navbar Title"),
+        ("nb_subtitle", "Navbar SubTitle"),
+    )    
+    block_id = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
+    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    hidden = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(default=1)  # same block_id can be repeated
+    css_class = models.CharField(max_length=255, blank=True, null=True)
+    textstbitems = GenericRelation(TextstbItem)
+    class Meta:
+        unique_together = ("content_type", "object_id", "block_id", "order")
+        verbose_name = "01-06a General Text Block"  
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["content_type", "object_id", "order"]),
+        ]        
+    def __str__(self):
+        return f"{self.block_id} {self.ltext}" 
+    
 
 class Client(models.Model):
-    client_id = LowercaseCharField(max_length=25, unique=True)    
+    client_id = LowercaseCharField(max_length=25, unique=True, db_index=True)    
 
     parent = models.ForeignKey("self", null=True, blank=True, related_name="children", on_delete=models.CASCADE)
     language_list = models.JSONField(null = True, blank = True, default=list, help_text="A JSON array of selected values from Language.")
     theme_list = models.JSONField(null = True, blank = True, default=list)
     # Add this to allow: client_instance.translations.all()
-    translations = GenericRelation(TextItemValue)
+    #translations = GenericRelation(TextItemValue)
+    gentextblocks = GenericRelation(GentextBlock)
 
     def __str__(self):
         return self.client_id
@@ -198,7 +322,8 @@ class Page(models.Model):
     )
     hidden = models.BooleanField(default=False)
     # Add this to allow: client_instance.translations.all()
-    translations = GenericRelation(TextItemValue)    
+    #translations = GenericRelation(TextItemValue)    
+    gentextblocks = GenericRelation(GentextBlock)
 
     def __str__(self):
         return f"{self.client.client_id} / {self.page_id}"
@@ -208,7 +333,9 @@ class Page(models.Model):
         #verbose_name = "00-04 Project Page"
         #verbose_name_plural = "My Custom Models"
         ordering = ["order"]
-
+        indexes = [
+            models.Index(fields=["client", "order"]),
+        ]
 
 class Layout(models.Model):
     # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
@@ -293,7 +420,8 @@ class HeroText(models.Model):
         ("end", "End"),
     )    
     actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES, blank=True, null=True)
-    textcontents = GenericRelation(TextContent)
+    #textcontents = GenericRelation(TextContent)
+    comptextblocks = GenericRelation(ComptextBlock)
 
     class Meta:
         verbose_name = "01-05a1 HeroText"
@@ -344,7 +472,8 @@ class HeroCardText(models.Model):
         ("end", "End"),
     )    
     actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES, blank=True, null=True)
-    textcontents = GenericRelation(TextContent)
+    #textcontents = GenericRelation(TextContent)
+    comptextblocks = GenericRelation(ComptextBlock)
     class Meta:
         verbose_name = "01-05a3a HeroCard Text"  
 
@@ -371,7 +500,6 @@ class Card(models.Model):
     ltext = models.CharField(max_length=50, blank=True, null=True)   # e.g., "Country"
     css_class = models.CharField(max_length=255, blank=True, null=True)
     body_class = models.CharField(max_length=255, blank=True, null=True)
-
     class Meta:
         verbose_name = "01-05b Card" 
 
@@ -401,7 +529,8 @@ class CardText(models.Model):
         ("end", "End"),
     )    
     actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES, blank=True, null=True)
-    textcontents = GenericRelation(TextContent)
+    #textcontents = GenericRelation(TextContent)
+    comptextblocks = GenericRelation(ComptextBlock)
 
    
 

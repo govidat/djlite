@@ -10,34 +10,36 @@
       <ul
         tabindex="0"
         class="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
-        <c-navbar_v001_l1recur :items="client.page_tree"></c-navbar_v001_l1recur>    
+        <c-navbar_v001_l1recur :items="nb.items_nested"></c-navbar_v001_l1recur>
       </ul>
     </div>
-    {% comment %}
     <a href="{% url 'client_page' client_id 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    {% comment %}
+
+    <a href="{% url 'home' client %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
     {% endcomment %}
 
-    <h1 class="text-xl font-bold">
-      {% with lv_nb_title=client.textblocks.nb_title %}
-        <h1 class="text-xl font-bold {{lv_nb_title.css_class|default:""}}">
-        <c-svgtextbadge :items="lv_nb_title.0.items"></c-svgtextbadge>
-      {% endwith %}    
+    <h1 class="text-xl font-bold {{nb.title.class|default:""}}">
+      
+      {% comment %}{% endcomment %}
+      
+      
+      <c-textrouter :type="nb.title.type" :ids="nb.title.ids"></c-textrouter>
+      
+
+      {% comment %}
+      {% endcomment %}
     </h1>
 
   </div>
   <div class="navbar-center hidden lg:flex">
     <ul class="menu menu-horizontal px-1">
       
-      {% comment %}{% endcomment %}
-      <c-navbar_v001_l1recur :items="client.page_tree"></c-navbar_v001_l1recur>
-      
+      <c-navbar_v001_l1recur :items="nb.items_nested"></c-navbar_v001_l1recur>
     </ul>
   </div>
   <div class="navbar-end flex xl:gap-1">
-    
-    <c-select_theme :themes="client.themes"></c-select_theme>
-    
-    <c-select_language :languages="client.languages"></c-select_language>      
-    
+    <c-select_themev2 :themes="client_theme_ids"></c-select_themev2>
+    <c-select_language :languages="client_language_ids"></c-select_language>      
   </div>
 </div>

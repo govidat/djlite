@@ -11,6 +11,8 @@ urlpatterns = [
 
     path('', views.ClientPageView.as_view(), name="client_page"), 
     path('<str:pkey>/', views.ClientPageView.as_view(), name="client_page"), 
-    path("<str:pkey>/<str:page>/", views.ClientPageView.as_view(), name="client_page")
-   
+    path("<str:pkey>/<str:page>/", views.ClientPageView.as_view(), name="client_page"),
+
+    # this is for persisting theme selection 
+    #path("set-theme/", views.set_theme, name="set_theme"),  
 ]

@@ -1,17 +1,22 @@
 {% load my_tags %}
+{% load i18n %}
+{% get_current_language as CURRENT_LANG %}
 
 {% block language_switcher %} 
   <form method="post" action="{% url 'set_language' %}">
     {% csrf_token %}
     
     <select class="select" id="language-select" name="language" onchange="this.form.submit()">
-      {% for item in languages %}    
+      {% for lang in languages %}    
 
-        <option value="{{ item }}" {% if current_language == item %}selected{% endif %}>        
-        {{ item }}-{% mytext_static_tag item %}
+        <option value="{{ lang.language_id }}" 
+          {% if CURRENT_LANG|slice:":2" == lang.language_id %}selected{% endif %}>        
+          {{ lang.language_id }} - {% mytext_labelv2 lang.labels %}
+
         </option>
       {% endfor %}
     </select>
   </form>
 {% endblock %}
+
         

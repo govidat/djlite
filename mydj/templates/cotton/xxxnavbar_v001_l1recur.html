@@ -1,28 +1,22 @@
-
-{% comment %}
 {% load my_filters %}
-{% endcomment %}
 {% load my_tags %}
 
 {% for item in items %}
-    {% mytextv2 item.textblocks.name.0.items.0.values 'stext' as result_var %}
-    {% with lv_name=result_var %}  
+    {% with page_id=item|get_item:"page_id" %}    
         {% if item.children %}  <!-- if the children length > 0 -->
             <li>
-                
                 <details>
-                    <summary>{{lv_name}}</summary>                   
+                    <summary>{% mytext_static_tag page_id %}</summary>
                     <ul class="p-2">
                         <c-navbar_v001_l1recur :items="item.children"></c-navbar_v001_l1recur>
                     </ul>
                 </details>
-                
             </li>
 
         {% else %}
             <li>
-                <a href="{% url 'client_page' item.client_id item.page_id %}">
-                    {{lv_name}}
+                <a href="{% url 'client_page' client_id page_id %}">
+                    {% mytext_static_tag page_id %}
                 </a>
             </li>
         {% endif %}

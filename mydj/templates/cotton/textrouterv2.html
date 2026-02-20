@@ -1,0 +1,42 @@
+{% comment %}
+input sample
+"ids": [
+            {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira Home Page Hero",
+                    "ltext": "ltBahushira Home Page Hero"
+                    },
+                    "fr": {
+                    "stext": "frBahushira Home Page Hero",
+                    "ltext": "ltfrBahushira Home Page Hero"
+                    },
+                    "hi": {
+                    "stext": "hiBahushira Home Page Hero",
+                    "ltext": "lthiBahushira Home Page Hero"
+                    }
+                }
+                }
+            ]
+            }
+        ]
+
+{% load my_tags %}
+
+{% endcomment %}
+
+
+
+{% for id in ids %} 
+    <div class="flex">
+        <c-svgtextbadge :items="id.items"></c-svgtextbadge> 
+    </div> 
+{% endfor %}

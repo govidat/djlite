@@ -7,8 +7,10 @@ from .forms import ClientForm
 
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 
-from .models import Language, Theme, Client, Page, TextItemValue, TextBlockItem, TextBlock, TextContent, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, Card, Hero, Layout
+from .models import Language, Theme, Client, Page, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, Card, Hero, Layout, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
+# TextItemValue, TextBlockItem, TextBlock, TextContent,
 
+# VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
 class LanguageAdmin(admin.ModelAdmin):
     #list_display = ("language_id", "label_obj")
     fields = ["language_id", "label_obj"]
@@ -18,37 +20,64 @@ class ThemeAdmin(admin.ModelAdmin):
     #list_display = ("theme_id", "label_obj")
     fields = ["theme_id", "label_obj"]    
     search_fields = ("theme_id",)
-
+"""
 class TextItemValueInline(nested_admin.NestedGenericTabularInline):
     model = TextItemValue
     extra = 1
     classes = ['collapse']
-
+"""
+class SvgtextbadgeValueInline(nested_admin.NestedStackedInline):
+    model = SvgtextbadgeValue
+    extra = 1
+    classes = ['collapse']
+"""
 class TextBlockItemInline(nested_admin.NestedStackedInline):
     model = TextBlockItem
     extra = 0
     inlines = [TextItemValueInline]
     classes = ['collapse']
+"""
+class TextstbItemInline(nested_admin.NestedGenericTabularInline):
+    model = TextstbItem
+    fields = ("item_id", "ltext", "hidden", "order", "css_class", "svg_text")
+    extra = 0
+    inlines = [SvgtextbadgeValueInline]
+    classes = ['collapse']
 
+"""
 class TextBlockInline(nested_admin.NestedStackedInline):
     model = TextBlock
     extra = 0
     inlines = [TextBlockItemInline]
     classes = ['collapse']
+"""
+class ComptextBlockInline(nested_admin.NestedGenericTabularInline):
+    model = ComptextBlock
+    fields = ("block_id", "ltext", "hidden", "order", "css_class")
+    extra = 0
+    inlines = [TextstbItemInline]
+    classes = ['collapse']
 
+class GentextBlockInline(nested_admin.NestedGenericTabularInline):
+    model = GentextBlock
+    fields = ("block_id", "ltext", "hidden", "order", "css_class")
+    extra = 0
+    inlines = [TextstbItemInline]
+    classes = ['collapse']
+"""
 class TextContentInline(nested_admin.NestedGenericTabularInline):
     model = TextContent
     extra = 1
     inlines = [TextBlockInline]
     classes = ['collapse']
-
+"""
 class HeroCardTextInline(nested_admin.NestedStackedInline):
     model = HeroCardText
     extra = 0
     max_num = 1
     fields = ("ltext", "actions_class", "actions_position_id")
     #"title_class", "title_stb_ids", "contents_class", "contents_stb_ids", "button01_class", "button01_stb_ids", "button02_class", "button02_stb_ids", "button03_class", "button03_stb_ids", "button04_class", "button04_stb_ids")
-    inlines = [TextContentInline]
+    inlines = [ComptextBlockInline]
     classes = ['collapse']
 
 class HeroCardFigureInline(nested_admin.NestedStackedInline):
@@ -78,7 +107,7 @@ class HeroTextInline(nested_admin.NestedStackedInline):
         (None, {"fields": ["order", "hidden", "ltext"]}),
         ("Actions", {"fields": ["actions_class", "actions_position_id"]}), 
     ]    
-    inlines = [TextContentInline]
+    inlines = [ComptextBlockInline]
     classes = ['collapse']
 
 class HeroFigureInline(nested_admin.NestedStackedInline):
@@ -101,7 +130,7 @@ class CardTextInline(nested_admin.NestedStackedInline):
     max_num = 1
     fields = ("ltext", "actions_class", "actions_position_id")
     #"title_class", "title_stb_ids", "contents_class", "contents_stb_ids", "button01_class", "button01_stb_ids", "button02_class", "button02_stb_ids", "button03_class", "button03_stb_ids", "button04_class", "button04_stb_ids")
-    inlines = [TextContentInline]
+    inlines = [ComptextBlockInline]
     classes = ['collapse']
 
 class CardFigureInline(nested_admin.NestedStackedInline):
@@ -190,7 +219,7 @@ class PageInline(nested_admin.NestedStackedInline):
     extra = 0
     classes = ['collapse']
     list_display = ('page_id', 'ltext', 'order', 'parent', 'hidden')
-    inlines = [TextItemValueInline]
+    inlines = [GentextBlockInline]
     classes = ['collapse']
     #inlines = []
 
@@ -203,7 +232,7 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
     # Hide the raw JSON field in the admin display
     fields = ['client_id', 'parent', 'language_choices', 'theme_choices'] 
     list_display = ('client_id', 'parent')
-    inlines = [TextItemValueInline, PageInline]
+    inlines = [GentextBlockInline, PageInline]
     
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(Theme, ThemeAdmin)

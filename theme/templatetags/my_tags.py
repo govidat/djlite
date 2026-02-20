@@ -5,7 +5,7 @@ register = template.Library()
 
 
 @register.simple_tag(takes_context=True)
-def mytext_static_tag(context, lv_token_id='', lv_ln=''):
+def xxxmytext_static_tag(context, lv_token_id='', lv_ln=''):
 
     
     """
@@ -104,7 +104,7 @@ def mytext_static_tag(context, lv_token_id='', lv_ln=''):
     return 'ERR001'
     
 @register.simple_tag(takes_context=True)
-def myimage_static_tag(context, lv_token_id=''):
+def xxxmyimage_static_tag(context, lv_token_id=''):
 
     
     """
@@ -161,7 +161,7 @@ def myimage_static_tag(context, lv_token_id=''):
     return {'image_url': '', 'alt': 'ERR001'}    
 
 @register.simple_tag(takes_context=True)
-def mysvg_static_tag(context, lv_token_id=''):
+def xxxmysvg_static_tag(context, lv_token_id=''):
 
     
     """
@@ -216,3 +216,156 @@ def mysvg_static_tag(context, lv_token_id=''):
                             
     # If no value was found after checking all priorities
     return {'svg_text': ''}
+
+@register.simple_tag(takes_context=True)
+def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
+     
+    """ Option 1
+    lv_text_list=[]
+    Input is :
+        "lv_text_list/ name": [
+          {
+            "order": 1,
+            "css_class": "",
+            "ltext": "",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "",
+                "values": {
+                  "en": {
+                    "stext": "Home",
+                    "ltext": ""
+                  },
+                  "fr": {
+                    "stext": "frHome",
+                    "ltext": ""
+                  },
+                  "hi": {
+                    "stext": "hiHome",
+                    "ltext": ""
+                  }
+                }
+              }
+            ]
+          }
+        ]
+
+    Option 2
+    Input is :
+
+                "values": {
+                  "en": {
+                    "stext": "Home",
+                    "ltext": ""
+                  },
+                  "fr": {
+                    "stext": "frHome",
+                    "ltext": ""
+                  },
+                  "hi": {
+                    "stext": "hiHome",
+                    "ltext": ""
+                  }
+                }
+
+    Optional lv_ln = "en', 'hi'...
+    Output is a text. 
+
+    LANGUAGE_CODE 
+    CURRENT_LANGUAGE_CODE
+
+    """    
+    cv_base_ln_code = context.get("LANGUAGE_CODE")
+    cv_curr_ln_code = get_language()
+
+    # a hierarchy of page is with global followed by current page
+    cv_ln_hier_list = [cv_curr_ln_code]
+    if cv_base_ln_code != cv_curr_ln_code:
+        cv_ln_hier_list.append(cv_base_ln_code)
+    # if a lv_ln is passed to the function ie. the preferred ln code, then put this as the first entry in ln_hier_list
+    if lv_ln != '':
+        if lv_ln in cv_ln_hier_list:
+            cv_ln_hier_list.remove(lv_ln) # Removes the first occurrence by value
+        cv_ln_hier_list.insert(0, lv_ln) # Inserts the item at index 0 (the beginning)
+
+    """
+    Attempts to retrieve a value from a nested dictionary 
+    using predefined paths in order of preference.
+    
+    # If none of the paths are found
+    return None
+    """
+
+    # Get the dictionary for the specific token
+    """
+    Option 1
+    lv_values_dict = lv_text_list[0]["items"][0]["values"]
+    Option
+    """
+    lv_values_dict = lv_dict
+         
+
+    # Iterate through the language priorities
+    for language_id in cv_ln_hier_list:
+        if language_id in lv_values_dict:
+            return lv_values_dict[language_id][lv_key]
+                                
+
+                            
+    # If no value was found after checking all priorities
+    return 'ERR001'
+
+@register.simple_tag(takes_context=True)
+def mytext_labelv2(context, lv_dict={}):
+     
+    """ 
+    Option 2
+    Input is :
+
+      "labels": {
+        "en": "Aqua",
+        "fr": "frAqua",
+        "hi": "hiAqua"
+      }
+
+    Output is a text. 
+
+    LANGUAGE_CODE 
+    CURRENT_LANGUAGE_CODE
+
+    """    
+    cv_base_ln_code = context.get("LANGUAGE_CODE")
+    cv_curr_ln_code = get_language()
+
+    # a hierarchy of page is with global followed by current page
+    cv_ln_hier_list = [cv_curr_ln_code]
+    if cv_base_ln_code != cv_curr_ln_code:
+        cv_ln_hier_list.append(cv_base_ln_code)
+    """
+    Attempts to retrieve a value from a nested dictionary 
+    using predefined paths in order of preference.
+    
+    # If none of the paths are found
+    return None
+    """
+
+    # Get the dictionary for the specific token
+    """
+    Option 1
+    lv_values_dict = lv_text_list[0]["items"][0]["values"]
+    Option
+    """
+    lv_values_dict = lv_dict
+         
+
+    # Iterate through the language priorities
+    for language_id in cv_ln_hier_list:
+        if language_id in lv_values_dict:
+            return lv_values_dict[language_id]
+                                
+
+                            
+    # If no value was found after checking all priorities
+    return 'ERR001'    

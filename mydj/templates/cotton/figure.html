@@ -1,9 +1,11 @@
-{% load my_filters %}
 
 <figure class={{ figure.figure_class|default:"" }}>
-    {% if figure.link_id %}
-       
-        <c-rawimage class="{{figure.class}}" id="{{figure.link_id}}"></c-rawimage>
+    {% if figure.image_url %}
+        <img
+            class={{figure.css_class}}
+            src={{figure.image_url}}
+            alt={{figure.alt}} />       
+        {# <c-rawimage class="{{figure.css_class}}" id="{{figure.link_id}}"></c-rawimage> #}
         
     {% endif %}              
 </figure>

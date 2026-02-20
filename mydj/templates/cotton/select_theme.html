@@ -6,8 +6,37 @@
   <option value="light">Light</option>  
 </select>
 {% load my_filters %}
-{% endcomment %}
 
+client.themes is of form:
+  "themes": [
+    {
+      "theme_id": "aqua",
+      "labels": {
+        "en": "Aqua",
+        "fr": "frAqua",
+        "hi": "hiAqua"
+      }
+    },
+    {
+      "theme_id": "dark",
+      "labels": {
+        "en": "Dark",
+        "fr": "frDark",
+        "hi": "hiDark"
+      }
+    },
+    {
+      "theme_id": "light",
+      "labels": {
+        "en": "Light",
+        "fr": "frLight",
+        "hi": "hiLight"
+      }
+    }
+  ]
+
+{% load my_tags %}  
+{% endcomment %}
 {% load my_tags %}
 
 <div class="dropdown">
@@ -20,7 +49,7 @@
     
   </div>
 
-
+  
   <ul tabindex="0" class="dropdown-content bg-base-300 rounded-box z-1 w-52 p-2 shadow-2xl">
     {% for theme in themes %}
         <li>
@@ -28,9 +57,10 @@
             type="radio"
             name="theme-dropdown"
             class="theme-controller w-full btn btn-sm btn-block btn-ghost justify-start"
-            aria-label={% mytext_static_tag theme %}
-            value={{theme}} />
-        </li>        
+            aria-label= {% mytext_labelv2 theme.labels %}
+            value={{theme.theme_id}} />
+        </li>
+                
     {% endfor %}
 
   </ul>

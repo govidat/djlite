@@ -15,3 +15,10 @@ def settings_constants(request):
         # 'PC_THEMES': settings.PC_THEMES,
         #'PC_LANGUAGES': settings.PC_LANGUAGES,
     }
+
+"""
+def theme_processor(request):
+    return {
+        "current_theme": request.session.get("theme", "light")
+    }
+"""    
