@@ -1,9 +1,12 @@
 #from mysite.models import TokenType
 #from mysite.models import Token
 from mysite.models import Language
-from mysite.models import Theme
-from mysite.models import Page
+from mysite.models import ThemePreset
+
+
 from mysite.models import Client
+from mysite.models import Page
+from mysite.models import Theme
 from mysite.models import Layout
 #from mysite.models import ClientLanguage
 #from mysite.models import ClientTheme
@@ -17,7 +20,7 @@ from mysite.models import Layout
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
 
-from mysite.models import TextItemValue
+#from mysite.models import TextItemValue
 
 #from django.db.models import F, Case, When
 from django.utils import timezone
@@ -148,172 +151,8 @@ def run():
             hidden=row["hidden"],
         ) 
 
-          
-                    
-
-    TEXTITEMVALUE_DATA = [
-        {
-        "language_id": "en",
-        "stext": "Bahushira",
-        "ltext": "Bahushira Technologies LLP",
-        "source_model": "Client",
-        "source_field": "client_id",
-        "row_value": "bahushira"
-        },
-        
-        {
-        "language_id": "fr",
-        "stext": "Bahushira",
-        "ltext": "frBahushira Technologies LLP",
-        "source_model": "Client",
-        "source_field": "client_id",
-        "row_value": "bahushira"
-        },        
-        {
-        "language_id": "hi",
-        "stext": "Bahushira",
-        "ltext": "Bahushira Technologies LLP",
-        "source_model": "Client",
-        "source_field": "client_id",
-        "row_value": "bahushira"
-        },        
-        {
-        "language_id": "en",
-        "stext": "Home",
-        "ltext": "Home",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "home"
-        },        
-        {
-        "language_id": "fr",
-        "stext": "frHome",
-        "ltext": "frHome",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "home"
-        },        
-        {
-        "language_id": "hi",
-        "stext": "hiHome",
-        "ltext": "hiHome",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "home"
-        },        
-        {
-        "language_id": "en",
-        "stext": "About",
-        "ltext": "About",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "about"
-        },                                
-        {
-        "language_id": "fr",
-        "stext": "frAbout",
-        "ltext": "frAbout",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "about"
-        },                                
-        {
-        "language_id": "hi",
-        "stext": "hiAbout",
-        "ltext": "hiAbout",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "about"
-        },                                
-        {
-        "language_id": "en",
-        "stext": "Team",
-        "ltext": "Team",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "team"
-        },                                                        
-        {
-        "language_id": "fr",
-        "stext": "frTeam",
-        "ltext": "frTeam",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "team"
-        },                                                        
-        {
-        "language_id": "hi",
-        "stext": "hiTeam",
-        "ltext": "hiTeam",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "team"
-        },
-        {
-        "language_id": "en",
-        "stext": "Contact",
-        "ltext": "Contact",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "contact"
-        },                                                        
-        {
-        "language_id": "fr",
-        "stext": "frContact",
-        "ltext": "frContact",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "contact"
-        },
-        {
-        "language_id": "hi",
-        "stext": "hiContact",
-        "ltext": "hiContact",
-        "source_model": "Page",
-        "source_field": "page_id",
-        "row_value": "contact"
-        }         
-    ]    
-
-    languages = {c.language_id: c for c in Language.objects.all()}
-    content_types = {c.model: c for c in ContentType.objects.filter(app_label="mysite")}
-
-    for row in TEXTITEMVALUE_DATA:
-        lv_source_model_lower = row["source_model"].lower()
-        
-        # Define the model name and app label as variables
-        app_label = 'mysite' # Replace with the actual name of your app
-        model_name = row["source_model"] # Replace with the actual name of your model
-
-        # Get the model class dynamically
-        ModelClass = apps.get_model(app_label, model_name)
-
-        # Now you can use the ModelClass just like a normal model
-        try:
-            lv_content_type_obj = ModelClass.objects.get(**{row["source_field"]: row["row_value"]})
-            lv_object_id = lv_content_type_obj.id
-            # or simply:
-            # lv_content_type_id = ContentType.objects.get(app_label="my_site", model=lv_source_model_lower).id
-        except ModelClass.DoesNotExist:
-            # Handle the case where the content type is not found
-            print(f"content_type_id not found.")
-            lv_object_id = None # Or handle the error as appropriate for your application
-        
-
-        language_value = languages[row["language_id"]]
-        content_type_value = content_types.get(lv_source_model_lower)
-        #content_type_value = content_types[row[lv_source_model_lower]]
-
-        TextItemValue.objects.update_or_create(
-            language = language_value,
-            stext=row["stext"],
-            ltext=row["ltext"],
-            object_id=lv_object_id,
-            content_type = content_type_value            
-        )    
-
-        
-    """ 
+                  
+ 
 
     LAYOUT_DATA = [
         {
@@ -400,4 +239,140 @@ def run():
             comp_id=row["comp_id"],
         ) 
 
-          
+        
+    THEMEPRESET_DATA = [
+        {
+        "themepreset_id": "light",
+        "ltext": "a",
+        "primary": "#570df8",
+        "primary_content": "#ffffff",
+
+        "secondary": "#f000b8",
+        "secondary_content": "#ffffff",
+
+        "accent": "#37cdbe",
+        "accent_content": "#163835",
+
+        "neutral": "#3d4451",
+        "neutral_content": "#ffffff",
+
+        "base_100": "#ffffff",
+        "base_200": "#f2f2f2",
+        "base_300": "#e5e6e6",
+        "base_content": "#1f2937",
+
+        "success": "#00c853",
+        "success_content": "#ffffff",
+
+        "warning": "#ff9800",
+        "warning_content": "#ffffff",
+
+        "error": "#ff5724",
+        "error_content": "#ffffff",
+
+        "info": "#2094f3",
+        "info_content": "#ffffff"
+        },   
+        {
+        "themepreset_id": "dark",
+        "ltext": "b",
+        "primary": "#661ae6",
+        "primary_content": "#ffffff",
+
+        "secondary": "#d926aa",
+        "secondary_content": "#ffffff",
+
+        "accent": "#1fb2a6",
+        "accent_content": "#ffffff",
+
+        "neutral": "#191d24",
+        "neutral_content": "#a6adbb",
+
+        "base_100": "#2a303c",
+        "base_200": "#242933",
+        "base_300": "#1d232a",
+        "base_content": "#a6adbb",
+
+        "success": "#36d399",
+        "success_content": "#000000",
+
+        "warning": "#fbbd23",
+        "warning_content": "#000000",
+
+        "error": "#f87272",
+        "error_content": "#000000",
+
+        "info": "#3abff8",
+        "info_content": "#000000"
+        },              
+               
+    ]
+
+
+    for row in THEMEPRESET_DATA:
+
+        ThemePreset.objects.update_or_create(
+            themepreset_id=row["themepreset_id"],
+            ltext=row["ltext"],
+            primary=row["primary"],
+            primary_content=row["primary_content"],
+
+            secondary=row["secondary"],
+            secondary_content=row["secondary_content"],
+
+            accent=row["accent"],
+            accent_content=row["accent_content"],
+
+            neutral=row["neutral"],
+            neutral_content=row["neutral_content"],
+
+            base_100=row["base_100"],
+            base_200=row["base_200"],
+            base_300=row["base_300"],
+            base_content=row["base_content"],
+
+            success=row["success"],
+            success_content=row["success_content"],
+
+            warning=row["warning"],
+            warning_content=row["warning_content"],
+
+            error=row["error"],
+            error_content=row["error_content"],
+
+            info=row["info"],
+            info_content=row["info_content"]
+        ) 
+
+"""
+    THEME_DATA = [
+        {
+        "client_id": "bahushira",
+        "themepreset_id" : "light",
+        "theme_id": "light2",
+        "is_default": False
+        },        
+        {
+        "client_id": "bahushira",
+        "themepreset_id" : "dark",
+        "theme_id": "dark2",
+        "is_default": True
+        },
+    ]
+
+    clients = {c.client_id: c for c in Client.objects.all()}
+    themepresets = {c.themepreset_id: c for c in ThemePreset.objects.all()}
+    #layouts = {(c.client.client_id, c.page.page_id, c.slug, c.level): c for c in Layout.objects.all()}
+
+    for row in THEME_DATA:
+
+        client_value = clients[row["client_id"]]
+        themepreset_value = themepresets[row["themepreset_id"]]
+ 
+        Theme.objects.update_or_create(
+            client = client_value,
+            themepreset = themepreset_value,
+            theme_id=row["theme_id"],
+            #overrides=row["overrides"],
+            is_default=row["is_default"]
+        ) 

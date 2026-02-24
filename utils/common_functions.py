@@ -2,7 +2,7 @@ from collections import defaultdict
 from django.core.cache import cache
 
 #from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, Image, Svg, Layout, Hero, Card, Client2
-from mysite.models import Language, Theme, Client, Card, Hero, Layout, Page, HeroText, HeroCardText, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
+from mysite.models import Language, ThemePreset, Client, Card, Hero, Layout, Page, Theme, HeroText, HeroCardText, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 from django.db.models import Prefetch
 #from django.http import JsonResponse
 #import json
@@ -588,14 +588,15 @@ def build_client_payload(client):
     languages_qs = Language.objects.filter(
         language_id__in=client.language_list
     )
-
+    """
     themes_qs = Theme.objects.filter(
         theme_id__in=client.theme_list
     )
+    """
 
     # Preserve client order
     language_lookup = {l.language_id: l for l in languages_qs}
-    theme_lookup = {t.theme_id: t for t in themes_qs}
+    #theme_lookup = {t.theme_id: t for t in themes_qs}
     lv_languages = [
         {
             "language_id": lang_id,
@@ -604,7 +605,7 @@ def build_client_payload(client):
         for lang_id in client.language_list
         if lang_id in language_lookup
     ]
-
+    """
     lv_themes = [
         {
             "theme_id": theme_id,
@@ -613,13 +614,27 @@ def build_client_payload(client):
         for theme_id in client.theme_list
         if theme_id in theme_lookup
     ]
-    
+    """
+
+    # To reconstruct the theme values
+    lv_themes = []
+
+    for theme in client.themes.all():
+      resolved_tokens = resolve_theme(theme)
+      lv_themes.append({
+          "theme_id": theme.theme_id,
+          "ltext": theme.ltext,
+          "is_default": theme.is_default,
+          "textblocks": build_blocks(theme.gentextblocks.all()),
+          "tokens": resolved_tokens,  # fully resolved
+      })
+
     return {
         "client_id": client.client_id,
         "languages": lv_languages,
         "themes": lv_themes,
     
-        "parent": client.parent.client_id if client.parent else None,
+        #"parent": client.parent.client_id if client.parent else None,
 
         "textblocks": build_blocks(client.gentextblocks.all()),
 
@@ -631,7 +646,7 @@ def build_client_payload(client):
             [l for l in client.pages.all() if not l.hidden]
         ), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
         # this is for navigation bar requirement. this is nested
-        "client_theme": "light"
+        #"clienttheme": "dark2"
 
     }
 
@@ -665,7 +680,7 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
           #)
           qs_client = (
             Client.objects
-            .select_related("parent")  # Add this if you access parent
+            #.select_related("parent")  # Add this if you access parent -- also modify build_client_payload
             .prefetch_related(
                 gentextblock_prefetch,
                 Prefetch(
@@ -677,6 +692,15 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                         layout_prefetch,
                     ).order_by("order"),
                 ),
+                Prefetch(
+                    "themes",
+                    queryset=Theme.objects
+                        .select_related("themepreset")  # IMPORTANT
+                        .prefetch_related(
+                            gentextblock_prefetch,
+                        )
+                        .order_by("order"),
+                ) 
             )
             .get(client_id=lv_client_id)
           )
@@ -688,50 +712,6 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
           # client_static remains {} as initialized above.
           pass 
       
-        # do many sql calls and update the list
-        """    
-            
-            #client_ancestors=client_static['client'].get_ancestors()
-            #client_static['client_hierarchy_list'] = [lv_client_id] + client_ancestors + ['default']
-            # expected value is a list of client_ids
-
-            # Build query for client_nb_items
-            #client_static['client_nb_items'] = ClientNavbar.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'client_page', 'parent', 'order').order_by('order')        
-            #client_static['client_nb_items_nested'] = build_nested_hierarchy(client_static['client_nb_items'], 'client_page')
-
-            # using a function module here leads to some async errors, hence explicitly doing the reshape here
-            #qsnb = ClientPage.objects.filter(client__client_id=lv_client_id).values('id', 'page_id', 'comp_unique', 'parent', 'order').order_by('order')
-            # reshape result
-                # Create a dictionary for quick lookup of items by their client_page
-            #item_map = {item['id']: item for item in qsnb}
-
-            # Initialize a list to store the top-level items (roots)
-            #nested_list = []
-
-            # Iterate through each item to build the hierarchy
-            #for item in qsnb:
-            #    parent = item.get('parent')
-
-                # If the item has a parent, add it to the parent's children list
-            #    if parent is not None and parent in item_map:
-            #        parent_item = item_map[parent]
-            #        if 'children' not in parent_item:
-            #            parent_item['children'] = []
-            #        parent_item['children'].append(item)
-                # If the item has no parent, it's a top-level item
-            #    else:
-            #        nested_list.append(item)
-            #client_static['nb_items_nested'] = nested_list
-
-            
-        else:
-            # push some content into this to display an error message
-            client_static = {}
-        """  
-    #else:
-        # push some content into this to display an error message
-    #    client_static = {}
-
   
     # Cache it
     if cache_key:
@@ -1239,4 +1219,69 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
 }
 """
 
+"""
+# Theme Resolution Engine (Core Logic)
+def resolve_theme(theme):
+    base = theme.preset
+    data = {}
 
+    for field in [f.name for f in ThemePreset._meta.fields]:
+        if field in ["id", "name", "slug", "is_system"]:
+            continue
+
+        override = theme.overrides.get(field) if theme.overrides else None
+        data[field] = override or getattr(base, field)
+
+    return data
+"""
+
+"""
+For using clienttheme as the source css instead of standard daisy, steps are:
+1. Model ThemePreset to have base values like light, dark (default values)
+2. ClientTheme to have Client specific values like light, dark which in turn is linked to ThemePreset light, dark etc; Client Specific values to override defaults
+3. resolve_theme(theme) code to do this step 2 above
+4. Inject the variables in base.html 
+Example code
+:root {
+  --p: {{ theme.primary }};
+  --s: {{ theme.secondary }};
+  --a: {{ theme.accent }};
+  --n: {{ theme.neutral }};
+  --b1: {{ theme.base_100 }};
+  --font-main: {{ theme.font_family }};
+5. configure daisyui to use these variables: 
+A Constant value "clienttheme" is pushed into daisyui. This takes variable values like b1, b2 etc
+theme > static_src > src > styles.css  (tailwind.config.js file is not visible in django-tailwind setup) 
+Example code
+@plugin "daisyui/theme" {
+  name: "clienttheme";
+  default: true; /* set as default */
+  prefersdark: false; /* set as default dark mode (prefers-color-scheme:dark) */
+  color-scheme: light; /* color of browser-provided UI */
+
+  --color-base-100: oklch(var(--b1));
+  --color-base-2
+6. In Views - pass the variable values like b1, b2 etc based on the theme chosen into a dict called theme.
+This dict called theme is pulled into base.html and passed on to daisyui.
+
+  
+"""
+# Cache the preset field names once at import time
+THEME_PRESET_FIELDS = [
+    f.name
+    for f in ThemePreset._meta.get_fields()
+    if f.concrete
+    and not f.is_relation
+    and f.name not in ["id", "themepreset_id", "ltext", "is_system"]
+]
+
+def resolve_theme(theme):
+    base = theme.themepreset
+    overrides = theme.overrides or {}
+
+    data = {}
+
+    for field in THEME_PRESET_FIELDS:
+        data[field] = overrides.get(field) or getattr(base, field)
+
+    return data

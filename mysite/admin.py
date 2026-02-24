@@ -7,7 +7,7 @@ from .forms import ClientForm
 
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 
-from .models import Language, Theme, Client, Page, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, Card, Hero, Layout, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
+from .models import Language, ThemePreset, Client, Page, Theme, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, Card, Hero, Layout, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 # TextItemValue, TextBlockItem, TextBlock, TextContent,
 
 # VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
@@ -16,10 +16,17 @@ class LanguageAdmin(admin.ModelAdmin):
     fields = ["language_id", "label_obj"]
     search_fields = ("language_id",)
 
+class ThemePresetAdmin(admin.ModelAdmin):
+    #list_display = ("language_id", "label_obj")
+    #fields = ["language_id", "label_obj"]
+    search_fields = ("themepreset_id",)
+
+"""
 class ThemeAdmin(admin.ModelAdmin):
     #list_display = ("theme_id", "label_obj")
     fields = ["theme_id", "label_obj"]    
     search_fields = ("theme_id",)
+"""    
 """
 class TextItemValueInline(nested_admin.NestedGenericTabularInline):
     model = TextItemValue
@@ -214,6 +221,15 @@ class LayoutAdmin(nested_admin.NestedModelAdmin):
                 return [HeroInline(self.model, self.admin_site)]
         return []
 
+class ThemeInline(nested_admin.NestedStackedInline):
+    model = Theme
+    extra = 0
+    classes = ['collapse']
+    #list_display = ('page_id', 'ltext', 'order', 'parent', 'hidden')
+    inlines = [GentextBlockInline]
+    classes = ['collapse']
+    #inlines = []
+
 class PageInline(nested_admin.NestedStackedInline):
     model = Page
     extra = 0
@@ -230,9 +246,10 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
     #search_fields = ("client_id",)
     form = ClientForm
     # Hide the raw JSON field in the admin display
-    fields = ['client_id', 'parent', 'language_choices', 'theme_choices'] 
+    fields = ['client_id', 'parent', 'language_choices'] 
     list_display = ('client_id', 'parent')
-    inlines = [GentextBlockInline, PageInline]
+    inlines = [GentextBlockInline, PageInline, ThemeInline]
     
 admin.site.register(Language, LanguageAdmin)
-admin.site.register(Theme, ThemeAdmin)
+admin.site.register(ThemePreset, ThemePresetAdmin)
+#admin.site.register(Theme, ThemeAdmin)

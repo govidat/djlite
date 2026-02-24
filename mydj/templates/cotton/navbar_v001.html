@@ -29,14 +29,15 @@
     <ul class="menu menu-horizontal px-1">
       
       {% comment %}{% endcomment %}
+      
       <c-navbar_v001_l1recur :items="client.page_tree"></c-navbar_v001_l1recur>
       
     </ul>
   </div>
   <div class="navbar-end flex xl:gap-1">
     
-    <c-select_theme :themes="client.themes"></c-select_theme>
-    
+    <c-select_theme></c-select_theme>
+    {% comment %}{% endcomment %}
     <c-select_language :languages="client.languages"></c-select_language>      
     
   </div>

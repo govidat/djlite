@@ -3,7 +3,61 @@
 {% load l10n %}
 
 <!DOCTYPE html>
-<html lang="en" data-theme="{{ client.client_theme|lower }}">
+
+<style>
+  :root {
+
+    /* COLORS */
+    --p: {{ theme.primary }};
+    --s: {{ theme.secondary }};
+    --a: {{ theme.accent }};
+    --n: {{ theme.neutral }};
+
+    --pc: {{ theme.primary_content }};
+    --sc: {{ theme.secondary_content }};
+    --ac: {{ theme.accent_content }};
+    --nc: {{ theme.neutral_content }};
+    
+
+    --b1: {{ theme.base_100 }};
+    --b2: {{ theme.base_200 }};
+    --b3: {{ theme.base_300 }};
+    --bc: {{ theme.base_content }};
+
+    --su: {{ theme.success }};
+    --wa: {{ theme.warning }};
+    --er: {{ theme.error }};
+    --in: {{ theme.info }};
+
+    --suc: {{ theme.success_content }};
+    --wac: {{ theme.warning_content }};
+    --erc: {{ theme.error_content }};
+    --inc: {{ theme.info_content }};    
+
+
+    /* TYPOGRAPHY */
+    --font-body: {{ theme.font_body }};
+    --font-heading: {{ theme.font_heading }};
+    --base-font-size: {{ theme.base_font_size }};
+    --scale-ratio: {{ theme.scale_ratio }};
+
+    /* SPACING */
+    --section-gap: {{ theme.section_gap }};
+    --container-padding: {{ theme.container_padding }};
+
+    /* RADIUS */
+    --radius-btn: {{ theme.radius_btn }};
+    --radius-card: {{ theme.radius_card }};
+    --radius-input: {{ theme.radius_input }};
+
+    /* SHADOW */
+    --shadow-sm: {{ theme.shadow_sm }};
+    --shadow-md: {{ theme.shadow_md }};
+    --shadow-lg: {{ theme.shadow_lg }};
+  }
+</style>
+
+<html lang="en" data-theme="clienttheme">
 <head>
   {% comment %} 
   <script>
@@ -16,7 +70,7 @@
   {% endcomment %}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{client|title}}</title>
+  <title>{{client.client_id}}</title>
   {% comment %} 
   <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
   {% endcomment %}

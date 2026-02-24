@@ -9,10 +9,11 @@ urlpatterns = [
 #    path('<str:pkey>/about/', views.AboutView.as_view(), name='about'),  # with pkey
 #    path('<str:pkey>/contact/', views.ContactView.as_view(), name='contact'),  # with pkey          
 
+    # this is for persisting theme selection 
+    path("set-theme/", views.set_theme, name="set_theme"),
+
     path('', views.ClientPageView.as_view(), name="client_page"), 
     path('<str:pkey>/', views.ClientPageView.as_view(), name="client_page"), 
     path("<str:pkey>/<str:page>/", views.ClientPageView.as_view(), name="client_page"),
 
-    # this is for persisting theme selection 
-    #path("set-theme/", views.set_theme, name="set_theme"),  
 ]

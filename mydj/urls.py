@@ -27,6 +27,9 @@ urlpatterns = [
     path('i18n/', include('django.conf.urls.i18n')),  # i18n
     path("", include("mysite.urls")),  # zapp
     path('_nested_admin/', include('nested_admin.urls')),
+    # this is for persisting theme selection 
+    #path("set-theme/", ./mysite.views.set_theme, name="set_theme")
+
 ] 
 # + debug_toolbar_urls() 
 
