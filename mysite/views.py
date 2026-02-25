@@ -11,6 +11,7 @@ from django.shortcuts import redirect # for persisting theme
 from django.views.decorators.http import require_POST
 from django.shortcuts import render, HttpResponse
 #from collections import defaultdict
+#from datastar_py.django import DatastarResponse
 
 from utils.common_functions import fetch_clientstatic
 #, build_nested_hierarchy, build_layout_tree
@@ -88,16 +89,35 @@ def set_theme(request):
     if selected in valid_names:
     """
     request.session["active_theme_id"] = selected
-    #after = request.session.get("active_theme_id")
-
-    #return HttpResponse(
-    #    f"""
-    #    POSTED: {selected} <br>
-    #    BEFORE: {before} <br>
-    #    AFTER: {after}
-    #    """
-    #)
     return redirect(request.META.get("HTTP_REFERER", "/"))
+    """
+    Datastar is not working
+    # using data star
+    #return redirect(request.META.get("HTTP_REFERER", "/"))
+    client_dict = fetch_clientstatic(lv_client_id=request.session.get("client_id"),
+                                     use_cache=False  # important for immediate refresh
+                                     )
+    selected_theme_id = selected
+    selected_theme = next(
+        (t for t in client_dict["themes"] if t["theme_id"] == selected_theme_id),
+        None
+    )  
+    #selected_theme = False
+    # bring up the client default
+    if not selected_theme:
+        selected_theme = next(
+            (t for t in client_dict["themes"] if t["is_default"]),
+            None
+        )
+
+    resolved_theme = selected_theme["tokens"] if selected_theme else {}
+
+    return render(
+        request,
+        "partials/theme_vars.html",
+        {"theme": resolved_theme}
+    )
+    """
 """
 def set_theme(request):
     if request.method == "POST":

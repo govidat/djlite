@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.sites', # allauth
     'allauth', # allauth
     'allauth.account', # allauth
-    'zapp', # zapp
+    #'zapp', # zapp
     'tailwind', # tailwind
     'theme',  # tailwind
     'django_cotton.apps.SimpleAppConfig', # cotton

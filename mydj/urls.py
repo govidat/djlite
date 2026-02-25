@@ -23,9 +23,9 @@ from django.conf import settings
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("accounts/", include("allauth.urls")),  # allauth
-    path("zapp/", include("zapp.urls")),  # zapp
+    #path("zapp/", include("zapp.urls")),  # zapp
     path('i18n/', include('django.conf.urls.i18n')),  # i18n
-    path("", include("mysite.urls")),  # zapp
+    path("", include("mysite.urls")),  # mysite
     path('_nested_admin/', include('nested_admin.urls')),
     # this is for persisting theme selection 
     #path("set-theme/", ./mysite.views.set_theme, name="set_theme")
@@ -46,19 +46,3 @@ if settings.DEBUG:
 #    urlpatterns += [
 #        path("__reload__/", include("django_browser_reload.urls")),
 #    ]
-
-""" for inserting language in urls 
-from django.conf.urls.i18n import i18n_patterns
-
-urlpatterns = [
-    path('i18n/', include('django.conf.urls.i18n')),  # Language switcher
-]
-
-urlpatterns += i18n_patterns(
-    path('admin/', admin.site.urls),
-    path("accounts/", include("allauth.urls")),  # allauth
-    path("zapp/", include("zapp.urls")),  # zapp
-    path("", include("core.urls")),  # core    
- #   path('i18n/', include('django.conf.urls.i18n')),  # i18n
-)
-"""

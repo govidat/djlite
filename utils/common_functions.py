@@ -1,19 +1,16 @@
 from collections import defaultdict
 from django.core.cache import cache
 
-#from mysite.models import Client, ClientLanguage, ClientTheme, ClientPage, TextStatic, Image, Svg, Layout, Hero, Card, Client2
 from mysite.models import Language, ThemePreset, Client, Card, Hero, Layout, Page, Theme, HeroText, HeroCardText, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 from django.db.models import Prefetch
-#from django.http import JsonResponse
-#import json
-#from functools import lru_cache
+
 
 from django.contrib.contenttypes.models import ContentType
 
 
 # This is NOT USED a modified version and takes the key_name or the field on which the relationship is built.
 # But used in ZAPP - to evaluate ZAPP
-def build_nested_hierarchy(flat_list, key_name="id"):
+def xxxbuild_nested_hierarchy(flat_list, key_name="id"):
     # Create a dictionary for quick lookup of items by their ID
     item_map = {item[key_name]: item for item in flat_list}
 
@@ -37,7 +34,7 @@ def build_nested_hierarchy(flat_list, key_name="id"):
     return nested_list
 
 # This is NOT USED used to update the values in navbar
-def update_list_of_dictionaries(smaller_list, larger_list, key_field):
+def xxxupdate_list_of_dictionaries(smaller_list, larger_list, key_field):
     """
     Updates dictionaries in the smaller_list with values from matching dictionaries
     in the larger_list based on a common key.
@@ -446,47 +443,7 @@ def build_layout(layout, layout_map):
         layout_data["children"] = children
 
     return layout_data
-"""
-def build_layout(layout):
-    layout = visible(layout)
-    if not layout:
-        return None
 
-    layout_data = {
-        "level": layout.level,
-        "slug": layout.slug,
-        "order": layout.order,
-        "css_class": layout.css_class,
-    }
-
-    component = None
-
-    if layout.comp_id == "hero":
-        hero = visible(get_attr(layout, "hero"))
-        if hero:
-            component = {
-                "type": "hero",
-                "herotext": build_herotext(
-                    visible(get_attr(hero, "herotext"))
-                ),
-            }
-
-    elif layout.comp_id == "card":
-        card = visible(get_attr(layout, "card"))
-        if card:
-            component = {
-                "type": "card",
-                "cardtext": build_cardtext(
-                    visible(get_attr(card, "cardtext"))
-                ),
-            }
-
-    if not component:
-        return None
-
-    layout_data["component"] = component
-    return layout_data
-"""
 
 # 6️⃣ Page Builder
 
@@ -521,26 +478,7 @@ def build_page(page):
         "textblocks": build_blocks(page.gentextblocks.all()),
         "layouts": layouts,
     }
-"""
-def build_page(page):
-    page = visible(page)
-    if not page:
-        return None
 
-    layouts = [
-        build_layout(layout)
-        for layout in page.layouts.all()
-    ]
-
-    layouts = [l for l in layouts if l]
-
-    return {
-        "page_id": page.page_id,
-        "order": page.order,
-        "textblocks": build_blocks(page.gentextblocks.all()),
-        "layouts": layouts,
-    }
-"""
 # 6️⃣B Page tree for Navigation bar
 def build_page_tree(pages):
     node_map = {}
@@ -581,18 +519,11 @@ def build_page_tree(pages):
 def build_client_payload(client):
 
     # Create a lookup dictionary
-    """
-    master_language = {c.language_id: c.label_obj for c in Language.objects.filter(language_id__in=client.language_list)}
-    master_theme = {c.theme_id: c.label_obj for c in Theme.objects.filter(theme_id__in=client.theme_list)}
-    """
+
     languages_qs = Language.objects.filter(
         language_id__in=client.language_list
     )
-    """
-    themes_qs = Theme.objects.filter(
-        theme_id__in=client.theme_list
-    )
-    """
+
 
     # Preserve client order
     language_lookup = {l.language_id: l for l in languages_qs}
@@ -605,16 +536,6 @@ def build_client_payload(client):
         for lang_id in client.language_list
         if lang_id in language_lookup
     ]
-    """
-    lv_themes = [
-        {
-            "theme_id": theme_id,
-            "labels": theme_lookup[theme_id].label_obj
-        }
-        for theme_id in client.theme_list
-        if theme_id in theme_lookup
-    ]
-    """
 
     # To reconstruct the theme values
     lv_themes = []
@@ -645,8 +566,6 @@ def build_client_payload(client):
         "page_tree": build_page_tree(
             [l for l in client.pages.all() if not l.hidden]
         ), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
-        # this is for navigation bar requirement. this is nested
-        #"clienttheme": "dark2"
 
     }
 
@@ -719,6 +638,58 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
 
     
     return client_static
+
+"""
+For using clienttheme as the source css instead of standard daisy, steps are:
+1. Model ThemePreset to have base values like light, dark (default values)
+2. ClientTheme to have Client specific values like light, dark which in turn is linked to ThemePreset light, dark etc; Client Specific values to override defaults
+3. resolve_theme(theme) code to do this step 2 above
+4. Inject the variables in base.html 
+Example code
+:root {
+  --p: {{ theme.primary }};
+  --s: {{ theme.secondary }};
+  --a: {{ theme.accent }};
+  --n: {{ theme.neutral }};
+  --b1: {{ theme.base_100 }};
+  --font-main: {{ theme.font_family }};
+5. configure daisyui to use these variables: 
+A Constant value "clienttheme" is pushed into daisyui. This takes variable values like b1, b2 etc
+theme > static_src > src > styles.css  (tailwind.config.js file is not visible in django-tailwind setup) 
+Example code
+@plugin "daisyui/theme" {
+  name: "clienttheme";
+  default: true; /* set as default */
+  prefersdark: false; /* set as default dark mode (prefers-color-scheme:dark) */
+  color-scheme: light; /* color of browser-provided UI */
+
+  --color-base-100: oklch(var(--b1));
+  --color-base-2
+6. In Views - pass the variable values like b1, b2 etc based on the theme chosen into a dict called theme.
+This dict called theme is pulled into base.html and passed on to daisyui.
+
+  
+"""
+# Cache the preset field names once at import time
+THEME_PRESET_FIELDS = [
+    f.name
+    for f in ThemePreset._meta.get_fields()
+    if f.concrete
+    and not f.is_relation
+    and f.name not in ["id", "themepreset_id", "ltext", "is_system"]
+]
+
+def resolve_theme(theme):
+    base = theme.themepreset
+    overrides = theme.overrides or {}
+
+    data = {}
+
+    for field in THEME_PRESET_FIELDS:
+        data[field] = overrides.get(field) or getattr(base, field)
+
+    return data
+
 """
 {
   "client_id": "bahushira",
@@ -745,32 +716,6 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
         "en": "Hindi",
         "fr": "frHindi",
         "hi": "hiHindi"
-      }
-    }
-  ],
-  "themes": [
-    {
-      "theme_id": "aqua",
-      "labels": {
-        "en": "Aqua",
-        "fr": "frAqua",
-        "hi": "hiAqua"
-      }
-    },
-    {
-      "theme_id": "dark",
-      "labels": {
-        "en": "Dark",
-        "fr": "frDark",
-        "hi": "hiDark"
-      }
-    },
-    {
-      "theme_id": "light",
-      "labels": {
-        "en": "Light",
-        "fr": "frLight",
-        "hi": "hiLight"
       }
     }
   ],
@@ -1235,53 +1180,3 @@ def resolve_theme(theme):
     return data
 """
 
-"""
-For using clienttheme as the source css instead of standard daisy, steps are:
-1. Model ThemePreset to have base values like light, dark (default values)
-2. ClientTheme to have Client specific values like light, dark which in turn is linked to ThemePreset light, dark etc; Client Specific values to override defaults
-3. resolve_theme(theme) code to do this step 2 above
-4. Inject the variables in base.html 
-Example code
-:root {
-  --p: {{ theme.primary }};
-  --s: {{ theme.secondary }};
-  --a: {{ theme.accent }};
-  --n: {{ theme.neutral }};
-  --b1: {{ theme.base_100 }};
-  --font-main: {{ theme.font_family }};
-5. configure daisyui to use these variables: 
-A Constant value "clienttheme" is pushed into daisyui. This takes variable values like b1, b2 etc
-theme > static_src > src > styles.css  (tailwind.config.js file is not visible in django-tailwind setup) 
-Example code
-@plugin "daisyui/theme" {
-  name: "clienttheme";
-  default: true; /* set as default */
-  prefersdark: false; /* set as default dark mode (prefers-color-scheme:dark) */
-  color-scheme: light; /* color of browser-provided UI */
-
-  --color-base-100: oklch(var(--b1));
-  --color-base-2
-6. In Views - pass the variable values like b1, b2 etc based on the theme chosen into a dict called theme.
-This dict called theme is pulled into base.html and passed on to daisyui.
-
-  
-"""
-# Cache the preset field names once at import time
-THEME_PRESET_FIELDS = [
-    f.name
-    for f in ThemePreset._meta.get_fields()
-    if f.concrete
-    and not f.is_relation
-    and f.name not in ["id", "themepreset_id", "ltext", "is_system"]
-]
-
-def resolve_theme(theme):
-    base = theme.themepreset
-    overrides = theme.overrides or {}
-
-    data = {}
-
-    for field in THEME_PRESET_FIELDS:
-        data[field] = overrides.get(field) or getattr(base, field)
-
-    return data

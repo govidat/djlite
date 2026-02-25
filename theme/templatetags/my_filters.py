@@ -36,21 +36,21 @@ def my_text(value={}, arg=""):
 
     else:
         return "ERR Z002"
-
+ 
 # used obly in hero template. to be refactored and removed
 @register.filter
-def my_removetrue(value=[], arg=""):
+def xxxmy_removetrue(value=[], arg=""):
     """value is expected to be a list like [{hidden: True, a:x, b:y}, {hidden: False, a:p, b:q}] ; arg should be a key in the dictionary. This filter will remove records that have true  """
     # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
     return list(filter(lambda item: not item.get(arg), value))
-
+ 
 @register.filter
-def get_item(dictionary, key):
+def xxxget_item(dictionary, key):
     return dictionary.get(key)
 
 
 @register.filter
-def get_dictid(dict_array=[], arg=0):
+def xxxget_dictid(dict_array=[], arg=0):
     return next(filter(lambda x: x['id'] == arg, dict_array), None)
     """ To be deprecated and replaced with a combination of get_dict_filtered_by_id; get_dict_by_client_id_and_prioritized_values
     To return the first dictionary item that matches a key value;
@@ -106,29 +106,29 @@ def get_key_values(list_of_dicts=[], key_to_extract=""):
     return sorted([d[key_to_extract] for d in list_of_dicts if key_to_extract in d])
 
 @register.filter
-def get_dict_filtered_by_level(value=[], arg=0):
+def xxxget_dict_filtered_by_level(value=[], arg=0):
     """value is expected to be a list like [{hidden: True, a:x, b:y}, {hidden: False, a:p, b:q}] ; arg should be a key in the dictionary. This filter will remove records that have true  """
     # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
     return list(filter(lambda item: item.get('level') == arg, value))
 
 @register.filter
-def get_dict_filtered_by_parent(value=[], arg=0):
+def xxxget_dict_filtered_by_parent(value=[], arg=0):
     """value is expected to be a list like [{hidden: True, a:x, b:y}, {hidden: False, a:p, b:q}] ; arg should be a key in the dictionary. This filter will remove records that have true  """
     # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
     return list(filter(lambda item: item.get('parent') == arg, value))
 
 @register.filter
-def get_dict_filtered_by_id(value=[], arg=0):
+def xxxget_dict_filtered_by_id(value=[], arg=0):
     # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
     return list(filter(lambda item: item.get('id') == arg, value))
 
 @register.filter
-def get_list_filtered_by_token_id(value=[], arg=''):
+def xxxget_list_filtered_by_token_id(value=[], arg=''):
     # filtered_data = list(filter(lambda item: not item.get('is_active'), data))
     return list(filter(lambda item: item.get('token_id') == arg, value))
 
 @register.filter
-def get_dict_by_client_id_and_prioritized_values(list_of_dicts=[], keyvals=""):
+def xxxget_dict_by_client_id_and_prioritized_values(list_of_dicts=[], keyvals=""):
     """
     Retrieves a dictionary from a list of dictionaries based on client_id
     and a prioritized list of values to check for that key.
@@ -159,7 +159,7 @@ def get_dict_by_client_id_and_prioritized_values(list_of_dicts=[], keyvals=""):
     print(result)
     """
 @register.filter (needs_context=True)
-def mytext_static(context, lv_token_id=''):
+def xxxmytext_static(context, lv_token_id=''):
     client_id = context.get("client_id")
     """
     Input is a lv_token; optional arg = "en', 'hi'...
@@ -212,7 +212,7 @@ def mytext_static(context, lv_token_id=''):
     return client_id
 
 @register.filter
-def get_listdict_by_token_id(listdict=[], arg=''):
+def xxxget_listdict_by_token_id(listdict=[], arg=''):
 
     # Add print statements to see exactly what is being passed
     # print(f"DEBUG: arg received: {arg!r}, type: {type(arg)}")

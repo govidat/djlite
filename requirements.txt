@@ -10,3 +10,4 @@ django-debug-toolbar==6.0.0 # debug-toolbar
 django-admin-sortable2==2.2.8 #admin-sortable2
 django-extensions==4.1 # this is for things like orm query
 django-nested-admin==4.1.6 # this is for multi level nested inline
+# datastar-py==0.8.0 # this is for datastar BUT NOT WORKING PROPERLY DROPPED FOR THE TIME BEING

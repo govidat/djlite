@@ -57,11 +57,12 @@ input type is :
     }
     ],
     "comp_id": "hero"
-}
+}\
+{% load my_filters %}
 {% endcomment %}
 
 
-{% load my_filters %}
+
 
 {% if hero %}   
       <div class="hero bg-base-200 min-h-screen {{ hero.css_class|default:'' }}"
@@ -74,8 +75,8 @@ input type is :
         {% endif %}
         <div class="hero-content flex-row {{ hero.herocontent_class|default:'' }}">    
           
-          {% for herocontent in hero.herocontents|my_removetrue:"hidden"|dictsort:"order" %}
-             <div>
+          {% for herocontent in hero.herocontents %}
+            <div>
               
               {% if herocontent.type_id == 'figure' %}                
                 <c-figure :figure="herocontent"></c-figure>                           
