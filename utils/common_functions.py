@@ -3,6 +3,7 @@ from django.core.cache import cache
 
 from mysite.models import Language, ThemePreset, Client, Card, Hero, Layout, Page, Theme, HeroText, HeroCardText, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 from django.db.models import Prefetch
+from django.db.models import ForeignKey
 
 
 from django.contrib.contenttypes.models import ContentType
@@ -57,6 +58,24 @@ def xxxupdate_list_of_dictionaries(smaller_list, larger_list, key_field):
             smaller_dict.update(matching_larger_dict)
     return smaller_list
 
+# this is used extensively in build programs to serialize data.
+def serialize_model(instance, exclude=None):
+    exclude = set(exclude or [])
+    data = {}
+
+    for field in instance._meta.fields:
+        name = field.name
+        if name in exclude:
+            continue
+
+        value = getattr(instance, name)
+
+        if isinstance(field, ForeignKey):
+            data[name] = getattr(instance, f"{name}_id")
+        else:
+            data[name] = value or None
+
+    return data
 
 #Step 1: Universal Prefetch for TextContent Tree
 # Universal Text Block Tree
@@ -197,11 +216,14 @@ def build_blocks(blocks_queryset):
 
         if not items:
             continue  # skip empty blocks
-
+        # ComptextBlock will have a field href_page and GentextBlock does not have this.
+        href = getattr(block, "href_page", None)
+        
         block_data = {
             "order": block.order,
             "css_class": block.css_class,
             "ltext": block.ltext,
+            "href_page": href if href else None,
             "items": items,
         }
 
@@ -220,7 +242,17 @@ def build_hero_text(ht):
     textblocks = build_blocks(ht.comptextblocks.all())
     if not textblocks:
         return None
+    
+    data = serialize_model(
+        ht,
+        exclude={"id", "content_type", "object_id", "hero"}
+    )
 
+    data["type_id"] = "text"
+    data["textblocks"] = textblocks
+
+    return data    
+    """
     return {
         "hidden": ht.hidden,
         "type_id": "text",
@@ -230,12 +262,22 @@ def build_hero_text(ht):
         "actions_position": ht.actions_position_id,
         "textblocks": textblocks,
     }
+    """
 # HeroFigure
 def build_hero_figure(hf):
     hf = visible(hf)
     if not hf:
         return None
 
+    data = serialize_model(
+        hf,
+        exclude={"id", "content_type", "object_id"}
+    )
+
+    data["type_id"] = "figure"
+
+    return data
+    """
     return {
         "hidden": hf.hidden,
         "type_id": "figure",
@@ -247,7 +289,7 @@ def build_hero_figure(hf):
         "css_class": hf.css_class,
         "alt": hf.alt,
     }
-
+    """
 
 
 # HeroCardText
@@ -255,7 +297,22 @@ def build_herocard_text(obj):
     obj = visible(obj)
     if not obj:
         return None
+    
+    textblocks = build_blocks(obj.comptextblocks.all())
+    if not textblocks:
+        return None
+    
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "herocard_id"}
+    )
 
+    data["type_id"] = "text"
+    data["textblocks"] = textblocks
+
+    return data
+
+    """
     return {
         "hidden": obj.hidden,
         "type_id": "text",
@@ -265,13 +322,22 @@ def build_herocard_text(obj):
         "actions_position": obj.actions_position_id,
         "textblocks": build_blocks(obj.comptextblocks.all()),
     }
-
+    """
 # HeroCardFigure
 def build_herocard_figure(obj):
     obj = visible(obj)
     if not obj:
         return None
+  
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "herocard_id"}
+    )
 
+    data["type_id"] = "figure"
+
+    return data
+    """
     return {
         "hidden": obj.hidden,
         "type_id": "figure",
@@ -283,6 +349,7 @@ def build_herocard_figure(obj):
         "css_class": obj.css_class,
         "alt": obj.alt,
     }
+    """
 
 # HeroCard
 def build_herocard(obj):
@@ -302,6 +369,16 @@ def build_herocard(obj):
 
     contents.sort(key=lambda x: x["order"])
 
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "hero_id"}
+    )
+
+    data["type_id"] = "herocard"
+    data["contents"] = contents
+
+    return data
+    """
     return {
         "hidden": obj.hidden,
         "type_id": "herocard",
@@ -310,6 +387,7 @@ def build_herocard(obj):
         "css_class": obj.css_class,
         "contents": contents,
     }
+    """
 
 # Hero
 def build_hero(obj):
@@ -333,6 +411,16 @@ def build_hero(obj):
 
     contents.sort(key=lambda x: x["order"])
 
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "layout_id"}
+    )
+
+    data["comp_id"] = "hero"
+    data["herocontents"] = contents
+
+    return data
+    """
     return {
         "css_class": obj.css_class,
         "herocontent_class": obj.herocontent_class,
@@ -341,7 +429,7 @@ def build_hero(obj):
         "herocontents": contents,
         "comp_id": "hero",
     }
-
+    """
 
 # CardFigure
 def build_card_figure(obj):
@@ -349,6 +437,15 @@ def build_card_figure(obj):
     if not obj:
         return None
 
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "card_id"}
+    )
+
+    data["type_id"] = "figure"
+
+    return data
+    """
     return {
         "hidden": obj.hidden,
         "type_id": "figure",
@@ -360,13 +457,27 @@ def build_card_figure(obj):
         "css_class": obj.css_class,
         "alt": obj.alt,
     }
+    """
 
 # CardText
 def build_card_text(obj):
     obj = visible(obj)
     if not obj:
         return None
+    textblocks = build_blocks(obj.comptextblocks.all())
+    if not textblocks:
+        return None
+    
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "card_id"}
+    )
 
+    data["type_id"] = "text"
+    data["textblocks"] = textblocks
+
+    return data
+    """
     return {
         "hidden": obj.hidden,
         "type_id": "text",
@@ -376,7 +487,7 @@ def build_card_text(obj):
         "actions_position": obj.actions_position_id,
         "textblocks": build_blocks(obj.comptextblocks.all()),
     }
-
+    """
 
 # Card
 def build_card(obj):
@@ -394,8 +505,16 @@ def build_card(obj):
     if text:
         contents.append(text)
 
-    contents.sort(key=lambda x: x["order"])
+    #contents.sort(key=lambda x: x["order"])
 
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "layout_id"}
+    )
+
+    data["comp_id"] = "card"
+    data["contents"] = contents
+    """
     return {
         "hidden": obj.hidden,
         "comp_id": "card",
@@ -404,7 +523,7 @@ def build_card(obj):
         "css_class": obj.css_class,
         "contents": contents,
     }
-
+    """
 # 5️⃣ Layout Builder
 
 def build_layout(layout, layout_map):

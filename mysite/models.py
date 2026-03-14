@@ -187,6 +187,8 @@ class ComptextBlock(models.Model):
     order = models.PositiveIntegerField(default=1)  # same block_id can be repeated
     css_class = models.CharField(max_length=255, blank=True, null=True)
     textstbitems = GenericRelation(TextstbItem)
+    # ideally this should be a dropdown of page of this client, but have kept it as a simple text for the timebeing. This value is passed as <a link in the Button component
+    href_page=models.CharField(max_length=25, blank=True, null=True)
     class Meta:
         unique_together = ("content_type", "object_id", "block_id", "order")
         verbose_name = "01-06a Component Text Block" 

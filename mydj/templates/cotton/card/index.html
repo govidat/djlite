@@ -1,8 +1,9 @@
-{% load my_filters %}
+
+Hello
 
 {% comment %}
+{% load my_filters %}
 
-{% endcomment %}
 
 
 {% if card %}
@@ -19,10 +20,10 @@
                 <c-card.actions></c-card.actions>
             {% endif %}      
             <h2 class="card-title {{ card.title.class|default:"" }}">
-                <c-textrouter :type="card.title.type" :ids="card.title.ids"></c-textrouter>        
+                <c-zztextrouter :type="card.title.type" :ids="card.title.ids"></c-zztextrouter>        
             </h2>
 
-            <c-textrouter :type="card.contents.type" :ids="card.contents.ids"></c-textrouter>
+            <c-zztextrouter :type="card.contents.type" :ids="card.contents.ids"></c-zztextrouter>
 
             {% if card.actions.position == 'end' %}                        
                 <c-card.actions></c-card.actions>
@@ -38,3 +39,4 @@
         
 {% endif %}
 
+{% endcomment %}

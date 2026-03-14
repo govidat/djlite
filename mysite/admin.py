@@ -21,46 +21,23 @@ class ThemePresetAdmin(admin.ModelAdmin):
     #fields = ["language_id", "label_obj"]
     search_fields = ("themepreset_id",)
 
-"""
-class ThemeAdmin(admin.ModelAdmin):
-    #list_display = ("theme_id", "label_obj")
-    fields = ["theme_id", "label_obj"]    
-    search_fields = ("theme_id",)
-"""    
-"""
-class TextItemValueInline(nested_admin.NestedGenericTabularInline):
-    model = TextItemValue
-    extra = 1
-    classes = ['collapse']
-"""
+
 class SvgtextbadgeValueInline(nested_admin.NestedStackedInline):
     model = SvgtextbadgeValue
     extra = 1
     classes = ['collapse']
-"""
-class TextBlockItemInline(nested_admin.NestedStackedInline):
-    model = TextBlockItem
-    extra = 0
-    inlines = [TextItemValueInline]
-    classes = ['collapse']
-"""
-class TextstbItemInline(nested_admin.NestedGenericTabularInline):
+
+class TextstbItemInline(nested_admin.NestedGenericStackedInline):
     model = TextstbItem
     fields = ("item_id", "ltext", "hidden", "order", "css_class", "svg_text")
     extra = 0
     inlines = [SvgtextbadgeValueInline]
     classes = ['collapse']
 
-"""
-class TextBlockInline(nested_admin.NestedStackedInline):
-    model = TextBlock
-    extra = 0
-    inlines = [TextBlockItemInline]
-    classes = ['collapse']
-"""
-class ComptextBlockInline(nested_admin.NestedGenericTabularInline):
+
+class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
     model = ComptextBlock
-    fields = ("block_id", "ltext", "hidden", "order", "css_class")
+    #fields = ("block_id", "ltext", "hidden", "order", "css_class")
     extra = 0
     inlines = [TextstbItemInline]
     classes = ['collapse']
@@ -71,13 +48,7 @@ class GentextBlockInline(nested_admin.NestedGenericTabularInline):
     extra = 0
     inlines = [TextstbItemInline]
     classes = ['collapse']
-"""
-class TextContentInline(nested_admin.NestedGenericTabularInline):
-    model = TextContent
-    extra = 1
-    inlines = [TextBlockInline]
-    classes = ['collapse']
-"""
+
 class HeroCardTextInline(nested_admin.NestedStackedInline):
     model = HeroCardText
     extra = 0
@@ -162,41 +133,7 @@ class CardInline(nested_admin.NestedStackedInline):
     fields = ("ltext", "css_class", "body_class")
     inlines = [CardTextInline, CardFigureInline]
     classes = ['collapse']
-"""
-class Hero2Inline(nested_admin.NestedStackedInline):
-    model = Hero2
-    extra = 0
-    max_num = 1    
-    fields = ("css_class", "herocontent_class", "overlay", "overlay_style")
-    #inlines = [HeroTextInline, HeroFigureInline, HeroCardInline]
-    #classes = ['collapse']
-    classes = ['layer3-hero-inline', 'dynamic-inline']
-class Card2Inline(nested_admin.NestedStackedInline):
-    model = Card2
-    extra = 0
-    max_num = 1
-    fields = ("ltext", "css_class", "body_class")
-    #inlines = [CardTextInline, CardFigureInline]
-    #classes = ['collapse']
-    # Add a custom CSS class for JS targeting
-    classes = ['layer3-card-inline', 'dynamic-inline']
 
-class Layout2Inline(nested_admin.NestedStackedInline):
-    model = Layout2
-    extra = 0
-    max_num = 1
-    #fields = ("ltext", "css_class", "body_class")
-    inlines = [Card2Inline, Hero2Inline]
-    classes = ['collapse']
-    class Media:
-        js = ('js/dynamic_inlines.js',) # Path to your JS file
-    #def get_inlines(self, request, obj=None):
-    #    if obj and obj.some_field == 'value_a':
-    #        return [OptionAInline]
-    #    elif obj and obj.some_field == 'value_b':
-    #        return [OptionBInline]
-    #    return self.inlines  # Default if no condition met
-"""
 
 @admin.register(Layout)
 class LayoutAdmin(nested_admin.NestedModelAdmin):
@@ -252,4 +189,4 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
     
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(ThemePreset, ThemePresetAdmin)
-#admin.site.register(Theme, ThemeAdmin)
+

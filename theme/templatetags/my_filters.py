@@ -4,6 +4,12 @@ from django.utils.translation import get_language
 
 register = template.Library()
 
+# used in button.html to wrap into a list
+@register.filter
+def wrap_in_list(value):
+    return [value]
+
+
 # TO BE DROPPED
 @register.filter
 def my_text(value={}, arg=""):
