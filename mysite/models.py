@@ -451,12 +451,13 @@ class HeroCard(models.Model):
 class HeroCardText(models.Model):
     herocard = models.OneToOneField(HeroCard, on_delete=models.CASCADE, related_name="herocardtext")
     ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    order = models.PositiveIntegerField(default=1)
     hidden = models.BooleanField(default=False)
     actions_class = models.CharField(max_length=255, blank=True, null=True)        
     POSITION_TYPES = (
         ("start", "Start"),
         ("end", "End"),
-    )    
+    ) # this is redundant. ordering of comptextblocks defines the location of actions   
     actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES, blank=True, null=True)
     #textcontents = GenericRelation(TextContent)
     comptextblocks = GenericRelation(ComptextBlock)
@@ -467,6 +468,7 @@ class HeroCardText(models.Model):
 class HeroCardFigure(models.Model):
     herocard = models.OneToOneField(HeroCard, on_delete=models.CASCADE, related_name="herocardfigure")
     ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    order = models.PositiveIntegerField(default=1) # position is redundant. order decindes the sequence
     figure_class = models.CharField(max_length=255, blank=True, null=True)
     hidden = models.BooleanField(default=False)
     POSITION_TYPES = (
@@ -492,6 +494,7 @@ class Card(models.Model):
 class CardFigure(models.Model):
     card = models.OneToOneField(Card, on_delete=models.CASCADE, related_name="cardfigure")
     ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    order = models.PositiveIntegerField(default=1) # position is redundant. order decindes the sequence
     figure_class = models.CharField(max_length=255, blank=True, null=True)
     hidden = models.BooleanField(default=False)
     POSITION_TYPES = (
@@ -508,12 +511,12 @@ class CardText(models.Model):
     card = models.OneToOneField(Card, on_delete=models.CASCADE, related_name="cardtext" )
     ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
     hidden = models.BooleanField(default=False)
-
+    order = models.PositiveIntegerField(default=1)
     actions_class = models.CharField(max_length=255, blank=True, null=True)        
     POSITION_TYPES = (
         ("start", "Start"),
         ("end", "End"),
-    )    
+    )    # this is redundant. ordering of comptextblocks defines the location of actions
     actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES, blank=True, null=True)
     #textcontents = GenericRelation(TextContent)
     comptextblocks = GenericRelation(ComptextBlock)

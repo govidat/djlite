@@ -5,13 +5,21 @@
 {% load my_tags %}
 
 {% for item in items %}
-    {% mytextv2 item.textblocks.name.0.items.0.values 'stext' as result_var %}
+    {% comment %}
+    {% mytext_gen item.textblocks 'name' as result_var %}
     {% with lv_name=result_var %}  
+    {% endcomment %}
+    {% mytext_l0dict item.textblocks 'name' as result_var %}
+    
         {% if item.children %}  <!-- if the children length > 0 -->
-            <li>
-                
+            <li>                
                 <details>
-                    <summary>{{lv_name}}</summary>                   
+                    <summary>
+                        {% comment %}
+                        {{lv_name}}
+                        {% endcomment %}
+                        <c-svgtextbadge :items="result_var.items"></c-svgtextbadge>
+                    </summary>                   
                     <ul class="p-2">
                         <c-navbar_v001_l1recur :items="item.children"></c-navbar_v001_l1recur>
                     </ul>
@@ -22,10 +30,15 @@
         {% else %}
             <li>
                 <a href="{% url 'client_page' item.client_id item.page_id %}">
+                    {% comment %}
                     {{lv_name}}
+                    {% endcomment %}
+                    <c-svgtextbadge :items="result_var.items"></c-svgtextbadge>
                 </a>
             </li>
         {% endif %}
+    {% comment %}    
     {% endwith %}
+    {% endcomment %}
 {% endfor %}
 

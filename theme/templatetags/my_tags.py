@@ -217,42 +217,239 @@ def xxxmysvg_static_tag(context, lv_token_id=''):
     # If no value was found after checking all priorities
     return {'svg_text': ''}
 
+# this is to be used for getting the gentext like name, nb_title for further passing to svgtextbadge
+@register.simple_tag(takes_context=True)
+def mytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_position0=0):
+     
+    """ 
+    Input:
+      "textblocks": [
+            {
+            "block_id": "name",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira",
+                    "ltext": "ltBahushira"
+                    },
+                    "fr": {
+                    "stext": "frBahushira",
+                    "ltext": "ltfrBahushira"
+                    },
+                    "hi": {
+                    "stext": "hiBahushira",
+                    "ltext": "lthiBahushira"
+                    }
+                }
+                }
+            ]
+            },
+            {
+            "block_id": "nb_title",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira Nav Bar",
+                    "ltext": ""
+                    },
+                    "fr": {
+                    "stext": "frBahushira Nav Bar",
+                    "ltext": ""
+                    },
+                    "hi": {
+                    "stext": "hiBahushira Nav Bar",
+                    "ltext": ""
+                    }
+                }
+                }
+            ]
+            }
+        ],
+
+        Output expected is:
+            {
+            "block_id": "name",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira",
+                    "ltext": "ltBahushira"
+                    },
+                    "fr": {
+                    "stext": "frBahushira",
+                    "ltext": "ltfrBahushira"
+                    },
+                    "hi": {
+                    "stext": "hiBahushira",
+                    "ltext": "lthiBahushira"
+                    }
+                }
+                }
+            ]
+            }
+
+    """    
+    """
+    # Get the dictionary
+    lv0_filtered_list = [item for item in lv_list if item.get(lv_key0) == lv_val0]
+    lv0_dict = lv0_filtered_list[lv_position0]  # {block_id: name... items:[]}
+    return lv0_dict
+    """
+    try:
+        return next(
+            item for idx, item in enumerate(lv_list or [])
+            if item.get(lv_key0) == lv_val0 and idx == lv_position0
+        )
+    except StopIteration:
+        return {}
+
+
+# deprecated
+# this is to be used for getting the gentext like name, nb_title etc
+@register.simple_tag(takes_context=True)
+def zzmytext_gen(context, lv_list=[], lv_val0="name", lv_ln='', lv_key0="block_id", lv_position0=0, lv_key1="type", lv_val1="text", lv_position1=0, lv_key='stext'):
+     
+    """ 
+    Input:
+      "textblocks": [
+            {
+            "block_id": "name",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira",
+                    "ltext": "ltBahushira"
+                    },
+                    "fr": {
+                    "stext": "frBahushira",
+                    "ltext": "ltfrBahushira"
+                    },
+                    "hi": {
+                    "stext": "hiBahushira",
+                    "ltext": "lthiBahushira"
+                    }
+                }
+                }
+            ]
+            },
+            {
+            "block_id": "nb_title",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira Nav Bar",
+                    "ltext": ""
+                    },
+                    "fr": {
+                    "stext": "frBahushira Nav Bar",
+                    "ltext": ""
+                    },
+                    "hi": {
+                    "stext": "hiBahushira Nav Bar",
+                    "ltext": ""
+                    }
+                }
+                }
+            ]
+            }
+        ],
+
+    Optional lv_ln = "en', 'hi'...
+    Output is a text. 
+
+    LANGUAGE_CODE 
+    CURRENT_LANGUAGE_CODE
+
+    """    
+    cv_base_ln_code = context.get("LANGUAGE_CODE")
+    cv_curr_ln_code = get_language()
+
+    # a hierarchy of page is with global followed by current page
+    cv_ln_hier_list = [cv_curr_ln_code]
+    if cv_base_ln_code != cv_curr_ln_code:
+        cv_ln_hier_list.append(cv_base_ln_code)
+    # if a lv_ln is passed to the function ie. the preferred ln code, then put this as the first entry in ln_hier_list
+    if lv_ln != '':
+        if lv_ln in cv_ln_hier_list:
+            cv_ln_hier_list.remove(lv_ln) # Removes the first occurrence by value
+        cv_ln_hier_list.insert(0, lv_ln) # Inserts the item at index 0 (the beginning)
+
+    """
+    Attempts to retrieve a value from a nested dictionary 
+    using predefined paths in order of preference.
+    
+    # If none of the paths are found
+    return None
+    """
+
+    # Get the dictionary
+    """
+    Option 1
+    """
+    lv0_filtered_list = [item for item in lv_list if item.get(lv_key0) == lv_val0]
+    lv0_dict = lv0_filtered_list[lv_position0]  # {block_id: name... items:[]}
+    lv1_list = lv0_dict["items"]  # [{type: text, values:[]}]
+    lv1_filtered_list = [item for item in lv1_list if item.get(lv_key1) == lv_val1] # [{type: text, values:[]}]
+    lv1_dict = lv1_filtered_list[lv_position1]  # {type: text, values:[]}
+
+    lv_values_dict = lv1_dict["values"]
+        #lv_values_dict = lv_dict
+         
+
+    # Iterate through the language priorities
+    for language_id in cv_ln_hier_list:
+        if language_id in lv_values_dict:
+            return lv_values_dict[language_id][lv_key]
+                                
+
+                            
+    # If no value was found after checking all priorities
+    return 'ERR001'
+
 @register.simple_tag(takes_context=True)
 def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
      
-    """ Option 1
-    lv_text_list=[]
-    Input is :
-        "lv_text_list/ name": [
-          {
-            "order": 1,
-            "css_class": "",
-            "ltext": "",
-            "items": [
-              {
-                "type": "text",
-                "order": 1,
-                "css_class": "",
-                "values": {
-                  "en": {
-                    "stext": "Home",
-                    "ltext": ""
-                  },
-                  "fr": {
-                    "stext": "frHome",
-                    "ltext": ""
-                  },
-                  "hi": {
-                    "stext": "hiHome",
-                    "ltext": ""
-                  }
-                }
-              }
-            ]
-          }
-        ]
-
-    Option 2
+    """ 
     Input is :
 
                 "values": {

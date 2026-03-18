@@ -26,7 +26,7 @@ first get the svgitem for this input and then proceed as before
         {% endif %}
 
         {% if item.type == 'text' or item.type == 'badge' %}
-
+            
             {% mytextv2 item.values 'stext' as result_var %}
             {% with lv_name=result_var %}
                 {% if item.type == 'text' %}
@@ -38,6 +38,7 @@ first get the svgitem for this input and then proceed as before
                     </div>
                 {% endif %}
             {% endwith %}
+            
         {% endif %}
     </div>    
 {% endfor%}   

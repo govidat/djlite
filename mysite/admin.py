@@ -53,7 +53,7 @@ class HeroCardTextInline(nested_admin.NestedStackedInline):
     model = HeroCardText
     extra = 0
     max_num = 1
-    fields = ("ltext", "actions_class", "actions_position_id")
+    fields = ("ltext", "order", "actions_class", "actions_position_id")
     #"title_class", "title_stb_ids", "contents_class", "contents_stb_ids", "button01_class", "button01_stb_ids", "button02_class", "button02_stb_ids", "button03_class", "button03_stb_ids", "button04_class", "button04_stb_ids")
     inlines = [ComptextBlockInline]
     classes = ['collapse']
@@ -62,7 +62,7 @@ class HeroCardFigureInline(nested_admin.NestedStackedInline):
     model = HeroCardFigure
     extra = 0
     max_num = 1
-    fields = ("ltext", "figure_class", "position_id", "image_url", "alt", "css_class" )
+    fields = ("ltext", "order", "figure_class", "position_id", "image_url", "alt", "css_class" )
     classes = ['collapse']
 
 class HeroCardInline(nested_admin.NestedStackedInline):
@@ -106,7 +106,7 @@ class CardTextInline(nested_admin.NestedStackedInline):
     model = CardText
     extra = 0
     max_num = 1
-    fields = ("ltext", "actions_class", "actions_position_id")
+    fields = ("ltext", "order", "actions_class", "actions_position_id")
     #"title_class", "title_stb_ids", "contents_class", "contents_stb_ids", "button01_class", "button01_stb_ids", "button02_class", "button02_stb_ids", "button03_class", "button03_stb_ids", "button04_class", "button04_stb_ids")
     inlines = [ComptextBlockInline]
     classes = ['collapse']
@@ -115,7 +115,7 @@ class CardFigureInline(nested_admin.NestedStackedInline):
     model = CardFigure
     extra = 0
     max_num = 1
-    fields = ("ltext", "figure_class", "position_id", "image_url", "alt", "css_class" )
+    fields = ("ltext", "order", "figure_class", "position_id", "image_url", "alt", "css_class" )
     classes = ['collapse'] 
     
 class HeroInline(nested_admin.NestedStackedInline):

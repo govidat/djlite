@@ -1,0 +1,52 @@
+
+{% comment %}
+recd button
+      {
+        "block_id": "actbut",
+        "order": 3,
+        "css_class": "btn-primary",
+        "ltext": "None",
+        "href_page": "about",
+        "items": [
+          {
+            "type": "text",
+            "order": 1,
+            "css_class": "None",
+            "values": {
+              "en": {
+                "stext": "Get Started",
+                "ltext": ""
+              },
+              "fr": {
+                "stext": "frGet Started",
+                "ltext": ""
+              },
+              "hi": {
+                "stext": "hiGet Started",
+                "ltext": ""
+              }
+            }
+          }
+        ]
+      }
+
+
+{% endcomment %}
+
+
+    {% comment %}
+        if a href_page value is provided then use a href, else just put a button
+    {% endcomment %}
+    
+{% if button.href_page != "" %}
+    <a href="{% url 'client_page' client.client_id button.href_page %}"
+        class="btn btn-primary {{ button.css_class|default:'' }}">
+          <c-svgtextbadge :items="button.items"></c-svgtextbadge>
+    </a>
+    
+{% else %}
+    <button class="btn btn-primary {{ button.css_class|default:"" }}">
+        <c-svgtextbadge :items="button.items"></c-svgtextbadge>    
+    </button>    
+{% endif %}
+

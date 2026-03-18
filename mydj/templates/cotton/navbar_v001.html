@@ -1,7 +1,7 @@
 {% comment %}
 {% load my_filters %}
 {% endcomment %}
-
+{% load my_tags %}
 <div class="navbar bg-base-100 shadow-sm fixed top-0 left-0 w-full z-50">
   <div class="navbar-start">
     <div class="dropdown">
@@ -19,10 +19,15 @@
     {% endcomment %}
 
     <h1 class="text-xl font-bold">
+      {% mytext_l0dict client.textblocks 'nb_title' as result_var %}
+      {% comment %}
       {% with lv_nb_title=client.textblocks.nb_title %}
-        <h1 class="text-xl font-bold {{lv_nb_title.css_class|default:""}}">
-        <c-svgtextbadge :items="lv_nb_title.0.items"></c-svgtextbadge>
-      {% endwith %}    
+      {% endcomment %}
+        <h1 class="text-xl font-bold {{result_var.css_class|default:""}}">
+        <c-svgtextbadge :items="result_var.items"></c-svgtextbadge>
+      {% comment %}
+      {% endwith %}
+      {% endcomment %} 
     </h1>
 
   </div>

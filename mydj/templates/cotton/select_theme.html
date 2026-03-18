@@ -2,17 +2,17 @@
 {% load my_tags %}
 {% comment %}
 
-[
   {
-    "theme_id": "light2",
-    "ltext": "None",
-    "is_default": "False",
-    "textblocks": {
-      "name": [
+      "theme_id": "dark",
+      "ltext": "None",
+      "is_default": "False",
+      "textblocks": [
         {
+          "block_id": "name",
           "order": 1,
           "css_class": "None",
           "ltext": "None",
+          "href_page": "None",
           "items": [
             {
               "type": "text",
@@ -20,56 +20,22 @@
               "css_class": "None",
               "values": {
                 "en": {
-                  "stext": "Light2",
-                  "ltext": ""
-                }, 
-                "fr": {xxx},
-                "hi": {xxx}
-              }
-            }
-          ]
-        }
-      ]
-    },
-    "tokens": {
-      "primary": "#570df8",
-        ....    
-    }
-  },
-  {
-    "theme_id": "dark2",
-    "ltext": "None",
-    "is_default": "True",
-    "textblocks": {
-      "name": [
-        {
-          "order": 1,
-          "css_class": "None",
-          "ltext": "None",
-          "items": [
-            {
-              "type": "text",
-              "order": 1,
-              "css_class": "None",
-              "values": {
-                "en": {
-                  "stext": "Dark2",
+                  "stext": "Dark",
                   "ltext": ""
                 },
-                "fr": {xxx},
-                "hi": {xxx}
+                "fr": {
+                  "stext": "frDark",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiDark",
+                  "ltext": ""
+                }
               }
             }
           ]
         }
-      ]
-    },
-    "tokens": {
-      "primary": "#661ae6",
-      ...
-    }
-  }
-]
+      ],
 {% endcomment %} 
 
 {% comment %}
@@ -119,9 +85,12 @@
                  {% if t.theme_id == request.session.active_theme_id %}
                  btn-active
                  {% endif %}">
-          
-          {% mytextv2 t.textblocks.name.0.items.0.values 'stext' %}
-
+          {% comment %}
+          def mytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_position0=0)
+          {% endcomment %}
+          {% mytext_l0dict t.textblocks 'name' as result_var %}
+           
+          <c-svgtextbadge :items="result_var.items"></c-svgtextbadge>
         </button>
       </li>
       {% endfor %}

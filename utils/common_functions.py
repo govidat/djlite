@@ -199,7 +199,7 @@ def build_stb_item(item):
 
 # 3️⃣ Generic Block Builder
 # (Works for both ComptextBlock and GentextBlock)
-def build_blocks(blocks_queryset):
+def build_blocks_old(blocks_queryset):
     result = {}
 
     for block in blocks_queryset:
@@ -231,6 +231,88 @@ def build_blocks(blocks_queryset):
 
     return result
 
+def build_blocks(blocks_queryset):
+
+    blocks = []
+    #actbut_items = []
+    #actbut_order = None
+
+    for block in blocks_queryset.order_by("order"):
+
+        if not visible(block):
+            continue
+
+        items = [
+            build_stb_item(item)
+            for item in block.textstbitems.all()
+        ]
+        items = [i for i in items if i]
+
+        if not items:
+            continue
+
+        href = getattr(block, "href_page", None)
+
+        # DROPPED ---- special handler ----
+        """
+        if block.block_id == "actbut":
+
+            # track lowest order
+            if actbut_order is None or block.order < actbut_order:
+                actbut_order = block.order
+
+            actbut_items.extend(
+                {
+                    **item,
+                    "href_page": href,
+                    "css_class": block.css_class,
+                }
+                for item in items
+            )
+            continue
+        """
+
+        # ---- normal blocks ----
+        blocks.append({
+            "block_id": block.block_id,
+            "order": block.order,
+            "css_class": block.css_class,
+            "ltext": block.ltext,
+            "href_page": href,
+            "items": items,
+        })
+    """
+    # append actbut block
+    if actbut_items:
+        blocks.append({
+            "block_id": "actbut",
+            "order": actbut_order,
+            "items": actbut_items
+        })
+    """
+    # final ordering safeguard
+    blocks.sort(key=lambda x: x["order"])
+
+    return blocks
+    """
+    "textblocks": [
+      {
+        "block_id": "title",
+        "order": 1,
+        "items": [...]
+      },
+      {
+        "block_id": "content",
+        "order": 2,
+        "items": [...]
+      },
+      {
+        "block_id": "actbut",
+        "order": 3,
+        "items": [...]
+      }
+    ]
+    """
 
 # 4️⃣ Component Builders
 # HeroText
@@ -366,7 +448,7 @@ def build_herocard(obj):
     text = build_herocard_text(get_attr(obj, "herocardtext"))
     if text:
         contents.append(text)
-
+    #SORT IS NOT RELEVANT IN CARD 
     contents.sort(key=lambda x: x["order"])
 
     data = serialize_model(
@@ -376,6 +458,12 @@ def build_herocard(obj):
 
     data["type_id"] = "herocard"
     data["contents"] = contents
+
+
+    #if figure:
+    #    data["cardfigure"] = figure
+    #if text:
+    #    data["cardtext"] = text
 
     return data
     """
@@ -417,7 +505,7 @@ def build_hero(obj):
     )
 
     data["comp_id"] = "hero"
-    data["herocontents"] = contents
+    data["contents"] = contents
 
     return data
     """
@@ -505,7 +593,8 @@ def build_card(obj):
     if text:
         contents.append(text)
 
-    #contents.sort(key=lambda x: x["order"])
+    #SORT IS NOT RELEVANT IN CARD 
+    contents.sort(key=lambda x: x["order"])
 
     data = serialize_model(
         obj,
@@ -514,6 +603,12 @@ def build_card(obj):
 
     data["comp_id"] = "card"
     data["contents"] = contents
+    #if figure:
+    #    data["cardfigure"] = figure
+    #if text:
+    #    data["cardtext"] = text
+
+    return data
     """
     return {
         "hidden": obj.hidden,
@@ -689,8 +784,8 @@ def build_client_payload(client):
     }
 
 
-
-def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout=3600):
+# temporarily marking use_cache = False. To be changed after debugging
+def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeout=3600):
     """
     Fetch clientstatic with optional caching.
     Works when client_id as primary key.
@@ -1298,4 +1393,918 @@ def resolve_theme(theme):
 
     return data
 """
-
+"""
+{
+  "client_id": "bahushira",
+  "languages": [
+    {
+      "language_id": "en",
+      "labels": {
+        "en": "English",
+        "fr": "frEnglish",
+        "hi": "hiEnglish"
+      }
+    },
+    {
+      "language_id": "fr",
+      "labels": {
+        "en": "French",
+        "fr": "frFrench",
+        "hi": "hiFrench"
+      }
+    },
+    {
+      "language_id": "hi",
+      "labels": {
+        "en": "Hindi",
+        "fr": "frHindi",
+        "hi": "hiHindi"
+      }
+    }
+  ],
+  "themes": [
+    {
+      "theme_id": "light",
+      "ltext": "None",
+      "is_default": "True",
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Light",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frLight",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiLight",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "tokens": {
+        "primary": "#570df8",
+        "secondary": "#f000b8",
+        "accent": "#37cdbe",
+        "neutral": "#3d4451",
+        "primary_content": "#ffffff",
+        "secondary_content": "#ffffff",
+        "accent_content": "#163835",
+        "neutral_content": "#ffffff",
+        "base_100": "#ffffff",
+        "base_200": "#f2f2f2",
+        "base_300": "#e5e6e6",
+        "base_content": "#1f2937",
+        "success": "#00c853",
+        "warning": "#ff9800",
+        "error": "#ff5724",
+        "info": "#2094f3",
+        "success_content": "#ffffff",
+        "warning_content": "#ffffff",
+        "error_content": "#ffffff",
+        "info_content": "#ffffff",
+        "font_body": "",
+        "font_heading": "",
+        "base_font_size": "16px",
+        "scale_ratio": 1.2,
+        "section_gap": "4rem",
+        "container_padding": "1rem",
+        "radius_btn": "0.5rem",
+        "radius_card": "1rem",
+        "radius_input": "0.5rem",
+        "shadow_sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "shadow_md": "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        "shadow_lg": "0 10px 15px -3px rgb(0 0 0 / 0.1)"
+      }
+    },
+    {
+      "theme_id": "dark",
+      "ltext": "None",
+      "is_default": "False",
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Dark",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frDark",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiDark",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "tokens": {
+        "primary": "#661ae6",
+        "secondary": "#d926aa",
+        "accent": "#1fb2a6",
+        "neutral": "#191d24",
+        "primary_content": "#ffffff",
+        "secondary_content": "#ffffff",
+        "accent_content": "#ffffff",
+        "neutral_content": "#a6adbb",
+        "base_100": "#2a303c",
+        "base_200": "#242933",
+        "base_300": "#1d232a",
+        "base_content": "#a6adbb",
+        "success": "#36d399",
+        "warning": "#fbbd23",
+        "error": "#f87272",
+        "info": "#3abff8",
+        "success_content": "#000000",
+        "warning_content": "#000000",
+        "error_content": "#000000",
+        "info_content": "#000000",
+        "font_body": "",
+        "font_heading": "",
+        "base_font_size": "16px",
+        "scale_ratio": 1.2,
+        "section_gap": "4rem",
+        "container_padding": "1rem",
+        "radius_btn": "0.5rem",
+        "radius_card": "1rem",
+        "radius_input": "0.5rem",
+        "shadow_sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "shadow_md": "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        "shadow_lg": "0 10px 15px -3px rgb(0 0 0 / 0.1)"
+      }
+    }
+  ],
+  "textblocks": [
+    {
+      "block_id": "name",
+      "order": 1,
+      "css_class": "None",
+      "ltext": "None",
+      "href_page": "None",
+      "items": [
+        {
+          "type": "text",
+          "order": 1,
+          "css_class": "None",
+          "values": {
+            "en": {
+              "stext": "Bahushira",
+              "ltext": "ltBahushira"
+            },
+            "fr": {
+              "stext": "frBahushira",
+              "ltext": "ltfrBahushira"
+            },
+            "hi": {
+              "stext": "hiBahushira",
+              "ltext": "lthiBahushira"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "block_id": "nb_title",
+      "order": 1,
+      "css_class": "None",
+      "ltext": "None",
+      "href_page": "None",
+      "items": [
+        {
+          "type": "text",
+          "order": 1,
+          "css_class": "None",
+          "values": {
+            "en": {
+              "stext": "Bahushira Nav Bar",
+              "ltext": ""
+            },
+            "fr": {
+              "stext": "frBahushira Nav Bar",
+              "ltext": ""
+            },
+            "hi": {
+              "stext": "hiBahushira Nav Bar",
+              "ltext": ""
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "page_id": "home",
+      "order": 1,
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Home",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frHome",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiHome",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "layouts": [
+        {
+          "level": 10,
+          "slug": "a",
+          "order": 1,
+          "css_class": "",
+          "comp_id": "",
+          "children": [
+            {
+              "level": 20,
+              "slug": "a",
+              "order": 1,
+              "css_class": "",
+              "comp_id": "",
+              "children": [
+                {
+                  "level": 30,
+                  "slug": "a",
+                  "order": 1,
+                  "css_class": "",
+                  "comp_id": "",
+                  "children": [
+                    {
+                      "level": 40,
+                      "slug": "a",
+                      "order": 1,
+                      "css_class": "",
+                      "comp_id": "hero",
+                      "component": {
+                        "layout": 13,
+                        "css_class": "None",
+                        "herocontent_class": "None",
+                        "overlay": "None",
+                        "overlay_style": "None",
+                        "comp_id": "hero",
+                        "contents": [
+                          {
+                            "order": 1,
+                            "hidden": "None",
+                            "type_id": "text",
+                            "ltext": "None",
+                            "actions_class": "None",
+                            "actions_position_id": "end",
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "Bahushira Home Page Hero",
+                                        "ltext": "ltBahushira Home Page Hero"
+                                      },
+                                      "fr": {
+                                        "stext": "frBahushira Home Page Hero",
+                                        "ltext": "ltfrBahushira Home Page Hero"
+                                      },
+                                      "hi": {
+                                        "stext": "hiBahushira Home Page Hero",
+                                        "ltext": "lthiBahushira Home Page Hero"
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "This is a content line for Hero in Home page",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frThis is a content line for Hero in Home page",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiThis is a content line for Hero in Home page",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "actbut",
+                                "order": 3,
+                                "css_class": "btn-primary",
+                                "ltext": "None",
+                                "href_page": "about",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "Get Started",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frGet Started",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiGet Started",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "hero": 1,
+                            "order": 2,
+                            "hidden": "None",
+                            "type_id": "figure",
+                            "ltext": "None",
+                            "figure_class": "px-0 pt-0",
+                            "position_id": "start",
+                            "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                            "alt": "Spiderman",
+                            "css_class": "None"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page_id": "about",
+      "order": 2,
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "About",
+                  "ltext": "ltAbout"
+                },
+                "fr": {
+                  "stext": "frAbout",
+                  "ltext": "ltfrAbout"
+                },
+                "hi": {
+                  "stext": "hiAbout",
+                  "ltext": "lthiAbout"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "layouts": [
+        {
+          "level": 10,
+          "slug": "a",
+          "order": 1,
+          "css_class": "",
+          "comp_id": "None",
+          "children": [
+            {
+              "level": 20,
+              "slug": "a",
+              "order": 1,
+              "css_class": "",
+              "comp_id": "None",
+              "children": [
+                {
+                  "level": 30,
+                  "slug": "a",
+                  "order": 1,
+                  "css_class": "",
+                  "comp_id": "None",
+                  "children": [
+                    {
+                      "level": 40,
+                      "slug": "a",
+                      "order": 1,
+                      "css_class": "",
+                      "comp_id": "hero",
+                      "component": {
+                        "layout": 17,
+                        "css_class": "None",
+                        "herocontent_class": "None",
+                        "overlay": "None",
+                        "overlay_style": "None",
+                        "comp_id": "hero",
+                        "contents": [
+                          {
+                            "order": 1,
+                            "hidden": "None",
+                            "type_id": "text",
+                            "ltext": "None",
+                            "actions_class": "None",
+                            "actions_position_id": "None",
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "About Page Hero",
+                                        "ltext": "ltAbout Page Hero"
+                                      },
+                                      "fr": {
+                                        "stext": "frAbout Page Hero",
+                                        "ltext": "ltfr About Page Hero"
+                                      },
+                                      "hi": {
+                                        "stext": "hiAbout Page Hero",
+                                        "ltext": "lthiAbout Page Hero"
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "hero": 2,
+                            "order": 2,
+                            "hidden": "None",
+                            "type_id": "figure",
+                            "ltext": "None",
+                            "figure_class": "px-0 pt-0",
+                            "position_id": "start",
+                            "image_url": "https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp",
+                            "alt": "Shoes",
+                            "css_class": "max-w-sm rounded-xl shadow-2xl"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page_id": "team",
+      "order": 3,
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Team",
+                  "ltext": "ltTeam"
+                },
+                "fr": {
+                  "stext": "frTeam",
+                  "ltext": "ltfrTeam"
+                },
+                "hi": {
+                  "stext": "hiTeam",
+                  "ltext": "lthiTeam"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "layouts": []
+    },
+    {
+      "page_id": "contact",
+      "order": 4,
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Contact",
+                  "ltext": "ltContact"
+                },
+                "fr": {
+                  "stext": "frContact",
+                  "ltext": "ltfrContact"
+                },
+                "hi": {
+                  "stext": "hiContact",
+                  "ltext": "lthiContact"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "layouts": [
+        {
+          "level": 10,
+          "slug": "a",
+          "order": 1,
+          "css_class": "",
+          "comp_id": "",
+          "children": [
+            {
+              "level": 20,
+              "slug": "a",
+              "order": 1,
+              "css_class": "",
+              "comp_id": "",
+              "children": [
+                {
+                  "level": 30,
+                  "slug": "a",
+                  "order": 1,
+                  "css_class": "",
+                  "comp_id": "",
+                  "children": [
+                    {
+                      "level": 40,
+                      "slug": "a",
+                      "order": 4,
+                      "css_class": "",
+                      "comp_id": "card",
+                      "component": {
+                        "layout": 22,
+                        "ltext": "None",
+                        "css_class": "bg-base-100 w-96 shadow-sm",
+                        "body_class": "None",
+                        "comp_id": "card",
+                        "contents": [
+                          {
+                            "card": 2,
+                            "ltext": "None",
+                            "hidden": "None",
+                            "order": 1,
+                            "actions_class": "None",
+                            "actions_position_id": "start",
+                            "type_id": "text",
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "Contact Card Title",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frContact Card Title",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiContact Card Title",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "A card component has a figure, a body part, and inside body there are title and actions parts",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frA card component has a figure, a body part, and inside body there are title and actions parts",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiA card component has a figure, a body part, and inside body there are title and actions parts",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "actbut",
+                                "order": 3,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "Buy Now",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frBuy Now",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiBuy Now",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "card": 2,
+                            "ltext": "None",
+                            "order": 2,
+                            "figure_class": "None",
+                            "hidden": "None",
+                            "position_id": "start",
+                            "image_url": "https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp",
+                            "alt": "Shoes",
+                            "css_class": "None",
+                            "type_id": "figure"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "page_tree": [
+    {
+      "client_id": "bahushira",
+      "page_id": "home",
+      "order": 1,
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Home",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frHome",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiHome",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "client_id": "bahushira",
+      "page_id": "about",
+      "order": 2,
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "About",
+                  "ltext": "ltAbout"
+                },
+                "fr": {
+                  "stext": "frAbout",
+                  "ltext": "ltfrAbout"
+                },
+                "hi": {
+                  "stext": "hiAbout",
+                  "ltext": "lthiAbout"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "client_id": "bahushira",
+      "page_id": "team",
+      "order": 3,
+      "textblocks": [
+        {
+          "block_id": "name",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Team",
+                  "ltext": "ltTeam"
+                },
+                "fr": {
+                  "stext": "frTeam",
+                  "ltext": "ltfrTeam"
+                },
+                "hi": {
+                  "stext": "hiTeam",
+                  "ltext": "lthiTeam"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "client_id": "bahushira",
+          "page_id": "contact",
+          "order": 4,
+          "textblocks": [
+            {
+              "block_id": "name",
+              "order": 1,
+              "css_class": "None",
+              "ltext": "None",
+              "href_page": "None",
+              "items": [
+                {
+                  "type": "text",
+                  "order": 1,
+                  "css_class": "None",
+                  "values": {
+                    "en": {
+                      "stext": "Contact",
+                      "ltext": "ltContact"
+                    },
+                    "fr": {
+                      "stext": "frContact",
+                      "ltext": "ltfrContact"
+                    },
+                    "hi": {
+                      "stext": "hiContact",
+                      "ltext": "lthiContact"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+"""

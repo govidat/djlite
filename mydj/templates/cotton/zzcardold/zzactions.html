@@ -1,0 +1,158 @@
+{% comment %}
+{% load my_filters %}
+recd content:
+{
+  "layout": 22,
+  "ltext": "None",
+  "css_class": "bg-base-100 w-96 shadow-sm",
+  "body_class": "None",
+  "comp_id": "card",
+  "cardfigure": {
+    "card": 2,
+    "ltext": "None",
+    "figure_class": "None",
+    "hidden": "None",
+    "position_id": "start",
+    "image_url": "https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp",
+    "alt": "Shoes",
+    "css_class": "None",
+    "type_id": "figure"
+  },
+  "cardtext": {
+    "card": 2,
+    "ltext": "None",
+    "hidden": "None",
+    "actions_class": "None",
+    "actions_position_id": "start",
+    "type_id": "text",
+    "textblocks": {
+      "title": [
+        {
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Contact Card Title",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frContact Card Title",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiContact Card Title",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "content": [
+        {
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "A card component has a figure, a body part, and inside body there are title and actions parts",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frA card component has a figure, a body part, and inside body there are title and actions parts",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiA card component has a figure, a body part, and inside body there are title and actions parts",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "actbut": [
+        {
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Buy Now",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frBuy Now",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiBuy Now",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+
+recd content:
+:actclass="herocontent.actions_class" :actbuts="herocontent.textblocks.actbut"
+"actbut": [
+    {
+    "order": 3,
+    "css_class": "btn-primary",
+    "ltext": "None",
+    "items": [
+        {
+        "type": "text",
+        "order": 1,
+        "css_class": "None",
+        "values": {
+            "en": {
+            "stext": "Get Started",
+            "ltext": ""
+            },
+            "fr": {
+            "stext": "frGet Started",
+            "ltext": ""
+            },
+            "hi": {
+            "stext": "hiGet Started",
+            "ltext": ""
+            }
+        }
+        }
+    ]
+    }
+]
+<div class="card-actions justify-end {{ card.cardtext.actions_class|default:"" }}">
+    <c-buttons :buttons="card.cardtext.textblocks.actbut"></c-buttons>
+</div>
+{% endcomment %}
+
+<div class="card-actions justify-end {{ actclass|default:"" }}">  
+     
+    <c-buttons :buttons="actbuts"></c-buttons>
+</div>

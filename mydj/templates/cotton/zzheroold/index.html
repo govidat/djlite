@@ -146,7 +146,7 @@ input type is :
                
                 {% if herocontent.textblocks.actbut %} 
                   {% if herocontent.actions_position_id == 'start' %}                        
-                      <c-hero.actions :actclass="herocontent.actions_class" :actbuts="herocontent.textblocks.actbut"></c-hero.actions>
+                      <c-actions :actclass="herocontent.actions_class" :actbuts="herocontent.textblocks.actbut"></c-actions>
                   {% endif %}                
                 {% endif %}
 
@@ -163,7 +163,7 @@ input type is :
 
                 {% if herocontent.textblocks.actbut %} 
                   {% if herocontent.actions_position_id == 'end' %}                        
-                      <c-hero.actions :actions="herocontent.textblocks.actbut"></c-hero.actions>
+                      <c-actions :actclass="herocontent.actions_class" :actbuts="herocontent.textblocks.actbut"></c-actions>
                   {% endif %}                
                 {% endif %}  
                 

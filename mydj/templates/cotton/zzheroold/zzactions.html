@@ -31,6 +31,6 @@ recd content:
     }
 ]
 {% endcomment %}
-<div class="card-actions justify-end {{ card.actions.class|default:"" }}">
-    <c-buttons :buttons="card.actions.buttons"></c-buttons>
+<div class="justify-end {{ actclass|default:"" }}">    
+    <c-buttons :buttons="actbuts"></c-buttons>
 </div>

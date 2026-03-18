@@ -1,0 +1,180 @@
+{% comment %}
+input type is :
+
+"component": {
+  "layout": 13,
+  "css_class": "None",
+  "herocontent_class": "None",
+  "overlay": "None",
+  "overlay_style": "None",
+  "comp_id": "hero",
+  "contents": [
+    {
+      "order": 1,
+      "hidden": "None",
+      "type_id": "text",
+      "ltext": "None",
+      "actions_class": "None",
+      "actions_position_id": "end",
+      "textblocks": [
+        {
+          "block_id": "title",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Bahushira Home Page Hero",
+                  "ltext": "ltBahushira Home Page Hero"
+                },
+                "fr": {
+                  "stext": "frBahushira Home Page Hero",
+                  "ltext": "ltfrBahushira Home Page Hero"
+                },
+                "hi": {
+                  "stext": "hiBahushira Home Page Hero",
+                  "ltext": "lthiBahushira Home Page Hero"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "block_id": "content",
+          "order": 2,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "This is a content line for Hero in Home page",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frThis is a content line for Hero in Home page",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiThis is a content line for Hero in Home page",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        },
+        {
+          "block_id": "actbut",
+          "order": 3,
+          "css_class": "btn-primary",
+          "ltext": "None",
+          "href_page": "about",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Get Started",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frGet Started",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiGet Started",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "hero": 1,
+      "order": 2,
+      "hidden": "None",
+      "type_id": "figure",
+      "ltext": "None",
+      "figure_class": "px-0 pt-0",
+      "position_id": "start",
+      "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+      "alt": "Spiderman",
+      "css_class": "None"
+    }
+  ]
+}
+
+{% endcomment %}
+
+
+
+
+{% if hero %}   
+      
+      <div class="hero bg-base-200 min-h-screen {{ hero.css_class|default:'' }}"
+        style="{% if hero.overlay %} {{hero.overlay_style}} {% endif %}"
+      >
+        
+        {% if hero.overlay %}
+          <div class="hero-overlay">
+          </div>  
+        {% endif %}
+        <div class="hero-content flex-row {{ hero.herocontent_class|default:'' }}">    
+          
+          {% for content in hero.contents %}
+            <c-compcontent :content="content"></c-compcontent>
+            {% comment %}
+            <div>             
+              {% if content.type_id == 'figure' %}                
+                <c-figure :figure="content"></c-figure>                           
+              {% endif %}
+              {% if content.type_id == 'text' %}
+                {% for block in content.textblocks %} 
+                  {% if block.block_id == 'title' %}
+                    <h1 class="flex text-5xl font-bold mb-6 {{ block.css_class|default:"" }}">
+                      <c-svgtextbadge :items="block.items"></c-svgtextbadge>
+                    </h1>       
+                  {% endif %}
+                  {% if block.block_id == 'content' %}
+                    <div class="flex flex-col text-2xl mb-6 {{ block.css_class|default:"" }}">
+                      <c-svgtextbadge :items="block.items"></c-svgtextbadge>
+                    </div>       
+                  {% endif %}
+                  {% if block.block_id == 'actbut' %}
+                    { comment %}
+                    <div class="justify-end {{ content.actions_class|default:"" }}">    
+                        <c-buttons :buttons="block.items"></c-buttons>
+                    </div>
+                    { endcomment %}
+                  {% endif %}
+                {% endfor %}               
+              {% endif %}
+              { comment %}
+              To be tested
+              {% if content.type_id == 'card' %}
+                  {% with card=site_cards|get_dictid:herocontent.link_id %}
+                    <c-card :card="card"></c-card>
+                  {% endwith %}
+              {% endif %}
+              { endcomment %}
+            </div>
+            {% endcomment %}
+
+          {% endfor %}              
+        </div>
+      </div>    
+{% endif %}   
