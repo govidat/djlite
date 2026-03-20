@@ -8,6 +8,949 @@ from django.db.models import ForeignKey
 
 from django.contrib.contenttypes.models import ContentType
 
+# this is a helper used in hero/ card prefetch in layout
+"""
+def get_prefetched(obj, attr):
+    if not hasattr(obj, attr):
+        raise Exception(f"Missing prefetch: {attr}")
+
+    val = getattr(obj, attr)
+
+    if isinstance(val, list):
+        return val[0] if val else None
+
+    return val
+
+"""
+
+# this is used extensively in build programs to serialize data.
+def serialize_model(instance, exclude=None):
+    exclude = set(exclude or [])
+    data = {}
+
+    for field in instance._meta.fields:
+        name = field.name
+        if name in exclude:
+            continue
+
+        value = getattr(instance, name)
+
+        if isinstance(field, ForeignKey):
+            data[name] = getattr(instance, f"{name}_id")
+        else:
+            data[name] = value or None
+
+    return data
+
+#Step 1: Universal Prefetch for TextContent Tree
+# Universal Text Block Tree
+
+stbitem_qs = (
+    TextstbItem.objects
+    .select_related()  # important
+    .prefetch_related(
+        Prefetch(
+            "svgtextbadgevalue_set",
+            queryset=SvgtextbadgeValue.objects.select_related("language"),
+            to_attr="prefetched_svgtextbadgevalues"
+        )
+    )
+    .order_by("order")
+)
+
+stbitem_prefetch = Prefetch(
+    "textstbitems",
+    queryset=stbitem_qs,
+    to_attr="prefetched_stbitems"
+)
+"""
+stbitem_prefetch = Prefetch(
+    "textstbitems",
+    queryset=TextstbItem.objects.prefetch_related(
+        Prefetch(
+            "svgtextbadgevalue_set",
+            queryset=SvgtextbadgeValue.objects.select_related("language"),
+            to_attr="prefetched_svgtextbadgevalues"
+        )
+    ).order_by("order"),
+    to_attr="prefetched_stbitems"
+)
+"""
+"""
+comptextblock_qs = ComptextBlock.objects.prefetch_related(
+    stbitem_prefetch
+).order_by("order")
+
+comptextblock_prefetch = Prefetch(
+    "comptextblocks",
+    #queryset=ComptextBlock.objects.prefetch_related(stbitem_prefetch).order_by("order"),
+    queryset= comptextblock_qs,
+    to_attr="prefetched_comptextblocks"
+)
+"""
+gentextblock_qs = GentextBlock.objects.prefetch_related(
+    stbitem_prefetch
+).order_by("order")
+
+gentextblock_prefetch = Prefetch(
+    "gentextblocks",
+    #queryset=GentextBlock.objects.prefetch_related(stbitem_prefetch).order_by("order"),
+    queryset= gentextblock_qs,
+    to_attr="prefetched_gentextblocks"
+)
+
+
+#Step 2: Component-Level Prefetch
+# Hero subtree
+hero_prefetch = Prefetch(
+    "hero",  # ← reverse OneToOne accessor
+    queryset=Hero.objects
+        .select_related(
+            "herotext",
+            "herofigure",
+            "herocard",
+            "herocard__herocardtext",
+            "herocard__herocardfigure",
+        )
+        .prefetch_related(
+            Prefetch(
+                "herotext__comptextblocks",
+                queryset=ComptextBlock.objects.prefetch_related(
+                    Prefetch(
+                        "textstbitems",
+                        queryset=TextstbItem.objects.prefetch_related(
+                            Prefetch(
+                                "svgtextbadgevalue_set",
+                                queryset=SvgtextbadgeValue.objects.select_related("language"),
+                                to_attr="prefetched_svgtextbadgevalues",
+                            )
+                        ).order_by("order"),
+                        to_attr="prefetched_stbitems",
+                    )
+                ).order_by("order"),
+                to_attr="prefetched_ht_comptextblocks",
+            ),
+            Prefetch(
+                "herocard__herocardtext__comptextblocks",
+                queryset=ComptextBlock.objects.prefetch_related(
+                    Prefetch(
+                        "textstbitems",
+                        queryset=TextstbItem.objects.prefetch_related(
+                            Prefetch(
+                                "svgtextbadgevalue_set",
+                                queryset=SvgtextbadgeValue.objects.select_related("language"),
+                                to_attr="prefetched_svgtextbadgevalues",
+                            )
+                        ).order_by("order"),
+                        to_attr="prefetched_stbitems",
+                    )
+                ).order_by("order"),
+                to_attr="prefetched_hcht_comptextblocks",
+            ),
+        ),
+    #to_attr="prefetched_heros",
+)
+"""
+hero_prefetch_old = Prefetch(
+    "hero",
+    queryset=Hero.objects.select_related(
+        "herotext",
+        "herofigure",
+        "herocard",
+        "herocard__herocardtext",
+        "herocard__herocardfigure"
+    )
+    #.filter(
+    #    layout__level=40, layout__comp_id="hero"   # ✅ KEY OPTIMIZATION
+    #)
+    .prefetch_related(
+        Prefetch(
+            "herotext__comptextblocks",
+            #queryset=comptextblock_prefetch.queryset,
+            #queryset=ComptextBlock.objects.prefetch_related(stbitem_prefetch).order_by("order"),
+            queryset= comptextblock_qs,
+            to_attr="prefetched_ht_comptextblocks"
+        ),
+        Prefetch(
+            "herocard__herocardtext__comptextblocks",
+            #queryset=comptextblock_prefetch.queryset,
+            #queryset=ComptextBlock.objects.prefetch_related(stbitem_prefetch).order_by("order"),
+            queryset= comptextblock_qs,
+            to_attr="prefetched_hcht_comptextblocks"
+        ),
+    ),
+    to_attr="prefetched_heros"
+)
+"""
+# Card subtree
+card_prefetch = Prefetch(
+    "card",       # ← reverse OneToOne accessor
+    queryset=Card.objects
+        .select_related(
+            "cardtext",
+            "cardfigure",
+        )
+        .prefetch_related(
+            Prefetch(
+                "cardtext__comptextblocks",
+                queryset=ComptextBlock.objects.prefetch_related(
+                    Prefetch(
+                        "textstbitems",
+                        queryset=TextstbItem.objects.prefetch_related(
+                            Prefetch(
+                                "svgtextbadgevalue_set",
+                                queryset=SvgtextbadgeValue.objects.select_related("language"),
+                                to_attr="prefetched_svgtextbadgevalues",
+                            )
+                        ).order_by("order"),
+                        to_attr="prefetched_stbitems",
+                    )
+                ).order_by("order"),
+                to_attr="prefetched_ct_comptextblocks",
+            ),
+        ),
+    #to_attr="prefetched_cards",
+)
+"""
+card_prefetch_old = Prefetch(
+    "card",
+    queryset=Card.objects.select_related(
+        "cardtext",
+        "cardfigure",
+    )
+    #.filter(
+    #    layout__level=40, layout__comp_id="card"   # ✅ KEY OPTIMIZATION
+    #)
+    .prefetch_related(
+        Prefetch(
+            "cardtext__comptextblocks",
+            #queryset=comptextblock_prefetch.queryset,
+            #queryset=ComptextBlock.objects.prefetch_related(stbitem_prefetch).order_by("order"),
+            queryset= comptextblock_qs,
+            to_attr="prefetched_ct_comptextblocks"
+        )
+    ),
+    to_attr="prefetched_cards"
+)
+
+"""
+#Step 3: Layout Tree (Single Fetch, Ordered)
+
+layout_qs = Layout.objects.select_related("parent").order_by("level", "order") 
+
+layout_prefetch = Prefetch(
+    "layouts",
+    queryset=layout_qs.prefetch_related(
+        hero_prefetch,
+        card_prefetch,
+    ),
+    #.order_by("level", "order"),
+    to_attr="prefetched_layouts"
+)
+
+"""
+def lf_get_attr(obj, attr):
+    return getattr(obj, attr, None)
+"""
+def visible(obj):
+    return obj if obj and not getattr(obj, "hidden", False) else None
+
+
+
+# 1️⃣ Lowest Layer — SvgtextbadgeValue
+
+def build_values(item):
+    """
+    Uses prefetched values instead of hitting DB again.
+    Fallback to query only if prefetch is missing (safety).
+    """
+
+    # ✅ Use prefetched values if available
+    values = getattr(item, "prefetched_svgtextbadgevalues", None)
+
+    # ⚠️ Fallback (only if something was missed in prefetch)
+    if values is None:
+        values = item.svgtextbadgevalue_set.select_related("language").all()
+
+    return {
+        val.language.language_id: {
+            "stext": val.stext,
+            "ltext": val.ltext,
+        }
+        for val in values
+    }
+
+# 2️⃣ TextstbItem Builder
+
+
+def build_stb_item(item):
+    if not visible(item):
+        return None
+
+    data = {
+        "type": item.item_id,
+        "order": item.order,
+        "css_class": item.css_class,
+    }
+
+    if item.item_id == "svg":
+        data["svg"] = item.svg_text
+    else:
+        # ✅ Use optimized function
+        data["values"] = build_values(item)
+
+    return data
+
+# 3️⃣ Generic Block Builder
+
+def build_blocks(blocks_queryset):
+
+    blocks = blocks_queryset or []
+    result = []
+    
+    #actbut_items = []
+    #actbut_order = None
+
+    for block in blocks:
+
+        if not visible(block):
+            continue
+
+        raw_items = getattr(block, "prefetched_stbitems", [])
+
+        items = [build_stb_item(i) for i in raw_items]
+        items = [i for i in items if i]
+
+        if not items:
+            continue
+
+        href = getattr(block, "href_page", None)
+
+        # ---- normal blocks ----
+        result.append({
+            "block_id": block.block_id,
+            "order": block.order,
+            "css_class": block.css_class,
+            "ltext": block.ltext,
+            "href_page": href,
+            "items": items,
+        })
+
+    # final ordering safeguard
+    result.sort(key=lambda x: x["order"])
+
+    return result
+    """
+    "textblocks": [
+      {
+        "block_id": "title",
+        "order": 1,
+        "items": [...]
+      },
+      {
+        "block_id": "content",
+        "order": 2,
+        "items": [...]
+      },
+      {
+        "block_id": "actbut",
+        "order": 3,
+        "items": [...]
+      }
+    ]
+    """
+
+
+# 4️⃣ Component Builders
+# HeroText
+def build_hero_text(ht):
+    ht = visible(ht)
+    if not ht:
+        return None
+
+    #textblocks = build_blocks(ht.comptextblocks.all())
+    textblocks = build_blocks(getattr(ht, "prefetched_ht_comptextblocks", []))    
+    
+    if not textblocks:
+        return None
+    
+    data = serialize_model(
+        ht,
+        exclude={"id", "content_type", "object_id", "hero"}
+    )
+
+    data["type_id"] = "text"
+    data["textblocks"] = textblocks
+
+    return data    
+    """
+    return {
+        "hidden": ht.hidden,
+        "type_id": "text",
+        "order": ht.order,
+        "ltext": ht.ltext,
+        "actions_class": ht.actions_class,
+        "actions_position": ht.actions_position_id,
+        "textblocks": textblocks,
+    }
+    """
+# HeroFigure
+def build_hero_figure(hf):
+    hf = visible(hf)
+    if not hf:
+        return None
+
+    data = serialize_model(
+        hf,
+        exclude={"id", "content_type", "object_id"}
+    )
+
+    data["type_id"] = "figure"
+
+    return data
+    """
+    return {
+        "hidden": hf.hidden,
+        "type_id": "figure",
+        "order": hf.order,
+        "ltext": hf.ltext,
+        "figure_class": hf.figure_class,
+        "position_id": hf.position_id,
+        "image_url": hf.image_url if hf.image_url else None,
+        "css_class": hf.css_class,
+        "alt": hf.alt,
+    }
+    """
+
+
+# HeroCardText
+def build_herocard_text(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+    
+    #textblocks = build_blocks(obj.comptextblocks.all())
+    textblocks = build_blocks(getattr(obj, "prefetched_hcht_comptextblocks", []))
+    if not textblocks:
+        return None
+    
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "herocard_id"}
+    )
+
+    data["type_id"] = "text"
+    data["textblocks"] = textblocks
+
+    return data
+
+    """
+    return {
+        "hidden": obj.hidden,
+        "type_id": "text",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "actions_class": obj.actions_class,
+        "actions_position": obj.actions_position_id,
+        "textblocks": build_blocks(obj.comptextblocks.all()),
+    }
+    """
+# HeroCardFigure
+def build_herocard_figure(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+  
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "herocard_id"}
+    )
+
+    data["type_id"] = "figure"
+
+    return data
+    """
+    return {
+        "hidden": obj.hidden,
+        "type_id": "figure",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "figure_class": obj.figure_class,
+        "position_id": obj.position_id,
+        "image_url": obj.image_url if obj.image_url else None,
+        "css_class": obj.css_class,
+        "alt": obj.alt,
+    }
+    """
+
+# HeroCard
+def build_herocard(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    contents = []
+
+    #figure = build_herocard_figure(lf_get_attr(obj, "herocardfigure"))
+    figure = build_herocard_figure(getattr(obj, "herocardfigure", None))
+    if figure:
+        contents.append(figure)
+
+    #text = build_herocard_text(lf_get_attr(obj, "herocardtext"))
+    text = build_herocard_text(getattr(obj, "herocardtext", None))
+    if text:
+        contents.append(text)
+    #SORT IS NOT RELEVANT IN CARD 
+    contents.sort(key=lambda x: x["order"])
+
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "hero_id"}
+    )
+
+    data["type_id"] = "herocard"
+    data["contents"] = contents
+
+
+    #if figure:
+    #    data["cardfigure"] = figure
+    #if text:
+    #    data["cardtext"] = text
+
+    return data
+    """
+    return {
+        "hidden": obj.hidden,
+        "type_id": "herocard",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "css_class": obj.css_class,
+        "contents": contents,
+    }
+    """
+
+# Hero
+def build_hero(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    contents = []
+
+    #figure = build_hero_figure(lf_get_attr(obj, "herofigure"))
+    figure = build_hero_figure(getattr(obj, "herofigure", None))
+    if figure:
+        contents.append(figure)
+
+    #text = build_hero_text(lf_get_attr(obj, "herotext"))
+    text = build_hero_text(getattr(obj, "herotext", None))
+    if text:
+        contents.append(text)
+
+    #herocard = build_herocard(lf_get_attr(obj, "herocard"))
+    herocard = build_herocard(getattr(obj, "herocard", None))
+    if herocard:
+        contents.append(herocard)
+
+    contents.sort(key=lambda x: x["order"])
+
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "layout_id"}
+    )
+
+    data["comp_id"] = "hero"
+    data["contents"] = contents
+
+    return data
+    """
+    return {
+        "css_class": obj.css_class,
+        "herocontent_class": obj.herocontent_class,
+        "overlay": obj.overlay,
+        "overlay_style": obj.overlay_style,
+        "herocontents": contents,
+        "comp_id": "hero",
+    }
+    """
+
+# CardFigure
+def build_card_figure(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "card_id"}
+    )
+
+    data["type_id"] = "figure"
+
+    return data
+    """
+    return {
+        "hidden": obj.hidden,
+        "type_id": "figure",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "figure_class": obj.figure_class,
+        "position_id": obj.position_id,
+        "image_url": obj.image_url if obj.image_url else None,
+        "css_class": obj.css_class,
+        "alt": obj.alt,
+    }
+    """
+
+# CardText
+def build_card_text(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+    #textblocks = build_blocks(obj.comptextblocks.all())
+    textblocks = build_blocks(getattr(obj, "prefetched_ct_comptextblocks", []))
+    if not textblocks:
+        return None
+    
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "card_id"}
+    )
+
+    data["type_id"] = "text"
+    data["textblocks"] = textblocks
+
+    return data
+    """
+    return {
+        "hidden": obj.hidden,
+        "type_id": "text",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "actions_class": obj.actions_class,
+        "actions_position": obj.actions_position_id,
+        "textblocks": build_blocks(obj.comptextblocks.all()),
+    }
+    """
+
+# Card
+def build_card(obj):
+    obj = visible(obj)
+    if not obj:
+        return None
+
+    contents = []
+
+    #figure = build_card_figure(lf_get_attr(obj, "cardfigure"))
+    figure = build_card_figure(getattr(obj, "cardfigure", None))
+    if figure:
+        contents.append(figure)
+
+    #text = build_card_text(lf_get_attr(obj, "cardtext"))
+    text = build_card_text(getattr(obj, "cardtext", None))
+    if text:
+        contents.append(text)
+
+    #SORT IS NOT RELEVANT IN CARD 
+    contents.sort(key=lambda x: x["order"])
+
+    data = serialize_model(
+        obj,
+        exclude={"id", "content_type", "object_id", "layout_id"}
+    )
+
+    data["comp_id"] = "card"
+    data["contents"] = contents
+    #if figure:
+    #    data["cardfigure"] = figure
+    #if text:
+    #    data["cardtext"] = text
+
+    return data
+    """
+    return {
+        "hidden": obj.hidden,
+        "comp_id": "card",
+        "order": obj.order,
+        "ltext": obj.ltext,
+        "css_class": obj.css_class,
+        "contents": contents,
+    }
+    """
+# 5️⃣ Layout Builder
+
+def build_layout(layout, layout_map):
+    layout = visible(layout)
+    if not layout:
+        return None
+
+    layout_data = {
+        "level": layout.level,
+        "slug": layout.slug,
+        "order": layout.order,
+        "css_class": layout.css_class,
+        "comp_id": layout.comp_id
+    }
+
+    component = None
+    
+    #hero_obj = getattr(layout, "prefetched_heros", None)
+    #card_obj = getattr(layout, "prefetched_cards", None)
+
+    if layout.comp_id == "hero":
+      #if isinstance(hero_obj, list):
+      #    hero_obj = hero_obj[0] if hero_obj else None
+      #component = build_hero(hero_obj)
+
+      #hero = get_prefetched(layout, "prefetched_heros")
+      hero = getattr(layout, "hero", None)
+      if hero:
+        component = build_hero(hero)    
+      #component = build_hero(get_prefetched(layout, "prefetched_heros"))
+      #hero_list = getattr(layout, "prefetched_heros", [])
+      #component = build_hero(hero_list)
+      #component = build_hero(lf_get_attr(layout, "hero"))
+
+    elif layout.comp_id == "card":
+      #if isinstance(card_obj, list):
+      #    card_obj = card_obj[0] if card_obj else None
+      #component = build_card(card_obj)
+
+      #card = get_prefetched(layout, "prefetched_cards")
+      card = getattr(layout, "card", None)
+      if card:
+        component = build_card(card)      
+      #component = build_card(get_prefetched(layout, "prefetched_cards"))
+      #card_list = getattr(layout, "prefetched_cards", [])
+      #component = build_card(card_list)  
+      #component = build_card(lf_get_attr(layout, "card"))
+
+    if component:
+        layout_data["component"] = component
+
+
+    # 🔥 Build children recursively
+    children = [
+        build_layout(child, layout_map)
+        for child in layout_map.get(layout.id, [])
+    ]
+
+    children = [c for c in children if c]
+
+    if children:
+        layout_data["children"] = children
+
+    return layout_data
+
+
+# 6️⃣ Page Builder
+
+def build_page(page):
+    page = visible(page)
+    if not page:
+        return None
+
+    #all_layouts = list(page.layouts.all())
+    all_layouts = list(getattr(page, "prefetched_layouts", []))
+    # 🔥 Build parent-child lookup
+    layout_map = {}
+    root_layouts = []
+
+    for layout in all_layouts:
+        if layout.parent_id:
+            layout_map.setdefault(layout.parent_id, []).append(layout)
+        else:
+            root_layouts.append(layout)
+
+    # 🔥 Build tree from roots
+    layouts = [
+        build_layout(layout, layout_map)
+        for layout in root_layouts
+    ]
+
+    layouts = [l for l in layouts if l]
+
+    return {
+        "page_id": page.page_id,
+        "order": page.order,
+        #"textblocks": build_blocks(page.gentextblocks.all()),
+        "textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
+        "layouts": layouts,
+    }
+
+# 6️⃣B Page tree for Navigation bar
+def build_page_tree(pages):
+    node_map = {}
+    roots = []
+    
+    # Step 1: create flat nodes
+    for page in pages:
+        page_vis = visible(page)
+        if not page_vis:
+            return None        
+
+        node_map[page.id] = {
+            "client_id": page.client.client_id,
+            "page_id": page.page_id,
+            "order": page.order,
+            #"textblocks": build_blocks(page.gentextblocks.all()),
+            "textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
+            "children": []
+        }
+
+    # Step 2: attach children
+    for page in pages:
+        page_vis = visible(page)
+        if not page_vis:
+            return None         
+
+        node = node_map[page.id]
+
+        if page.parent_id:
+            parent_node = node_map.get(page.parent_id)
+            if parent_node:
+                parent_node["children"].append(node)
+        else:
+            roots.append(node)
+
+    return roots
+
+# 7️⃣ FINAL: build_client_payload()
+def build_client_payload(client):
+
+    # Create a lookup dictionary
+
+    languages_qs = Language.objects.filter(
+        language_id__in=client.language_list
+    )
+
+
+    # Preserve client order
+    language_lookup = {l.language_id: l for l in languages_qs}
+    #theme_lookup = {t.theme_id: t for t in themes_qs}
+    lv_languages = [
+        {
+            "language_id": lang_id,
+            "labels": language_lookup[lang_id].label_obj 
+        }
+        for lang_id in client.language_list
+        if lang_id in language_lookup
+    ]
+
+    # To reconstruct the theme values
+    lv_themes = []
+
+    #all_layouts = list(page.layouts.all())
+    all_themes = list(getattr(client, "prefetched_themes", []))
+
+    #for theme in client.themes.all():
+    for theme in all_themes:
+
+      resolved_tokens = resolve_theme(theme)
+      lv_themes.append({
+          "theme_id": theme.theme_id,
+          "ltext": theme.ltext,
+          "is_default": theme.is_default,
+          #"textblocks": build_blocks(theme.gentextblocks.all()),
+          "textblocks": build_blocks(getattr(theme, "prefetched_gentextblocks", [])),
+          "tokens": resolved_tokens,  # fully resolved
+      })
+
+    all_pages = list(getattr(client, "prefetched_pages", []))
+    return {
+        "client_id": client.client_id,
+        "languages": lv_languages,
+        "themes": lv_themes,
+    
+        #"parent": client.parent.client_id if client.parent else None,
+
+        #"textblocks": build_blocks(client.gentextblocks.all()),
+        "textblocks": build_blocks(getattr(client, "prefetched_gentextblocks", [])),
+        "pages": [
+            build_page(page)
+            #for page in client.pages.all()
+            for page in all_pages
+        ],
+        "page_tree": build_page_tree(
+            [l for l in all_pages if not l.hidden]
+            #[l for l in client.pages.all() if not l.hidden]
+        ), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
+
+    }
+
+
+# temporarily marking use_cache = False. To be changed after debugging
+def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeout=3600):
+    """
+    Fetch clientstatic with optional caching.
+    Works when client_id as primary key.
+    """
+    
+    # Build cache key
+    cache_key = None
+    if use_cache and lv_client_id:
+        cache_key = f"clientstatic:{lv_client_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+    
+    # Build query
+    client_static = {}
+    # refactored to get all static data in one go and cache the sql call
+    #Step 4: Page + Client Query (The Entry Point)
+    if lv_client_id:
+        try:
+          #ContentType.objects.get_for_models(
+          #  Client,
+          #  Page,
+          #  HeroText,
+          #  HeroCardText,
+          #)
+          qs_client = (
+            Client.objects
+            #.select_related("parent")  # Add this if you access parent -- also modify build_client_payload
+            .prefetch_related(
+                gentextblock_prefetch,
+                Prefetch(
+                    "pages",
+                    queryset=Page.objects.select_related(
+                        "parent"
+                    ).prefetch_related(
+                        gentextblock_prefetch,
+                        layout_prefetch,
+                    ).order_by("order"),
+                    to_attr="prefetched_pages"
+                ),
+                Prefetch(
+                    "themes",
+                    queryset=Theme.objects
+                        .select_related("themepreset")  # IMPORTANT
+                        .prefetch_related(
+                            gentextblock_prefetch,
+                        )
+                        .order_by("order"),
+                        to_attr="prefetched_themes"
+                ) 
+            )
+            .get(client_id=lv_client_id)
+          )
+            # If we get here, the client exists
+          client_static = build_client_payload(qs_client)
+
+        except Client.DoesNotExist:
+          # If .get() fails, we land here. 
+          # client_static remains {} as initialized above.
+          pass 
+      
+  
+    # Cache it
+    if cache_key:
+        cache.set(cache_key, client_static, timeout=timeout)
+
+    
+    return client_static
+
+# some old codes
 
 # This is NOT USED a modified version and takes the key_name or the field on which the relationship is built.
 # But used in ZAPP - to evaluate ZAPP
@@ -58,113 +1001,7 @@ def xxxupdate_list_of_dictionaries(smaller_list, larger_list, key_field):
             smaller_dict.update(matching_larger_dict)
     return smaller_list
 
-# this is used extensively in build programs to serialize data.
-def serialize_model(instance, exclude=None):
-    exclude = set(exclude or [])
-    data = {}
-
-    for field in instance._meta.fields:
-        name = field.name
-        if name in exclude:
-            continue
-
-        value = getattr(instance, name)
-
-        if isinstance(field, ForeignKey):
-            data[name] = getattr(instance, f"{name}_id")
-        else:
-            data[name] = value or None
-
-    return data
-
-#Step 1: Universal Prefetch for TextContent Tree
-# Universal Text Block Tree
-stbitem_prefetch = Prefetch(
-    "textstbitems",
-    queryset=TextstbItem.objects.prefetch_related(
-        Prefetch(
-            "svgtextbadgevalue_set",
-            queryset=SvgtextbadgeValue.objects.select_related("language"),
-        )
-    ).order_by("order"),
-)
-
-comptextblock_prefetch = Prefetch(
-    "comptextblocks",
-    queryset=ComptextBlock.objects.prefetch_related(
-        stbitem_prefetch
-    ).order_by("order"),
-)
-
-gentextblock_prefetch = Prefetch(
-    "gentextblocks",
-    queryset=GentextBlock.objects.prefetch_related(
-        stbitem_prefetch
-    ).order_by("order"),
-)
-
-
-#Step 2: Component-Level Prefetch
-# Hero subtree
-
-hero_prefetch = Prefetch(
-    "hero",
-    queryset=Hero.objects.select_related(
-        "herotext",
-        "herofigure",
-        "herocard",
-        "herocard__herocardtext",
-        "herocard__herocardfigure"
-    ).prefetch_related(
-        Prefetch(
-            "herotext__comptextblocks",
-            queryset=comptextblock_prefetch.queryset,
-        ),
-        Prefetch(
-            "herocard__herocardtext__comptextblocks",
-            queryset=comptextblock_prefetch.queryset,
-        ),
-    ),
-)
-
-# Card subtree
-
-card_prefetch = Prefetch(
-    "card",
-    queryset=Card.objects.select_related(
-        "cardtext",
-        "cardfigure",
-    ).prefetch_related(
-        Prefetch(
-            "cardtext__comptextblocks",
-            queryset=comptextblock_prefetch.queryset,
-        )
-    ),
-)
-
-
-#Step 3: Layout Tree (Single Fetch, Ordered)
-layout_prefetch = Prefetch(
-    "layouts",
-    queryset=Layout.objects.select_related(
-        "parent",
-    ).prefetch_related(
-        hero_prefetch,
-        card_prefetch,
-    ).order_by("level", "order"),
-)
-
-
-def get_attr(obj, attr):
-    return getattr(obj, attr, None)
-
-def visible(obj):
-    return obj if obj and not getattr(obj, "hidden", False) else None
-
-
-
-# 1️⃣ Lowest Layer — SvgtextbadgeValue
-def build_values(item):
+def build_values_old_woattr(item):
     return {
         val.language.language_id: {
             "stext": val.stext,
@@ -173,8 +1010,7 @@ def build_values(item):
         for val in item.svgtextbadgevalue_set.all()
     }
 
-# 2️⃣ TextstbItem Builder
-def build_stb_item(item):
+def build_stb_item_old_wo_attr(item):
     if not visible(item):
         return None
 
@@ -197,9 +1033,8 @@ def build_stb_item(item):
 
     return data
 
-# 3️⃣ Generic Block Builder
 # (Works for both ComptextBlock and GentextBlock)
-def build_blocks_old(blocks_queryset):
+def zzbuild_blocks_old(blocks_queryset):
     result = {}
 
     for block in blocks_queryset:
@@ -231,7 +1066,7 @@ def build_blocks_old(blocks_queryset):
 
     return result
 
-def build_blocks(blocks_queryset):
+def build_blocks_oldwoattr(blocks_queryset):
 
     blocks = []
     #actbut_items = []
@@ -241,10 +1076,11 @@ def build_blocks(blocks_queryset):
 
         if not visible(block):
             continue
-
+        raw_items = getattr(block, "prefetched_stbitems", [])
         items = [
             build_stb_item(item)
-            for item in block.textstbitems.all()
+            for item in raw_items
+            # block.textstbitems.all()
         ]
         items = [i for i in items if i]
 
@@ -313,546 +1149,6 @@ def build_blocks(blocks_queryset):
       }
     ]
     """
-
-# 4️⃣ Component Builders
-# HeroText
-def build_hero_text(ht):
-    ht = visible(ht)
-    if not ht:
-        return None
-
-    textblocks = build_blocks(ht.comptextblocks.all())
-    if not textblocks:
-        return None
-    
-    data = serialize_model(
-        ht,
-        exclude={"id", "content_type", "object_id", "hero"}
-    )
-
-    data["type_id"] = "text"
-    data["textblocks"] = textblocks
-
-    return data    
-    """
-    return {
-        "hidden": ht.hidden,
-        "type_id": "text",
-        "order": ht.order,
-        "ltext": ht.ltext,
-        "actions_class": ht.actions_class,
-        "actions_position": ht.actions_position_id,
-        "textblocks": textblocks,
-    }
-    """
-# HeroFigure
-def build_hero_figure(hf):
-    hf = visible(hf)
-    if not hf:
-        return None
-
-    data = serialize_model(
-        hf,
-        exclude={"id", "content_type", "object_id"}
-    )
-
-    data["type_id"] = "figure"
-
-    return data
-    """
-    return {
-        "hidden": hf.hidden,
-        "type_id": "figure",
-        "order": hf.order,
-        "ltext": hf.ltext,
-        "figure_class": hf.figure_class,
-        "position_id": hf.position_id,
-        "image_url": hf.image_url if hf.image_url else None,
-        "css_class": hf.css_class,
-        "alt": hf.alt,
-    }
-    """
-
-
-# HeroCardText
-def build_herocard_text(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-    
-    textblocks = build_blocks(obj.comptextblocks.all())
-    if not textblocks:
-        return None
-    
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "herocard_id"}
-    )
-
-    data["type_id"] = "text"
-    data["textblocks"] = textblocks
-
-    return data
-
-    """
-    return {
-        "hidden": obj.hidden,
-        "type_id": "text",
-        "order": obj.order,
-        "ltext": obj.ltext,
-        "actions_class": obj.actions_class,
-        "actions_position": obj.actions_position_id,
-        "textblocks": build_blocks(obj.comptextblocks.all()),
-    }
-    """
-# HeroCardFigure
-def build_herocard_figure(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-  
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "herocard_id"}
-    )
-
-    data["type_id"] = "figure"
-
-    return data
-    """
-    return {
-        "hidden": obj.hidden,
-        "type_id": "figure",
-        "order": obj.order,
-        "ltext": obj.ltext,
-        "figure_class": obj.figure_class,
-        "position_id": obj.position_id,
-        "image_url": obj.image_url if obj.image_url else None,
-        "css_class": obj.css_class,
-        "alt": obj.alt,
-    }
-    """
-
-# HeroCard
-def build_herocard(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    contents = []
-
-    figure = build_herocard_figure(get_attr(obj, "herocardfigure"))
-    if figure:
-        contents.append(figure)
-
-    text = build_herocard_text(get_attr(obj, "herocardtext"))
-    if text:
-        contents.append(text)
-    #SORT IS NOT RELEVANT IN CARD 
-    contents.sort(key=lambda x: x["order"])
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "hero_id"}
-    )
-
-    data["type_id"] = "herocard"
-    data["contents"] = contents
-
-
-    #if figure:
-    #    data["cardfigure"] = figure
-    #if text:
-    #    data["cardtext"] = text
-
-    return data
-    """
-    return {
-        "hidden": obj.hidden,
-        "type_id": "herocard",
-        "order": obj.order,
-        "ltext": obj.ltext,
-        "css_class": obj.css_class,
-        "contents": contents,
-    }
-    """
-
-# Hero
-def build_hero(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    contents = []
-
-    figure = build_hero_figure(get_attr(obj, "herofigure"))
-    if figure:
-        contents.append(figure)
-
-    text = build_hero_text(get_attr(obj, "herotext"))
-    if text:
-        contents.append(text)
-
-    herocard = build_herocard(get_attr(obj, "herocard"))
-    if herocard:
-        contents.append(herocard)
-
-    contents.sort(key=lambda x: x["order"])
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "layout_id"}
-    )
-
-    data["comp_id"] = "hero"
-    data["contents"] = contents
-
-    return data
-    """
-    return {
-        "css_class": obj.css_class,
-        "herocontent_class": obj.herocontent_class,
-        "overlay": obj.overlay,
-        "overlay_style": obj.overlay_style,
-        "herocontents": contents,
-        "comp_id": "hero",
-    }
-    """
-
-# CardFigure
-def build_card_figure(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "card_id"}
-    )
-
-    data["type_id"] = "figure"
-
-    return data
-    """
-    return {
-        "hidden": obj.hidden,
-        "type_id": "figure",
-        "order": obj.order,
-        "ltext": obj.ltext,
-        "figure_class": obj.figure_class,
-        "position_id": obj.position_id,
-        "image_url": obj.image_url if obj.image_url else None,
-        "css_class": obj.css_class,
-        "alt": obj.alt,
-    }
-    """
-
-# CardText
-def build_card_text(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-    textblocks = build_blocks(obj.comptextblocks.all())
-    if not textblocks:
-        return None
-    
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "card_id"}
-    )
-
-    data["type_id"] = "text"
-    data["textblocks"] = textblocks
-
-    return data
-    """
-    return {
-        "hidden": obj.hidden,
-        "type_id": "text",
-        "order": obj.order,
-        "ltext": obj.ltext,
-        "actions_class": obj.actions_class,
-        "actions_position": obj.actions_position_id,
-        "textblocks": build_blocks(obj.comptextblocks.all()),
-    }
-    """
-
-# Card
-def build_card(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    contents = []
-
-    figure = build_card_figure(get_attr(obj, "cardfigure"))
-    if figure:
-        contents.append(figure)
-
-    text = build_card_text(get_attr(obj, "cardtext"))
-    if text:
-        contents.append(text)
-
-    #SORT IS NOT RELEVANT IN CARD 
-    contents.sort(key=lambda x: x["order"])
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "layout_id"}
-    )
-
-    data["comp_id"] = "card"
-    data["contents"] = contents
-    #if figure:
-    #    data["cardfigure"] = figure
-    #if text:
-    #    data["cardtext"] = text
-
-    return data
-    """
-    return {
-        "hidden": obj.hidden,
-        "comp_id": "card",
-        "order": obj.order,
-        "ltext": obj.ltext,
-        "css_class": obj.css_class,
-        "contents": contents,
-    }
-    """
-# 5️⃣ Layout Builder
-
-def build_layout(layout, layout_map):
-    layout = visible(layout)
-    if not layout:
-        return None
-
-    layout_data = {
-        "level": layout.level,
-        "slug": layout.slug,
-        "order": layout.order,
-        "css_class": layout.css_class,
-        "comp_id": layout.comp_id
-    }
-
-    component = None
-
-    if layout.comp_id == "hero":
-      component = build_hero(get_attr(layout, "hero"))
-
-    elif layout.comp_id == "card":
-        component = build_card(get_attr(layout, "card"))
-
-    if component:
-        layout_data["component"] = component
-
-    # 🔥 Build children recursively
-    children = [
-        build_layout(child, layout_map)
-        for child in layout_map.get(layout.id, [])
-    ]
-
-    children = [c for c in children if c]
-
-    if children:
-        layout_data["children"] = children
-
-    return layout_data
-
-
-# 6️⃣ Page Builder
-
-def build_page(page):
-    page = visible(page)
-    if not page:
-        return None
-
-    all_layouts = list(page.layouts.all())
-
-    # 🔥 Build parent-child lookup
-    layout_map = {}
-    root_layouts = []
-
-    for layout in all_layouts:
-        if layout.parent_id:
-            layout_map.setdefault(layout.parent_id, []).append(layout)
-        else:
-            root_layouts.append(layout)
-
-    # 🔥 Build tree from roots
-    layouts = [
-        build_layout(layout, layout_map)
-        for layout in root_layouts
-    ]
-
-    layouts = [l for l in layouts if l]
-
-    return {
-        "page_id": page.page_id,
-        "order": page.order,
-        "textblocks": build_blocks(page.gentextblocks.all()),
-        "layouts": layouts,
-    }
-
-# 6️⃣B Page tree for Navigation bar
-def build_page_tree(pages):
-    node_map = {}
-    roots = []
-    
-    # Step 1: create flat nodes
-    for page in pages:
-        page_vis = visible(page)
-        if not page_vis:
-            return None        
-
-        node_map[page.id] = {
-            "client_id": page.client.client_id,
-            "page_id": page.page_id,
-            "order": page.order,
-            "textblocks": build_blocks(page.gentextblocks.all()),
-            "children": []
-        }
-
-    # Step 2: attach children
-    for page in pages:
-        page_vis = visible(page)
-        if not page_vis:
-            return None         
-
-        node = node_map[page.id]
-
-        if page.parent_id:
-            parent_node = node_map.get(page.parent_id)
-            if parent_node:
-                parent_node["children"].append(node)
-        else:
-            roots.append(node)
-
-    return roots
-
-# 7️⃣ FINAL: build_client_payload()
-def build_client_payload(client):
-
-    # Create a lookup dictionary
-
-    languages_qs = Language.objects.filter(
-        language_id__in=client.language_list
-    )
-
-
-    # Preserve client order
-    language_lookup = {l.language_id: l for l in languages_qs}
-    #theme_lookup = {t.theme_id: t for t in themes_qs}
-    lv_languages = [
-        {
-            "language_id": lang_id,
-            "labels": language_lookup[lang_id].label_obj 
-        }
-        for lang_id in client.language_list
-        if lang_id in language_lookup
-    ]
-
-    # To reconstruct the theme values
-    lv_themes = []
-
-    for theme in client.themes.all():
-      resolved_tokens = resolve_theme(theme)
-      lv_themes.append({
-          "theme_id": theme.theme_id,
-          "ltext": theme.ltext,
-          "is_default": theme.is_default,
-          "textblocks": build_blocks(theme.gentextblocks.all()),
-          "tokens": resolved_tokens,  # fully resolved
-      })
-
-    return {
-        "client_id": client.client_id,
-        "languages": lv_languages,
-        "themes": lv_themes,
-    
-        #"parent": client.parent.client_id if client.parent else None,
-
-        "textblocks": build_blocks(client.gentextblocks.all()),
-
-        "pages": [
-            build_page(page)
-            for page in client.pages.all()
-        ],
-        "page_tree": build_page_tree(
-            [l for l in client.pages.all() if not l.hidden]
-        ), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
-
-    }
-
-
-# temporarily marking use_cache = False. To be changed after debugging
-def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeout=3600):
-    """
-    Fetch clientstatic with optional caching.
-    Works when client_id as primary key.
-    """
-    
-    # Build cache key
-    cache_key = None
-    if use_cache and lv_client_id:
-        cache_key = f"clientstatic:{lv_client_id}"
-        cached_data = cache.get(cache_key)
-        if cached_data is not None:
-            return cached_data
-    
-    # Build query
-    client_static = {}
-    # refactored to get all static data in one go and cache the sql call
-    #Step 4: Page + Client Query (The Entry Point)
-    if lv_client_id:
-        try:
-          #ContentType.objects.get_for_models(
-          #  Client,
-          #  Page,
-          #  HeroText,
-          #  HeroCardText,
-          #)
-          qs_client = (
-            Client.objects
-            #.select_related("parent")  # Add this if you access parent -- also modify build_client_payload
-            .prefetch_related(
-                gentextblock_prefetch,
-                Prefetch(
-                    "pages",
-                    queryset=Page.objects.select_related(
-                        "parent"
-                    ).prefetch_related(
-                        gentextblock_prefetch,
-                        layout_prefetch,
-                    ).order_by("order"),
-                ),
-                Prefetch(
-                    "themes",
-                    queryset=Theme.objects
-                        .select_related("themepreset")  # IMPORTANT
-                        .prefetch_related(
-                            gentextblock_prefetch,
-                        )
-                        .order_by("order"),
-                ) 
-            )
-            .get(client_id=lv_client_id)
-          )
-            # If we get here, the client exists
-          client_static = build_client_payload(qs_client)
-
-        except Client.DoesNotExist:
-          # If .get() fails, we land here. 
-          # client_static remains {} as initialized above.
-          pass 
-      
-  
-    # Cache it
-    if cache_key:
-        cache.set(cache_key, client_static, timeout=timeout)
-
-    
-    return client_static
-
 """
 For using clienttheme as the source css instead of standard daisy, steps are:
 1. Model ThemePreset to have base values like light, dark (default values)

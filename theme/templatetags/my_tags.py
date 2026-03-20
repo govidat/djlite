@@ -319,13 +319,13 @@ def mytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_po
     lv0_dict = lv0_filtered_list[lv_position0]  # {block_id: name... items:[]}
     return lv0_dict
     """
-    try:
-        return next(
-            item for idx, item in enumerate(lv_list or [])
-            if item.get(lv_key0) == lv_val0 and idx == lv_position0
-        )
-    except StopIteration:
-        return {}
+    filtered = [
+        item for item in (lv_list or [])
+        if item.get(lv_key0) == lv_val0
+    ]
+
+    return filtered[lv_position0] if lv_position0 < len(filtered) else {}
+
 
 
 # deprecated
@@ -474,6 +474,39 @@ def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
     CURRENT_LANGUAGE_CODE
 
     """    
+
+    if not lv_dict:
+        return "ERR001"
+
+    base_ln = context.get("LANGUAGE_CODE")
+    curr_ln = get_language()
+
+    # Build priority list
+    lang_priority = []
+
+    if lv_ln:
+        lang_priority.append(lv_ln)
+
+    if curr_ln and curr_ln not in lang_priority:
+        lang_priority.append(curr_ln)
+
+    if base_ln and base_ln not in lang_priority:
+        lang_priority.append(base_ln)
+
+    # Lookup
+    for lang in lang_priority:
+        value = (
+            lv_dict.get(lang, {})
+                   .get(lv_key)
+        )
+        if value:
+            return value
+
+    return "ERR001"
+    """
+    if not lv_dict:
+        return "ERR001"
+    
     cv_base_ln_code = context.get("LANGUAGE_CODE")
     cv_curr_ln_code = get_language()
 
@@ -487,20 +520,8 @@ def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
             cv_ln_hier_list.remove(lv_ln) # Removes the first occurrence by value
         cv_ln_hier_list.insert(0, lv_ln) # Inserts the item at index 0 (the beginning)
 
-    """
-    Attempts to retrieve a value from a nested dictionary 
-    using predefined paths in order of preference.
-    
-    # If none of the paths are found
-    return None
-    """
 
     # Get the dictionary for the specific token
-    """
-    Option 1
-    lv_values_dict = lv_text_list[0]["items"][0]["values"]
-    Option
-    """
     lv_values_dict = lv_dict
          
 
@@ -508,11 +529,10 @@ def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
     for language_id in cv_ln_hier_list:
         if language_id in lv_values_dict:
             return lv_values_dict[language_id][lv_key]
-                                
-
-                            
+                                                           
     # If no value was found after checking all priorities
     return 'ERR001'
+    """
 
 @register.simple_tag(takes_context=True)
 def mytext_labelv2(context, lv_dict={}):
