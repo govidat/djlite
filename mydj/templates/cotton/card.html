@@ -5,7 +5,7 @@
                         "css_class": "bg-base-100 w-96 shadow-sm",
                         "body_class": "None",
                         "comp_id": "card",
-                        "contents": [
+                        "slots": [
                           {
                             "card": 2,
                             "ltext": "None",
@@ -115,12 +115,11 @@
                       }
 {% endcomment %}
 
-{% if card %}
+{% if component %}
 
-    <div class="card bg-base-100 w-96 shadow-sm {{ card.css_class|default:"" }}">
-      {% for content in card.contents %}
-        {% comment %}{% endcomment %}
-        <c-compcontent :content="content"></c-compcontent>                         
+    <div class="card bg-base-100 w-96 shadow-sm {{ component.css_class|default:"" }}">
+      {% for compslot in component.slots %}
+        <c-compcontent :compslot="compslot"></c-compcontent>                         
       {% endfor %}
     </div>
         

@@ -5,6 +5,7 @@ import json
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.fields import GenericRelation
+from html.parser import HTMLParser
 
 # Create your models here
 """
@@ -16,18 +17,21 @@ Client
         ├── GentextBlock    
         ├── Layout @level 40
             ├── Hero
-            │         ├── HeroText   (only if type=text)
-            │             └── ComptextBlock
-            │         ├── HeroFigure (only if type=figure)
-            │         └── HeroCard
-            │              ├── HeroCardFigure
-            │              └── HeroCardText
-            │                 └── ComptextBlock
+            │         ├── HeroText   (onetoone)
+            │             └── ComptextBlock (GenericRelation)
+            │         ├── HeroFigure (onetoone)
+            │         └── HeroCard (onetoone)
+            │              ├── HeroCardFigure (onetoone)
+            │              └── HeroCardText (onetoone)
+            │                 └── ComptextBlock (GenericRelation)
             │
             └── Card
-                ├── CardFigure
-                └── CardText
-                        └── ComptextBlock 
+                ├── CardFigure (onetoone)
+                └── CardText (onetoone)
+                        └── ComptextBlock (GenericRelation)
+            └── Accordion
+                └── AccordionText (foreignkey)
+                        └── ComptextBlock  (GenericRelation)                       
     ├── Themes
         ├── themepreset
         └── gentextblocks                        
@@ -35,7 +39,6 @@ Client
 GentextBlock (content_type) (name / nb_title / nb_logo) # used in Client, Page
 └──TextstbItem (content_type) (text / svg / badge)
     └── SvgtextbadgeValue (per language)
-
                       
 ComptextBlock (content_type) (title / content / actbut)  # used in HeroText, CardText, HeroCardText
 └──TextstbItem (content_type) (text / svg / badge)
@@ -46,6 +49,36 @@ TextstbItem (content_type) (text / svg / badge)
 └── SvgtextbadgeValue (per language)
                       
 """
+class HTMLTagDetector(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.found_tags = False
+
+    def handle_starttag(self, tag, attrs):
+        self.found_tags = True
+
+    def handle_endtag(self, tag):
+        self.found_tags = True
+
+
+def no_html_tags(value):
+    if not value:
+        return
+    detector = HTMLTagDetector()
+    detector.feed(value)
+    if detector.found_tags:
+        raise ValidationError("HTML tags are not allowed.")
+
+
+def no_double_quotes(value):
+    if value and '"' in value:
+        raise ValidationError('Double quotes (") are not allowed. Use &quot; instead.')
+
+
+# Combine both into one validator list for convenience
+text_field_validators = [no_html_tags, no_double_quotes]
+
+    
 class LowercaseCharField(models.CharField):
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
@@ -68,7 +101,7 @@ class Language(models.Model):
 
 class ThemePreset(models.Model):
     themepreset_id = LowercaseCharField(max_length=25, unique=True, db_index=True)
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
 
     # === COLORS ===
     primary = models.CharField(max_length=20)
@@ -136,7 +169,7 @@ class TextstbItem(models.Model):
         ("badge", "Badge"),
     )    
     item_id = models.CharField(max_length=20, choices=STB_ITEM_TYPES, blank=False, null=False) 
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     hidden = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=1)
     css_class = models.CharField(max_length=255, blank=True, null=True)
@@ -161,8 +194,8 @@ class TextstbItem(models.Model):
 class SvgtextbadgeValue(models.Model):
     textstbitem = models.ForeignKey(TextstbItem, on_delete=models.CASCADE)
     language = models.ForeignKey(Language, on_delete=models.CASCADE)    
-    stext = models.CharField(max_length=255, null=True, blank=True)
-    ltext = models.TextField(null=True, blank=True)
+    stext = models.CharField(max_length=255, null=True, blank=True, validators=text_field_validators)
+    ltext = models.TextField(null=True, blank=True, validators=text_field_validators)
     def __str__(self):
         return f"{self.stext} / ({self.ltext})"
     class Meta:
@@ -182,10 +215,10 @@ class ComptextBlock(models.Model):
         ("actbut", "ActionButtons"),
     )    
     block_id = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     hidden = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=1)  # same block_id can be repeated
-    css_class = models.CharField(max_length=255, blank=True, null=True)
+    css_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
     textstbitems = GenericRelation(TextstbItem)
     # ideally this should be a dropdown of page of this client, but have kept it as a simple text for the timebeing. This value is passed as <a link in the Button component
     href_page=models.CharField(max_length=25, blank=True, null=True)
@@ -211,10 +244,10 @@ class GentextBlock(models.Model):
         ("nb_subtitle", "Navbar SubTitle"),
     )    
     block_id = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     hidden = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=1)  # same block_id can be repeated
-    css_class = models.CharField(max_length=255, blank=True, null=True)
+    css_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
     textstbitems = GenericRelation(TextstbItem)
     class Meta:
         unique_together = ("content_type", "object_id", "block_id", "order")
@@ -270,7 +303,7 @@ class Theme(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='themes')    
     theme_id = LowercaseCharField(max_length=10)  
     themepreset = models.ForeignKey(ThemePreset, on_delete=models.SET_NULL, null=True)
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     order = models.PositiveIntegerField(default=0)
     hidden = models.BooleanField(default=False)
     # Add this to allow: client_instance.translations.all()
@@ -291,7 +324,7 @@ class Theme(models.Model):
             models.Index(fields=["client", "order"]),
         ]
 
-
+"""
 class Page(models.Model):
     #id = LowercaseCharField(max_length=20, primary_key=True)
     client = models.ForeignKey(
@@ -300,7 +333,7 @@ class Page(models.Model):
         related_name='pages'
         )    
     page_id = LowercaseCharField(max_length=10)  
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     order = models.PositiveIntegerField(default=0)
     parent = models.ForeignKey("self", null=True, blank=True, related_name="children",
         on_delete=models.CASCADE
@@ -346,8 +379,8 @@ class Layout(models.Model):
     )
     level = models.PositiveSmallIntegerField(choices=LEVEL_CHOICES)
 
-    css_class = models.CharField(max_length=255, blank=True)
-    style = models.CharField(max_length=255, blank=True)
+    css_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+    style = models.CharField(max_length=255, blank=True, validators=text_field_validators)
     hidden = models.BooleanField(default=False)
 
     slug = models.SlugField()  # for bulk upload / human reference
@@ -386,10 +419,10 @@ class Hero(models.Model):
         on_delete=models.CASCADE,
         related_name="hero"
     )
-    css_class = models.CharField(max_length=255, blank=True)
-    herocontent_class = models.CharField(max_length=255, blank=True)
+    css_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+    herocontent_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
     overlay = models.BooleanField(default=False)
-    overlay_style = models.CharField(max_length=255, blank=True)
+    overlay_style = models.CharField(max_length=255, blank=True, validators=text_field_validators)
 
     class Meta:
         verbose_name = "01-05a Hero"
@@ -399,7 +432,7 @@ class HeroText(models.Model):
     order = models.PositiveIntegerField()
     hidden = models.BooleanField(default=False)
     type_id = models.CharField(max_length=10, default="text")
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     actions_class = models.CharField(max_length=255, blank=True, null=True)        
     POSITION_TYPES = (
         ("start", "Start"),
@@ -419,7 +452,7 @@ class HeroFigure(models.Model):
     order = models.PositiveIntegerField()
     hidden = models.BooleanField(default=False)
     type_id = models.CharField(max_length=10, default="figure")
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     figure_class = models.CharField(max_length=255, blank=True, null=True)
 
     POSITION_TYPES = (
@@ -430,7 +463,7 @@ class HeroFigure(models.Model):
 
     image_url = models.URLField(max_length=500)
     alt = models.CharField(max_length=100, null=False, default="Default")
-    css_class = models.CharField(max_length=255, blank=True, null=True)
+    css_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
     class Meta:
         verbose_name = "01-05a2 HeroFigure"  
         unique_together = ("hero", "type_id")
@@ -441,16 +474,16 @@ class HeroCard(models.Model):
     hidden = models.BooleanField(default=False)
     type_id = models.CharField(max_length=10, default="card")
 
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # e.g., "Country"
-    css_class = models.CharField(max_length=255, blank=True, null=True)
-    body_class = models.CharField(max_length=255, blank=True, null=True)
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # e.g., "Country"
+    css_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
+    body_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
     class Meta:
         verbose_name = "01-05a3 HeroCard"  
         unique_together = ("hero", "type_id")
 
 class HeroCardText(models.Model):
     herocard = models.OneToOneField(HeroCard, on_delete=models.CASCADE, related_name="herocardtext")
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     order = models.PositiveIntegerField(default=1)
     hidden = models.BooleanField(default=False)
     actions_class = models.CharField(max_length=255, blank=True, null=True)        
@@ -467,7 +500,7 @@ class HeroCardText(models.Model):
 
 class HeroCardFigure(models.Model):
     herocard = models.OneToOneField(HeroCard, on_delete=models.CASCADE, related_name="herocardfigure")
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     order = models.PositiveIntegerField(default=1) # position is redundant. order decindes the sequence
     figure_class = models.CharField(max_length=255, blank=True, null=True)
     hidden = models.BooleanField(default=False)
@@ -485,17 +518,17 @@ class HeroCardFigure(models.Model):
 
 class Card(models.Model):
     layout = models.OneToOneField(Layout, on_delete=models.CASCADE, related_name="card")
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # e.g., "Country"
-    css_class = models.CharField(max_length=255, blank=True, null=True)
-    body_class = models.CharField(max_length=255, blank=True, null=True)
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # e.g., "Country"
+    css_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
+    body_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
     class Meta:
         verbose_name = "01-05b Card" 
 
 class CardFigure(models.Model):
     card = models.OneToOneField(Card, on_delete=models.CASCADE, related_name="cardfigure")
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     order = models.PositiveIntegerField(default=1) # position is redundant. order decindes the sequence
-    figure_class = models.CharField(max_length=255, blank=True, null=True)
+    figure_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
     hidden = models.BooleanField(default=False)
     POSITION_TYPES = (
         ("start", "Start"),
@@ -504,12 +537,12 @@ class CardFigure(models.Model):
     position_id = models.CharField(max_length=20, choices=POSITION_TYPES, blank=True, null=True)
     image_url = models.URLField(max_length=500)
     alt = models.CharField(max_length=100, null=False, default="Default")
-    css_class = models.CharField(max_length=255, blank=True, null=True)  
+    css_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)  
 
 
 class CardText(models.Model):
     card = models.OneToOneField(Card, on_delete=models.CASCADE, related_name="cardtext" )
-    ltext = models.CharField(max_length=50, blank=True, null=True)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
     hidden = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=1)
     actions_class = models.CharField(max_length=255, blank=True, null=True)        
@@ -521,7 +554,228 @@ class CardText(models.Model):
     #textcontents = GenericRelation(TextContent)
     comptextblocks = GenericRelation(ComptextBlock)
 
+
+class Accordion(models.Model):
+    layout = models.OneToOneField(Layout, on_delete=models.CASCADE, related_name="accordion")
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # e.g., "Country"
+    css_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
+    type = models.CharField(max_length=25, default="radio") # defaulted
+    name = models.CharField(max_length=25, default="myaccordion_01") # deaulted
+    #body_class = models.CharField(max_length=255, blank=True, null=True)
+    class Meta:
+        verbose_name = "01-05c Accordion" 
+        unique_together = ("layout", "name")  # to ensure proper opening closing of accordions
    
+class AccordionText(models.Model):
+    # different from cardtext one accordion will have multiple accordiontext
+    accordion = models.ForeignKey(Accordion, on_delete=models.CASCADE, related_name="accordiontext" )
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
+    hidden = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(default=1)
+    checked = models.BooleanField(default=False) # if true then the accordion is kept open
+    #actions_class = models.CharField(max_length=255, blank=True, null=True)        
+    #POSITION_TYPES = (
+    #    ("start", "Start"),
+    #    ("end", "End"),
+    #)    # this is redundant. ordering of comptextblocks defines the location of actions
+    #actions_position_id = models.CharField(max_length=20, choices=POSITION_TYPES, blank=True, null=True)
+    #textcontents = GenericRelation(TextContent)
+    comptextblocks = GenericRelation(ComptextBlock)
 
 
 # TBD Accordion and Carousal...
+"""
+#Common component structrue:
+"""
+Client
+    ├── GentextBlock    
+    ├── Page
+        ├── GentextBlock    
+        ├── Layout @level 40
+            ├── Component (onetoone at level=40, compl0_id = hero, card, accordion etc... + some fields at this level)
+                     ├── ComponentSlot (foreign key compl1_id= figure, text + some fields that may be applicable for each of this)
+                         └── ComptextBlock (only for compll1_id = text GenericRelation)
+
+    ├── Themes
+        ├── themepreset
+        └── gentextblocks                        
+           
+GentextBlock (content_type) (name / nb_title / nb_logo) # used in Client, Page
+└──TextstbItem (content_type) (text / svg / badge)
+    └── SvgtextbadgeValue (per language)
+                      
+ComptextBlock (content_type) (title / content / actbut)  # used in HeroText, CardText, HeroCardText
+└──TextstbItem (content_type) (text / svg / badge)
+    └── SvgtextbadgeValue (per language)
+           
+           
+TextstbItem (content_type) (text / svg / badge)
+└── SvgtextbadgeValue (per language)
+"""
+
+class Page3(models.Model):
+    #id = LowercaseCharField(max_length=20, primary_key=True)
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='pages3'
+        )    
+    page_id = LowercaseCharField(max_length=10)  
+    ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
+    order = models.PositiveIntegerField(default=0)
+    parent = models.ForeignKey("self", null=True, blank=True, related_name="children",
+        on_delete=models.CASCADE
+    )
+    hidden = models.BooleanField(default=False)  
+    gentextblocks = GenericRelation(GentextBlock)
+
+    def __str__(self):
+        return f"{self.client.client_id} / {self.page_id}"
+      
+    # for usage in Admin Panel
+    class Meta:
+        unique_together = ("client", "page_id")
+        ordering = ["client", "order"]
+        indexes = [
+            models.Index(fields=["client", "order"]),
+        ]
+        verbose_name = "01-02 Page"
+
+class Layout3(models.Model):
+    # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
+    # client is kept, so that layout can be a separate admin tab. in that we are braching to component type admin.
+    #client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page3, on_delete=models.CASCADE, related_name='layouts3')
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE
+    )
+
+    order = models.PositiveIntegerField(default=1)
+
+    LEVEL_CHOICES = (
+        (10, "Section"),
+        (20, "Row"),
+        (30, "Col"),
+        (40, "Cell"),
+    )
+    level = models.PositiveSmallIntegerField(choices=LEVEL_CHOICES)
+
+    css_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+    style = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+    hidden = models.BooleanField(default=False)
+
+    slug = models.SlugField()  # for bulk upload / human reference
+    #COMPONENT_TYPES = (
+    #    ("hero", "Comp Hero"),
+    #    ("card", "Comp Card"),
+    #    ("accordion", "Comp Accordion"),
+    #    ("carousel", "Comp Carousel"),
+    #)
+    #comp_id = models.CharField(max_length=30, choices=COMPONENT_TYPES, blank=True, null=True )
+    class Meta:
+        ordering = ("page", "level", "order")
+        unique_together = ("page", "level", "slug")
+        verbose_name = "01-03 Layout"
+
+    def clean(self):
+        #if self.level != 40 and self.comp_id:
+        #    raise ValidationError("Component has to be at Level = 40")
+        
+        if self.level != 10 and not self.parent:
+            raise ValidationError("Non-root layouts must have a parent")
+
+        if self.parent and self.parent.level != self.level - 10:
+            raise ValidationError("Invalid parent level")
+
+        #if self.client.client_id != self.page.client.client_id:
+        #    raise ValidationError("Page and Layout Clients need to be same !")
+
+    def __str__(self):
+        return f"{self.page.client.client_id} / {self.page.page_id} / {self.level} / {self.slug}"
+
+
+class Component(models.Model):
+    """L0 — one per Layout cell (level=40)"""
+    layout = models.OneToOneField(
+        Layout3,
+        on_delete=models.CASCADE,
+        related_name="component"
+    )
+
+    COMP_TYPES = (
+        ("hero",      "Hero"),
+        ("card",      "Card"),
+        ("accordion", "Accordion"),
+        ("carousel",  "Carousel"),
+    )
+    comp_id       = models.CharField(max_length=30, choices=COMP_TYPES)
+    ltext         = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)
+    css_class     = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
+    card_body_class     = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)    # card    
+    hero_content_class     = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)    # hero
+    hero_overlay       = models.BooleanField(default=False)          # hero
+    hero_overlay_style = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)  # hero
+    accordion_type = models.CharField(max_length=25, blank=True, null=True)   # accordion
+    accordion_name = models.CharField(max_length=25, blank=True, null=True)   # accordion
+    config        = models.JSONField(default=dict, blank=True)
+    hidden        = models.BooleanField(default=False)
+    order         = models.PositiveIntegerField(default=1)  # This is not relevant and can be removed. As at cell lelvel there will be only one component
+
+    def __str__(self):
+        return f"{self.layout} / {self.comp_id}"
+
+    class Meta:
+        verbose_name = "01-04 Component L0"
+
+
+class ComponentSlot(models.Model):
+    """L1 — multiple slots per Component (figure or text)"""
+    component = models.ForeignKey(
+        Component,
+        on_delete=models.CASCADE,
+        related_name="slots"
+    )
+
+    SLOT_TYPES = (
+        ("figure", "Figure"),
+        ("text",   "Text"),
+    )
+    slot_type   = models.CharField(max_length=20, choices=SLOT_TYPES)
+    order       = models.PositiveIntegerField(default=1)
+    hidden      = models.BooleanField(default=False)
+    ltext       = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)
+    css_class   = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
+
+    # Figure fields
+    image_url   = models.URLField(max_length=500, blank=True, null=True)
+    alt         = models.CharField(max_length=100, blank=True, null=True)
+    figure_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
+
+    # Hero/Card slot specific
+    actions_class = models.CharField(max_length=255, blank=True, null=True, validators=text_field_validators)
+
+    # Accordion slot specific
+    accordion_checked     = models.BooleanField(default=False)
+
+    # Text slot — ComptextBlocks via GenericRelation
+    comptextblocks = GenericRelation(ComptextBlock)
+
+    def clean(self):
+        if self.slot_type == 'figure' and not self.image_url:
+            raise ValidationError("Figure slot requires an image_url.")
+
+    def __str__(self):
+        return f"{self.component} / {self.slot_type} / {self.order}"
+
+    class Meta:
+        ordering = ["component", "order"]
+        unique_together = ("component", "slot_type", "order")
+        verbose_name = "01-05 Component L1 Slot"
+
+"""
+
+"""

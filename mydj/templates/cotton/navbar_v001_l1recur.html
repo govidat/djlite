@@ -9,7 +9,7 @@
     {% mytext_gen item.textblocks 'name' as result_var %}
     {% with lv_name=result_var %}  
     {% endcomment %}
-    {% mytext_l0dict item.textblocks 'name' as result_var %}
+    {% mylist_bykey item.textblocks 'name' 'block_id' as result_var %}
     
         {% if item.children %}  <!-- if the children length > 0 -->
             <li>                
@@ -18,7 +18,7 @@
                         {% comment %}
                         {{lv_name}}
                         {% endcomment %}
-                        <c-svgtextbadge :items="result_var.items"></c-svgtextbadge>
+                        <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
                     </summary>                   
                     <ul class="p-2">
                         <c-navbar_v001_l1recur :items="item.children"></c-navbar_v001_l1recur>
@@ -33,7 +33,7 @@
                     {% comment %}
                     {{lv_name}}
                     {% endcomment %}
-                    <c-svgtextbadge :items="result_var.items"></c-svgtextbadge>
+                    <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
                 </a>
             </li>
         {% endif %}

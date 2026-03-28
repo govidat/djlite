@@ -88,9 +88,8 @@
           {% comment %}
           def mytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_position0=0)
           {% endcomment %}
-          {% mytext_l0dict t.textblocks 'name' as result_var %}
-           
-          <c-svgtextbadge :items="result_var.items"></c-svgtextbadge>
+          {% mylist_bykey t.textblocks 'name' 'block_id' as result_var %}
+          <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
         </button>
       </li>
       {% endfor %}

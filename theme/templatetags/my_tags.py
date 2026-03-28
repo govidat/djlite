@@ -1,5 +1,8 @@
 from django import template
+import html
 from django.utils.translation import get_language
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -219,7 +222,118 @@ def xxxmysvg_static_tag(context, lv_token_id=''):
 
 # this is to be used for getting the gentext like name, nb_title for further passing to svgtextbadge
 @register.simple_tag(takes_context=True)
-def mytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_position0=0):
+def mylist_bykey(context, lv_list=[], lv_val0="name", lv_key0="block_id"):
+     
+    """ 
+    Input:
+      "textblocks": [
+            {
+            "block_id": "name",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira",
+                    "ltext": "ltBahushira"
+                    },
+                    "fr": {
+                    "stext": "frBahushira",
+                    "ltext": "ltfrBahushira"
+                    },
+                    "hi": {
+                    "stext": "hiBahushira",
+                    "ltext": "lthiBahushira"
+                    }
+                }
+                }
+            ]
+            },
+            {
+            "block_id": "nb_title",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira Nav Bar",
+                    "ltext": ""
+                    },
+                    "fr": {
+                    "stext": "frBahushira Nav Bar",
+                    "ltext": ""
+                    },
+                    "hi": {
+                    "stext": "hiBahushira Nav Bar",
+                    "ltext": ""
+                    }
+                }
+                }
+            ]
+            }
+        ],
+
+        Output expected is:
+        [   
+            {
+            "block_id": "name",
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "href_page": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira",
+                    "ltext": "ltBahushira"
+                    },
+                    "fr": {
+                    "stext": "frBahushira",
+                    "ltext": "ltfrBahushira"
+                    },
+                    "hi": {
+                    "stext": "hiBahushira",
+                    "ltext": "lthiBahushira"
+                    }
+                }
+                }
+            ]
+            }...
+        ]
+
+    """    
+    """
+    # Get the filtered list
+    lv0_filtered_list = [item for item in lv_list if item.get(lv_key0) == lv_val0]
+    
+    """
+    filtered = [
+        item for item in (lv_list or [])
+        if item.get(lv_key0) == lv_val0
+    ]
+
+    return filtered
+
+
+# this is to be used for getting the gentext like name, nb_title for further passing to svgtextbadge
+@register.simple_tag(takes_context=True)
+def xxxmytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_position0=0):
      
     """ 
     Input:
@@ -493,6 +607,28 @@ def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
     if base_ln and base_ln not in lang_priority:
         lang_priority.append(base_ln)
 
+    # Build key priority based on user choice
+    if lv_key == 'ltext':
+        key_priority = ['ltext', 'stext']
+    else:
+        # default: stext first, ltext as fallback
+        key_priority = ['stext', 'ltext']
+
+    # Lookup
+    for lang in lang_priority:
+        lang_data = lv_dict.get(lang, {})
+        for key in key_priority:
+            value = lang_data.get(key)
+            if value:
+                # Step 1: unescape stored entities like &quot; → "
+                unescaped = html.unescape(value)
+                # Step 2: re-escape any real HTML tags for safety
+                safe_value = conditional_escape(unescaped)
+                # Step 3: mark safe so Django doesn't double-escape
+                return mark_safe(safe_value)
+
+                #return value
+    """        
     # Lookup
     for lang in lang_priority:
         value = (
@@ -501,6 +637,7 @@ def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
         )
         if value:
             return value
+    """
 
     return "ERR001"
     """

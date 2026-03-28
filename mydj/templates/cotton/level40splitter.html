@@ -59,13 +59,13 @@ input type is :
     "comp_id": "hero"
 }
 {% endcomment %}
-
+    
     {% if component.comp_id == "card" %}  
-        <c-card :card="component"></c-card>                               
+        <c-card :component="component"></c-card>                               
     {% elif component.comp_id == "hero" %} 
-        <c-hero :hero="component"></c-hero>
+        <c-hero :component="component"></c-hero>
     {% elif component.comp_id == "accordion" %} 
-        <c-accordion :accordion="component"></c-accordion>
+        <c-accordion :component="component"></c-accordion>
     {% elif component.comp_id == "carousal" %} 
         <c-carousal :carousal="component"></c-carousal>
     {% endif %}

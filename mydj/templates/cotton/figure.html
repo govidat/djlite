@@ -1,14 +1,16 @@
 
-<figure class={{ figure.figure_class|default:"" }}>
-    {% if figure.image_url %}
-        <img
-            class={{figure.css_class}}
-            src={{figure.image_url}}
-            alt={{figure.alt}} />              
-    {% endif %}              
+<figure class="{{ compslot.figure_class|default:'' }}">
+    {% if compslot.image_url %}
+    <img
+        class="{{ compslot.css_class|default:'' }}"
+        src="{{ compslot.image_url|default:'' }}"
+        alt="{{ compslot.alt|default:'' }}" />
+    {% endif %}
 </figure>
 
+
 {% comment %}
+
 Input is like:
     {
       "hero": 1,

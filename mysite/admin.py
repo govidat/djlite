@@ -7,8 +7,12 @@ from .forms import ClientForm
 
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 
-from .models import Language, ThemePreset, Client, Page, Theme, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, Card, Hero, Layout, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
-# TextItemValue, TextBlockItem, TextBlock, TextContent,
+from .models import Language, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
+
+#from .models import Page, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, AccordionText, Card, Hero, Accordion, Layout
+
+# Option 3 Common Component Model
+from .models import Page3, Layout3, Component, ComponentSlot
 
 # VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
 class LanguageAdmin(admin.ModelAdmin):
@@ -49,6 +53,7 @@ class GentextBlockInline(nested_admin.NestedGenericTabularInline):
     inlines = [TextstbItemInline]
     classes = ['collapse']
 
+"""
 class HeroCardTextInline(nested_admin.NestedStackedInline):
     model = HeroCardText
     extra = 0
@@ -117,7 +122,16 @@ class CardFigureInline(nested_admin.NestedStackedInline):
     max_num = 1
     fields = ("ltext", "order", "figure_class", "position_id", "image_url", "alt", "css_class" )
     classes = ['collapse'] 
-    
+
+class AccordionTextInline(nested_admin.NestedStackedInline):
+    model = AccordionText
+    extra = 0
+    max_num = 5
+    fields = ("ltext", "order", "checked", "hidden")
+    #"title_class", "title_stb_ids", "contents_class", "contents_stb_ids", "button01_class", "button01_stb_ids", "button02_class", "button02_stb_ids", "button03_class", "button03_stb_ids", "button04_class", "button04_stb_ids")
+    inlines = [ComptextBlockInline]
+    classes = ['collapse']
+
 class HeroInline(nested_admin.NestedStackedInline):
     model = Hero
     extra = 0
@@ -134,6 +148,13 @@ class CardInline(nested_admin.NestedStackedInline):
     inlines = [CardTextInline, CardFigureInline]
     classes = ['collapse']
 
+class AccordionInline(nested_admin.NestedStackedInline):
+    model = Accordion
+    extra = 0
+    max_num = 1
+    fields = ("ltext", "css_class", "type", "name")
+    inlines = [AccordionTextInline]
+    classes = ['collapse']
 
 @admin.register(Layout)
 class LayoutAdmin(nested_admin.NestedModelAdmin):
@@ -156,16 +177,10 @@ class LayoutAdmin(nested_admin.NestedModelAdmin):
                 return [CardInline(self.model, self.admin_site)]
             if obj.comp_id == 'hero':            
                 return [HeroInline(self.model, self.admin_site)]
+            if obj.comp_id == 'accordion':            
+                return [AccordionInline(self.model, self.admin_site)]            
         return []
 
-class ThemeInline(nested_admin.NestedStackedInline):
-    model = Theme
-    extra = 0
-    classes = ['collapse']
-    #list_display = ('page_id', 'ltext', 'order', 'parent', 'hidden')
-    inlines = [GentextBlockInline]
-    classes = ['collapse']
-    #inlines = []
 
 class PageInline(nested_admin.NestedStackedInline):
     model = Page
@@ -175,7 +190,109 @@ class PageInline(nested_admin.NestedStackedInline):
     inlines = [GentextBlockInline]
     classes = ['collapse']
     #inlines = []
+"""
+class ThemeInline(nested_admin.NestedStackedInline):
+    model = Theme
+    extra = 0
+    classes = ['collapse']
+    #list_display = ('page_id', 'ltext', 'order', 'parent', 'hidden')
+    inlines = [GentextBlockInline]
+    classes = ['collapse']
+    #inlines = []
 
+class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
+    model = ComptextBlock
+    extra = 0
+    classes = ['collapse']
+    inlines = [TextstbItemInline]
+
+# Option 3 Common Component Model
+# ── Component inlines ─────────────────────────────────────────
+
+class ComponentSlotInline(nested_admin.NestedStackedInline):
+    model = ComponentSlot
+    fk_name = "component"
+    extra = 0
+    classes = ['collapse']
+    fields = [
+        "slot_type", "order", "hidden", "ltext", "css_class",
+        "actions_class", # text for card, hero
+        "image_url", "alt", "figure_class",   # figure
+        "accordion_checked",                             # accordion text slot
+    ]
+    inlines = [ComptextBlockInline]
+
+    class Media:
+        js = ("admin/js/component_admin.js",)
+
+
+class ComponentInline(nested_admin.NestedStackedInline):
+    model = Component
+    extra = 0
+    classes = ['collapse']
+    fields = [
+        "comp_id", "order", "hidden", "ltext", "css_class",
+        "card_body_class", # card
+        "hero_content_class", "hero_overlay", "hero_overlay_style",            # hero
+        "accordion_type", "accordion_name",    # accordion
+        "config",
+    ]
+    inlines = [ComponentSlotInline]
+
+    class Media:
+        js = ("admin/js/component_admin.js",)
+
+
+class Layout3Inline(nested_admin.NestedStackedInline):
+    model = Layout3
+    extra = 0
+    classes = ['collapse']
+    fields = ["level", "slug", "order", "hidden", "css_class", "style", "parent"]
+    show_change_link = True
+    inlines = [ComponentInline]
+
+    class Media:
+        js = ("admin/js/layout_admin.js",)
+
+
+class Page3Inline(nested_admin.NestedStackedInline):
+    model = Page3
+    extra = 0
+    classes = ['collapse']
+    inlines = [GentextBlockInline, Layout3Inline]
+
+"""
+@admin.register(Client)
+class ClientAdmin(nested_admin.NestedModelAdmin):
+    inlines = [GentextBlockInline, Page3Inline]
+
+    class Media:
+        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
+"""
+"""
+@admin.register(Page3)
+class Page3Admin(nested_admin.NestedModelAdmin):
+    inlines = [GentextBlockInline, Layout3Inline]
+
+    class Media:
+        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
+
+
+@admin.register(Layout3)
+class Layout3Admin(nested_admin.NestedModelAdmin):
+    inlines = [ComponentInline]
+
+    class Media:
+        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
+
+
+@admin.register(Component)
+class ComponentAdmin(nested_admin.NestedModelAdmin):
+    inlines = [ComponentSlotInline]
+
+    class Media:
+        js = ("admin/js/component_admin.js",)
+"""
 
 @admin.register(Client)
 class ClientAdmin(nested_admin.NestedModelAdmin):
@@ -185,8 +302,10 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
     # Hide the raw JSON field in the admin display
     fields = ['client_id', 'parent', 'language_choices'] 
     list_display = ('client_id', 'parent')
-    inlines = [GentextBlockInline, PageInline, ThemeInline]
-    
+    inlines = [GentextBlockInline, ThemeInline, Page3Inline]
+    class Media:
+        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
+        
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(ThemePreset, ThemePresetAdmin)
 

@@ -113,15 +113,14 @@ input type is : one of the list items
 
 {% endcomment %}
 
-
-{% if content %}   
+{% if compslot %}   
       
   <div>             
-    {% if content.type_id == 'figure' %}                
-      <c-figure :figure="content"></c-figure>                           
+    {% if compslot.slot_type == 'figure' %}                
+      <c-figure :compslot="compslot"></c-figure>                           
     {% endif %}
-    {% if content.type_id == 'text' %}
-      {% for block in content.textblocks %} 
+    {% if compslot.slot_type == 'text' %}
+      {% for block in compslot.textblocks %} 
         {% if block.block_id == 'title' %}
           <h1 class="flex text-5xl font-bold mb-6 {{ block.css_class|default:"" }}">
             <c-svgtextbadge :items="block.items"></c-svgtextbadge>
@@ -133,19 +132,11 @@ input type is : one of the list items
           </div>       
         {% endif %}
         {% if block.block_id == 'actbut' %}
-          <div class="justify-end {{ content.actions_class|default:"" }}">    
+          <div class="justify-end {{ compslot.actions_class|default:"" }}">    
               <c-button :button="block"></c-button>
           </div>
         {% endif %}
       {% endfor %}               
     {% endif %}
-    {% comment %}
-    To be tested
-    {% if content.type_id == 'card' %}
-        {% with card=site_cards|get_dictid:herocontent.link_id %}
-          <c-card :card="card"></c-card>
-        {% endwith %}
-    {% endif %}
-    {% endcomment %}
   </div>   
 {% endif %}   

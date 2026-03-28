@@ -122,58 +122,20 @@ input type is :
 
 
 
-
-{% if hero %}   
+{% if component %}   
       
-      <div class="hero bg-base-200 min-h-screen {{ hero.css_class|default:'' }}"
-        style="{% if hero.overlay %} {{hero.overlay_style}} {% endif %}"
+      <div class="hero bg-base-200 min-h-screen {{ component.css_class|default:'' }}"
+        style="{% if component.hero_overlay %} {{component.hero_overlay_style|default:''}} {% endif %}"
       >
         
-        {% if hero.overlay %}
+        {% if component.hero_overlay %}
           <div class="hero-overlay">
           </div>  
         {% endif %}
-        <div class="hero-content flex-row {{ hero.herocontent_class|default:'' }}">    
+        <div class="hero-content flex-row {{ component.hero_content_class|default:'' }}">    
           
-          {% for content in hero.contents %}
-            <c-compcontent :content="content"></c-compcontent>
-            {% comment %}
-            <div>             
-              {% if content.type_id == 'figure' %}                
-                <c-figure :figure="content"></c-figure>                           
-              {% endif %}
-              {% if content.type_id == 'text' %}
-                {% for block in content.textblocks %} 
-                  {% if block.block_id == 'title' %}
-                    <h1 class="flex text-5xl font-bold mb-6 {{ block.css_class|default:"" }}">
-                      <c-svgtextbadge :items="block.items"></c-svgtextbadge>
-                    </h1>       
-                  {% endif %}
-                  {% if block.block_id == 'content' %}
-                    <div class="flex flex-col text-2xl mb-6 {{ block.css_class|default:"" }}">
-                      <c-svgtextbadge :items="block.items"></c-svgtextbadge>
-                    </div>       
-                  {% endif %}
-                  {% if block.block_id == 'actbut' %}
-                    { comment %}
-                    <div class="justify-end {{ content.actions_class|default:"" }}">    
-                        <c-buttons :buttons="block.items"></c-buttons>
-                    </div>
-                    { endcomment %}
-                  {% endif %}
-                {% endfor %}               
-              {% endif %}
-              { comment %}
-              To be tested
-              {% if content.type_id == 'card' %}
-                  {% with card=site_cards|get_dictid:herocontent.link_id %}
-                    <c-card :card="card"></c-card>
-                  {% endwith %}
-              {% endif %}
-              { endcomment %}
-            </div>
-            {% endcomment %}
-
+          {% for compslot in component.slots %}
+            <c-compcontent :compslot="compslot"></c-compcontent>
           {% endfor %}              
         </div>
       </div>    

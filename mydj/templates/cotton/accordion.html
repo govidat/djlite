@@ -1,37 +1,247 @@
 
-{% comment %}
 
-<div class="collapse collapse-arrow bg-base-100 border border-base-300">
-  <input type="radio" name="my-accordion-2" checked="checked" />
-  <div class="collapse-title font-semibold">How do I create an account?</div>
-  <div class="collapse-content text-sm">Click the "Sign Up" button in the top right corner and follow the registration process.</div>
-</div>
-<div class="collapse collapse-arrow bg-base-100 border border-base-300">
-  <input type="radio" name="my-accordion-2" />
-  <div class="collapse-title font-semibold">I forgot my password. What should I do?</div>
-  <div class="collapse-content text-sm">Click on "Forgot Password" on the login page and follow the instructions sent to your email.</div>
-</div>
-<div class="collapse collapse-arrow bg-base-100 border border-base-300">
-  <input type="radio" name="my-accordion-2" />
-  <div class="collapse-title font-semibold">How do I update my profile information?</div>
-  <div class="collapse-content text-sm">Go to "My Account" settings and select "Edit Profile" to make changes.</div>
-</div>
+{% load my_tags %}
+{% mylist_bykey component.slots 'text' 'slot_type' as result_var %}
 
-input is an accordion from views
-{% endcomment %}
-<div class=" {{accordion.classjoin|default:""}} ">
-    {% for item in accordion.accordioncontents|dictsort:"order" %}
-        <div class="collapse bg-base-100 border border-base-300 {{accordion.class|default:""}} ">
-            <input type="radio" name="my-accordion-2" checked="checked" />
-            <div class="collapse-title font-semibold {{item.title.class|default:""}}">
-                <c-zztextrouter :type="item.title.type" :ids="item.title.ids"></c-zztextrouter>
-            </div>
-            <div class="collapse-content text-sm {{item.contents.class|default:""}}">
-                <c-zztextrouter :type="item.contents.type" :ids="item.contents.ids"></c-zztextrouter>
-            </div>
+{% for compslot in result_var %}
+
+    {# pre-extract blocks to avoid loop inserting nodes in wrong place #}
+    {% mylist_bykey compslot.textblocks 'title' 'block_id' as title_blocks %}
+    {% mylist_bykey compslot.textblocks 'content' 'block_id' as content_blocks %}
+
+    <div class="collapse collapse-arrow bg-base-100 border border-base-300 {{ component.css_class|default:'' }}">
+        
+        <input 
+            type="{{ component.accordion_type }}" 
+            name="{{ component.accordion_name }}"
+            {% if compslot.checked %}checked="checked"{% endif %} 
+        />
+
+        {# title block — direct sibling of input, no extra nodes in between #}
+        {% for block in title_blocks %}
+        <div class="collapse-title font-semibold {{ block.css_class|default:'' }}">
+            <c-svgtextbadge :items="block.items"></c-svgtextbadge>
         </div>
-    {% endfor %}
-</div>
-{% comment %}
+        {% endfor %}
 
+        {# content block #}
+        {% for block in content_blocks %}
+        <div class="collapse-content text-sm {{ block.css_class|default:'' }}">
+            <c-svgtextbadge :items="block.items"></c-svgtextbadge>
+        </div>
+        {% endfor %}
+
+    </div>
+
+{% endfor %}
+
+{% comment %}
+"component": {
+                        "layout": 23,
+                        "ltext": "None",
+                        "css_class": "collapse-arrow",
+                        "type": "radio",
+                        "name": "myaccordion_01",
+                        "comp_id": "accordion",
+                        "slots": [
+                          {
+                            "accordion": 1,
+                            "ltext": "None",
+                            "hidden": "None",
+                            "order": 1,
+                            "checked": "True",
+                            "slot_type": "text",
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "How do I create an account?",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frHow do I create an account?",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiHow do I create an account?",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "None",
+                                        "ltext": "Click the \"Sign Up\" button in the top right corner and follow the registration process."
+                                      },
+                                      "fr": {
+                                        "stext": "None",
+                                        "ltext": "frClick the \"Sign Up\" button in the top right corner and follow the registration process."
+                                      },
+                                      "hi": {
+                                        "stext": "None",
+                                        "ltext": "hiClick the \"Sign Up\" button in the top right corner and follow the registration process."
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "accordion": 1,
+                            "ltext": "None",
+                            "hidden": "None",
+                            "order": 2,
+                            "checked": "None",
+                            "slot_type": "text",
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "I forgot my password. What should I do?",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frI forgot my password. What should I do?",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiI forgot my password. What should I do?",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "None",
+                                        "ltext": "Click on \"Forgot Password\" on the login page and follow the instructions sent to your email."
+                                      },
+                                      "fr": {
+                                        "stext": "None",
+                                        "ltext": "frClick on \"Forgot Password\" on the login page and follow the instructions sent to your email."
+                                      },
+                                      "hi": {
+                                        "stext": "None",
+                                        "ltext": "hiClick on \"Forgot Password\" on the login page and follow the instructions sent to your email."
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "accordion": 1,
+                            "ltext": "None",
+                            "hidden": "None",
+                            "order": 3,
+                            "checked": "None",
+                            "slot_type": "text",
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "How do I update my profile information?",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frHow do I update my profile information?",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiHow do I update my profile information?",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "None",
+                                        "ltext": "Go to \"My Account\" settings and select \"Edit Profile\" to make changes.</div>"
+                                      },
+                                      "fr": {
+                                        "stext": "None",
+                                        "ltext": "frGo to \"My Account\" settings and select \"Edit Profile\" to make changes.</div>"
+                                      },
+                                      "hi": {
+                                        "stext": "None",
+                                        "ltext": "hiGo to \"My Account\" settings and select \"Edit Profile\" to make changes.</div>"
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
 {% endcomment %}
