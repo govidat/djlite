@@ -8,30 +8,18 @@ from django.contrib.contenttypes.fields import GenericRelation
 from html.parser import HTMLParser
 
 # Create your models here
+
+#Common component structrue:
 """
-Language
-Theme
 Client
     ├── GentextBlock    
     ├── Page
         ├── GentextBlock    
         ├── Layout @level 40
-            ├── Hero
-            │         ├── HeroText   (onetoone)
-            │             └── ComptextBlock (GenericRelation)
-            │         ├── HeroFigure (onetoone)
-            │         └── HeroCard (onetoone)
-            │              ├── HeroCardFigure (onetoone)
-            │              └── HeroCardText (onetoone)
-            │                 └── ComptextBlock (GenericRelation)
-            │
-            └── Card
-                ├── CardFigure (onetoone)
-                └── CardText (onetoone)
-                        └── ComptextBlock (GenericRelation)
-            └── Accordion
-                └── AccordionText (foreignkey)
-                        └── ComptextBlock  (GenericRelation)                       
+            ├── Component (onetoone at level=40, compl0_id = hero, card, accordion etc... + some fields at this level)
+                     ├── ComponentSlot (foreign key compl1_id= figure, text + some fields that may be applicable for each of this)
+                         └── ComptextBlock (only for compll1_id = text GenericRelation)
+
     ├── Themes
         ├── themepreset
         └── gentextblocks                        
@@ -47,8 +35,8 @@ ComptextBlock (content_type) (title / content / actbut)  # used in HeroText, Car
            
 TextstbItem (content_type) (text / svg / badge)
 └── SvgtextbadgeValue (per language)
-                      
 """
+
 class HTMLTagDetector(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -60,7 +48,6 @@ class HTMLTagDetector(HTMLParser):
     def handle_endtag(self, tag):
         self.found_tags = True
 
-
 def no_html_tags(value):
     if not value:
         return
@@ -69,11 +56,9 @@ def no_html_tags(value):
     if detector.found_tags:
         raise ValidationError("HTML tags are not allowed.")
 
-
 def no_double_quotes(value):
     if value and '"' in value:
         raise ValidationError('Double quotes (") are not allowed. Use &quot; instead.')
-
 
 # Combine both into one validator list for convenience
 text_field_validators = [no_html_tags, no_double_quotes]
@@ -190,7 +175,6 @@ class TextstbItem(models.Model):
         ]        
         verbose_name = "01-06b Text SVG/Text/Badge item"                
 
-
 class SvgtextbadgeValue(models.Model):
     textstbitem = models.ForeignKey(TextstbItem, on_delete=models.CASCADE)
     language = models.ForeignKey(Language, on_delete=models.CASCADE)    
@@ -201,7 +185,6 @@ class SvgtextbadgeValue(models.Model):
     class Meta:
         unique_together = ("textstbitem", "language")
         verbose_name = "01-06c Svg Text Badge(STB) Item value"
-
 
 class ComptextBlock(models.Model):
     #textcontent = models.ForeignKey(TextContent, related_name="blocks", on_delete=models.CASCADE)
@@ -232,7 +215,6 @@ class ComptextBlock(models.Model):
     def __str__(self):
         return f"{self.block_id} {self.ltext}"    
                
-
 class GentextBlock(models.Model):
     #textcontent = models.ForeignKey(TextContent, related_name="blocks", on_delete=models.CASCADE)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -585,40 +567,14 @@ class AccordionText(models.Model):
 
 # TBD Accordion and Carousal...
 """
-#Common component structrue:
-"""
-Client
-    ├── GentextBlock    
-    ├── Page
-        ├── GentextBlock    
-        ├── Layout @level 40
-            ├── Component (onetoone at level=40, compl0_id = hero, card, accordion etc... + some fields at this level)
-                     ├── ComponentSlot (foreign key compl1_id= figure, text + some fields that may be applicable for each of this)
-                         └── ComptextBlock (only for compll1_id = text GenericRelation)
 
-    ├── Themes
-        ├── themepreset
-        └── gentextblocks                        
-           
-GentextBlock (content_type) (name / nb_title / nb_logo) # used in Client, Page
-└──TextstbItem (content_type) (text / svg / badge)
-    └── SvgtextbadgeValue (per language)
-                      
-ComptextBlock (content_type) (title / content / actbut)  # used in HeroText, CardText, HeroCardText
-└──TextstbItem (content_type) (text / svg / badge)
-    └── SvgtextbadgeValue (per language)
-           
-           
-TextstbItem (content_type) (text / svg / badge)
-└── SvgtextbadgeValue (per language)
-"""
 
-class Page3(models.Model):
+class Page(models.Model):
     #id = LowercaseCharField(max_length=20, primary_key=True)
     client = models.ForeignKey(
         Client,
         on_delete=models.CASCADE,
-        related_name='pages3'
+        related_name='pages'
         )    
     page_id = LowercaseCharField(max_length=10)  
     ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
@@ -641,11 +597,11 @@ class Page3(models.Model):
         ]
         verbose_name = "01-02 Page"
 
-class Layout3(models.Model):
+class Layout(models.Model):
     # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
     # client is kept, so that layout can be a separate admin tab. in that we are braching to component type admin.
     #client = models.ForeignKey(Client, on_delete=models.CASCADE)
-    page = models.ForeignKey(Page3, on_delete=models.CASCADE, related_name='layouts3')
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='layouts')
     parent = models.ForeignKey(
         "self",
         null=True,
@@ -701,7 +657,7 @@ class Layout3(models.Model):
 class Component(models.Model):
     """L0 — one per Layout cell (level=40)"""
     layout = models.OneToOneField(
-        Layout3,
+        Layout,
         on_delete=models.CASCADE,
         related_name="component"
     )

@@ -3,7 +3,7 @@ from django.core.cache import cache
 
 from mysite.models import Language, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 #from mysite.models import Card, Hero, Accordion, Layout, Page, HeroText, HeroCardText, AccordionText
-from mysite.models import Page3, Layout3, Component, ComponentSlot 
+from mysite.models import Page, Layout, Component, ComponentSlot 
 
 from django.db.models import Prefetch
 from django.db.models import ForeignKey
@@ -143,9 +143,9 @@ component_prefetch = Prefetch(
     ),
 )
 
-layout3_prefetch = Prefetch(
-    "layouts3",
-    queryset=Layout3.objects.select_related("parent").prefetch_related(
+layout_prefetch = Prefetch(
+    "layouts",
+    queryset=Layout.objects.select_related("parent").prefetch_related(
         component_prefetch,
     ).order_by("level", "order"),
     to_attr="prefetched_layouts3",
@@ -1036,7 +1036,7 @@ def build_component(layout):
     return data
 
 
-def build_layout3(layout, layout_map):
+def build_layout(layout, layout_map):
     layout = visible(layout)
     if not layout:
         return None
@@ -1056,7 +1056,7 @@ def build_layout3(layout, layout_map):
             layout_data["component"] = component
 
     children = [
-        build_layout3(child, layout_map)
+        build_layout(child, layout_map)
         for child in layout_map.get(layout.id, [])
     ]
     children = [c for c in children if c]
@@ -1066,7 +1066,7 @@ def build_layout3(layout, layout_map):
     return layout_data
 
 
-def build_page3(page):
+def build_page(page):
     page = visible(page)
     if not page:
         return None
@@ -1081,7 +1081,7 @@ def build_page3(page):
         else:
             root_layouts.append(layout)
 
-    layouts = [build_layout3(l, layout_map) for l in root_layouts]
+    layouts = [build_layout(l, layout_map) for l in root_layouts]
     layouts = [l for l in layouts if l]
 
     return {
@@ -1130,7 +1130,7 @@ def build_client_payload(client):
       })
 
     #all_pages = list(getattr(client, "prefetched_pages", []))
-    all_pages3 = list(getattr(client, "prefetched_pages3", []))    
+    all_pages = list(getattr(client, "prefetched_pages", []))    
     return {
         "client_id": client.client_id,
         "languages": lv_languages,
@@ -1146,11 +1146,11 @@ def build_client_payload(client):
         #    [l for l in all_pages if not l.hidden]
         #), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
         "pages": [
-            build_page3(page)
-            for page in all_pages3
+            build_page(page)
+            for page in all_pages
         ],
         "page_tree": build_page_tree(
-            [l for l in all_pages3 if not l.hidden]
+            [l for l in all_pages if not l.hidden]
         ), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
 
 
@@ -1184,25 +1184,15 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
             #.select_related("parent")  # Add this if you access parent -- also modify build_client_payload
             .prefetch_related(
                 gentextblock_prefetch,
-                #Prefetch(
-                #    "pages",
-                #    queryset=Page.objects.select_related(
-                #        "parent"
-                #    ).prefetch_related(
-                #        gentextblock_prefetch,
-                #        layout_prefetch,
-                #    ).order_by("order"),
-                #    to_attr="prefetched_pages"
-                #),
                 Prefetch(
-                    "pages3",
-                    queryset=Page3.objects.select_related(
+                    "pages",
+                    queryset=Page.objects.select_related(
                         "parent"
                     ).prefetch_related(
                         gentextblock_prefetch,
-                        layout3_prefetch,
+                        layout_prefetch,
                     ).order_by("order"),
-                    to_attr="prefetched_pages3"
+                    to_attr="prefetched_pages"
                 ),                
                 Prefetch(
                     "themes",

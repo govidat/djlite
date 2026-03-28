@@ -42,56 +42,171 @@ def run():
 
     # print("Hello from runscript")
     """
-        LANGUAGE_DATA = [
-            {
-            "language_id": "en",
-            "label_obj": {"en": "English", "fr": "frEnglish", "hi": "hiEnglish"}
-            },
-            {
-            "language_id": "fr",
-            "label_obj": {"en": "French", "fr": "frFrench", "hi": "hiFrench"}
-            },
-            {
-            "language_id": "hi",
-            "label_obj": {"en": "Hindi", "fr": "frHindi", "hi": "hiHindi"}
-            }
-        ]
-        for row in LANGUAGE_DATA:
-            Language.objects.update_or_create(
-                language_id=row["language_id"],
-                label_obj= row["label_obj"]
-            )    
+    LANGUAGE_DATA = [
+        {
+        "language_id": "en",
+        "label_obj": {"en": "English", "fr": "frEnglish", "hi": "hiEnglish"}
+        },
+        {
+        "language_id": "fr",
+        "label_obj": {"en": "French", "fr": "frFrench", "hi": "hiFrench"}
+        },
+        {
+        "language_id": "hi",
+        "label_obj": {"en": "Hindi", "fr": "frHindi", "hi": "hiHindi"}
+        }
+    ]
+    for row in LANGUAGE_DATA:
+        Language.objects.update_or_create(
+            language_id=row["language_id"],
+            label_obj= row["label_obj"]
+        )    
 
-        THEME_DATA = [
-            {
-            "theme_id": "light",
-            "label_obj": {"en": "Light", "fr": "frLight", "hi": "hiLight"}
-            },
-            {
-            "theme_id": "dark",
-            "label_obj": {"en": "Dark", "fr": "frDark", "hi": "hiDark"}
-            },
-            {
-            "theme_id": "aqua",
-            "label_obj": {"en": "Aqua", "fr": "frAqua", "hi": "hiAqua"}
-            }
-        ]
-        for row in THEME_DATA:
-            Theme.objects.update_or_create(
-                theme_id=row["theme_id"],
-                label_obj= row["label_obj"]
-            )    
+    THEMEPRESET_DATA = [
+        {
+        "themepreset_id": "light",
+        "ltext": "a",
+        "primary": "#570df8",
+        "primary_content": "#ffffff",
 
-        CLIENT_DATA = [
-            {
-            "client_id": "bahushira"
-            }
-        ]
-        for row in CLIENT_DATA:
-            Client.objects.update_or_create(
-                client_id=row["client_id"]
-            )    
+        "secondary": "#f000b8",
+        "secondary_content": "#ffffff",
+
+        "accent": "#37cdbe",
+        "accent_content": "#163835",
+
+        "neutral": "#3d4451",
+        "neutral_content": "#ffffff",
+
+        "base_100": "#ffffff",
+        "base_200": "#f2f2f2",
+        "base_300": "#e5e6e6",
+        "base_content": "#1f2937",
+
+        "success": "#00c853",
+        "success_content": "#ffffff",
+
+        "warning": "#ff9800",
+        "warning_content": "#ffffff",
+
+        "error": "#ff5724",
+        "error_content": "#ffffff",
+
+        "info": "#2094f3",
+        "info_content": "#ffffff"
+        },   
+        {
+        "themepreset_id": "dark",
+        "ltext": "b",
+        "primary": "#661ae6",
+        "primary_content": "#ffffff",
+
+        "secondary": "#d926aa",
+        "secondary_content": "#ffffff",
+
+        "accent": "#1fb2a6",
+        "accent_content": "#ffffff",
+
+        "neutral": "#191d24",
+        "neutral_content": "#a6adbb",
+
+        "base_100": "#2a303c",
+        "base_200": "#242933",
+        "base_300": "#1d232a",
+        "base_content": "#a6adbb",
+
+        "success": "#36d399",
+        "success_content": "#000000",
+
+        "warning": "#fbbd23",
+        "warning_content": "#000000",
+
+        "error": "#f87272",
+        "error_content": "#000000",
+
+        "info": "#3abff8",
+        "info_content": "#000000"
+        },              
+            
+    ]
+    for row in THEMEPRESET_DATA:
+
+        ThemePreset.objects.update_or_create(
+            themepreset_id=row["themepreset_id"],
+            ltext=row["ltext"],
+            primary=row["primary"],
+            primary_content=row["primary_content"],
+
+            secondary=row["secondary"],
+            secondary_content=row["secondary_content"],
+
+            accent=row["accent"],
+            accent_content=row["accent_content"],
+
+            neutral=row["neutral"],
+            neutral_content=row["neutral_content"],
+
+            base_100=row["base_100"],
+            base_200=row["base_200"],
+            base_300=row["base_300"],
+            base_content=row["base_content"],
+
+            success=row["success"],
+            success_content=row["success_content"],
+
+            warning=row["warning"],
+            warning_content=row["warning_content"],
+
+            error=row["error"],
+            error_content=row["error_content"],
+
+            info=row["info"],
+            info_content=row["info_content"]
+        ) 
     """
+    
+    CLIENT_DATA = [
+        {
+        "client_id": "bahushira"
+        }
+    ]
+    for row in CLIENT_DATA:
+        Client.objects.update_or_create(
+            client_id=row["client_id"]
+        )    
+
+    THEME_DATA = [
+        {
+        "client_id": "bahushira",
+        "themepreset_id" : "light",
+        "theme_id": "light",
+        "is_default": False
+        },        
+        {
+        "client_id": "bahushira",
+        "themepreset_id" : "dark",
+        "theme_id": "dark",
+        "is_default": True
+        },
+    ]
+
+    clients = {c.client_id: c for c in Client.objects.all()}
+    themepresets = {c.themepreset_id: c for c in ThemePreset.objects.all()}
+    #layouts = {(c.client.client_id, c.page.page_id, c.slug, c.level): c for c in Layout.objects.all()}
+
+    for row in THEME_DATA:
+
+        client_value = clients[row["client_id"]]
+        themepreset_value = themepresets[row["themepreset_id"]]
+
+        Theme.objects.update_or_create(
+            client = client_value,
+            themepreset = themepreset_value,
+            theme_id=row["theme_id"],
+            #overrides=row["overrides"],
+            is_default=row["is_default"]
+        )   
+    
     """
         PAGE_DATA = [
             {
@@ -207,6 +322,7 @@ def run():
         }                
     ]
     """
+    """
     # Layout of Contact
     LAYOUT_DATA = [
         {
@@ -292,162 +408,4 @@ def run():
             slug=row["slug"],
             comp_id=row["comp_id"],
         ) 
-
-    # Hero of Contact slug=a
-    # DROPPING THIS . BELOW LAYOUT TO BE MAINTAINED DIRECTLY IN DJANGO ADMIN.
-    # BUILDING THE LINKS LOOKS COMPLICATED AS IT IS MULTI LEVEL
-    # POSTPONING THIS TYPE OF MASS UPLOAD 
-    """
-    HERO_DATA = [
-        {
-        "client_id": "bahushira",
-        "page_id" : "contact",
-        "layout_slug": "a",
-        "layout_level": 40,
-        "layout_comp_id": "hero",
-        "css_class": "",
-        "herocontent_class": "",
-        "overlay": "",
-        "overlay_style": "",
-        "comp_id": "",
-        }, 
-    ]
-    """
-    """        
-        THEMEPRESET_DATA = [
-            {
-            "themepreset_id": "light",
-            "ltext": "a",
-            "primary": "#570df8",
-            "primary_content": "#ffffff",
-
-            "secondary": "#f000b8",
-            "secondary_content": "#ffffff",
-
-            "accent": "#37cdbe",
-            "accent_content": "#163835",
-
-            "neutral": "#3d4451",
-            "neutral_content": "#ffffff",
-
-            "base_100": "#ffffff",
-            "base_200": "#f2f2f2",
-            "base_300": "#e5e6e6",
-            "base_content": "#1f2937",
-
-            "success": "#00c853",
-            "success_content": "#ffffff",
-
-            "warning": "#ff9800",
-            "warning_content": "#ffffff",
-
-            "error": "#ff5724",
-            "error_content": "#ffffff",
-
-            "info": "#2094f3",
-            "info_content": "#ffffff"
-            },   
-            {
-            "themepreset_id": "dark",
-            "ltext": "b",
-            "primary": "#661ae6",
-            "primary_content": "#ffffff",
-
-            "secondary": "#d926aa",
-            "secondary_content": "#ffffff",
-
-            "accent": "#1fb2a6",
-            "accent_content": "#ffffff",
-
-            "neutral": "#191d24",
-            "neutral_content": "#a6adbb",
-
-            "base_100": "#2a303c",
-            "base_200": "#242933",
-            "base_300": "#1d232a",
-            "base_content": "#a6adbb",
-
-            "success": "#36d399",
-            "success_content": "#000000",
-
-            "warning": "#fbbd23",
-            "warning_content": "#000000",
-
-            "error": "#f87272",
-            "error_content": "#000000",
-
-            "info": "#3abff8",
-            "info_content": "#000000"
-            },              
-                
-        ]
-
-
-        for row in THEMEPRESET_DATA:
-
-            ThemePreset.objects.update_or_create(
-                themepreset_id=row["themepreset_id"],
-                ltext=row["ltext"],
-                primary=row["primary"],
-                primary_content=row["primary_content"],
-
-                secondary=row["secondary"],
-                secondary_content=row["secondary_content"],
-
-                accent=row["accent"],
-                accent_content=row["accent_content"],
-
-                neutral=row["neutral"],
-                neutral_content=row["neutral_content"],
-
-                base_100=row["base_100"],
-                base_200=row["base_200"],
-                base_300=row["base_300"],
-                base_content=row["base_content"],
-
-                success=row["success"],
-                success_content=row["success_content"],
-
-                warning=row["warning"],
-                warning_content=row["warning_content"],
-
-                error=row["error"],
-                error_content=row["error_content"],
-
-                info=row["info"],
-                info_content=row["info_content"]
-            ) 
-
-
-        THEME_DATA = [
-            {
-            "client_id": "bahushira",
-            "themepreset_id" : "light",
-            "theme_id": "light",
-            "is_default": False
-            },        
-            {
-            "client_id": "bahushira",
-            "themepreset_id" : "dark",
-            "theme_id": "dark",
-            "is_default": True
-            },
-        ]
-
-        clients = {c.client_id: c for c in Client.objects.all()}
-        themepresets = {c.themepreset_id: c for c in ThemePreset.objects.all()}
-        #layouts = {(c.client.client_id, c.page.page_id, c.slug, c.level): c for c in Layout.objects.all()}
-
-        for row in THEME_DATA:
-
-            client_value = clients[row["client_id"]]
-            themepreset_value = themepresets[row["themepreset_id"]]
-    
-            Theme.objects.update_or_create(
-                client = client_value,
-                themepreset = themepreset_value,
-                theme_id=row["theme_id"],
-                #overrides=row["overrides"],
-                is_default=row["is_default"]
-            ) 
     """

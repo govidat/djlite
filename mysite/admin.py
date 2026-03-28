@@ -12,7 +12,7 @@ from .models import Language, ThemePreset, Client, Theme, ComptextBlock, Gentext
 #from .models import Page, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, AccordionText, Card, Hero, Accordion, Layout
 
 # Option 3 Common Component Model
-from .models import Page3, Layout3, Component, ComponentSlot
+from .models import Page, Layout, Component, ComponentSlot
 
 # VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
 class LanguageAdmin(admin.ModelAdmin):
@@ -46,7 +46,7 @@ class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
     inlines = [TextstbItemInline]
     classes = ['collapse']
 
-class GentextBlockInline(nested_admin.NestedGenericTabularInline):
+class GentextBlockInline(nested_admin.NestedGenericStackedInline):
     model = GentextBlock
     fields = ("block_id", "ltext", "hidden", "order", "css_class")
     extra = 0
@@ -243,8 +243,8 @@ class ComponentInline(nested_admin.NestedStackedInline):
         js = ("admin/js/component_admin.js",)
 
 
-class Layout3Inline(nested_admin.NestedStackedInline):
-    model = Layout3
+class LayoutInline(nested_admin.NestedStackedInline):
+    model = Layout
     extra = 0
     classes = ['collapse']
     fields = ["level", "slug", "order", "hidden", "css_class", "style", "parent"]
@@ -255,44 +255,12 @@ class Layout3Inline(nested_admin.NestedStackedInline):
         js = ("admin/js/layout_admin.js",)
 
 
-class Page3Inline(nested_admin.NestedStackedInline):
-    model = Page3
+class PageInline(nested_admin.NestedStackedInline):
+    model = Page
     extra = 0
     classes = ['collapse']
-    inlines = [GentextBlockInline, Layout3Inline]
+    inlines = [GentextBlockInline, LayoutInline]
 
-"""
-@admin.register(Client)
-class ClientAdmin(nested_admin.NestedModelAdmin):
-    inlines = [GentextBlockInline, Page3Inline]
-
-    class Media:
-        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
-"""
-"""
-@admin.register(Page3)
-class Page3Admin(nested_admin.NestedModelAdmin):
-    inlines = [GentextBlockInline, Layout3Inline]
-
-    class Media:
-        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
-
-
-@admin.register(Layout3)
-class Layout3Admin(nested_admin.NestedModelAdmin):
-    inlines = [ComponentInline]
-
-    class Media:
-        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
-
-
-@admin.register(Component)
-class ComponentAdmin(nested_admin.NestedModelAdmin):
-    inlines = [ComponentSlotInline]
-
-    class Media:
-        js = ("admin/js/component_admin.js",)
-"""
 
 @admin.register(Client)
 class ClientAdmin(nested_admin.NestedModelAdmin):
@@ -302,7 +270,7 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
     # Hide the raw JSON field in the admin display
     fields = ['client_id', 'parent', 'language_choices'] 
     list_display = ('client_id', 'parent')
-    inlines = [GentextBlockInline, ThemeInline, Page3Inline]
+    inlines = [GentextBlockInline, ThemeInline, PageInline]
     class Media:
         js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
         
