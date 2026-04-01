@@ -3,13 +3,16 @@ from django import forms
 from .models import Language, Client
 
 class ClientForm(forms.ModelForm):
+    
     # This field fetches choices from Language
     language_choices = forms.ModelMultipleChoiceField(
         queryset=Language.objects.all(),
-        widget=forms.SelectMultiple(attrs={'class': 'select-multiple'}),
+        widget=forms.CheckboxSelectMultiple,
+        #widget=forms.SelectMultiple(attrs={'class': 'select-multiple'}),
         # Ensure 'required=False' if the JSON array can be empty
-        required=False, 
-        label="Select Source Languages"
+        required=True, 
+        label="Select Source Languages",
+        initial=['en']   # safety net for unbound forms
     )
     """
     # This field fetches choices from Theme

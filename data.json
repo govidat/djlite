@@ -1,0 +1,267 @@
+{
+    "client_id": "bahushira",
+    "pages": [
+        {
+            "page_id": "home",
+            "parent_page_id": "",
+            "ltext": "Home Page",
+            "order": 1,
+            "gentextblocks": [
+                {
+                    "block_id": "name",
+                    "ltext": "Home",
+                    "order": 1,
+                    "items": [
+                        {
+                            "item_id": "text",
+                            "order": 1,
+                            "values": {
+                                "en": {"stext": "Home", "ltext": ""},
+                                "fr": {"stext": "frHome", "ltext": ""},
+                                "hi": {"stext": "hiHome", "ltext": ""}
+                            }
+                        }
+                    ]
+                }
+            ],
+            "layouts": [
+                {
+                    "slug": "a",
+                    "level": 10,
+                    "order": 1,
+                    "css_class": "",
+                    "style": "",
+                    "hidden": false,
+                    "comp_id": null,
+                    "parent_slug": null,
+                    "children": [
+                        {
+                            "slug": "a",
+                            "level": 20,
+                            "order": 1,
+                            "css_class": "",
+                            "hidden": false,
+                            "comp_id": null,
+                            "parent_slug": "a",
+                            "children": [
+                                {
+                                    "slug": "a",
+                                    "level": 30,
+                                    "order": 1,
+                                    "css_class": "",
+                                    "hidden": false,
+                                    "comp_id": null,
+                                    "parent_slug": "a",
+                                    "children": [
+                                        {
+                                            "slug": "a",
+                                            "level": 40,
+                                            "order": 1,
+                                            "css_class": "",
+                                            "hidden": false,
+                                            "comp_id": "hero",
+                                            "parent_slug": "a",
+                                            "component": {
+                                                "comp_id": "hero",
+                                                "ltext": "Home Hero",
+                                                "css_class": "",
+                                                "hero_overlay": true,
+                                                "hero_overlay_style": "",
+                                                "order": 1,
+                                                "hidden": false,
+                                                "config": {},
+                                                "slots": [
+                                                    {
+                                                        "slot_type": "figure",
+                                                        "order": 2,
+                                                        "hidden": false,
+                                                        "css_class": "",
+                                                        "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                                                        "alt": "Spiderman",
+                                                        "figure_class": "px-0 pt-0"
+                                                    },
+                                                    {
+                                                        "slot_type": "text",
+                                                        "order": 1,
+                                                        "hidden": false,
+                                                        "css_class": "",
+                                                        "checked": false,
+                                                        "comptextblocks": [
+                                                            {
+                                                                "block_id": "title",
+                                                                "order": 1,
+                                                                "css_class": "",
+                                                                "ltext": "Home Title",
+                                                                "items": [
+                                                                    {
+                                                                        "item_id": "text",
+                                                                        "order": 1,
+                                                                        "values": {
+                                                                            "en": {"stext": "Home Title", "ltext": ""},
+                                                                            "fr": {"stext": "frHome Title", "ltext": ""}
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "block_id": "content",
+                                                                "order": 2,
+                                                                "css_class": "",
+                                                                "ltext": "Home content",
+                                                                "items": [
+                                                                    {
+                                                                        "item_id": "text",
+                                                                        "order": 1,
+                                                                        "values": {
+                                                                            "en": {"stext": "Home Content", "ltext": ""},
+                                                                            "fr": {"stext": "frHome Content", "ltext": ""}
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            }                                                            
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },        
+        {
+            "page_id": "about",
+            "parent_page_id": "",
+            "ltext": "About Page",
+            "order": 2,
+            "gentextblocks": [
+                {
+                    "block_id": "name",
+                    "ltext": "About",
+                    "order": 1,
+                    "items": [
+                        {
+                            "item_id": "text",
+                            "order": 1,
+                            "values": {
+                                "en": {"stext": "About", "ltext": ""},
+                                "fr": {"stext": "frAbout", "ltext": ""},
+                                "hi": {"stext": "hiAbout", "ltext": ""}
+                            }
+                        }
+                    ]
+                }
+            ],
+            "layouts": [
+                {
+                    "slug": "a",
+                    "level": 10,
+                    "order": 1,
+                    "css_class": "",
+                    "style": "",
+                    "hidden": false,
+                    "comp_id": null,
+                    "parent_slug": null,
+                    "children": [
+                        {
+                            "slug": "a",
+                            "level": 20,
+                            "order": 1,
+                            "css_class": "",
+                            "hidden": false,
+                            "comp_id": null,
+                            "parent_slug": "a",
+                            "children": [
+                                {
+                                    "slug": "a",
+                                    "level": 30,
+                                    "order": 1,
+                                    "css_class": "",
+                                    "hidden": false,
+                                    "comp_id": null,
+                                    "parent_slug": "a",
+                                    "children": [
+                                        {
+                                            "slug": "a",
+                                            "level": 40,
+                                            "order": 1,
+                                            "css_class": "",
+                                            "hidden": false,
+                                            "comp_id": "hero",
+                                            "parent_slug": "a",
+                                            "component": {
+                                                "comp_id": "hero",
+                                                "ltext": "About Hero",
+                                                "css_class": "hero min-h-screen",
+                                                "hero_overlay": true,
+                                                "hero_overlay_style": "",
+                                                "order": 1,
+                                                "hidden": false,
+                                                "config": {},
+                                                "slots": [
+                                                    {
+                                                        "slot_type": "figure",
+                                                        "order": 1,
+                                                        "hidden": false,
+                                                        "css_class": "",
+                                                        "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                                                        "alt": "Spiderman",
+                                                        "figure_class": "px-0 pt-0"
+                                                    },
+                                                    {
+                                                        "slot_type": "text",
+                                                        "order": 2,
+                                                        "hidden": false,
+                                                        "css_class": "",
+                                                        "checked": false,
+                                                        "comptextblocks": [
+                                                            {
+                                                                "block_id": "title",
+                                                                "order": 1,
+                                                                "css_class": "",
+                                                                "ltext": "About Title",
+                                                                "items": [
+                                                                    {
+                                                                        "item_id": "text",
+                                                                        "order": 1,
+                                                                        "values": {
+                                                                            "en": {"stext": "About Title", "ltext": ""},
+                                                                            "fr": {"stext": "frAbout Title", "ltext": ""}
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            {
+                                                                "block_id": "content",
+                                                                "order": 2,
+                                                                "css_class": "",
+                                                                "ltext": "About content",
+                                                                "items": [
+                                                                    {
+                                                                        "item_id": "text",
+                                                                        "order": 1,
+                                                                        "values": {
+                                                                            "en": {"stext": "About Content", "ltext": ""},
+                                                                            "fr": {"stext": "frAbout Content", "ltext": ""}
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            }                                                            
+                                                        ]
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

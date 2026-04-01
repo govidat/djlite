@@ -1158,7 +1158,7 @@ def build_client_payload(client):
 
 
 # temporarily marking use_cache = False. To be changed after debugging
-def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout=3600):
+def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeout=3600):
     """
     Fetch clientstatic with optional caching.
     Works when client_id as primary key.

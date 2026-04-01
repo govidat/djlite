@@ -4,20 +4,13 @@ from mysite.models import Language
 from mysite.models import ThemePreset
 
 
-from mysite.models import Client
-from mysite.models import Page
 from mysite.models import Theme
 from mysite.models import Layout
-#from mysite.models import ClientLanguage
-#from mysite.models import ClientTheme
-#from mysite.models import ClientPage
-#from mysite.models import TextStatic
-#from mysite.models import Image
-#from mysite.models import Svg
+
 
 #from mysite.models import Position
 
-from django.contrib.contenttypes.models import ContentType
+# from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
 
 #from mysite.models import TextItemValue
@@ -28,6 +21,15 @@ from django.db import connection
 from django.db.models.functions import Lower
 
 from pprint import pprint
+
+import json
+from django.db import transaction
+from django.contrib.contenttypes.models import ContentType
+from mysite.models import (
+    Client, Page, Layout, Component, ComponentSlot,
+    GentextBlock, ComptextBlock, TextstbItem, SvgtextbadgeValue, Language
+)
+from django.db import models as django_models
 
 def run():
     #lv_client_id = 'bahushira'
@@ -41,7 +43,7 @@ def run():
     #pprint(connection.queries)
 
     # print("Hello from runscript")
-    """
+    """ Step 1
     LANGUAGE_DATA = [
         {
         "language_id": "en",
@@ -164,6 +166,7 @@ def run():
             info_content=row["info_content"]
         ) 
     """
+    """ Step 2
     
     CLIENT_DATA = [
         {
@@ -208,204 +211,291 @@ def run():
         )   
     
     """
-        PAGE_DATA = [
-            {
-            "client_id": "bahushira",
-            "page_id" : "home",
-            "ltext": "Home",
-            "parent_id": "",
-            "order": 1, 
-            "hidden": False
-            },
-            {
-            "client_id": "bahushira",
-            "page_id" : "about",
-            "ltext": "About",
-            "parent_id": "",
-            "order": 2, 
-            "hidden": False
-            },        
-            {
-            "client_id": "bahushira",
-            "page_id" : "team",
-            "ltext": "Team",
-            "parent_id": "",
-            "order": 3, 
-            "hidden": False
-            },        
-            {
-            "client_id": "bahushira",
-            "page_id" : "contact",
-            "ltext": "Contact",
-            "parent_id": "team",
-            "order": 4,
-            "hidden": False
+    """ Step 3 Mass upload """
+
+    # ── Helpers ───────────────────────────────────────────────────
+
+def get_content_type(model):
+    return ContentType.objects.get_for_model(model)
+
+
+def upload_stb_items(items_data, parent_obj):
+    """Create TextstbItem + SvgtextbadgeValue for any parent (GentextBlock or ComptextBlock)"""
+    ct = get_content_type(parent_obj.__class__)
+    for item_data in items_data:
+        item, created = TextstbItem.objects.get_or_create(
+            content_type=ct,
+            object_id=parent_obj.id,
+            item_id=item_data["item_id"],
+            order=item_data.get("order", 1),
+            defaults={
+                "ltext":     item_data.get("ltext", ""),
+                "hidden":    item_data.get("hidden", False),
+                "css_class": item_data.get("css_class", ""),
+                "svg_text":  item_data.get("svg_text", ""),
             }
-        ]
+        )
+        # Upload language values
+        for lang_id, val in item_data.get("values", {}).items():
+            try:
+                language = Language.objects.get(language_id=lang_id)
+            except Language.DoesNotExist:
+                print(f"  ⚠ Language '{lang_id}' not found — skipping")
+                continue
+            SvgtextbadgeValue.objects.get_or_create(
+                textstbitem=item,
+                language=language,
+                defaults={
+                    "stext": val.get("stext", ""),
+                    "ltext": val.get("ltext", ""),
+                }
+            )
 
-        clients = {c.client_id: c for c in Client.objects.all()}
-        # this may not update the currently created page
-        #pages = {c.page_id: c for c in Page.objects.all()}
-        for row in PAGE_DATA:
-            # Calculate the parent value using Python logic
-            if row["parent_id"] != "":
-                # Get the related Page2 object instance from the 'pages' dictionary
-                #parent_value = pages[row["parent_id"]]
-                parent_value = Page.objects.get(client.client_id = row["client_id"], page_id=row["parent_id"])
-                
-            else:
-                # Set to None if there is no parent_id, which corresponds to the null value in the database
-                parent_value = None
 
-            client_value = clients[row["client_id"]]
+def upload_comptextblocks(blocks_data, parent_obj):
+    """Create ComptextBlock + items for any parent (ComponentSlot etc)"""
+    ct = get_content_type(parent_obj.__class__)
+    for block_data in blocks_data:
+        block, created = ComptextBlock.objects.get_or_create(
+            content_type=ct,
+            object_id=parent_obj.id,
+            block_id=block_data["block_id"],
+            order=block_data.get("order", 1),
+            defaults={
+                "ltext":     block_data.get("ltext", ""),
+                "hidden":    block_data.get("hidden", False),
+                "css_class": block_data.get("css_class", ""),
+                "href_page": block_data.get("href_page", ""),
+            }
+        )
+        upload_stb_items(block_data.get("items", []), block)
 
-            Page.objects.update_or_create(
-                client = client_value,
-                page_id=row["page_id"],
-                ltext=row["ltext"],
-                parent= parent_value,
-                order=row["order"],
-                hidden=row["hidden"],
-            ) 
 
-                    
-    
+def upload_gentextblocks(blocks_data, parent_obj):
+    """Create GentextBlock + items for Client, Page or Theme"""
+    ct = get_content_type(parent_obj.__class__)
+    for block_data in blocks_data:
+        block, created = GentextBlock.objects.get_or_create(
+            content_type=ct,
+            object_id=parent_obj.id,
+            block_id=block_data["block_id"],
+            order=block_data.get("order", 1),
+            defaults={
+                "ltext":     block_data.get("ltext", ""),
+                "hidden":    block_data.get("hidden", False),
+                "css_class": block_data.get("css_class", ""),
+            }
+        )
+        upload_stb_items(block_data.get("items", []), block)
 
-        LAYOUT_DATA = [
-        {
-        "client_id": "bahushira",
-        "page_id" : "home",
-        "parent_slug": "",
-        "order": 1, 
-        "level": 10,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "",
-        },        
-        {
-        "client_id": "bahushira",
-        "page_id" : "home",
-        "parent_slug": "a",
-        "order": 1, 
-        "level": 20,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "",
-        },
-        {
-        "client_id": "bahushira",
-        "page_id" : "home",
-        "parent_slug": "a",
-        "order": 1, 
-        "level": 30,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "",
-        },
-        {
-        "client_id": "bahushira",
-        "page_id" : "home",
-        "parent_slug": "a",
-        "order": 1, 
-        "level": 40,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "hero",
-        }                
-    ]
+# ── Generic field extractor ───────────────────────────────────
+
+def extract_fields(model_class, data, exclude=None):
     """
+    Introspects model fields and extracts matching values from data dict.
+    Skips excluded fields, FK fields, and fields not present in data.
+    Returns a defaults dict ready for get_or_create.
     """
-    # Layout of Contact
-    LAYOUT_DATA = [
-        {
-        "client_id": "bahushira",
-        "page_id" : "contact",
-        "parent_slug": "",
-        "order": 1, 
-        "level": 10,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "",
-        },        
-        {
-        "client_id": "bahushira",
-        "page_id" : "contact",
-        "parent_slug": "a",
-        "order": 1, 
-        "level": 20,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "",
-        },
-        {
-        "client_id": "bahushira",
-        "page_id" : "contact",
-        "parent_slug": "a",
-        "order": 1, 
-        "level": 30,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "",
-        },
-        {
-        "client_id": "bahushira",
-        "page_id" : "contact",
-        "parent_slug": "a",
-        "order": 1, 
-        "level": 40,
-        "css_class": "",
-        "style": "",
-        "hidden": False,
-        "slug" : "a",
-        "comp_id": "hero",
-        }                
-    ]    
-    
-    clients = {c.client_id: c for c in Client.objects.all()}
-    pages = {(c.client.client_id, c.page_id): c for c in Page.objects.all()}
-    #layouts = {(c.client.client_id, c.page.page_id, c.slug, c.level): c for c in Layout.objects.all()}
+    exclude = set(exclude or [])
+    defaults = {}
 
-    for row in LAYOUT_DATA:
+    for field in model_class._meta.fields:
+        name = field.name
 
-        client_value = clients[row["client_id"]]
-        #page_value = pages.get((row["client_id"], row["page_id"]))
-        page_value = pages[(row["client_id"], row["page_id"])]
-        # Calculate the parent value using Python logic
-        if row["parent_slug"] != "":
-            # Get the related Layout object instance from the 'layouts' dictionary
-            #parent_value = layouts.get((row["client_id"], row["page_id"], row["parent_slug"], row["level"]-10))
-            # in the above code only the first row gets updated correctly. so we may have to update one row at a time
-            parent_value = Layout.objects.get(client=client_value, page=page_value, slug= row["parent_slug"], level=row["level"]-10)
+        # Skip excluded and FK fields (handled separately)
+        if name in exclude:
+            continue
+        if isinstance(field, django_models.ForeignKey):
+            continue
+
+        # Only include if key exists in data
+        if name not in data:
+            continue
+
+        value = data[name]
+
+        # Use field default if value is None
+        if value is None:
+            if field.has_default():
+                defaults[name] = field.default() if callable(field.default) else field.default
         else:
-            # Set to None if there is no parent_id, which corresponds to the null value in the database
-            parent_value = None
+            defaults[name] = value
+
+    return defaults
 
 
+# ── Upload functions ──────────────────────────────────────────
 
-        Layout.objects.update_or_create(
-            client = client_value,
-            page = page_value,
-            parent= parent_value,
-            order=row["order"],
-            level=row["level"],
-            css_class=row["css_class"],
-            style=row["style"],
-            hidden=row["hidden"],
-            slug=row["slug"],
-            comp_id=row["comp_id"],
-        ) 
+def upload_component(component_data, layout):
+    """Create Component + slots — generic, no hardcoded field names"""
+
+    # Extract all non-FK fields except layout and id
+    defaults = extract_fields(
+        Component,
+        component_data,
+        exclude={"id", "layout"}
+    )
+
+    component, created = Component.objects.get_or_create(
+        layout=layout,
+        defaults=defaults
+    )
+
+    upload_slots(component_data.get("slots", []), component)
+    return component
+
+
+def upload_slots(slots_data, component):
+    """Create ComponentSlot + comptextblocks — generic, no hardcoded field names"""
+
+    for slot_data in slots_data:
+
+        # Extract lookup fields separately
+        slot_type = slot_data["slot_type"]
+        order     = slot_data.get("order", 1)
+
+        # Extract remaining fields generically
+        defaults = extract_fields(
+            ComponentSlot,
+            slot_data,
+            exclude={"id", "component", "slot_type", "order"}
+        )
+
+        slot, created = ComponentSlot.objects.get_or_create(
+            component=component,
+            slot_type=slot_type,
+            order=order,
+            defaults=defaults
+        )
+
+        # Only text slots have comptextblocks
+        if slot_type == "text":
+            upload_comptextblocks(slot_data.get("comptextblocks", []), slot)
+
+
+def upload_layouts(layouts_data, page, slug_map=None):
     """
+    Recursively create Layout records — generic field extraction.
+    slug_map is keyed by (page_id, slug) to ensure uniqueness per page
+    not across the whole client.
+    """
+    if slug_map is None:
+        slug_map = {}
+
+    for layout_data in layouts_data:
+
+        # Resolve parent using (page, slug) as key
+        parent_slug = layout_data.get("parent_slug")
+        parent_layout = slug_map.get((page.page_id, parent_slug)) if parent_slug else None
+
+        # Extract lookup fields
+        level = layout_data["level"]
+        slug  = layout_data["slug"]
+
+        # Extract remaining fields generically
+        defaults = extract_fields(
+            Layout,
+            layout_data,
+            exclude={"id", "page", "level", "slug", "parent",
+                     "parent_slug", "component", "children"}
+        )
+        defaults["parent"] = parent_layout
+
+        layout, created = Layout.objects.get_or_create(
+            page=page,
+            level=level,
+            slug=slug,
+            defaults=defaults
+        )
+
+        # Register using (page_id, slug) as key — unique per page not client
+        slug_map[(page.page_id, slug)] = layout
+
+        # Upload component if level=40 and component data present
+        if level == 40 and layout_data.get("component"):
+            upload_component(layout_data["component"], layout)
+
+        # Recurse into children
+        if layout_data.get("children"):
+            upload_layouts(layout_data["children"], page, slug_map)
+
+    return slug_map
+
+def upload_pages(pages_data, client):
+    """Create Page records + their layouts"""
+    # Build page slug map for parent resolution
+    page_map = {}
+
+    for page_data in pages_data:
+        parent_page_id = page_data.get("parent_page_id")
+        parent_page = page_map.get(parent_page_id) if parent_page_id else None
+
+        page, created = Page.objects.get_or_create(
+            client=client,
+            page_id=page_data["page_id"],
+            defaults={
+                "ltext":  page_data.get("ltext", ""),
+                "order":  page_data.get("order", 0),
+                "hidden": page_data.get("hidden", False),
+                "parent": parent_page,
+            }
+        )
+        page_map[page_data["page_id"]] = page
+
+        upload_gentextblocks(page_data.get("gentextblocks", []), page)
+        upload_layouts(page_data.get("layouts", []), page)
+
+    return page_map
+
+
+# ── Main entry point ──────────────────────────────────────────
+
+@transaction.atomic
+def bulk_upload(json_data):
+    """
+    Main entry point. Pass either a dict or a JSON string.
+    Wrapped in transaction.atomic so everything rolls back on error.
+    """
+    if isinstance(json_data, str):
+        json_data = json.loads(json_data)
+
+    client_id = json_data["client_id"]
+
+    try:
+        client = Client.objects.get(client_id=client_id)
+    except Client.DoesNotExist:
+        raise ValueError(f"Client '{client_id}' does not exist. Create it first.")
+
+    print(f"Uploading data for client: {client_id}")
+
+    # Client level gentextblocks
+    upload_gentextblocks(json_data.get("gentextblocks", []), client)
+
+    # Pages + layouts + components
+    upload_pages(json_data.get("pages", []), client)
+
+    print(f"Upload complete for client: {client_id}")
+
+
+# ── Management command wrapper ────────────────────────────────
+
+# mysite/management/commands/bulk_upload.py
+# Usage: python manage.py bulk_upload path/to/data.json
+
+from django.core.management.base import BaseCommand
+
+class Command(BaseCommand):
+    help = "Bulk upload client page/layout/component data from JSON file"
+
+    def add_arguments(self, parser):
+        parser.add_argument("json_file", type=str, help="Path to JSON file")
+
+    def handle(self, *args, **options):
+        with open(options["json_file"], "r") as f:
+            json_data = json.load(f)
+        try:
+            bulk_upload(json_data)
+            self.stdout.write(self.style.SUCCESS("Bulk upload successful"))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"Bulk upload failed: {e}"))
+            raise

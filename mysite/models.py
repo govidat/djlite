@@ -246,8 +246,8 @@ class Client(models.Model):
     client_id = LowercaseCharField(max_length=25, unique=True, db_index=True)    
 
     parent = models.ForeignKey("self", null=True, blank=True, related_name="children", on_delete=models.CASCADE)
-    language_list = models.JSONField(null = True, blank = True, default=list, help_text="A JSON array of selected values from Language.")
-    theme_list = models.JSONField(null = True, blank = True, default=list)
+    language_list = models.JSONField(null = True, blank = True, default=lambda: ['en'], help_text="A JSON array of selected values from Language.")
+    theme_list = models.JSONField(null = True, blank = True, default=lambda: ['light'])
     # Add this to allow: client_instance.translations.all()
     #translations = GenericRelation(TextItemValue)
     gentextblocks = GenericRelation(GentextBlock)
