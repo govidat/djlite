@@ -1,0 +1,36 @@
+
+{% load my_tags %}
+
+{# Define defaults for all optional props at the top #}
+<c-vars svg_pre="" svg_suf="" textdict="" />
+
+{% comment %}
+This is to display a svg, text and svg in a single line.
+
+input:
+{
+svg_pre: 'xxx',
+textdict: {en: abc, hi: xyz...},
+svg_suf: xxx
+}
+
+ 
+
+{% endcomment %}
+
+ <div class="flex">
+    {% if svg_pre != '' %}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
+            d="{{svg_pre}}" /></svg>       
+    {% endif %}
+
+    {% if textdict != '' %}
+        {% mytext_labelv2 textdict as result_var %}
+                {{result_var}}        
+    {% endif %}
+    {% if svg_suf != '' %}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
+            d="{{svg_suf}}" /></svg>       
+    {% endif %}    
+
+</div>  

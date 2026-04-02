@@ -7,6 +7,13 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.fields import GenericRelation
 from html.parser import HTMLParser
 
+def default_languages():
+    return ['en']
+
+def default_themes():
+    return ['light']
+
+
 # Create your models here
 
 #Common component structrue:
@@ -246,11 +253,17 @@ class Client(models.Model):
     client_id = LowercaseCharField(max_length=25, unique=True, db_index=True)    
 
     parent = models.ForeignKey("self", null=True, blank=True, related_name="children", on_delete=models.CASCADE)
-    language_list = models.JSONField(null = True, blank = True, default=lambda: ['en'], help_text="A JSON array of selected values from Language.")
-    theme_list = models.JSONField(null = True, blank = True, default=lambda: ['light'])
+    language_list = models.JSONField(null = True, blank = True, default=default_languages, help_text="A JSON array of selected values from Language.")
+    theme_list = models.JSONField(null = True, blank = True, default=default_themes)
     # Add this to allow: client_instance.translations.all()
     #translations = GenericRelation(TextItemValue)
     gentextblocks = GenericRelation(GentextBlock)
+    # Translatable fields
+    name = models.CharField(max_length=100, blank=True, null=True)
+    nb_title = models.CharField(max_length=100, blank=True, null=True) 
+
+    nb_title_svg_pre = models.CharField(max_length=500, blank=True, null=True)
+    nb_title_svg_suf = models.CharField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return self.client_id
@@ -292,6 +305,10 @@ class Theme(models.Model):
     gentextblocks = GenericRelation(GentextBlock)
     overrides = models.JSONField(blank=True, null=True)
     is_default = models.BooleanField(default=False)    
+
+    # Translatable fields
+    name = models.CharField(max_length=40, blank=True, null=True)
+
 
     def __str__(self):
         return f"{self.client.client_id} / {self.theme_id}"
@@ -584,6 +601,8 @@ class Page(models.Model):
     )
     hidden = models.BooleanField(default=False)  
     gentextblocks = GenericRelation(GentextBlock)
+    # Translatable fields
+    name = models.CharField(max_length=40, blank=True, null=True)
 
     def __str__(self):
         return f"{self.client.client_id} / {self.page_id}"

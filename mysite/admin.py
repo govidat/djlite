@@ -1,10 +1,12 @@
 from django import forms
 from django.contrib import admin
 import nested_admin
+from modeltranslation.admin import TranslationAdmin, TranslationTabularInline, TranslationBaseModelAdmin
 #from django.contrib.contenttypes.admin import GenericTabularInline
 from .forms import ClientForm
 # Register your models here.
-
+#from .models import SUPPORTED_LANGUAGES   # your list of (code, label) tuples
+from django.conf import settings
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 
 from .models import Language, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
@@ -13,6 +15,78 @@ from .models import Language, ThemePreset, Client, Theme, ComptextBlock, Gentext
 
 # Option 3 Common Component Model
 from .models import Page, Layout, Component, ComponentSlot
+
+# ── Reusable mixin ────────────────────────────────────────────────────
+# Centralises the "climb up to Client and get language_list" logic
+# so ThemeInline, PageInline (and any future inline) can reuse it.
+
+class ClientLanguageMixin:
+    """
+    Mixin for any inline nested under Client.
+    Resolves the parent client's language_list from:
+      1. The inline object's own client FK (editing)
+      2. The URL's object_id (adding)
+      3. Fallback: all settings.LANGUAGES
+    """
+    TRANSLATED_FIELDS = ()   # override in each inline
+
+    def _get_client_languages(self, request, obj=None):
+        # Case 1: editing an existing inline object
+        if obj and obj.pk:
+            try:
+                return obj.client.language_list or self._all_lang_codes()
+            except AttributeError:
+                pass
+
+        # Case 2: adding — client_id is the object_id in the URL
+        client_id = request.resolver_match.kwargs.get('object_id')
+        if client_id:
+            try:
+                client = Client.objects.get(pk=client_id)
+                return client.language_list or self._all_lang_codes()
+            except Client.DoesNotExist:
+                pass
+
+        return self._all_lang_codes()
+
+    def _all_lang_codes(self):
+        return [code for code, _ in settings.LANGUAGES]
+
+    def _build_language_fieldsets(self, lang_codes, extra_fields=()):
+        """
+        Builds fieldsets like:
+          ('English', {'fields': ('name_en',)}),
+          ('Tamil',   {'fields': ('name_ta',)}),
+          ...
+          ('Common',  {'fields': ('zip_code', ...)})
+        """
+        lang_dict = dict(settings.LANGUAGES)
+        fieldsets = []
+        for code in lang_codes:
+            label = lang_dict.get(code, code.upper())
+            fields = tuple(f"{field}_{code}" for field in self.TRANSLATED_FIELDS)
+            fieldsets.append((label, {'fields': fields}))
+        if extra_fields:
+            fieldsets.append(('Common', {'fields': extra_fields}))
+        return fieldsets
+
+    def get_fieldsets(self, request, obj=None):
+        lang_codes = self._get_client_languages(request, obj)
+        return self._build_language_fieldsets(
+            lang_codes,
+            extra_fields=self.non_translated_fields
+        )
+
+    def get_fields(self, request, obj=None):
+        lang_codes = self._get_client_languages(request, obj)
+        fields = [
+            f"{field}_{code}"
+            for code in lang_codes
+            for field in self.TRANSLATED_FIELDS
+        ]
+        return fields + list(self.non_translated_fields)
+
+
 
 # VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
 class LanguageAdmin(admin.ModelAdmin):
@@ -191,6 +265,7 @@ class PageInline(nested_admin.NestedStackedInline):
     classes = ['collapse']
     #inlines = []
 """
+"""
 class ThemeInline(nested_admin.NestedStackedInline):
     model = Theme
     extra = 0
@@ -199,6 +274,22 @@ class ThemeInline(nested_admin.NestedStackedInline):
     inlines = [GentextBlockInline]
     classes = ['collapse']
     #inlines = []
+"""
+# ── ThemeInline ───────────────────────────────────────────────────────
+
+class ThemeInline(
+    ClientLanguageMixin,
+    TranslationBaseModelAdmin,
+    nested_admin.NestedStackedInline
+):
+    model = Theme
+    extra = 0
+    classes = ['collapse']
+    inlines = [GentextBlockInline]
+
+    TRANSLATED_FIELDS = ('name',)
+    non_translated_fields = ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default')   # adjust to your actual fields
+
 
 class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
     model = ComptextBlock
@@ -254,14 +345,63 @@ class LayoutInline(nested_admin.NestedStackedInline):
     class Media:
         js = ("admin/js/layout_admin.js",)
 
-
+"""
 class PageInline(nested_admin.NestedStackedInline):
     model = Page
     extra = 0
     classes = ['collapse']
     inlines = [GentextBlockInline, LayoutInline]
+"""
+class PageInline(
+    ClientLanguageMixin,
+    TranslationBaseModelAdmin,
+    nested_admin.NestedStackedInline
+):
+    model = Page
+    extra = 0
+    classes = ['collapse']
+    inlines = [GentextBlockInline, LayoutInline]                        # whatever Page's child inline is
+
+    TRANSLATED_FIELDS = ('name',)                   # add more if Page has other translated fields
+    non_translated_fields = ('page_id', 'ltext', 'order', 'parent', 'hidden')    # adjust to your actual fields
 
 
+@admin.register(Client)
+class ClientAdmin(TranslationBaseModelAdmin, nested_admin.NestedModelAdmin):
+    form = ClientForm
+    list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
+    inlines = [GentextBlockInline, ThemeInline, PageInline]
+
+    TRANSLATED_FIELDS = ('name', 'nb_title')   # add more here as needed
+
+    
+    def _language_fieldsets(self, lang_codes):
+        lang_dict = dict(settings.LANGUAGES)       # ← from settings directly
+        return [
+            (lang_dict.get(code, code.upper()), {
+                'fields': tuple(f"{field}_{code}" for field in self.TRANSLATED_FIELDS)
+            })
+            for code in lang_codes
+        ]    
+
+    def get_fieldsets(self, request, obj=None):
+        # Determine which languages to show
+        if obj and obj.language_list:
+            lang_codes = obj.language_list          # editing: use saved list
+        else:
+            lang_codes = [code for code, _ in settings.LANGUAGES]  # adding: show all
+
+        return [
+            ('Identity', {
+                'fields': ('client_id', 'parent', 'language_choices', 'nb_title_svg_pre', 'nb_title_svg_suf' )
+            }),
+            *self._language_fieldsets(lang_codes),
+        ]
+
+    class Media:
+        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
+
+"""
 @admin.register(Client)
 class ClientAdmin(nested_admin.NestedModelAdmin):
     #list_display = ("client_id", "parent")
@@ -273,7 +413,8 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
     inlines = [GentextBlockInline, ThemeInline, PageInline]
     class Media:
         js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
-        
+"""
+
 admin.site.register(Language, LanguageAdmin)
 admin.site.register(ThemePreset, ThemePresetAdmin)
 

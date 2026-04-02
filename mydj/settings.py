@@ -19,6 +19,7 @@ import sys # debug-toolbar
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+from django.utils.translation import gettext_lazy as _
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -36,6 +37,7 @@ TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ  # debug-toolbar
 # Application definition
 
 INSTALLED_APPS = [
+    'modeltranslation',   # must be BEFORE django.contrib.admin
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -176,12 +178,20 @@ ACCOUNT_EMAIL_VERIFICATION = "none"  # allauth
 
 LOGIN_REDIRECT_URL = "/"  # allauth
 
-LANGUAGES = [           # i18n
-    ('en', 'English'),
-    ('fr', 'French'),
-    ('hi', 'Hindi')
-]
 
+#LANGUAGES = [           # i18n
+#    ('en', 'English'),
+#    ('fr', 'French'),
+#    ('hi', 'Hindi'),
+#    ('ta', 'Tamil')
+#]
+
+LANGUAGES = [
+    ('en', _('English')),
+    ('hi', _('Hindi')),
+    ('fr', _('French')),
+    ('ta', _('Tamil')),    
+]
 # importing the constants from constants.py
 # PC_NAVBAR_ITEMS = PC_NAVBAR_ITEMS 
 #PC_THEMES = PC_THEMES 

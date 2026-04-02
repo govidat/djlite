@@ -20,15 +20,13 @@
 
     <h1 class="text-xl font-bold">
       
+
+      {% comment %}
       {% mylist_bykey client.textblocks 'nb_title' 'block_id' as result_var %}
-      {% comment %}
-      {% with lv_nb_title=client.textblocks.nb_title %}
-      {% endcomment %}
         <h1 class="text-xl font-bold {{result_var.css_class|default:""}}">
-        <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
-      {% comment %}
-      {% endwith %}
-      {% endcomment %} 
+        <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>      
+      {% endcomment %}
+      <c-svgtextsvg  :textdict="client.translations.nb_title" :svg_pre="client.translations.nb_title_svg_pre" :svg_suf="client.translations.nb_title_svg_suf"></c-svgtextsvg>
     </h1>
 
   </div>
@@ -49,3 +47,25 @@
     
   </div>
 </div>
+
+{% comment %}
+
+input 
+cilent: {
+"client_id": "bahushira",
+"translations": {
+  "name": {
+    "en": "Bahushira2",
+    "hi": "hiBahushira2",
+    "fr": "frBahushira2",
+    "ta": null
+  },
+  "nb_title": {
+    "en": "Bahushira2 Title",
+    "hi": "hiBahushira2 Title",
+    "fr": "frBahushira2 Title",
+    "ta": null
+  }
+},
+}
+{% endcomment %}

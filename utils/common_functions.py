@@ -8,6 +8,8 @@ from mysite.models import Page, Layout, Component, ComponentSlot
 from django.db.models import Prefetch
 from django.db.models import ForeignKey
 
+from modeltranslation.translator import translator, NotRegistered
+from django.conf import settings
 
 from django.contrib.contenttypes.models import ContentType
 
@@ -26,7 +28,58 @@ def get_prefetched(obj, attr):
 
 """
 
+"""
+def get_translated_fields(instance):
+
+    try:
+        opts = translator.get_options_for_model(type(instance))
+        translated_field_names = opts.fields.keys()  # e.g. ('name', 'nb_title')
+    except Exception:
+        return {}
+
+    result = {}
+    for field_name in translated_field_names:
+        result[field_name] = {
+            lang_code: getattr(instance, f"{field_name}_{lang_code}", None)
+            for lang_code, _ in settings.LANGUAGES
+        }
+    return result
+
+
+def get_non_translated_fields(instance, exclude_fields=None):
+
+    from django.db.models.fields.related import RelatedField
+    from django.db.models.fields import AutoField
+
+    exclude_fields = set(exclude_fields or [])
+
+    # Get translated field names to exclude them
+    try:
+        opts = translator.get_options_for_model(type(instance))
+        translated_names = set(opts.fields.keys())
+        # Also exclude the language-specific column names e.g. name_en, name_ta
+        for field_name in translated_names:
+            for lang_code, _ in settings.LANGUAGES:
+                translated_names.add(f"{field_name}_{lang_code}")
+    except Exception:
+        translated_names = set()
+
+    result = {}
+    for field in instance._meta.get_fields():
+        # Skip relations, auto fields, translated fields, excluded fields
+        if isinstance(field, (RelatedField, AutoField)):
+            continue
+        if not hasattr(field, 'column'):        # skip reverse relations
+            continue
+        if field.name in translated_names:
+            continue
+        if field.name in exclude_fields:
+            continue
+        result[field.name] = getattr(instance, field.name, None)
+    return result
+"""
 # this is used extensively in build programs to serialize data.
+"""
 def serialize_model(instance, exclude=None):
     exclude = set(exclude or [])
     data = {}
@@ -37,12 +90,6 @@ def serialize_model(instance, exclude=None):
             continue
 
         value = getattr(instance, name)
-        """
-        if isinstance(field, ForeignKey):
-            data[name] = getattr(instance, f"{name}_id")
-        else:
-            data[name] = value or None
-        """
         if isinstance(field, ForeignKey):
             value = getattr(instance, f"{name}_id")
 
@@ -51,7 +98,64 @@ def serialize_model(instance, exclude=None):
             data[name] = value
 
     return data
+"""
 
+# Plain model, no translated fields
+#serialize_model(layout, exclude={'id'})
+
+# Model with translated fields (name, nb_title)
+#serialize_model(client, exclude={'parent', 'language_list'})
+# Output includes 'translations': {'name': {'en': ..., 'ta': ...}, 'nb_title': {...}}
+
+# Skip translations if not needed
+#serialize_model(client, exclude={'parent'}, include_translations=False)
+
+def serialize_model(instance, exclude=None, include_translations=True):
+    exclude = set(exclude or [])
+
+    # ── Identify base translated fields and all their generated columns ──
+    base_translated_fields = set()
+    generated_lang_columns = set()
+    try:
+        opts = translator.get_options_for_model(type(instance))
+        base_translated_fields = set(opts.fields)   # {'name', 'nb_title'}
+        for field_name in base_translated_fields:
+            for lang_code, _ in settings.LANGUAGES:
+                generated_lang_columns.add(f"{field_name}_{lang_code}")
+    except NotRegistered:
+        pass  # model has no translated fields — that's fine
+
+    # ── Plain fields ──────────────────────────────────────────────────
+    data = {}
+    for field in instance._meta.fields:
+        name = field.name
+
+        if name in exclude:
+            continue
+        if name in base_translated_fields:
+            continue        # virtual proxy field — skip, handled in translations dict
+        if name in generated_lang_columns:
+            continue        # e.g. name_en, name_hi — skip, grouped below
+
+        if isinstance(field, ForeignKey):
+            value = getattr(instance, f"{name}_id")
+        else:
+            value = getattr(instance, name)
+
+        if value is not None:
+            data[name] = value
+
+    # ── Grouped translations dict ─────────────────────────────────────
+    if include_translations and base_translated_fields:
+        data['translations'] = {
+            field_name: {
+                lang_code: getattr(instance, f"{field_name}_{lang_code}", None)
+                for lang_code, _ in settings.LANGUAGES
+            }
+            for field_name in base_translated_fields
+        }
+
+    return data
 #Step 1: Universal Prefetch for TextContent Tree
 # Universal Text Block Tree
 
@@ -917,12 +1021,21 @@ def build_page_tree(pages):
         page_vis = visible(page)
         if not page_vis:
             return None        
+        
+        # Use serialize_model to get the grouped translations dict
+        # just like build_page does — exclude layout-irrelevant fields
+        serialized = serialize_model(
+            page,
+            exclude={'id', 'ltext', 'hidden'},
+            include_translations=True
+        )
 
         node_map[page.id] = {
             "client_id": page.client.client_id,
             "page_id": page.page_id,
             "order": page.order,
-            "textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
+            "translations": serialized.get('translations', {}),
+            #"textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
             "children": []
         }
 
@@ -1065,7 +1178,7 @@ def build_layout(layout, layout_map):
 
     return layout_data
 
-
+"""
 def build_page(page):
     page = visible(page)
     if not page:
@@ -1090,9 +1203,69 @@ def build_page(page):
         "textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
         "layouts":    layouts,
     }
+"""
+
+"""
+def build_page(page):
+    page = visible(page)
+    if not page:
+        return None
+
+    all_layouts = list(getattr(page, "prefetched_layouts3", []))
+    layout_map = {}
+    root_layouts = []
+    for layout in all_layouts:
+        if layout.parent_id:
+            layout_map.setdefault(layout.parent_id, []).append(layout)
+        else:
+            root_layouts.append(layout)
+    layouts = [build_layout(l, layout_map) for l in root_layouts]
+    layouts = [l for l in layouts if l]
+
+    return {
+        # ── Stable identity fields ─────────────────────────────────
+        "page_id":          page.page_id,
+
+        # ── All plain fields auto-extracted ────────────────────────
+        # Captures order, hidden, slug, and any future fields added
+        # to Page without needing to update this function.
+        **get_non_translated_fields(page, exclude_fields={'page_id'}),
+
+        # ── All translated fields auto-extracted ───────────────────
+        # Captures name, nb_title etc. for all languages.
+        # Output: {'name': {'en': 'Home', 'ta': 'முகப்பு'}, ...}
+        "translations":     get_translated_fields(page),
+
+        # ── Related data ───────────────────────────────────────────
+        "textblocks":       build_blocks(getattr(page, "prefetched_gentextblocks", [])),
+        "layouts":          layouts,
+    }
+"""
+def build_page(page):
+    page = visible(page)
+    if not page:
+        return None
+
+    all_layouts = list(getattr(page, "prefetched_layouts3", []))
+    layout_map = {}
+    root_layouts = []
+    for layout in all_layouts:
+        if layout.parent_id:
+            layout_map.setdefault(layout.parent_id, []).append(layout)
+        else:
+            root_layouts.append(layout)
+    layouts = [build_layout(l, layout_map) for l in root_layouts]
+    layouts = [l for l in layouts if l]
+
+    return {
+        **serialize_model(page, exclude={'id'}),
+        #"textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
+        "layouts":    layouts,
+    }
 
 
 # 7️⃣ FINAL: build_client_payload()
+"""
 def build_client_payload(client):
 
     # Create a lookup dictionary
@@ -1155,9 +1328,95 @@ def build_client_payload(client):
 
 
     }
+"""
+"""
+def build_client_payload(client):
+    # ── Languages ──────────────────────────────────────────────────
+    languages_qs = Language.objects.filter(language_id__in=client.language_list)
+    language_lookup = {l.language_id: l for l in languages_qs}
+    lv_languages = [
+        {
+            "language_id": lang_id,
+            "labels":      language_lookup[lang_id].label_obj
+        }
+        for lang_id in client.language_list
+        if lang_id in language_lookup
+    ]
 
+    # ── Themes ─────────────────────────────────────────────────────
+    lv_themes = []
+    for theme in getattr(client, "prefetched_themes", []):
+        lv_themes.append({
+            "theme_id":   theme.theme_id,
 
+            # Auto-extract all plain fields (order, is_default, ltext etc.)
+            **get_non_translated_fields(theme, exclude_fields={'theme_id'}),
+
+            # Auto-extract all translated fields (name etc.)
+            "translations": get_translated_fields(theme),
+
+            "textblocks": build_blocks(getattr(theme, "prefetched_gentextblocks", [])),
+            "tokens":     resolve_theme(theme),
+        })
+
+    # ── Pages ──────────────────────────────────────────────────────
+    all_pages = list(getattr(client, "prefetched_pages", []))
+
+    return {
+        # ── Stable identity fields ─────────────────────────────────
+        "client_id":    client.client_id,
+
+        # ── All plain fields auto-extracted ────────────────────────
+        # Captures any new fields added to Client automatically.
+        **get_non_translated_fields(
+            client,
+            exclude_fields={'client_id', 'language_list', 'parent'}
+        ),
+
+        # ── All translated fields auto-extracted ───────────────────
+        # Captures name, nb_title and any future translated fields.
+        "translations": get_translated_fields(client),
+
+        # ── Related data ───────────────────────────────────────────
+        "languages":    lv_languages,
+        "themes":       lv_themes,
+        "textblocks":   build_blocks(getattr(client, "prefetched_gentextblocks", [])),
+        "pages":        [build_page(page) for page in all_pages],
+        "page_tree":    build_page_tree([p for p in all_pages if not p.hidden]),
+    }
+"""
+def build_client_payload(client):
+    languages_qs = Language.objects.filter(language_id__in=client.language_list)
+    language_lookup = {l.language_id: l for l in languages_qs}
+    lv_languages = [
+        {
+            "language_id": lang_id,
+            "labels":      language_lookup[lang_id].label_obj
+        }
+        for lang_id in client.language_list
+        if lang_id in language_lookup
+    ]
+
+    lv_themes = []
+    for theme in getattr(client, "prefetched_themes", []):
+        lv_themes.append({
+            **serialize_model(theme, exclude={'id'}),
+            #"textblocks": build_blocks(getattr(theme, "prefetched_gentextblocks", [])),
+            "tokens":     resolve_theme(theme),
+        })
+
+    all_pages = list(getattr(client, "prefetched_pages", []))
+
+    return {
+        **serialize_model(client, exclude={'id', 'parent', 'language_list'}),
+        "languages":  lv_languages,
+        "themes":     lv_themes,
+        #"textblocks": build_blocks(getattr(client, "prefetched_gentextblocks", [])),
+        "pages":      [build_page(page) for page in all_pages],
+        "page_tree":  build_page_tree([p for p in all_pages if not p.hidden]),
+    }
 # temporarily marking use_cache = False. To be changed after debugging
+# instead of gentext block for name, nb_title have alreaady added modeltranslation fields.
 def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeout=3600):
     """
     Fetch clientstatic with optional caching.
@@ -1183,13 +1442,13 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeou
             Client.objects
             #.select_related("parent")  # Add this if you access parent -- also modify build_client_payload
             .prefetch_related(
-                gentextblock_prefetch,
+                #gentextblock_prefetch,
                 Prefetch(
                     "pages",
                     queryset=Page.objects.select_related(
                         "parent"
                     ).prefetch_related(
-                        gentextblock_prefetch,
+                        #gentextblock_prefetch,
                         layout_prefetch,
                     ).order_by("order"),
                     to_attr="prefetched_pages"
@@ -1198,9 +1457,9 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeou
                     "themes",
                     queryset=Theme.objects
                         .select_related("themepreset")  # IMPORTANT
-                        .prefetch_related(
-                            gentextblock_prefetch,
-                        )
+                        #.prefetch_related(
+                        #    gentextblock_prefetch,
+                        #)
                         .order_by("order"),
                         to_attr="prefetched_themes"
                 ) 

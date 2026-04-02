@@ -6,6 +6,14 @@
       "theme_id": "dark",
       "ltext": "None",
       "is_default": "False",
+      "translations": {
+        "name": {
+          "en": "Light2",
+          "hi": "hiLight2",
+          "fr": "frLight2",
+          "ta": null
+        }
+      },
       "textblocks": [
         {
           "block_id": "name",
@@ -86,10 +94,12 @@
                  btn-active
                  {% endif %}">
           {% comment %}
-          def mytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_position0=0)
-          {% endcomment %}
           {% mylist_bykey t.textblocks 'name' 'block_id' as result_var %}
           <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
+          {{t.translations.name|default:''}}
+                    
+          {% endcomment %}
+          <c-svgtextsvg  :textdict="t.translations.name" :svg_pre="t.svg_pre" :svg_suf="t.svg_suf"></c-svgtextsvg>
         </button>
       </li>
       {% endfor %}
