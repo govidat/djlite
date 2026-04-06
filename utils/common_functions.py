@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
 
-from mysite.models import Language, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
+from mysite.models import ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 #from mysite.models import Card, Hero, Accordion, Layout, Page, HeroText, HeroCardText, AccordionText
 from mysite.models import Page, Layout, Component, ComponentSlot 
 
@@ -158,7 +158,7 @@ def serialize_model(instance, exclude=None, include_translations=True):
     return data
 #Step 1: Universal Prefetch for TextContent Tree
 # Universal Text Block Tree
-
+"""
 stbitem_qs = (
     TextstbItem.objects
     .select_related()  # important
@@ -166,6 +166,18 @@ stbitem_qs = (
         Prefetch(
             "svgtextbadgevalue_set",
             queryset=SvgtextbadgeValue.objects.select_related("language"),
+            to_attr="prefetched_svgtextbadgevalues"
+        )
+    )
+    .order_by("order")
+)
+"""
+stbitem_qs = (
+    TextstbItem.objects
+    .prefetch_related(
+        Prefetch(
+            "svgtextbadgevalue_set",
+            queryset=SvgtextbadgeValue.objects.all(),  # no select_related needed
             to_attr="prefetched_svgtextbadgevalues"
         )
     )
@@ -214,6 +226,7 @@ gentextblock_prefetch = Prefetch(
 )
 
 # Option 3 Ccommon Components
+"""
 comptextblock_qs = ComptextBlock.objects.prefetch_related(
     Prefetch(
         "textstbitems",
@@ -221,6 +234,20 @@ comptextblock_qs = ComptextBlock.objects.prefetch_related(
             Prefetch(
                 "svgtextbadgevalue_set",
                 queryset=SvgtextbadgeValue.objects.select_related("language"),
+                to_attr="prefetched_svgtextbadgevalues",
+            )
+        ).order_by("order"),
+        to_attr="prefetched_stbitems",
+    )
+).order_by("order")
+"""
+comptextblock_qs = ComptextBlock.objects.prefetch_related(
+    Prefetch(
+        "textstbitems",
+        queryset=TextstbItem.objects.prefetch_related(
+            Prefetch(
+                "svgtextbadgevalue_set",
+                queryset=SvgtextbadgeValue.objects.all(),  # no select_related needed
                 to_attr="prefetched_svgtextbadgevalues",
             )
         ).order_by("order"),
@@ -389,7 +416,7 @@ def visible(obj):
 
 
 # 1️⃣ Lowest Layer — SvgtextbadgeValue
-
+"""
 def build_values(item):
     
     # Uses prefetched values instead of hitting DB again.
@@ -405,6 +432,20 @@ def build_values(item):
 
     return {
         val.language.language_id: {
+            "stext": val.stext,
+            "ltext": val.ltext,
+        }
+        for val in values
+    }
+"""
+def build_values(item):
+    values = getattr(item, "prefetched_svgtextbadgevalues", None)
+    if values is None:
+        # Fallback — no select_related needed, language_code is a plain column
+        values = item.svgtextbadgevalue_set.all()
+
+    return {
+        val.language_code: {
             "stext": val.stext,
             "ltext": val.ltext,
         }
@@ -1386,6 +1427,7 @@ def build_client_payload(client):
     }
 """
 def build_client_payload(client):
+    """
     languages_qs = Language.objects.filter(language_id__in=client.language_list)
     language_lookup = {l.language_id: l for l in languages_qs}
     lv_languages = [
@@ -1396,6 +1438,7 @@ def build_client_payload(client):
         for lang_id in client.language_list
         if lang_id in language_lookup
     ]
+    """
 
     lv_themes = []
     for theme in getattr(client, "prefetched_themes", []):
@@ -1409,7 +1452,8 @@ def build_client_payload(client):
 
     return {
         **serialize_model(client, exclude={'id', 'parent', 'language_list'}),
-        "languages":  lv_languages,
+        "languages":  client.language_list, 
+        #lv_languages,
         "themes":     lv_themes,
         #"textblocks": build_blocks(getattr(client, "prefetched_gentextblocks", [])),
         "pages":      [build_page(page) for page in all_pages],

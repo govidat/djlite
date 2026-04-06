@@ -1,6 +1,6 @@
 # forms.py
 from django import forms
-from .models import Language, Client
+from .models import Client
 from django.conf import settings
 
 class ClientForm(forms.ModelForm):

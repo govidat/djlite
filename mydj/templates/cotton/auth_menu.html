@@ -1,0 +1,159 @@
+{% load i18n %}
+
+<c-vars />
+
+<div class="dropdown dropdown-end">
+
+  {# ── Trigger Button ─────────────────────────────────────────── #}
+  <div tabindex="0" role="button"
+       class="btn btn-ghost btn-sm gap-2 px-2">
+
+    {% if request.user.is_authenticated %}
+
+      {# Desktop: show text label #}
+      <span class="hidden sm:inline text-sm font-medium">
+        {{ request.user.email|truncatechars:20 }}
+      </span>
+
+      {# Mobile: user icon #}
+      <svg xmlns="http://www.w3.org/2000/svg"
+           fill="none" viewBox="0 0 24 24"
+           stroke-width="1.5" stroke="currentColor"
+           class="size-5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z
+             M4.501 20.118a7.5 7.5 0 0 1 14.998 0
+             A17.933 17.933 0 0 1 12 21.75
+             c-2.676 0-5.216-.584-7.499-1.632Z" />
+      </svg>
+
+    {% else %}
+
+      {# Desktop: show text label #}
+      <span class="hidden sm:inline text-sm font-medium">
+        {% trans "Sign In / Sign Up" %}
+      </span>
+
+      {# Mobile: keyhole icon #}
+      <svg xmlns="http://www.w3.org/2000/svg"
+           fill="none" viewBox="0 0 24 24"
+           stroke-width="1.5" stroke="currentColor"
+           class="size-5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912
+             c-.563-.097-1.159.026-1.563.43
+             L10.5 17.25H8.25v2.25H6v2.25H2.25
+             v-2.818c0-.597.237-1.17.659-1.591
+             l6.499-6.499
+             c.404-.404.527-1 .43-1.563
+             A6 6 0 0 1 21.75 8.25Z" />
+      </svg>
+
+      {# Dropdown chevron #}
+      <svg width="10px" height="10px"
+           class="hidden sm:inline fill-current opacity-50"
+           xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048">
+        <path d="M1799 349l242 241-1017 1017L7 590l242-241 775 775 775-775z"/>
+      </svg>
+
+    {% endif %}
+  </div>
+
+  {# ── Dropdown Menu ──────────────────────────────────────────── #}
+  <ul tabindex="0"
+      class="dropdown-content menu bg-base-200 rounded-box
+             z-50 w-52 p-2 shadow-xl mt-1">
+
+    {% if request.user.is_authenticated %}
+
+      {# Logged-in user info header #}
+      <li class="menu-title text-xs opacity-60 px-2 py-1 truncate">
+        {{ request.user.email }}
+      </li>
+      <div class="divider my-0.5"></div>
+
+      {# Change Password #}
+      <li>
+        <a href="{% url 'account_change_password' %}"
+           class="gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               fill="none" viewBox="0 0 24 24"
+               stroke-width="1.5" stroke="currentColor"
+               class="size-4">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75
+                 m-.75 11.25h10.5
+                 a2.25 2.25 0 0 0 2.25-2.25v-6.75
+                 a2.25 2.25 0 0 0-2.25-2.25H6.75
+                 a2.25 2.25 0 0 0-2.25 2.25v6.75
+                 a2.25 2.25 0 0 0 2.25 2.25Z" />
+          </svg>
+          {% trans "Change Password" %}
+        </a>
+      </li>
+
+      {# Sign Out — allauth uses POST for logout #}
+      <li>
+        <form method="post" action="{% url 'account_logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="gap-3 w-full text-left text-error">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 fill="none" viewBox="0 0 24 24"
+                 stroke-width="1.5" stroke="currentColor"
+                 class="size-4">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6
+                   a2.25 2.25 0 0 0-2.25 2.25v13.5
+                   A2.25 2.25 0 0 0 7.5 21h6
+                   a2.25 2.25 0 0 0 2.25-2.25V15
+                   m3 0 3-3m0 0-3-3m3 3H9" />
+            </svg>
+            {% trans "Sign Out" %}
+          </button>
+        </form>
+      </li>
+
+    {% else %}
+
+      {# Sign In #}
+      <li>
+        <a href="{% url 'account_login' %}" class="gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               fill="none" viewBox="0 0 24 24"
+               stroke-width="1.5" stroke="currentColor"
+               class="size-4">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6
+                 a2.25 2.25 0 0 0-2.25 2.25v13.5
+                 A2.25 2.25 0 0 0 7.5 21h6
+                 a2.25 2.25 0 0 0 2.25-2.25V15
+                 M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+          </svg>
+          {% trans "Sign In" %}
+        </a>
+      </li>
+
+      {# Sign Up #}
+      <li>
+        <a href="{% url 'account_signup' %}" class="gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               fill="none" viewBox="0 0 24 24"
+               stroke-width="1.5" stroke="currentColor"
+               class="size-4">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3
+                 m-2.25-4.125a3.375 3.375 0 1 1-6.75 0
+                 3.375 3.375 0 0 1 6.75 0Z
+                 M4 19.235v-.11
+                 a6.375 6.375 0 0 1 12.75 0v.109
+                 A12.318 12.318 0 0 1 10.374 21
+                 c-2.331 0-4.512-.645-6.374-1.766Z" />
+          </svg>
+          {% trans "Sign Up" %}
+        </a>
+      </li>
+
+    {% endif %}
+
+  </ul>
+</div>

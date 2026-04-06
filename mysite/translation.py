@@ -1,5 +1,10 @@
 from modeltranslation.translator import register, TranslationOptions
-from .models import Client, Theme, Page
+from .models import GlobalVal, Client, Theme, Page
+
+@register(GlobalVal)
+class GlobalValTranslationOptions(TranslationOptions):
+    fields = ('keyval',)
+    required_languages = ('en',)
 
 @register(Client)
 class ClientTranslationOptions(TranslationOptions):

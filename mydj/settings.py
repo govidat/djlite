@@ -94,6 +94,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'mydj.context_processors.settings_constants', # context_processors
+                'mydj.context_processors.globalval',      # context_processors for globalval
             ],
             "loaders": [(                   # cotton
                 "django.template.loaders.cached.Loader",
@@ -168,8 +169,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # django-allauth configurations # allauth
 AUTHENTICATION_BACKENDS = [
+    # Needed to login by username in Django admin, regardless of `allauth`
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",  # new
+
+    # `allauth` specific authentication methods, such as login by email
+    'allauth.account.auth_backends.AuthenticationBackend',  # allauth 
 ]
 
 SITE_ID = 1  # allauth

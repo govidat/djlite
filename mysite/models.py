@@ -19,9 +19,9 @@ def default_themes():
 #Common component structrue:
 """
 Client
-    ├── GentextBlock    
+    ├── name using modelTranslation #GentextBlock    
     ├── Page
-        ├── GentextBlock    
+        ├── name using modelTranslation #GentextBlock    
         ├── Layout @level 40
             ├── Component (onetoone at level=40, compl0_id = hero, card, accordion etc... + some fields at this level)
                      ├── ComponentSlot (foreign key compl1_id= figure, text + some fields that may be applicable for each of this)
@@ -29,7 +29,7 @@ Client
 
     ├── Themes
         ├── themepreset
-        └── gentextblocks                        
+        └── name using modelTranslation #GentextBlock                        
            
 GentextBlock (content_type) (name / nb_title / nb_logo) # used in Client, Page
 └──TextstbItem (content_type) (text / svg / badge)
@@ -77,7 +77,8 @@ class LowercaseCharField(models.CharField):
         if value is not None:
             return value.lower()
         return value
-
+"""
+This is deprecated and we are using the settings.Language value and globalval for descriptions.
 class Language(models.Model):
     # id = LowercaseCharField(max_length=2, primary_key=True)
     language_id = LowercaseCharField(max_length=2, unique=True, db_index=True)    
@@ -90,7 +91,7 @@ class Language(models.Model):
     class Meta:
         verbose_name = "00-01 Project Language"
         ordering = ["language_id"]    
-
+"""
 class ThemePreset(models.Model):
     themepreset_id = LowercaseCharField(max_length=25, unique=True, db_index=True)
     ltext = models.CharField(max_length=50, blank=True, null=True, validators=text_field_validators)   # Optional
@@ -147,8 +148,36 @@ class ThemePreset(models.Model):
 
     # for usage in Admin Panel
     class Meta:
-        verbose_name = "00-02 Project ThemePresets"
+        verbose_name = "00-02 Project ThemePreset"
         ordering = ["themepreset_id"]    
+
+class GlobalValCat(models.Model):
+    globalvalcat_id = LowercaseCharField(max_length=25, primary_key=True)
+
+    class Meta:
+        verbose_name        = "00-01 Project Global Value Category"
+        verbose_name_plural = "00-01 Project Global Value Categories"
+        ordering            = ['globalvalcat_id']
+
+    def __str__(self):
+        return self.globalvalcat_id
+
+
+class GlobalVal(models.Model):
+    globalvalcat = models.ForeignKey(
+        GlobalValCat,
+        on_delete=models.CASCADE,
+        related_name='globalvals'
+    )
+    key    = models.CharField(max_length=100)
+    keyval = models.CharField(max_length=500)   # modeltranslation expands to keyval_en, keyval_hi etc.
+
+    class Meta:
+        unique_together = ('globalvalcat', 'key')
+        ordering        = ['globalvalcat__globalvalcat_id', 'key']
+
+    def __str__(self):
+        return f"{self.globalvalcat_id}.{self.key}"
 
 class TextstbItem(models.Model):
     #block = models.ForeignKey(TextBlock, related_name="items", on_delete=models.CASCADE)
@@ -184,13 +213,14 @@ class TextstbItem(models.Model):
 
 class SvgtextbadgeValue(models.Model):
     textstbitem = models.ForeignKey(TextstbItem, on_delete=models.CASCADE)
-    language = models.ForeignKey(Language, on_delete=models.CASCADE)    
+    #zzlanguage = models.ForeignKey(Language, on_delete=models.CASCADE) 
+    language_code = LowercaseCharField(max_length=2, null=True, blank=True)   # stores 'en', 'fr', 'hi' etc.
     stext = models.CharField(max_length=255, null=True, blank=True, validators=text_field_validators)
     ltext = models.TextField(null=True, blank=True, validators=text_field_validators)
     def __str__(self):
         return f"{self.stext} / ({self.ltext})"
     class Meta:
-        unique_together = ("textstbitem", "language")
+        unique_together = ("textstbitem", "language_code" )
         verbose_name = "01-06c Svg Text Badge(STB) Item value"
 
 class ComptextBlock(models.Model):
@@ -257,7 +287,7 @@ class Client(models.Model):
     theme_list = models.JSONField(null = True, blank = True, default=default_themes)
     # Add this to allow: client_instance.translations.all()
     #translations = GenericRelation(TextItemValue)
-    gentextblocks = GenericRelation(GentextBlock)
+    #gentextblocks = GenericRelation(GentextBlock)
     # Translatable fields
     name = models.CharField(max_length=100, blank=True, null=True)
     nb_title = models.CharField(max_length=100, blank=True, null=True) 
@@ -302,7 +332,7 @@ class Theme(models.Model):
     order = models.PositiveIntegerField(default=0)
     hidden = models.BooleanField(default=False)
     # Add this to allow: client_instance.translations.all()
-    gentextblocks = GenericRelation(GentextBlock)
+    #gentextblocks = GenericRelation(GentextBlock)
     overrides = models.JSONField(blank=True, null=True)
     is_default = models.BooleanField(default=False)    
 
@@ -600,7 +630,7 @@ class Page(models.Model):
         on_delete=models.CASCADE
     )
     hidden = models.BooleanField(default=False)  
-    gentextblocks = GenericRelation(GentextBlock)
+    #gentextblocks = GenericRelation(GentextBlock)
     # Translatable fields
     name = models.CharField(max_length=40, blank=True, null=True)
 

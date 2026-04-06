@@ -9,7 +9,23 @@ register = template.Library()
 def wrap_in_list(value):
     return [value]
 
+@register.filter
+def dictget(d, key):
+    """
+    Generic dict lookup by variable key.
+    Usage: {{ mydict|dictget:variable_key }}
+    """
+    if not d or not key:
+        return ''
+    return d.get(key, '')
 
+"""
+# gv[cat_var][key_var][lang_var] — fully dynamic #}
+{{ gv|dictget:cat_var|dictget:key_var|dictget:lang_var }}
+
+{# e.g. cat_var='accounts', key_var='logout', lang_var='hi' #}
+{{ gv|dictget:'accounts'|dictget:'logout'|dictget:'hi' }}
+"""
 # TO BE DROPPED
 @register.filter
 def my_text(value={}, arg=""):

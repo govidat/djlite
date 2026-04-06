@@ -7,6 +7,7 @@ from mysite.models import (
     GentextBlock, ComptextBlock, TextstbItem, SvgtextbadgeValue, Language
 )
 from django.db import models as django_models
+from django.conf import settings
 
 # ── Helpers ───────────────────────────────────────────────────
 def get_content_type(model):
@@ -36,7 +37,21 @@ def upload_stb_items(items_data, parent_obj):
 
         values = item_data.get("values", {})
         #print(f"    values in JSON: {list(values.keys())}")
-
+        # Optional: validate lang_code against settings without a DB hit
+        valid_codes = {code for code, _ in settings.LANGUAGES}
+        for lang_code, val in values.items():
+            if lang_code not in valid_codes:
+                print(f"    ⚠ Language '{lang_code}' not in settings.LANGUAGES — skipping")
+                continue
+            SvgtextbadgeValue.objects.update_or_create(
+                textstbitem=item,
+                language_code=lang_code,
+                defaults={
+                    "stext": val.get("stext", ""),
+                    "ltext": val.get("ltext", ""),
+                }
+            )        
+        """
         for lang_id, val in values.items():
             try:
                 language = Language.objects.get(language_id=lang_id)
@@ -55,7 +70,7 @@ def upload_stb_items(items_data, parent_obj):
             #print(f"    SvgtextbadgeValue: lang={lang_id} "
             #      f"stext='{stb_val.stext}' "
             #      f"created={stb_created}")
-
+        """
 def upload_comptextblocks(blocks_data, parent_obj):
     ct = get_content_type(parent_obj.__class__)
     #print(f"  ComptextBlock parent: {parent_obj.__class__.__name__} "

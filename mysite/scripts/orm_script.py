@@ -1,6 +1,6 @@
 #from mysite.models import TokenType
 #from mysite.models import Token
-from mysite.models import Language
+#from mysite.models import Language
 from mysite.models import ThemePreset
 
 
@@ -27,7 +27,7 @@ from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
 from mysite.models import (
     Client, Page, Layout, Component, ComponentSlot,
-    GentextBlock, ComptextBlock, TextstbItem, SvgtextbadgeValue, Language
+    GentextBlock, ComptextBlock, TextstbItem, SvgtextbadgeValue
 )
 from django.db import models as django_models
 
@@ -44,25 +44,6 @@ def run():
 
     # print("Hello from runscript")
     """ Step 1
-    LANGUAGE_DATA = [
-        {
-        "language_id": "en",
-        "label_obj": {"en": "English", "fr": "frEnglish", "hi": "hiEnglish"}
-        },
-        {
-        "language_id": "fr",
-        "label_obj": {"en": "French", "fr": "frFrench", "hi": "hiFrench"}
-        },
-        {
-        "language_id": "hi",
-        "label_obj": {"en": "Hindi", "fr": "frHindi", "hi": "hiHindi"}
-        }
-    ]
-    for row in LANGUAGE_DATA:
-        Language.objects.update_or_create(
-            language_id=row["language_id"],
-            label_obj= row["label_obj"]
-        )    
 
     THEMEPRESET_DATA = [
         {

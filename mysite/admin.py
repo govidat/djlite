@@ -9,7 +9,7 @@ from .forms import ClientForm
 from django.conf import settings
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
 
-from .models import Language, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
+from .models import GlobalValCat, GlobalVal, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 
 #from .models import Page, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, AccordionText, Card, Hero, Accordion, Layout
 
@@ -87,23 +87,78 @@ class ClientLanguageMixin:
         return fields + list(self.non_translated_fields)
 
 
+class GlobalValInline(TranslationBaseModelAdmin, nested_admin.NestedTabularInline):
+    model  = GlobalVal
+    extra  = 1
+    fields = ['key'] + [f'keyval_{code}' for code, _ in settings.LANGUAGES]
+    # Renders as:
+    # | key      | keyval_en | keyval_hi | keyval_fr | keyval_ta |
+    # | logout   | Logout    | hiLogout  | frLogout  |           |
+
+
+@admin.register(GlobalValCat)
+class GlobalValCatAdmin(nested_admin.NestedModelAdmin):
+    inlines     = [GlobalValInline]
+    list_display = ('globalvalcat_id',)
+    search_fields = ('globalvalcat_id',)
 
 # VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
+"""
 class LanguageAdmin(admin.ModelAdmin):
     #list_display = ("language_id", "label_obj")
     fields = ["language_id", "label_obj"]
     search_fields = ("language_id",)
-
+"""
 class ThemePresetAdmin(admin.ModelAdmin):
     #list_display = ("language_id", "label_obj")
     #fields = ["language_id", "label_obj"]
     search_fields = ("themepreset_id",)
 
-
+"""
 class SvgtextbadgeValueInline(nested_admin.NestedStackedInline):
     model = SvgtextbadgeValue
     extra = 1
     classes = ['collapse']
+"""
+class SvgtextbadgeValueInline(nested_admin.NestedTabularInline):
+    model  = SvgtextbadgeValue
+    extra  = 0
+    fields = ('language_code', 'stext', 'ltext')
+
+    def get_language_choices(self, request):
+        """
+        Resolve client's language_list from the URL's object_id.
+        Caches result on the request object so Client is queried
+        only once per page load, regardless of how many inline
+        rows are rendered.
+        """
+        # Return cached result if already resolved this request
+        if hasattr(request, '_cached_client_lang_choices'):
+            return request._cached_client_lang_choices
+
+        from django.conf import settings
+        choices = list(settings.LANGUAGES)   # fallback
+
+        client_id = request.resolver_match.kwargs.get('object_id')
+        if client_id:
+            try:
+                client = Client.objects.get(pk=client_id)
+                lang_codes = client.language_list or []
+                lang_dict  = dict(settings.LANGUAGES)
+                choices = [(code, lang_dict.get(code, code)) for code in lang_codes]
+            except Client.DoesNotExist:
+                pass
+
+        # Cache on request — lives only for this request/response cycle
+        request._cached_client_lang_choices = choices
+        return choices
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'language_code':
+            kwargs['widget'] = forms.Select(
+                choices=self.get_language_choices(request)
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 class TextstbItemInline(nested_admin.NestedGenericStackedInline):
     model = TextstbItem
@@ -285,7 +340,7 @@ class ThemeInline(
     model = Theme
     extra = 0
     classes = ['collapse']
-    inlines = [GentextBlockInline]
+    #inlines = [GentextBlockInline]
 
     TRANSLATED_FIELDS = ('name',)
     non_translated_fields = ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default')   # adjust to your actual fields
@@ -360,7 +415,7 @@ class PageInline(
     model = Page
     extra = 0
     classes = ['collapse']
-    inlines = [GentextBlockInline, LayoutInline]                        # whatever Page's child inline is
+    inlines = [LayoutInline]                        # GentextBlockInline,  whatever Page's child inline is
 
     TRANSLATED_FIELDS = ('name',)                   # add more if Page has other translated fields
     non_translated_fields = ('page_id', 'ltext', 'order', 'parent', 'hidden')    # adjust to your actual fields
@@ -370,7 +425,7 @@ class PageInline(
 class ClientAdmin(TranslationBaseModelAdmin, nested_admin.NestedModelAdmin):
     form = ClientForm
     list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
-    inlines = [GentextBlockInline, ThemeInline, PageInline]
+    inlines = [ThemeInline, PageInline]  # GentextBlockInline, 
 
     TRANSLATED_FIELDS = ('name', 'nb_title')   # add more here as needed
 
@@ -415,6 +470,6 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
         js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
 """
 
-admin.site.register(Language, LanguageAdmin)
+#admin.site.register(Language, LanguageAdmin)
 admin.site.register(ThemePreset, ThemePresetAdmin)
 
