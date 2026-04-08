@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "allauth_ui", # allauth ui
     'django.contrib.sites', # allauth
     'allauth', # allauth
     'allauth.account', # allauth
@@ -55,6 +56,8 @@ INSTALLED_APPS = [
     "adminsortable2", # admin-sortable2
     'django_extensions', # django_extensions for orm scripts
     'nested_admin',# this is for nested inline in admin
+    "widget_tweaks", # allauth ui
+    "slippers", # allauth ui
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 
@@ -178,11 +181,12 @@ AUTHENTICATION_BACKENDS = [
 
 SITE_ID = 1  # allauth
 
-ACCOUNT_EMAIL_VERIFICATION = "none"  # allauth
-
+# TBD in PRD this email setting to be modified
+ACCOUNT_EMAIL_VERIFICATION = "optional"  # allauth
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 LOGIN_REDIRECT_URL = "/"  # allauth
-
-
+#ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+#ACCOUNT_LOGIN_METHODS = {'email', 'username'}
 #LANGUAGES = [           # i18n
 #    ('en', 'English'),
 #    ('fr', 'French'),
