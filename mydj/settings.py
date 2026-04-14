@@ -37,6 +37,8 @@ TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ  # debug-toolbar
 # Application definition
 
 INSTALLED_APPS = [
+    #'unfold', # must be BEFORE django.contrib.admin NOT WORKING WELL WITH nested-admin
+    'nested_admin',# this is for nested inline in admin
     'modeltranslation',   # must be BEFORE django.contrib.admin
     'django.contrib.admin',
     'django.contrib.auth',
@@ -55,9 +57,10 @@ INSTALLED_APPS = [
     'mysite', # mysite
     "adminsortable2", # admin-sortable2
     'django_extensions', # django_extensions for orm scripts
-    'nested_admin',# this is for nested inline in admin
+    #'nested_admin',# this is for nested inline in admin
     "widget_tweaks", # allauth ui
     "slippers", # allauth ui
+    "guardian", # client level authorization
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 
@@ -174,6 +177,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTHENTICATION_BACKENDS = [
     # Needed to login by username in Django admin, regardless of `allauth`
     "django.contrib.auth.backends.ModelBackend",
+    'guardian.backends.ObjectPermissionBackend',  # this is for client level authorization
 
     # `allauth` specific authentication methods, such as login by email
     'allauth.account.auth_backends.AuthenticationBackend',  # allauth 

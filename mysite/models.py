@@ -6,6 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.fields import GenericRelation
 from html.parser import HTMLParser
+from django.contrib.auth.models import User  # this is for ClientUser to have client level authorization
 
 def default_languages():
     return ['en']
@@ -31,7 +32,7 @@ Client
         ├── themepreset
         └── name using modelTranslation #GentextBlock                        
            
-GentextBlock (content_type) (name / nb_title / nb_logo) # used in Client, Page
+GentextBlock Presently NOT USED (content_type) (name / nb_title / nb_logo) # used in Client, Page
 └──TextstbItem (content_type) (text / svg / badge)
     └── SvgtextbadgeValue (per language)
                       
@@ -70,28 +71,13 @@ def no_double_quotes(value):
 # Combine both into one validator list for convenience
 text_field_validators = [no_html_tags, no_double_quotes]
 
-    
 class LowercaseCharField(models.CharField):
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
         if value is not None:
             return value.lower()
         return value
-"""
-This is deprecated and we are using the settings.Language value and globalval for descriptions.
-class Language(models.Model):
-    # id = LowercaseCharField(max_length=2, primary_key=True)
-    language_id = LowercaseCharField(max_length=2, unique=True, db_index=True)    
-    label_obj = models.JSONField(null = True, blank = True, default=dict)
 
-    def __str__(self):
-        return f"{self.language_id} / {self.label_obj['en']}"
-
-    # for usage in Admin Panel
-    class Meta:
-        verbose_name = "00-01 Project Language"
-        ordering = ["language_id"]    
-"""
 class ThemePreset(models.Model):
     themepreset_id = LowercaseCharField(max_length=25, unique=True, db_index=True)
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
@@ -161,7 +147,6 @@ class GlobalValCat(models.Model):
 
     def __str__(self):
         return self.globalvalcat_id
-
 
 class GlobalVal(models.Model):
     globalvalcat = models.ForeignKey(
@@ -278,7 +263,6 @@ class GentextBlock(models.Model):
     def __str__(self):
         return f"{self.block_id} {self.ltext}" 
     
-
 class Client(models.Model):
     client_id = LowercaseCharField(max_length=25, unique=True, db_index=True)    
 
@@ -322,7 +306,12 @@ class Client(models.Model):
     class Meta:
         verbose_name = "00-03 Client"
         ordering = ["client_id"]
-
+        permissions = [
+            ('view_client_data',   'Can view client data'),
+            ('edit_client_data',   'Can edit client data'),
+            ('create_client_data', 'Can create client data'),
+            ('admin_client_data',  'Can admin client — manage users'),
+        ]
 
 class Theme(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='themes')    
@@ -353,7 +342,310 @@ class Theme(models.Model):
             models.Index(fields=["client", "order"]),
         ]
 
+class Page(models.Model):
+    #id = LowercaseCharField(max_length=20, primary_key=True)
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='pages'
+        )    
+    page_id = LowercaseCharField(max_length=10)  
+    ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
+    order = models.PositiveIntegerField(default=0)
+    parent = models.ForeignKey("self", null=True, blank=True, related_name="children",
+        on_delete=models.CASCADE
+    )
+    hidden = models.BooleanField(default=False)  
+    #gentextblocks = GenericRelation(GentextBlock)
+    # Translatable fields
+    name = models.CharField(max_length=40, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.client.client_id} / {self.page_id}"
+      
+    # for usage in Admin Panel
+    class Meta:
+        unique_together = ("client", "page_id")
+        ordering = ["client", "order"]
+        indexes = [
+            models.Index(fields=["client", "order"]),
+        ]
+        verbose_name = "01-02 Page"
+
+class Layout(models.Model):
+    # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
+    # client is kept, so that layout can be a separate admin tab. in that we are braching to component type admin.
+    #client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='layouts')
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        on_delete=models.CASCADE
+    )
+
+    order = models.PositiveIntegerField(default=1)
+
+    LEVEL_CHOICES = (
+        (10, "Section"),
+        (20, "Row"),
+        (30, "Col"),
+        (40, "Cell"),
+    )
+    level = models.PositiveSmallIntegerField(choices=LEVEL_CHOICES)
+
+    css_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+    style = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+    hidden = models.BooleanField(default=False)
+
+    slug = models.SlugField()  # for bulk upload / human reference
+    #COMPONENT_TYPES = (
+    #    ("hero", "Comp Hero"),
+    #    ("card", "Comp Card"),
+    #    ("accordion", "Comp Accordion"),
+    #    ("carousel", "Comp Carousel"),
+    #)
+    #comp_id = models.CharField(max_length=30, choices=COMPONENT_TYPES, blank=True, null=True )
+    class Meta:
+        ordering = ("page", "level", "order")
+        unique_together = ("page", "level", "slug")
+        verbose_name = "01-03 Layout"
+
+    def clean(self):
+        #if self.level != 40 and self.comp_id:
+        #    raise ValidationError("Component has to be at Level = 40")
+        
+        if self.level != 10 and not self.parent:
+            raise ValidationError("Non-root layouts must have a parent")
+
+        if self.parent and self.parent.level != self.level - 10:
+            raise ValidationError("Invalid parent level")
+
+        #if self.client.client_id != self.page.client.client_id:
+        #    raise ValidationError("Page and Layout Clients need to be same !")
+
+    def __str__(self):
+        return f"{self.page.client.client_id} / {self.page.page_id} / {self.level} / {self.slug}"
+
+class Component(models.Model):
+    """L0 — one per Layout cell (level=40)"""
+    layout = models.OneToOneField(
+        Layout,
+        on_delete=models.CASCADE,
+        related_name="component"
+    )
+
+    COMP_TYPES = (
+        ("hero",      "Hero"),
+        ("card",      "Card"),
+        ("accordion", "Accordion"),
+        ("carousel",  "Carousel"),
+    )
+    comp_id       = models.CharField(max_length=30, choices=COMP_TYPES)
+    ltext         = models.CharField(max_length=50, blank=True, validators=text_field_validators)
+    css_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+    card_body_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)    # card    
+    hero_content_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)    # hero
+    hero_overlay       = models.BooleanField(default=False)          # hero
+    hero_overlay_style = models.CharField(max_length=255, blank=True, validators=text_field_validators)  # hero
+    accordion_type = models.CharField(max_length=25, blank=True, null=True)   # accordion
+    accordion_name = models.CharField(max_length=25, blank=True, null=True)   # accordion
+    config        = models.JSONField(default=dict, blank=True)
+    hidden        = models.BooleanField(default=False)
+    order         = models.PositiveIntegerField(default=1)  # This is not relevant and can be removed. As at cell lelvel there will be only one component
+
+    def __str__(self):
+        return f"{self.layout} / {self.comp_id}"
+
+    class Meta:
+        verbose_name = "01-04 Component L0"
+
+class ComponentSlot(models.Model):
+    """L1 — multiple slots per Component (figure or text)"""
+    component = models.ForeignKey(
+        Component,
+        on_delete=models.CASCADE,
+        related_name="slots"
+    )
+
+    SLOT_TYPES = (
+        ("figure", "Figure"),
+        ("text",   "Text"),
+    )
+    slot_type   = models.CharField(max_length=20, choices=SLOT_TYPES)
+    order       = models.PositiveIntegerField(default=1)
+    hidden      = models.BooleanField(default=False)
+    ltext       = models.CharField(max_length=50, blank=True, validators=text_field_validators)
+    css_class   = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+
+    # Figure fields
+    image_url   = models.URLField(max_length=500, blank=True, null=True)
+    alt         = models.CharField(max_length=100, blank=True, null=True)
+    figure_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+
+    # Hero/Card slot specific
+    actions_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
+
+    # Accordion slot specific
+    accordion_checked     = models.BooleanField(default=False)
+
+    # Text slot — ComptextBlocks via GenericRelation
+    comptextblocks = GenericRelation(ComptextBlock)
+
+    def clean(self):
+        if self.slot_type == 'figure' and not self.image_url:
+            raise ValidationError("Figure slot requires an image_url.")
+
+    def __str__(self):
+        return f"{self.component} / {self.slot_type} / {self.order}"
+
+    class Meta:
+        ordering = ["component", "order"]
+        unique_together = ("component", "slot_type", "order")
+        verbose_name = "01-05 Component L1 Slot"
+
 """
+Client
+  └── ClientGroup  (e.g. "Warehouse Staff", "Billing Team", "Store A Managers")
+        ├── module permissions  (what they can do)
+        ├── location scope      (which stores/branches)
+        └── Users               (many users assigned to one group)
+"""
+
+
+# ── Location (Store / Branch) ─────────────────────────────────────────
+
+class ClientLocation(models.Model):
+    LOCATION_TYPE_CHOICES = [
+        ('store',      'Store'),
+        ('branch',     'Branch'),
+        ('warehouse',  'Warehouse'),
+        ('office',     'Office'),
+    ]
+
+    client        = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='locations')
+    location_id   = LowercaseCharField(max_length=50)
+    name          = models.CharField(max_length=100)
+    location_type = models.CharField(max_length=20, choices=LOCATION_TYPE_CHOICES, default='store')
+    is_active     = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('client', 'location_id')
+        ordering        = ['client', 'location_id']
+        verbose_name = "00-05 Client Location"
+    def __str__(self):
+        return f"{self.client.client_id} / {self.location_id} ({self.location_type})"
+
+# ── Client Group ──────────────────────────────────────────────────────
+
+class ClientGroup(models.Model):
+    
+    #A named group within a client — like Django's Group but client-scoped.
+    #e.g. 'Warehouse Staff', 'Billing Team', 'Store A Managers'
+    #Multiple users can be assigned to one group.
+    
+    ROLE_CHOICES = [
+        ('admin',  'Client Admin'),   # manage users/groups, full access
+        ('staff',  'Client Staff'),   # access controlled per module
+        ('viewer', 'Client Viewer'),  # read-only on permitted modules
+    ]
+
+    client      = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='groups')
+    group_id    = LowercaseCharField(max_length=50)
+    name        = models.CharField(max_length=100)
+    role        = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
+    description = models.CharField(max_length=300, blank=True)
+    is_active   = models.BooleanField(default=True)
+
+    # Location scope — empty means access to ALL locations
+    locations   = models.ManyToManyField(
+        ClientLocation,
+        blank=True,
+        related_name='groups',
+        help_text='Leave empty to grant access to all locations'
+    )
+
+    class Meta:
+        unique_together = ('client', 'group_id')
+        ordering        = ['client', 'group_id']
+        verbose_name = "00-04 Client Group"
+    def __str__(self):
+        return f"{self.client.client_id} / {self.name} ({self.role})"
+
+    def has_location_access(self, location):
+        #Empty locations = all access. Otherwise check membership.
+        if not self.locations.exists():
+            return True
+        return self.locations.filter(pk=location.pk).exists()
+
+# ── Module Permissions per Group ──────────────────────────────────────
+
+class ClientGroupPermission(models.Model):
+    MODULE_CHOICES = [
+        # CMS
+        ('cms',       'CMS (Pages, Themes)'),
+        # Commerce
+        ('cart',      'Shopping Cart'),
+        ('quotation', 'Quotations'),
+        ('order',     'Orders'),
+        ('delivery',  'Delivery'),
+        ('shipment',  'Shipments'),
+        ('billing',   'Billing'),
+    ]
+
+    ACTION_CHOICES = [
+        ('view',   'View'),
+        ('create', 'Create'),
+        ('edit',   'Edit'),
+        ('delete', 'Delete'),
+    ]
+
+    group  = models.ForeignKey(ClientGroup, on_delete=models.CASCADE, related_name='permissions')
+    module = models.CharField(max_length=30, choices=MODULE_CHOICES)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+
+    class Meta:
+        unique_together = ('group', 'module', 'action')
+        ordering        = ['group', 'module', 'action']
+
+    def __str__(self):
+        return f"{self.group} | {self.module}.{self.action}"
+
+# ── User → Group assignment ───────────────────────────────────────────
+
+class ClientUserMembership(models.Model):
+    
+    # Assigns a user to a ClientGroup.
+    # A user can belong to multiple groups within the same client
+    # (permissions are unioned across groups).
+    
+    user  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='client_memberships')
+    group = models.ForeignKey(ClientGroup, on_delete=models.CASCADE, related_name='memberships')
+
+    class Meta:
+        unique_together = ('user', 'group')
+        ordering        = ['group__client', 'user']
+
+    def __str__(self):
+        return f"{self.user.username} → {self.group}"
+
+"""
+
+This is deprecated and we are using the settings.Language value and globalval for descriptions.
+class Language(models.Model):
+    # id = LowercaseCharField(max_length=2, primary_key=True)
+    language_id = LowercaseCharField(max_length=2, unique=True, db_index=True)    
+    label_obj = models.JSONField(null = True, blank = True, default=dict)
+
+    def __str__(self):
+        return f"{self.language_id} / {self.label_obj['en']}"
+
+    # for usage in Admin Panel
+    class Meta:
+        verbose_name = "00-01 Project Language"
+        ordering = ["language_id"]    
+
 class Page(models.Model):
     #id = LowercaseCharField(max_length=20, primary_key=True)
     client = models.ForeignKey(
@@ -612,175 +904,6 @@ class AccordionText(models.Model):
     comptextblocks = GenericRelation(ComptextBlock)
 
 
-# TBD Accordion and Carousal...
-"""
-
-
-class Page(models.Model):
-    #id = LowercaseCharField(max_length=20, primary_key=True)
-    client = models.ForeignKey(
-        Client,
-        on_delete=models.CASCADE,
-        related_name='pages'
-        )    
-    page_id = LowercaseCharField(max_length=10)  
-    ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
-    order = models.PositiveIntegerField(default=0)
-    parent = models.ForeignKey("self", null=True, blank=True, related_name="children",
-        on_delete=models.CASCADE
-    )
-    hidden = models.BooleanField(default=False)  
-    #gentextblocks = GenericRelation(GentextBlock)
-    # Translatable fields
-    name = models.CharField(max_length=40, blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.client.client_id} / {self.page_id}"
-      
-    # for usage in Admin Panel
-    class Meta:
-        unique_together = ("client", "page_id")
-        ordering = ["client", "order"]
-        indexes = [
-            models.Index(fields=["client", "order"]),
-        ]
-        verbose_name = "01-02 Page"
-
-class Layout(models.Model):
-    # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
-    # client is kept, so that layout can be a separate admin tab. in that we are braching to component type admin.
-    #client = models.ForeignKey(Client, on_delete=models.CASCADE)
-    page = models.ForeignKey(Page, on_delete=models.CASCADE, related_name='layouts')
-    parent = models.ForeignKey(
-        "self",
-        null=True,
-        blank=True,
-        related_name="children",
-        on_delete=models.CASCADE
-    )
-
-    order = models.PositiveIntegerField(default=1)
-
-    LEVEL_CHOICES = (
-        (10, "Section"),
-        (20, "Row"),
-        (30, "Col"),
-        (40, "Cell"),
-    )
-    level = models.PositiveSmallIntegerField(choices=LEVEL_CHOICES)
-
-    css_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
-    style = models.CharField(max_length=255, blank=True, validators=text_field_validators)
-    hidden = models.BooleanField(default=False)
-
-    slug = models.SlugField()  # for bulk upload / human reference
-    #COMPONENT_TYPES = (
-    #    ("hero", "Comp Hero"),
-    #    ("card", "Comp Card"),
-    #    ("accordion", "Comp Accordion"),
-    #    ("carousel", "Comp Carousel"),
-    #)
-    #comp_id = models.CharField(max_length=30, choices=COMPONENT_TYPES, blank=True, null=True )
-    class Meta:
-        ordering = ("page", "level", "order")
-        unique_together = ("page", "level", "slug")
-        verbose_name = "01-03 Layout"
-
-    def clean(self):
-        #if self.level != 40 and self.comp_id:
-        #    raise ValidationError("Component has to be at Level = 40")
-        
-        if self.level != 10 and not self.parent:
-            raise ValidationError("Non-root layouts must have a parent")
-
-        if self.parent and self.parent.level != self.level - 10:
-            raise ValidationError("Invalid parent level")
-
-        #if self.client.client_id != self.page.client.client_id:
-        #    raise ValidationError("Page and Layout Clients need to be same !")
-
-    def __str__(self):
-        return f"{self.page.client.client_id} / {self.page.page_id} / {self.level} / {self.slug}"
-
-
-class Component(models.Model):
-    """L0 — one per Layout cell (level=40)"""
-    layout = models.OneToOneField(
-        Layout,
-        on_delete=models.CASCADE,
-        related_name="component"
-    )
-
-    COMP_TYPES = (
-        ("hero",      "Hero"),
-        ("card",      "Card"),
-        ("accordion", "Accordion"),
-        ("carousel",  "Carousel"),
-    )
-    comp_id       = models.CharField(max_length=30, choices=COMP_TYPES)
-    ltext         = models.CharField(max_length=50, blank=True, validators=text_field_validators)
-    css_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)
-    card_body_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)    # card    
-    hero_content_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)    # hero
-    hero_overlay       = models.BooleanField(default=False)          # hero
-    hero_overlay_style = models.CharField(max_length=255, blank=True, validators=text_field_validators)  # hero
-    accordion_type = models.CharField(max_length=25, blank=True, null=True)   # accordion
-    accordion_name = models.CharField(max_length=25, blank=True, null=True)   # accordion
-    config        = models.JSONField(default=dict, blank=True)
-    hidden        = models.BooleanField(default=False)
-    order         = models.PositiveIntegerField(default=1)  # This is not relevant and can be removed. As at cell lelvel there will be only one component
-
-    def __str__(self):
-        return f"{self.layout} / {self.comp_id}"
-
-    class Meta:
-        verbose_name = "01-04 Component L0"
-
-
-class ComponentSlot(models.Model):
-    """L1 — multiple slots per Component (figure or text)"""
-    component = models.ForeignKey(
-        Component,
-        on_delete=models.CASCADE,
-        related_name="slots"
-    )
-
-    SLOT_TYPES = (
-        ("figure", "Figure"),
-        ("text",   "Text"),
-    )
-    slot_type   = models.CharField(max_length=20, choices=SLOT_TYPES)
-    order       = models.PositiveIntegerField(default=1)
-    hidden      = models.BooleanField(default=False)
-    ltext       = models.CharField(max_length=50, blank=True, validators=text_field_validators)
-    css_class   = models.CharField(max_length=255, blank=True, validators=text_field_validators)
-
-    # Figure fields
-    image_url   = models.URLField(max_length=500, blank=True, null=True)
-    alt         = models.CharField(max_length=100, blank=True, null=True)
-    figure_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
-
-    # Hero/Card slot specific
-    actions_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
-
-    # Accordion slot specific
-    accordion_checked     = models.BooleanField(default=False)
-
-    # Text slot — ComptextBlocks via GenericRelation
-    comptextblocks = GenericRelation(ComptextBlock)
-
-    def clean(self):
-        if self.slot_type == 'figure' and not self.image_url:
-            raise ValidationError("Figure slot requires an image_url.")
-
-    def __str__(self):
-        return f"{self.component} / {self.slot_type} / {self.order}"
-
-    class Meta:
-        ordering = ["component", "order"]
-        unique_together = ("component", "slot_type", "order")
-        verbose_name = "01-05 Component L1 Slot"
-
-"""
+# TBD Accordion and Carousal...        
 
 """

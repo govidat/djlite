@@ -12,7 +12,7 @@
 
       {# Desktop: show text label #}
       <span class="hidden sm:inline text-sm font-medium">
-        {{ request.user.email|truncatechars:20 }}
+        {{ request.user.username|truncatechars:20 }}
       </span>
 
       {# Mobile: user icon #}
@@ -68,7 +68,7 @@
 
       {# Logged-in user info header #}
       <li class="menu-title text-xs opacity-60 px-2 py-1 truncate">
-        {{ request.user.email }}
+        {{ request.user.username }}
       </li>
       <div class="divider my-0.5"></div>
 

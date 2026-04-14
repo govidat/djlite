@@ -1,24 +1,31 @@
 from django import forms
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User
 import nested_admin
 from modeltranslation.admin import TranslationAdmin, TranslationTabularInline, TranslationBaseModelAdmin
-#from django.contrib.contenttypes.admin import GenericTabularInline
 from .forms import ClientForm
-# Register your models here.
-#from .models import SUPPORTED_LANGUAGES   # your list of (code, label) tuples
 from django.conf import settings
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
-
+from .admin_mixins import ClientScopedMixin, _user_has_admin_role
+# Register your models here.
 from .models import GlobalValCat, GlobalVal, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 
-#from .models import Page, HeroCardText, HeroCardFigure, HeroCard, HeroText, HeroFigure, CardText, CardFigure, AccordionText, Card, Hero, Accordion, Layout
-
-# Option 3 Common Component Model
 from .models import Page, Layout, Component, ComponentSlot
+
+# using guardian
+from .models import ClientUserMembership, ClientGroup, ClientGroupPermission, ClientLocation
+#from unfold.admin import ModelAdmin  # unfold ui NOT WORKING WITH nested-admin
+#from django.contrib.contenttypes.admin import GenericTabularInline
+
+#from .models import SUPPORTED_LANGUAGES   # your list of (code, label) tuples
 
 # ── Reusable mixin ────────────────────────────────────────────────────
 # Centralises the "climb up to Client and get language_list" logic
 # so ThemeInline, PageInline (and any future inline) can reuse it.
+
+# Derive app label dynamically — never hardcode 'myapp' or 'mysite'
+APP_LABEL = Client._meta.app_label   # → 'mysite'
 
 class ClientLanguageMixin:
     """
@@ -103,23 +110,12 @@ class GlobalValCatAdmin(nested_admin.NestedModelAdmin):
     search_fields = ('globalvalcat_id',)
 
 # VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
-"""
-class LanguageAdmin(admin.ModelAdmin):
-    #list_display = ("language_id", "label_obj")
-    fields = ["language_id", "label_obj"]
-    search_fields = ("language_id",)
-"""
+
 class ThemePresetAdmin(admin.ModelAdmin):
     #list_display = ("language_id", "label_obj")
     #fields = ["language_id", "label_obj"]
     search_fields = ("themepreset_id",)
 
-"""
-class SvgtextbadgeValueInline(nested_admin.NestedStackedInline):
-    model = SvgtextbadgeValue
-    extra = 1
-    classes = ['collapse']
-"""
 class SvgtextbadgeValueInline(nested_admin.NestedTabularInline):
     model  = SvgtextbadgeValue
     extra  = 0
@@ -182,6 +178,392 @@ class GentextBlockInline(nested_admin.NestedGenericStackedInline):
     inlines = [TextstbItemInline]
     classes = ['collapse']
 
+# ── ThemeInline ───────────────────────────────────────────────────────
+
+class ThemeInline(ClientLanguageMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline):
+    model = Theme
+    extra = 0
+    classes = ['collapse']
+    #inlines = [GentextBlockInline]
+
+    TRANSLATED_FIELDS = ('name',)
+    non_translated_fields = ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default')   # adjust to your actual fields
+
+
+class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
+    model = ComptextBlock
+    extra = 0
+    classes = ['collapse']
+    inlines = [TextstbItemInline]
+
+# Option 3 Common Component Model
+# ── Component inlines ─────────────────────────────────────────
+
+class ComponentSlotInline(nested_admin.NestedStackedInline):
+    model = ComponentSlot
+    fk_name = "component"
+    extra = 0
+    classes = ['collapse']
+    fields = [
+        "slot_type", "order", "hidden", "ltext", "css_class",
+        "actions_class", # text for card, hero
+        "image_url", "alt", "figure_class",   # figure
+        "accordion_checked",                             # accordion text slot
+    ]
+    inlines = [ComptextBlockInline]
+
+    class Media:
+        js = ("admin/js/component_admin.js",)
+
+
+class ComponentInline(nested_admin.NestedStackedInline):
+    model = Component
+    extra = 0
+    classes = ['collapse']
+    fields = [
+        "comp_id", "order", "hidden", "ltext", "css_class",
+        "card_body_class", # card
+        "hero_content_class", "hero_overlay", "hero_overlay_style",            # hero
+        "accordion_type", "accordion_name",    # accordion
+        "config",
+    ]
+    inlines = [ComponentSlotInline]
+
+    class Media:
+        js = ("admin/js/component_admin.js",)
+
+
+class LayoutInline(nested_admin.NestedStackedInline):
+    model = Layout
+    extra = 0
+    classes = ['collapse']
+    fields = ["level", "slug", "order", "hidden", "css_class", "style", "parent"]
+    show_change_link = True
+    inlines = [ComponentInline]
+
+    class Media:
+        js = ("admin/js/layout_admin.js",)
+
+"""
+class PageInline(nested_admin.NestedStackedInline):
+    model = Page
+    extra = 0
+    classes = ['collapse']
+    inlines = [GentextBlockInline, LayoutInline]
+"""
+class PageInline(ClientLanguageMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline):
+    model = Page
+    extra = 0
+    classes = ['collapse']
+    inlines = [LayoutInline]                        # GentextBlockInline,  whatever Page's child inline is
+
+    TRANSLATED_FIELDS = ('name',)                   # add more if Page has other translated fields
+    non_translated_fields = ('page_id', 'ltext', 'order', 'parent', 'hidden')    # adjust to your actual fields
+
+
+@admin.register(Client)
+class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin):
+    form         = ClientForm
+    list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
+    inlines      = [ThemeInline, PageInline]
+    TRANSLATED_FIELDS = ('name', 'nb_title')
+    admin_role_only = True
+
+    def _language_fieldsets(self, lang_codes):
+        lang_dict = dict(settings.LANGUAGES)
+        return [
+            (lang_dict.get(code, code.upper()), {
+                'fields': tuple(f"{field}_{code}" for field in self.TRANSLATED_FIELDS)
+            })
+            for code in lang_codes
+        ]
+
+    def get_fieldsets(self, request, obj=None):
+        if obj and obj.language_list:
+            lang_codes = obj.language_list
+        else:
+            lang_codes = [code for code, _ in settings.LANGUAGES]
+        return [
+            ('Identity', {
+                'fields': ('client_id', 'parent', 'language_choices',
+                           'nb_title_svg_pre', 'nb_title_svg_suf')
+            }),
+            *self._language_fieldsets(lang_codes),
+        ]
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+    
+    def has_module_perms(self, request):        # chatgpt
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+    """
+    def has_view_permission(self, request, obj=None):
+        # Explicitly call mixin method — bypass TranslationBaseModelAdmin
+        return ClientScopedMixin.has_view_permission(self, request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        # Explicitly call mixin method — bypass TranslationBaseModelAdmin
+        return ClientScopedMixin.has_change_permission(self, request, obj)
+    """
+    def get_queryset(self, request):
+        # Call NestedModelAdmin's get_queryset directly — skip TranslationBaseModelAdmin
+        qs = nested_admin.NestedModelAdmin.get_queryset(self, request)
+        if request.user.is_superuser:
+            return qs
+        # Explicitly use ClientScopedMixin method
+        return qs.filter(
+            client_id__in=ClientScopedMixin._permitted_client_ids(self, request)
+        )
+
+    class Media:
+        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
+
+# ── User admin — superuser only, hidden from everyone else ────────────
+
+try:
+    admin.site.unregister(User)
+except admin.sites.NotRegistered:
+    pass
+
+@admin.register(User)
+class CustomUserAdmin(UserAdmin):
+    search_fields = ('username', 'email')
+
+    def has_module_permission(self, request):  # instead of has_module_perms
+        return request.user.is_superuser        # ← superuser only
+    """ chatgpt        
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        # Allow view_user perm so autocomplete endpoint works
+        # but has_module_perms=False keeps it off the sidebar
+        return request.user.has_perm('auth.view_user')
+    """
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+
+        # Allow Client Admins to use autocomplete
+        from mysite.models import ClientGroup
+        return ClientGroup.objects.filter(
+            memberships__user=request.user,
+            role='admin',
+            is_active=True,
+        ).exists()
+
+    def get_queryset(self, request):   # chatgpt
+        qs = super().get_queryset(request)
+
+        if request.user.is_superuser:
+            return qs
+
+        # Client admins should not see superusers
+        return qs.filter(is_superuser=False, is_active=True)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Restrict autocomplete results based on who is searching.
+        Superusers see all users.
+        Client admins see only non-superusers.
+        """
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
+        if not request.user.is_superuser:
+            # Client admins should not see superusers in dropdown
+            queryset = queryset.filter(is_superuser=False)
+        return queryset, use_distinct    
+
+
+class ClientGroupPermissionInline(admin.TabularInline):
+    model  = ClientGroupPermission
+    extra  = 1
+    fields = ('module', 'action')
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return False
+        return request.user.has_perm(
+            f'{APP_LABEL}.admin_client_data', obj.client
+        )
+
+    has_change_permission = has_add_permission
+    has_delete_permission = has_add_permission
+
+
+class ClientLocationInline(nested_admin.NestedTabularInline):
+    model  = ClientLocation
+    extra  = 0
+    fields = ('location_id', 'name', 'location_type', 'is_active')
+
+class ClientUserMembershipInline(admin.TabularInline):
+    model  = ClientUserMembership
+    extra  = 1
+    fields = ('user',)
+    #raw_id_fields = ('user',)
+    autocomplete_fields = ('user',)   # ← replaces raw_id_fields
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return _user_has_admin_role(request.user)
+        return request.user.has_perm(
+            f'{APP_LABEL}.view_client_data', obj.client
+        )
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return False
+        return request.user.has_perm(
+            f'{APP_LABEL}.admin_client_data', obj.client
+        )
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_add_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_add_permission(request, obj)
+
+
+# ── ClientGroup admin — admin role only ──────────────────────────────
+
+@admin.register(ClientGroup)
+class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin):
+    inlines       = [ClientGroupPermissionInline, ClientUserMembershipInline]
+    list_display  = ('name', 'client', 'role', 'is_active')
+    list_filter   = ('role', 'is_active')
+    search_fields = ('name', 'client__client_id')
+    filter_horizontal = ('locations',)
+    admin_role_only = True
+
+    def has_module_permission(self, request):   #chatgpt permission instead of perms in Django5
+        return _user_has_admin_role(request.user)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(
+            client__client_id__in=self._permitted_client_ids(request)
+        )
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'client':
+            kwargs['queryset'] = self._permitted_clients(request)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_inlines(self, request, obj=None):
+        if obj is None:
+            return [ClientGroupPermissionInline]
+        return [ClientGroupPermissionInline, ClientUserMembershipInline]
+
+# ── ClientLocation admin — admin role only ────────────────────────────
+
+@admin.register(ClientLocation)
+class ClientLocationAdmin(ClientScopedMixin, admin.ModelAdmin):
+    list_display  = ('location_id', 'name', 'client', 'location_type', 'is_active')
+    list_filter   = ('location_type', 'is_active')
+    search_fields = ('location_id', 'name', 'client__client_id')
+
+    def has_module_permission(self, request):   #chatgpt permission instead of perms in Django5
+        return _user_has_admin_role(request.user)   # ← admin role only
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(client__client_id__in=self._permitted_client_ids(request))
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'client':
+            kwargs['queryset'] = self._permitted_clients(request)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+"""
+# Future eCommerce models
+@admin.register(Order)
+class OrderAdmin(ClientScopedMixin, admin.ModelAdmin):
+
+    def has_module_perms(self, request):
+        if request.user.is_superuser:
+            return True
+        # Visible only if user has any order permission
+        from utils.permissions import has_module_perm
+        # Need client context here — check across all their clients
+        return ClientGroup.objects.filter(
+            memberships__user=request.user,
+            permissions__module='order',
+            is_active=True,
+        ).exists()
+"""
+
+#admin.site.register(Language, LanguageAdmin)
+admin.site.register(ThemePreset, ThemePresetAdmin)
+
+
+
+# Future Commerce Admin like Order, Delivery Billing
+"""
+@admin.register(Order)
+class OrderAdmin(ClientScopedMixin, admin.ModelAdmin):
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'order', 'view', obj)
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'order', 'edit', obj)
+
+    def has_add_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'order', 'create', obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'order', 'delete', obj)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        # Scope to permitted clients first
+        qs = qs.filter(client_id__in=self._permitted_client_ids(request))
+        # Then scope to permitted locations if user has location restrictions
+        from utils.permissions import get_user_permissions
+        # Location scoping per order — only if needed
+        return qs
+
+
+@admin.register(Billing)
+class BillingAdmin(ClientScopedMixin, admin.ModelAdmin):
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'billing', 'view', obj)
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'billing', 'edit', obj)
+
+    def has_add_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'billing', 'create', obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_module_action_permission(request, 'billing', 'delete', obj)
+"""
 """
 class HeroCardTextInline(nested_admin.NestedStackedInline):
     model = HeroCardText
@@ -319,8 +701,7 @@ class PageInline(nested_admin.NestedStackedInline):
     inlines = [GentextBlockInline]
     classes = ['collapse']
     #inlines = []
-"""
-"""
+
 class ThemeInline(nested_admin.NestedStackedInline):
     model = Theme
     extra = 0
@@ -329,134 +710,17 @@ class ThemeInline(nested_admin.NestedStackedInline):
     inlines = [GentextBlockInline]
     classes = ['collapse']
     #inlines = []
-"""
-# ── ThemeInline ───────────────────────────────────────────────────────
 
-class ThemeInline(
-    ClientLanguageMixin,
-    TranslationBaseModelAdmin,
-    nested_admin.NestedStackedInline
-):
-    model = Theme
-    extra = 0
+class SvgtextbadgeValueInline(nested_admin.NestedStackedInline):
+    model = SvgtextbadgeValue
+    extra = 1
     classes = ['collapse']
-    #inlines = [GentextBlockInline]
 
-    TRANSLATED_FIELDS = ('name',)
-    non_translated_fields = ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default')   # adjust to your actual fields
+class LanguageAdmin(admin.ModelAdmin):
+    #list_display = ("language_id", "label_obj")
+    fields = ["language_id", "label_obj"]
+    search_fields = ("language_id",)
 
-
-class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
-    model = ComptextBlock
-    extra = 0
-    classes = ['collapse']
-    inlines = [TextstbItemInline]
-
-# Option 3 Common Component Model
-# ── Component inlines ─────────────────────────────────────────
-
-class ComponentSlotInline(nested_admin.NestedStackedInline):
-    model = ComponentSlot
-    fk_name = "component"
-    extra = 0
-    classes = ['collapse']
-    fields = [
-        "slot_type", "order", "hidden", "ltext", "css_class",
-        "actions_class", # text for card, hero
-        "image_url", "alt", "figure_class",   # figure
-        "accordion_checked",                             # accordion text slot
-    ]
-    inlines = [ComptextBlockInline]
-
-    class Media:
-        js = ("admin/js/component_admin.js",)
-
-
-class ComponentInline(nested_admin.NestedStackedInline):
-    model = Component
-    extra = 0
-    classes = ['collapse']
-    fields = [
-        "comp_id", "order", "hidden", "ltext", "css_class",
-        "card_body_class", # card
-        "hero_content_class", "hero_overlay", "hero_overlay_style",            # hero
-        "accordion_type", "accordion_name",    # accordion
-        "config",
-    ]
-    inlines = [ComponentSlotInline]
-
-    class Media:
-        js = ("admin/js/component_admin.js",)
-
-
-class LayoutInline(nested_admin.NestedStackedInline):
-    model = Layout
-    extra = 0
-    classes = ['collapse']
-    fields = ["level", "slug", "order", "hidden", "css_class", "style", "parent"]
-    show_change_link = True
-    inlines = [ComponentInline]
-
-    class Media:
-        js = ("admin/js/layout_admin.js",)
-
-"""
-class PageInline(nested_admin.NestedStackedInline):
-    model = Page
-    extra = 0
-    classes = ['collapse']
-    inlines = [GentextBlockInline, LayoutInline]
-"""
-class PageInline(
-    ClientLanguageMixin,
-    TranslationBaseModelAdmin,
-    nested_admin.NestedStackedInline
-):
-    model = Page
-    extra = 0
-    classes = ['collapse']
-    inlines = [LayoutInline]                        # GentextBlockInline,  whatever Page's child inline is
-
-    TRANSLATED_FIELDS = ('name',)                   # add more if Page has other translated fields
-    non_translated_fields = ('page_id', 'ltext', 'order', 'parent', 'hidden')    # adjust to your actual fields
-
-
-@admin.register(Client)
-class ClientAdmin(TranslationBaseModelAdmin, nested_admin.NestedModelAdmin):
-    form = ClientForm
-    list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
-    inlines = [ThemeInline, PageInline]  # GentextBlockInline, 
-
-    TRANSLATED_FIELDS = ('name', 'nb_title')   # add more here as needed
-
-    
-    def _language_fieldsets(self, lang_codes):
-        lang_dict = dict(settings.LANGUAGES)       # ← from settings directly
-        return [
-            (lang_dict.get(code, code.upper()), {
-                'fields': tuple(f"{field}_{code}" for field in self.TRANSLATED_FIELDS)
-            })
-            for code in lang_codes
-        ]    
-
-    def get_fieldsets(self, request, obj=None):
-        # Determine which languages to show
-        if obj and obj.language_list:
-            lang_codes = obj.language_list          # editing: use saved list
-        else:
-            lang_codes = [code for code, _ in settings.LANGUAGES]  # adding: show all
-
-        return [
-            ('Identity', {
-                'fields': ('client_id', 'parent', 'language_choices', 'nb_title_svg_pre', 'nb_title_svg_suf' )
-            }),
-            *self._language_fieldsets(lang_codes),
-        ]
-
-    class Media:
-        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
-
-"""
 @admin.register(Client)
 class ClientAdmin(nested_admin.NestedModelAdmin):
     #list_display = ("client_id", "parent")
@@ -469,7 +733,3 @@ class ClientAdmin(nested_admin.NestedModelAdmin):
     class Media:
         js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
 """
-
-#admin.site.register(Language, LanguageAdmin)
-admin.site.register(ThemePreset, ThemePresetAdmin)
-

@@ -6,3 +6,4 @@ class MysiteConfig(AppConfig):
     name = 'mysite'
     def ready(self):
         import mysite.signals   # ensures signals are connected on startup
+
