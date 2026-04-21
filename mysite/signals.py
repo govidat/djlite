@@ -7,7 +7,7 @@ from django.core.cache import cache
 from guardian.shortcuts import assign_perm, remove_perm
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from .models import User, ClientGroup, ClientLocation, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
+from .models import User, ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
 
 """
 @receiver(post_save, sender=GlobalVal)
@@ -44,10 +44,11 @@ ADMIN_ONLY_MODELS = [
     ClientLocation,
     ClientGroupPermission,
     ClientUserMembership,
+    ClientUserProfile,    # ← add — clientadmin can manage staff profiles
 ]
 
-# View only for everyone — needed for autocomplete/search only
-VIEW_ONLY_MODELS = [
+# ADMIN Add only for Admin — needed for user creation
+ADMIN_ADD_ONLY_MODELS = [
     User,
 ]
 
@@ -122,19 +123,20 @@ def _get_model_permissions(role):
                 ))
             except Permission.DoesNotExist:
                 pass
-    """ chatgpt
+
+
     # View-only (User) — ONLY for admin role, for autocomplete
     if role == 'admin':
-        for model in VIEW_ONLY_MODELS:
+        for model in ADMIN_ADD_ONLY_MODELS:
             ct = ContentType.objects.get_for_model(model)
-            try:
-                perms.append(Permission.objects.get(
-                    codename=f"view_{model._meta.model_name}",
-                    content_type=ct,
-                ))
-            except Permission.DoesNotExist:
-                pass
-    """
+            for action in ['view', 'add']:
+                try:
+                    perms.append(Permission.objects.get(
+                        codename=f"{action}_{model._meta.model_name}",
+                        content_type=ct,
+                    ))
+                except Permission.DoesNotExist:
+                    pass
     return perms
     
 
@@ -237,7 +239,7 @@ def _bust_user_group_cache(user, client):
 
 
 # ── ClientUserMembership signals ──────────────────────────────────────
-
+"""
 @receiver(post_save, sender=ClientUserMembership)
 def membership_saved(sender, instance, **kwargs):
     user   = instance.user
@@ -246,7 +248,34 @@ def membership_saved(sender, instance, **kwargs):
     _bust_user_group_cache(user, client)
     _sync_user_guardian_perms(user, client)
     _sync_user_model_perms(user, client)    # ← this was missing
+"""
+@receiver(post_save, sender=ClientUserMembership)
+def membership_saved(sender, instance, **kwargs):
+    user   = instance.user
+    client = instance.group.client
+    # ✅ STEP 1: Ensure staff profile exists
+    staff_profile, created = ClientUserProfile.objects.get_or_create(
+        user=user,
+        defaults={"client": client}
+    )
+    # ⚠️ Safety: If profile exists but wrong client (edge case)
+    if not created and staff_profile.client != client:
+        raise ValueError(
+            f"User {user} already belongs to another client as staff."
+        )
+    # ✅ STEP 2: Remove customer profile for SAME client (optional but recommended)
+    #CustomerProfile.objects.filter(
+    #    user=user,
+    #    client=client
+    #).delete()
 
+    # ✅ STEP 3: Your existing logic (unchanged)
+    _ensure_staff(user)
+    _bust_user_group_cache(user, client)
+    _sync_user_guardian_perms(user, client)
+    _sync_user_model_perms(user, client)
+
+"""
 @receiver(post_delete, sender=ClientUserMembership)
 def membership_deleted(sender, instance, **kwargs):
     user   = instance.user
@@ -254,6 +283,37 @@ def membership_deleted(sender, instance, **kwargs):
     _bust_user_group_cache(user, client)
     _sync_user_guardian_perms(user, client)
     _sync_user_model_perms(user, client)    # ← this was missing
+    _revoke_staff_if_unused(user)
+"""
+@receiver(post_delete, sender=ClientUserMembership)
+def membership_deleted(sender, instance, **kwargs):
+    user   = instance.user
+    client = instance.group.client
+
+    _bust_user_group_cache(user, client)
+    _sync_user_guardian_perms(user, client)
+    _sync_user_model_perms(user, client)
+
+    # ✅ STEP: Check if user still belongs to any group in this client
+    still_has_groups = ClientGroup.objects.filter(
+        memberships__user=user,
+        client=client,
+        is_active=True,
+    ).exists()
+
+    if not still_has_groups:
+        # Remove staff profile
+        ClientUserProfile.objects.filter(
+            user=user,
+            client=client
+        ).delete()
+
+        # Optional: recreate customer profile
+        #CustomerProfile.objects.get_or_create(
+        #    user=user,
+        #    client=client
+        #)
+
     _revoke_staff_if_unused(user)
 
 # ── ClientGroup signals ───────────────────────────────────────────────

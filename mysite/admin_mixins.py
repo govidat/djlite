@@ -62,18 +62,30 @@ class ClientScopedMixin:
             )
         return request._permitted_client_ids_list
 
-    def _client_from_obj(self, obj):
+    def _client_from_obj(self, obj, max_depth=5):
         """
         Walk FK chain to resolve the Client from any related object.
         Extend this if you have deeper nesting e.g. Shipment → Order → Client.
         """
-        if obj is None:
-            return None
+        if obj is None or max_depth <= 0:
+            return None        
         if isinstance(obj, Client):
             return obj
         # Direct FK to client
         if hasattr(obj, 'client'):
             return obj.client
+        # 🔁 Walk through all FK fields dynamically
+        for field in obj._meta.fields:
+            if field.is_relation and field.many_to_one:
+                related_obj = getattr(obj, field.name, None)
+                if related_obj:
+                    client = self._client_from_obj(related_obj, max_depth - 1)
+                    if client:
+                        return client
+
+        return None       
+
+        """
         # One level deep e.g. OrderLine → Order → Client
         if hasattr(obj, 'order') and hasattr(obj.order, 'client'):
             return obj.order.client
@@ -81,6 +93,7 @@ class ClientScopedMixin:
         if hasattr(obj, 'shipment') and hasattr(obj.shipment, 'order'):
             return obj.shipment.order.client
         return None
+        """
 
     def _has_guardian_perm(self, request, perm, obj=None):
         """Central guardian perm check with superuser bypass."""

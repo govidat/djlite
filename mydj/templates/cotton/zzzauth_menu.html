@@ -114,10 +114,11 @@
       </li>
 
     {% else %}
-
+ 
       {# Sign In #}
       <li>
-        <a href="{% url 'account_login' %}" class="gap-3">
+        
+        <a href="{% url 'client_login' client.client_id %}" class="gap-3">
           <svg xmlns="http://www.w3.org/2000/svg"
                fill="none" viewBox="0 0 24 24"
                stroke-width="1.5" stroke="currentColor"
@@ -135,7 +136,7 @@
 
       {# Sign Up #}
       <li>
-        <a href="{% url 'account_signup' %}" class="gap-3">
+        <a href="{% url 'client_signup' client.client_id %}" class="gap-3">
           <svg xmlns="http://www.w3.org/2000/svg"
                fill="none" viewBox="0 0 24 24"
                stroke-width="1.5" stroke="currentColor"

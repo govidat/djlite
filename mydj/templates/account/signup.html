@@ -1,0 +1,54 @@
+{% extends "account/base.html" %}
+{% load i18n %}
+
+{% block inner_content %}
+<div class="card bg-base-100 shadow-xl">
+  <div class="card-body">
+
+    <h1 class="card-title text-xl mb-4">{% trans "Create Account" %}</h1>
+
+    <form method="post">
+      {% csrf_token %}
+
+      {% for field in form %}
+      <div class="form-control mb-3">
+        <label class="label">
+          <span class="label-text">{{ field.label }}</span>
+        </label>
+        <input
+          type="{{ field.field.widget.input_type }}"
+          name="{{ field.html_name }}"
+          class="input input-bordered w-full
+                 {% if field.errors %}input-error{% endif %}"
+          placeholder="{{ field.field.widget.attrs.placeholder|default:'' }}"
+          {% if field.value %}value="{{ field.value }}"{% endif %}
+          {% if field.field.required %}required{% endif %}
+        >
+        {% if field.errors %}
+          {% for error in field.errors %}
+            <span class="text-error text-xs mt-1">{{ error }}</span>
+          {% endfor %}
+        {% endif %}
+        {% if field.help_text %}
+          <span class="label-text-alt opacity-60 mt-1">
+            {{ field.help_text }}
+          </span>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <button type="submit" class="btn btn-primary w-full mt-2">
+        {% trans "Sign Up" %}
+      </button>
+
+    </form>
+
+    <div class="divider text-xs opacity-50">{% trans "or" %}</div>
+
+    <a href="{% url 'account_login' %}" class="btn btn-outline w-full">
+      {% trans "Sign In" %}
+    </a>
+
+  </div>
+</div>
+{% endblock inner_content %}

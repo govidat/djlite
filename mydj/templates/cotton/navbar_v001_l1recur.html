@@ -1,31 +1,33 @@
 
 
 {% load my_tags %}
-
-{% for item in items %}
-    {% comment %}
-    {% mylist_bykey item.textblocks 'name' 'block_id' as result_var %}
-    <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
-    {% endcomment %}
-        {% if item.children %}  <!-- if the children length > 0 -->
-            <li>                
-                <details>
-                    <summary>
-                        <c-svgtextsvg  :textdict="item.translations.name" :svg_pre="item.svg_pre" :svg_suf="item.svg_suf"></c-svgtextsvg>
-                    </summary>                   
-                    <ul class="p-2">
-                        <c-navbar_v001_l1recur :items="item.children"></c-navbar_v001_l1recur>
-                    </ul>
-                </details>                
-            </li>
-        {% else %}
-            <li>
-                <a href="{% url 'client_page' item.client_id item.page_id %}">
-                    <c-svgtextsvg  :textdict="item.translations.name" :svg_pre="item.svg_pre" :svg_suf="item.svg_suf"></c-svgtextsvg>
-                </a>
-            </li>
-        {% endif %}
-{% endfor %}
+{% with current_page=request.resolver_match.kwargs.page|default:"home" %}
+  {% for item in items %}
+      {% comment %}
+      {% mylist_bykey item.textblocks 'name' 'block_id' as result_var %}
+      <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
+      {% endcomment %}
+          {% if item.children %}  <!-- if the children length > 0 -->
+              <li>                
+                  <details>
+                      <summary>
+                          <c-svgtextsvg  :textdict="item.translations.name" :svg_pre="item.svg_pre" :svg_suf="item.svg_suf"></c-svgtextsvg>
+                      </summary>                   
+                      <ul class="p-2">
+                          <c-navbar_v001_l1recur :items="item.children"></c-navbar_v001_l1recur>
+                      </ul>
+                  </details>                
+              </li>
+          {% else %}
+              <li>
+                  <a href="{% url 'client_page' item.client_id item.page_id %}"
+                    class="{% if item.page_id == current_page %}active bg-base-300 font-semibold{% endif %}">
+                      <c-svgtextsvg  :textdict="item.translations.name" :svg_pre="item.svg_pre" :svg_suf="item.svg_suf"></c-svgtextsvg>
+                  </a>
+              </li>
+          {% endif %}
+  {% endfor %}
+{% endwith %}
 
 {% comment %}
 

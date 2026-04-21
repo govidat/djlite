@@ -341,6 +341,7 @@ class Theme(models.Model):
         indexes = [
             models.Index(fields=["client", "order"]),
         ]
+        verbose_name = "00-03-01 Theme"
 
 class Page(models.Model):
     #id = LowercaseCharField(max_length=20, primary_key=True)
@@ -370,7 +371,7 @@ class Page(models.Model):
         indexes = [
             models.Index(fields=["client", "order"]),
         ]
-        verbose_name = "01-02 Page"
+        verbose_name = "00-03-02 Page"
 
 class Layout(models.Model):
     # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
@@ -511,9 +512,116 @@ Client
         ├── module permissions  (what they can do)
         ├── location scope      (which stores/branches)
         └── Users               (many users assigned to one group)
+
+Django User (auth identity — ONE per real person)
+    ↓
+    ├── ClientUserProfile (Type 1 — staff, ONE client only)
+    │       user = OneToOneField(User)
+    │       client = FK(Client)
+    │       → john is acme's editor, cannot be beta's editor
+    │
+    └── CustomerProfile (Type 2 — can have MANY per user)
+            user = ForeignKey(User)   ← NOT OneToOne
+            client = FK(Client)
+            → john can be acme's customer AND beta's customer
+            → same Django User, different CustomerProfile per client      
+        
 """
 
+# models.py
 
+# ── Type 1: Client Staff ──────────────────────────────────────────────
+
+class ClientUserProfile(models.Model):
+    """
+    Staff user anchored to exactly ONE client.
+    OneToOneField — one Django User = one client staff role.
+    """
+    user      = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='client_profile'
+    )
+    client    = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='staff_profiles'
+    )
+    mobile    = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "00-03-03 Client Staff Profile"
+
+
+    def __str__(self):
+        return f"{self.user.email} @ {self.client.client_id} [staff]"
+
+
+# ── Type 2: Customer ──────────────────────────────────────────────────
+
+class CustomerProfile(models.Model):
+    """
+    Customer registered with a specific client.
+    ForeignKey (not OneToOne) — same User can be a customer
+    of multiple clients in the same SaaS.
+    """
+    user               = models.ForeignKey(        # ← ForeignKey not OneToOne
+        User,
+        on_delete=models.CASCADE,
+        related_name='customer_profiles'
+    )
+    client             = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='customer_profiles'
+    )
+    mobile             = models.CharField(max_length=20, blank=True)
+    preferred_language = models.CharField(max_length=10, blank=True)
+    preferred_theme    = models.ForeignKey(
+        'Theme', null=True, blank=True, on_delete=models.SET_NULL
+    )
+    default_address    = models.ForeignKey(
+        'CustomerAddress', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+'
+    )
+    is_active          = models.BooleanField(default=True)
+    #created_at         = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'client')    # one profile per user per client
+        verbose_name    = 'Customer Profile'
+
+    def __str__(self):
+        return f"{self.user.email} @ {self.client.client_id} [customer]"
+
+
+class CustomerAddress(models.Model):
+    customer     = models.ForeignKey(
+        CustomerProfile,
+        on_delete=models.CASCADE,
+        related_name='addresses'
+    )
+    street       = models.CharField(max_length=200)
+    city         = models.CharField(max_length=100)
+    zip_code     = models.CharField(max_length=20)
+    country_code = models.CharField(max_length=2)
+    is_default   = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-is_default', 'city']
+
+    def __str__(self):
+        return f"{self.street}, {self.city}"
+
+    def save(self, *args, **kwargs):
+        # Only run default clearing if is_default is True
+        if self.is_default:
+            CustomerAddress.objects.filter(
+                customer=self.customer,
+                is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
 # ── Location (Store / Branch) ─────────────────────────────────────────
 
 class ClientLocation(models.Model):
@@ -614,6 +722,7 @@ class ClientGroupPermission(models.Model):
 
 # ── User → Group assignment ───────────────────────────────────────────
 
+"""
 class ClientUserMembership(models.Model):
     
     # Assigns a user to a ClientGroup.
@@ -629,6 +738,37 @@ class ClientUserMembership(models.Model):
 
     def __str__(self):
         return f"{self.user.username} → {self.group}"
+"""
+
+class ClientUserMembership(models.Model):
+    user  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='client_memberships')
+    group = models.ForeignKey(ClientGroup, on_delete=models.CASCADE, related_name='memberships')
+
+    class Meta:
+        unique_together = ('user', 'group')
+
+    def clean(self):
+        """Ensure user belongs to the same client as the group."""
+        from django.core.exceptions import ValidationError
+        try:
+            profile = self.user.client_profile
+            if profile.client != self.group.client:
+                raise ValidationError(
+                    f"User {self.user.username} belongs to "
+                    f"{profile.client.client_id}, not {self.group.client.client_id}"
+                )
+
+        except ClientUserProfile.DoesNotExist:
+            pass
+            #raise ValidationError(
+            #    f"User {self.user.username} has no client profile. "
+            #    f"Register them under a client first."
+            #)
+
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 """
 

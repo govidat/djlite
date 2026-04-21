@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto p-4">
+
+  {# ── Header ───────────────────────────────────────────────── #}
+  <div class="flex items-center gap-3 mb-6">
+    <div class="avatar placeholder">
+      <div class="bg-neutral text-neutral-content rounded-full w-12">
+        <span class="text-xl">
+          {{ request.user.first_name|first|upper|default:request.user.email|first|upper }}
+        </span>
+      </div>
+    </div>
+    <div>
+      <h1 class="text-xl font-bold">
+        {{ request.user.first_name }} {{ request.user.last_name }}
+      </h1>
+      <p class="text-sm opacity-60">{{ request.user.email }}</p>
+    </div>
+  </div>
+
+  {% comment "Included in base.html" %}
+    {# ── Messages ──────────────────────────────────────────────── #}
+    {% for message in messages %}
+    <div class="alert alert-success mb-4">
+      <span>{{ message }}</span>
+    </div>
+    {% endfor %}
+  {% endcomment %}
+  {# ── Profile form ──────────────────────────────────────────── #}
+  <div class="card bg-base-100 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-base">{% trans "My Details" %}</h2>
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="form-control mb-3">
+          <label class="label">
+            <span class="label-text">{% trans "Mobile" %}</span>
+          </label>
+          {{ form.mobile }}
+        </div>
+
+        <div class="form-control mb-3">
+          <label class="label">
+            <span class="label-text">{% trans "Preferred Language" %}</span>
+          </label>
+          {{ form.preferred_language }}
+        </div>
+
+        <div class="form-control mb-4">
+          <label class="label">
+            <span class="label-text">{% trans "Preferred Theme" %}</span>
+          </label>
+          {{ form.preferred_theme }}
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-sm">
+          {% trans "Save Changes" %}
+        </button>
+
+      </form>
+    </div>
+  </div>
+
+  {# ── Addresses summary ─────────────────────────────────────── #}
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="card-title text-base">{% trans "My Addresses" %}</h2>
+        <a href="{% url 'customer_addresses' client_id=client.client_id %}"
+           class="btn btn-ghost btn-xs">
+          {% trans "Manage" %} →
+        </a>
+      </div>
+
+      {% if addresses %}
+        {% for address in addresses %}
+        <div class="py-2 {% if not forloop.last %}border-b border-base-200{% endif %}">
+          <p class="text-sm font-medium">
+            {{ address.street }}
+            {% if address.is_default %}
+              <span class="badge badge-primary badge-xs ml-1">
+                {% trans "Default" %}
+              </span>
+            {% endif %}
+          </p>
+          <p class="text-xs opacity-60">
+            {{ address.city }}, {{ address.zip_code }}, {{ address.country_code }}
+          </p>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-sm opacity-50">
+          {% trans "No addresses yet." %}
+          <a href="{% url 'customer_addresses' client_id=client.client_id %}"
+             class="link link-primary">
+            {% trans "Add one" %}
+          </a>
+        </p>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

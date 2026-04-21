@@ -3,7 +3,7 @@ from django.core.cache import cache
 
 from mysite.models import ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 #from mysite.models import Card, Hero, Accordion, Layout, Page, HeroText, HeroCardText, AccordionText
-from mysite.models import Page, Layout, Component, ComponentSlot 
+from mysite.models import Page, Layout, Component, ComponentSlot
 
 from django.db.models import Prefetch
 from django.db.models import ForeignKey
@@ -430,7 +430,7 @@ def build_client_payload(client):
 # temporarily marking use_cache = False. To be changed after debugging
 # instead of gentext block for name, nb_title have alreaady added modeltranslation fields.
 # TBD in PRD use_cache=True
-def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeout=3600):
+def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout=3600):
     """
     Fetch clientstatic with optional caching.
     Works when client_id as primary key.
@@ -494,7 +494,6 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=False, timeou
 
     
     return client_static
-
 
 
 

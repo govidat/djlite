@@ -104,7 +104,7 @@ Input is of form :
   
   {# Level10 #}  
   {# For each full screen - Then level 20 items are derived from from available  #}
-  {% for id10 in page.layouts %}
+  {% for id10 in page_dict.layouts %}
     <div class="bg-cover bg-center {{ id10.css_class|default:'' }}" style="{{ id10.style|default:'' }}">  
       {# Level20 #}
       {# For each full screen - Then level 20 items are derived from from available  #}

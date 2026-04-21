@@ -75,6 +75,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # IMPORTANT: must come AFTER AuthenticationMiddleware
+    "mysite.middleware.customer_profile.CustomerProfileMiddleware", # CustomerProfile    
     'django.contrib.messages.middleware.MessageMiddleware',
     'allauth.account.middleware.AccountMiddleware',     # allauth
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -101,6 +103,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'mydj.context_processors.settings_constants', # context_processors
                 'mydj.context_processors.globalval',      # context_processors for globalval
+                'mydj.context_processors.client_context', # context_processors for usage of client val in account
             ],
             "loaders": [(                   # cotton
                 "django.template.loaders.cached.Loader",
@@ -273,3 +276,6 @@ LOCALE_PATHS = (os.path.join(os.path.dirname(__file__), '../locale/'),)
 
 # with nested inlines we are hitting limits sometimes
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
+
+ACCOUNT_ADAPTER      = 'mysite.adapters.ClientAwareAccountAdapter'
+#ACCOUNT_SIGNUP_FORM_CLASS = 'mysite.forms.CustomerSignupForm'

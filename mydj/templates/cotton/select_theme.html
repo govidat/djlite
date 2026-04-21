@@ -82,7 +82,8 @@
     <!-- DROPDOWN CONTENT -->
     <ul tabindex="0"
         class="dropdown-content bg-base-200 rounded-box z-50 w-52 p-2 shadow-xl">
-
+      
+      
       {% for t in client.themes %}
       <li>
         <button
@@ -93,17 +94,11 @@
                  {% if t.theme_id == request.session.active_theme_id %}
                  btn-active
                  {% endif %}">
-          {% comment %}
-          {% mylist_bykey t.textblocks 'name' 'block_id' as result_var %}
-          <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
-          {{t.translations.name|default:''}}
-                    
-          {% endcomment %}
           <c-svgtextsvg  :textdict="t.translations.name" :svg_pre="t.svg_pre" :svg_suf="t.svg_suf"></c-svgtextsvg>
         </button>
       </li>
       {% endfor %}
-
+      
     </ul>
   </div>
 </form>

@@ -19,7 +19,7 @@
   {% endcomment %}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{client.client_id}}</title>
+  <title>{{client.client_id|default:"App"}}</title>
   {% comment %} 
   <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
   {% endcomment %}
@@ -27,31 +27,31 @@
     :root {
 
       /* COLORS */
-      --p: {{ theme.primary }};
-      --s: {{ theme.secondary }};
-      --a: {{ theme.accent }};
-      --n: {{ theme.neutral }};
+      --p: {{ theme.primary|default:"#570df8" }};
+      --s: {{ theme.secondary|default:"#f000b8" }};
+      --a: {{ theme.accent|default:"#37cdbe" }};
+      --n: {{ theme.neutral|default:"#3d4451" }};
 
-      --pc: {{ theme.primary_content }};
-      --sc: {{ theme.secondary_content }};
-      --ac: {{ theme.accent_content }};
-      --nc: {{ theme.neutral_content }};
+      --pc: {{ theme.primary_content|default:"#ffffff" }};
+      --sc: {{ theme.secondary_content|default:"#ffffff" }};
+      --ac: {{ theme.accent_content|default:"#163835" }};
+      --nc: {{ theme.neutral_content|default:"#ffffff" }};
       
 
-      --b1: {{ theme.base_100 }};
-      --b2: {{ theme.base_200 }};
-      --b3: {{ theme.base_300 }};
-      --bc: {{ theme.base_content }};
+      --b1: {{ theme.base_100|default:"#ffffff" }};
+      --b2: {{ theme.base_200|default:"#f2f2f2" }};
+      --b3: {{ theme.base_300|default:"#e5e6e6" }};
+      --bc: {{ theme.base_content|default:"#1f2937" }};
 
-      --su: {{ theme.success }};
-      --wa: {{ theme.warning }};
-      --er: {{ theme.error }};
-      --in: {{ theme.info }};
+      --su: {{ theme.success|default:"#00c853" }};
+      --wa: {{ theme.warning|default:"#ff9800" }};
+      --er: {{ theme.error|default:"#ff5724" }};
+      --in: {{ theme.info|default:"#2094f3" }};
 
-      --suc: {{ theme.success_content }};
-      --wac: {{ theme.warning_content }};
-      --erc: {{ theme.error_content }};
-      --inc: {{ theme.info_content }};    
+      --suc: {{ theme.success_content|default:"#ffffff" }};
+      --wac: {{ theme.warning_content|default:"#ffffff" }};
+      --erc: {{ theme.error_content|default:"#ffffff" }};
+      --inc: {{ theme.info_content|default:"#ffffff"}};    
 
 
       /* TYPOGRAPHY */
@@ -96,12 +96,16 @@
   
   <main class="container p-4 pt-16 pb-12 h-screen max-w-full">
 
-    {% comment %}     
-    {{jsonclient}}
-    {{ gv.account.signin }}
-    {% endcomment %}
-    <c-level10to40maker></c-level10to40maker>
-    
+    {% block content %}
+      {# ── Messages ──────────────────────────────────────────────── #}
+      {% for message in messages %}
+      <div class="alert alert-success mb-4">
+        <span>{{ message }}</span>
+      </div>
+      {% endfor %}
+
+      <c-level10to40maker></c-level10to40maker>
+    {% endblock content %}
   </main>
 
   <!-- Footer -->    
