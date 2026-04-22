@@ -31,6 +31,8 @@ urlpatterns = [
     #path("set-theme/", ./mysite.views.set_theme, name="set_theme")
 
 ] 
+handler404 = 'mysite.views.main.custom_404'
+handler500 = 'mysite.views.main.custom_500'
 # + debug_toolbar_urls() 
 
 #+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

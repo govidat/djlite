@@ -424,7 +424,7 @@ def build_client_payload(client):
         #lv_languages,
         "themes":     lv_themes,
         #"textblocks": build_blocks(getattr(client, "prefetched_gentextblocks", [])),
-        "pages":      [build_page(page) for page in all_pages],
+        "pages":      [p for p in (build_page(page) for page in all_pages) if p], # [build_page(page) for page in all_pages],
         "page_tree":  build_page_tree([p for p in all_pages if not p.hidden]),
     }
 # temporarily marking use_cache = False. To be changed after debugging

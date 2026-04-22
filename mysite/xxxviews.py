@@ -322,6 +322,17 @@ def delete_address(request, client_id, address_id):
         address.delete()
         messages.success(request, 'Address deleted.')
     return redirect('customer_addresses', client_id=client_id)
+
+
+def custom_404(request, exception=None):
+    # client and theme are available via context processors
+    # even on 404 responses, as long as request.client was resolved
+    return render(request, '404.html', status=404)
+
+
+def custom_500(request):
+    # no context processors run on 500 — keep template self-contained
+    return render(request, '500.html', status=500)
 """
 
 @login_required

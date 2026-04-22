@@ -339,3 +339,104 @@ def group_deleted(sender, instance, **kwargs):
         _sync_user_guardian_perms(membership.user, instance.client)
         _sync_user_model_perms(membership.user, instance.client)   # ← add
 
+
+
+# to bust client cache if models are edited
+# ── Helper: walk up to client_id from any model instance ─────────────
+
+def get_client_id_from_instance(instance):
+    """
+    Walk up the ownership chain to find the client_id.
+    Returns None if the chain cannot be resolved (e.g. orphaned record).
+    """
+
+    try:
+        # Direct
+        if isinstance(instance, Client):
+            return instance.client_id
+
+        # One hop via client FK
+        if isinstance(instance, (Theme, Page)):
+            return instance.client.client_id
+
+        # Two hops: Layout → page → client
+        if isinstance(instance, Layout):
+            return instance.page.client.client_id
+
+        # Three hops: Component → layout → page → client
+        if isinstance(instance, Component):
+            return instance.layout.page.client.client_id
+
+        # Four hops: ComponentSlot → component → layout → page → client
+        if isinstance(instance, ComponentSlot):
+            return instance.component.layout.page.client.client_id
+
+        # GenericForeignKey models — content_object is the parent
+        # ComptextBlock.content_object is a ComponentSlot
+        if isinstance(instance, ComptextBlock):
+            slot = instance.content_object
+            if isinstance(slot, ComponentSlot):
+                return slot.component.layout.page.client.client_id
+            return None
+
+        # TextstbItem.content_object is a ComptextBlock
+        if isinstance(instance, TextstbItem):
+            block = instance.content_object
+            if isinstance(block, ComptextBlock):
+                slot = block.content_object
+                if isinstance(slot, ComponentSlot):
+                    return slot.component.layout.page.client.client_id
+            return None
+
+        # SvgtextbadgeValue → textstbitem → content_object (ComptextBlock) → ...
+        if isinstance(instance, SvgtextbadgeValue):
+            item = instance.textstbitem
+            block = item.content_object
+            if isinstance(block, ComptextBlock):
+                slot = block.content_object
+                if isinstance(slot, ComponentSlot):
+                    return slot.component.layout.page.client.client_id
+            return None
+
+    except Exception:
+        # Any broken FK chain (e.g. mid-delete cascade) — fail silently
+        return None
+
+    return None
+
+
+# ── Signal handler ────────────────────────────────────────────────────
+
+def invalidate_client_cache(sender, instance, **kwargs):
+    """
+    Single handler for post_save and post_delete on all content models.
+    Resolves client_id and deletes the clientstatic cache entry.
+    """
+    client_id = get_client_id_from_instance(instance)
+    if client_id:
+        cache_key = f"clientstatic:{client_id}"
+        cache.delete(cache_key)
+
+
+# ── Registration helper (called from AppConfig.ready) ─────────────────
+
+def register_signals():
+
+
+    models_to_watch = [
+        Client,
+        Theme,
+        Page,
+        Layout,
+        Component,
+        ComponentSlot,
+        ComptextBlock,
+        TextstbItem,
+        SvgtextbadgeValue,
+    ]
+
+    for model in models_to_watch:
+        post_save.connect(invalidate_client_cache, sender=model)
+        post_delete.connect(invalidate_client_cache, sender=model)
+
+
