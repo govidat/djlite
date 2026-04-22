@@ -1,0 +1,184 @@
+{% comment %}
+input type is :
+"component": {
+{
+  "css_class": "",
+  "herocontent_class": "",
+  "overlay": "False",
+  "overlay_style": "",
+  "herocontents": [
+    {
+      "hidden": "False",
+      "type_id": "text",
+      "order": 1,
+      "ltext": "None",
+      "actions_class": "None",
+      "actions_position_id": "end",
+      "textblocks": {
+        "title": [
+          {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "Bahushira Home Page Hero",
+                    "ltext": "ltBahushira Home Page Hero"
+                  },
+                  "fr": {
+                    "stext": "frBahushira Home Page Hero",
+                    "ltext": "ltfrBahushira Home Page Hero"
+                  },
+                  "hi": {
+                    "stext": "hiBahushira Home Page Hero",
+                    "ltext": "lthiBahushira Home Page Hero"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "content": [
+          {
+            "order": 2,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "This is a content line for Hero in Home page",
+                    "ltext": ""
+                  },
+                  "fr": {
+                    "stext": "frThis is a content line for Hero in Home page",
+                    "ltext": ""
+                  },
+                  "hi": {
+                    "stext": "hiThis is a content line for Hero in Home page",
+                    "ltext": ""
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "actbut": [
+          {
+            "order": 3,
+            "css_class": "btn-primary",
+            "ltext": "None",
+            "items": [
+              {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                  "en": {
+                    "stext": "Get Started",
+                    "ltext": ""
+                  },
+                  "fr": {
+                    "stext": "frGet Started",
+                    "ltext": ""
+                  },
+                  "hi": {
+                    "stext": "hiGet Started",
+                    "ltext": ""
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "hidden": "False",
+      "type_id": "figure",
+      "order": 2,
+      "ltext": "None",
+      "figure_class": "px-0 pt-0",
+      "position_id": "start",
+      "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+      "css_class": "None",
+      "alt": "Spiderman"
+    }
+  ],
+  "comp_id": "hero"
+}
+}\
+{% load my_filters %}
+{% endcomment %}
+
+
+
+
+{% if hero %}   
+      
+      <div class="hero bg-base-200 min-h-screen {{ hero.css_class|default:'' }}"
+        style="{% if hero.overlay %} {{hero.overlay_style}} {% endif %}"
+      >
+        
+        {% if hero.overlay %}
+          <div class="hero-overlay">
+          </div>  
+        {% endif %}
+        <div class="hero-content flex-row {{ hero.herocontent_class|default:'' }}">    
+          
+          {% for herocontent in hero.herocontents %}
+            <div>
+              
+              {% if herocontent.type_id == 'figure' %}                
+                <c-figure :figure="herocontent"></c-figure>                           
+              {% endif %}
+              
+              
+              {% if herocontent.type_id == 'text' %}
+               
+                {% if herocontent.textblocks.actbut %} 
+                  {% if herocontent.actions_position_id == 'start' %}                        
+                      <c-actions :actclass="herocontent.actions_class" :actbuts="herocontent.textblocks.actbut"></c-actions>
+                  {% endif %}                
+                {% endif %}
+
+                {% if herocontent.textblocks.title %}
+                  <h1 class="flex text-5xl font-bold mb-6 {{ herocontent.title.0.css_class|default:"" }}">
+                    <c-textrouter :ids="herocontent.textblocks.title"></c-textrouter>
+                  </h1>       
+                {% endif %}
+                {% if herocontent.textblocks.content %}  
+                  <div class="flex flex-col text-2xl mb-6">
+                    <c-textrouter :ids="herocontent.textblocks.content"></c-textrouter>
+                  </div>  
+                {% endif %} 
+
+                {% if herocontent.textblocks.actbut %} 
+                  {% if herocontent.actions_position_id == 'end' %}                        
+                      <c-actions :actclass="herocontent.actions_class" :actbuts="herocontent.textblocks.actbut"></c-actions>
+                  {% endif %}                
+                {% endif %}  
+                
+              {% endif %}
+              {% comment %}
+              To be tested
+              {% if herocontent.type_id == 'card' %}
+                  {% with card=site_cards|get_dictid:herocontent.link_id %}
+                    <c-card :card="card"></c-card>
+                  {% endwith %}
+              {% endif %}
+              {% endcomment %}
+            </div>
+
+          {% endfor %}              
+        </div>
+      </div>    
+{% endif %}   

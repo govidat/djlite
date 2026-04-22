@@ -18,6 +18,7 @@ import sys # debug-toolbar
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# BASE_DIR = djlite/
 
 from django.utils.translation import gettext_lazy as _
 
@@ -91,28 +92,42 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'mydj.urls'
 
+_BASE_LOADERS = [
+    'django_cotton.cotton_loader.Loader',
+    'django.template.loaders.filesystem.Loader',
+    'django.template.loaders.app_directories.Loader',
+]
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['mydj/templates'], # cotton
-        'APP_DIRS': False, # cotton  debug-toolbar expects this value to be True??
+        'DIRS': [
+            BASE_DIR / 'templates',    # ← djlite/templates/ — your templates
+        ],
+        #'APP_DIRS': True, # cotton  debug-toolbar expects this value to be True?? This in conflict with loaders setting below
+        # 'DIRS': ['mydj/templates'], # cotton        
+        #'APP_DIRS': False, # cotton  debug-toolbar expects this value to be True??
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'mydj.context_processors.settings_constants', # context_processors
-                'mydj.context_processors.globalval',      # context_processors for globalval
-                'mydj.context_processors.client_context', # context_processors for usage of client val in account
+                'mysite.context_processors.settings_constants', # context_processors
+                'mysite.context_processors.globalval',      # context_processors for globalval
+                'mysite.context_processors.client_context', # context_processors for usage of client val in account
             ],
-            "loaders": [(                   # cotton
-                "django.template.loaders.cached.Loader",
-                [
-                    "django_cotton.cotton_loader.Loader",
-                    "django.template.loaders.filesystem.Loader",
-                    "django.template.loaders.app_directories.Loader",
-                ],
-            )],
+            'loaders': _BASE_LOADERS if DEBUG else [
+                ('django.template.loaders.cached.Loader', _BASE_LOADERS)
+            ],
+
+            #"loaders": [(                   # cotton
+            #    "django.template.loaders.cached.Loader",
+            #    [
+            #        "django_cotton.cotton_loader.Loader",
+            #        "django.template.loaders.filesystem.Loader",
+            #        "django.template.loaders.app_directories.Loader",
+            #    ],
+            #)],
             "builtins": [                   # cotton
                 "django_cotton.templatetags.cotton"
             ],

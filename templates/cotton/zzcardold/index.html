@@ -1,0 +1,166 @@
+
+
+{% if card %}
+
+    <div class="card bg-base-100 w-96 shadow-sm {{ card.css_class|default:"" }}">
+                        
+        {% if card.cardfigure and card.cardfigure.position_id == 'start' %} 
+            <c-figure :figure="card.cardfigure"></c-figure> 
+        {% endif %}
+        
+        
+        {% if card.cardtext %}
+            <div class="card-body {{ card.body_class|default:"" }}">
+                
+                {% if card.cardtext.textblocks.actbut and card.cardtext.actions_position_id == 'start' %}                                       
+                    <c-actions :actclass="card.cardtext.actions_class" :actbuts="card.cardtext.textblocks.actbut"></c-actions>                                  
+                {% endif %}
+                
+                {% if card.cardtext.textblocks.title %}
+                  <h1 class="flex text-5xl font-bold mb-6 {{ card.cardtext.title.0.css_class|default:"" }}">
+                    <c-textrouter :ids="card.cardtext.textblocks.title"></c-textrouter>
+                  </h1>       
+                {% endif %}
+                
+                {% if card.cardtext.textblocks.content %}  
+                  <div class="flex flex-col text-2xl mb-6">
+                    <c-textrouter :ids="card.cardtext.textblocks.content"></c-textrouter>
+                  </div>  
+                {% endif %} 
+
+                {% if card.cardtext.textblocks.actbut and card.cardtext.actions_position_id == 'end' %}                                                           
+                    <c-actions :actclass="card.cardtext.actions_class" :actbuts="card.cardtext.textblocks.actbut"></c-actions>                                  
+                {% endif %}
+                
+            </div>
+        {% endif %}
+        
+        {% if card.cardfigure and card.cardfigure.position_id == 'end' %}  
+            <c-figure :figure="card.cardfigure"></c-figure>
+        {% endif %}
+        
+
+    </div>
+        
+{% endif %}
+
+
+
+{% comment %}
+
+{
+  "layout": 22,
+  "ltext": "None",
+  "css_class": "bg-base-100 w-96 shadow-sm",
+  "body_class": "None",
+  "comp_id": "card",
+  "cardfigure": {
+    "card": 2,
+    "ltext": "None",
+    "figure_class": "None",
+    "hidden": "None",
+    "position_id": "start",
+    "image_url": "https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp",
+    "alt": "Shoes",
+    "css_class": "None",
+    "type_id": "figure"
+  },
+  "cardtext": {
+    "card": 2,
+    "ltext": "None",
+    "hidden": "None",
+    "actions_class": "None",
+    "actions_position_id": "start",
+    "type_id": "text",
+    "textblocks": {
+      "title": [
+        {
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Contact Card Title",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frContact Card Title",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiContact Card Title",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "content": [
+        {
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "A card component has a figure, a body part, and inside body there are title and actions parts",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frA card component has a figure, a body part, and inside body there are title and actions parts",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiA card component has a figure, a body part, and inside body there are title and actions parts",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "actbut": [
+        {
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Buy Now",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frBuy Now",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiBuy Now",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+{% endcomment %}

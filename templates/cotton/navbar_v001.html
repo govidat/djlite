@@ -1,0 +1,72 @@
+{% comment %}
+{% load my_filters %}
+{% endcomment %}
+{% load my_tags %}
+<div class="navbar bg-base-100 shadow-sm fixed top-0 left-0 w-full z-50">
+  <div class="navbar-start">
+    <div class="dropdown">
+      <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" /> </svg>
+      </div>
+      <ul
+        tabindex="0"
+        class="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
+        <c-navbar_v001_l1recur :items="client.page_tree"></c-navbar_v001_l1recur>    
+      </ul>
+    </div>
+    {% comment %}
+    <a href="{% url 'client_page' client_id 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    {% endcomment %}
+
+    <h1 class="text-xl font-bold">
+      
+
+      {% comment %}
+      {% mylist_bykey client.textblocks 'nb_title' 'block_id' as result_var %}
+        <h1 class="text-xl font-bold {{result_var.css_class|default:""}}">
+        <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>      
+      {% endcomment %}
+      <c-svgtextsvg  :textdict="client.translations.nb_title" :svg_pre="client.translations.nb_title_svg_pre" :svg_suf="client.translations.nb_title_svg_suf"></c-svgtextsvg>
+    </h1>
+
+  </div>
+  <div class="navbar-center hidden lg:flex">
+    <ul class="menu menu-horizontal px-1">
+      
+      {% comment %}{% endcomment %}
+      
+      <c-navbar_v001_l1recur :items="client.page_tree"></c-navbar_v001_l1recur>
+      
+    </ul>
+  </div>
+  <div class="navbar-end flex xl:gap-1">
+    <c-customer-menu />
+    
+    <c-select_theme></c-select_theme>
+    
+    <c-select_language :languages="client.languages"></c-select_language>      
+    
+  </div>
+</div>
+
+{% comment %}
+
+input 
+cilent: {
+"client_id": "bahushira",
+"translations": {
+  "name": {
+    "en": "Bahushira2",
+    "hi": "hiBahushira2",
+    "fr": "frBahushira2",
+    "ta": null
+  },
+  "nb_title": {
+    "en": "Bahushira2 Title",
+    "hi": "hiBahushira2 Title",
+    "fr": "frBahushira2 Title",
+    "ta": null
+  }
+},
+}
+{% endcomment %}

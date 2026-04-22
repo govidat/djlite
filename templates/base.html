@@ -1,0 +1,132 @@
+{% load static tailwind_tags %}
+{% load i18n %}
+{% load l10n %}
+
+<!DOCTYPE html>
+
+
+
+<html lang="en" data-theme="clienttheme">
+<head>
+  {% comment %} 
+  <script>
+    // Apply stored theme BEFORE page renders (prevents flash)
+    const storedTheme = localStorage.getItem("theme");
+    if (storedTheme) {
+        document.documentElement.setAttribute("data-theme", storedTheme);
+    }
+  </script>
+  {% endcomment %}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{client.client_id|default:"App"}}</title>
+  {% comment %} 
+  <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
+  {% endcomment %}
+  <style>
+    :root {
+
+      /* COLORS */
+      --p: {{ theme.primary|default:"#570df8" }};
+      --s: {{ theme.secondary|default:"#f000b8" }};
+      --a: {{ theme.accent|default:"#37cdbe" }};
+      --n: {{ theme.neutral|default:"#3d4451" }};
+
+      --pc: {{ theme.primary_content|default:"#ffffff" }};
+      --sc: {{ theme.secondary_content|default:"#ffffff" }};
+      --ac: {{ theme.accent_content|default:"#163835" }};
+      --nc: {{ theme.neutral_content|default:"#ffffff" }};
+      
+
+      --b1: {{ theme.base_100|default:"#ffffff" }};
+      --b2: {{ theme.base_200|default:"#f2f2f2" }};
+      --b3: {{ theme.base_300|default:"#e5e6e6" }};
+      --bc: {{ theme.base_content|default:"#1f2937" }};
+
+      --su: {{ theme.success|default:"#00c853" }};
+      --wa: {{ theme.warning|default:"#ff9800" }};
+      --er: {{ theme.error|default:"#ff5724" }};
+      --in: {{ theme.info|default:"#2094f3" }};
+
+      --suc: {{ theme.success_content|default:"#ffffff" }};
+      --wac: {{ theme.warning_content|default:"#ffffff" }};
+      --erc: {{ theme.error_content|default:"#ffffff" }};
+      --inc: {{ theme.info_content|default:"#ffffff"}};    
+
+
+      /* TYPOGRAPHY */
+      --font-body: {{ theme.font_body }};
+      --font-heading: {{ theme.font_heading }};
+      --base-font-size: {{ theme.base_font_size }};
+      --scale-ratio: {{ theme.scale_ratio }};
+
+      /* SPACING */
+      --section-gap: {{ theme.section_gap }};
+      --container-padding: {{ theme.container_padding }};
+
+      /* RADIUS */
+      --radius-btn: {{ theme.radius_btn }};
+      --radius-card: {{ theme.radius_card }};
+      --radius-input: {{ theme.radius_input }};
+
+      /* SHADOW */
+      --shadow-sm: {{ theme.shadow_sm }};
+      --shadow-md: {{ theme.shadow_md }};
+      --shadow-lg: {{ theme.shadow_lg }};
+    }
+  </style>  
+  {% tailwind_css %}
+
+</head>
+<body class="h-screen min-h-screen">
+  
+  <!-- Header -->
+  <header  class="p-4 col-span-2 row-start-1 row-end-2">
+    <!-- navbar -->
+
+    <c-navbar_v001></c-navbar_v001> 
+
+  </header>
+  <!-- Sidebar -->
+  {% comment %} 
+  <aside class="bg-gray-100 p-4 row-start-2 row-end-3 col-start-1 col-end-2">
+  </aside>
+  {% endcomment %}
+  
+  <main class="container p-4 pt-16 pb-12 h-screen max-w-full">
+
+    {% block content %}
+      {# ── Messages ──────────────────────────────────────────────── #}
+      {% for message in messages %}
+      <div class="alert alert-success mb-4">
+        <span>{{ message }}</span>
+      </div>
+      {% endfor %}
+     
+      <c-level10to40maker></c-level10to40maker>
+    {% endblock content %}
+  </main>
+
+  <!-- Footer -->    
+  {% comment %} 
+  <c-footer_v001></c-footer_v001>
+  {% endcomment %}
+
+  {% comment %}
+  <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
+  <script>
+    themeChange(false);
+  </script>
+  {% endcomment %}
+  {% comment %}
+  For Datastar - NOT WORKING
+  <script src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js"></script>  
+  <script src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js"></script>
+  <script>Datastar.start()</script>  
+    <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js"></script>
+  {% endcomment %}
+  
+</body>
+
+</html>
+

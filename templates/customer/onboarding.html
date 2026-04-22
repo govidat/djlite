@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="min-h-screen bg-base-200 flex items-center justify-center p-4">
+  <div class="card bg-base-100 shadow-xl w-full max-w-lg">
+    <div class="card-body">
+
+      <h1 class="card-title text-2xl">{% trans "Complete Your Profile" %}</h1>
+      <p class="text-sm opacity-60 mb-2">
+        {% trans "A few details to personalise your experience." %}
+      </p>
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="divider text-xs opacity-50">{% trans "Preferences" %}</div>
+
+        <div class="form-control mb-3">
+          <label class="label">
+            <span class="label-text">{% trans "Mobile" %}</span>
+          </label>
+          {{ profile_form.mobile }}
+          {% if profile_form.mobile.errors %}
+            <span class="text-error text-xs mt-1">
+              {{ profile_form.mobile.errors.0 }}
+            </span>
+          {% endif %}
+        </div>
+
+        <div class="form-control mb-3">
+          <label class="label">
+            <span class="label-text">{% trans "Preferred Language" %}</span>
+          </label>
+          {{ profile_form.preferred_language }}
+        </div>
+
+        <div class="form-control mb-3">
+          <label class="label">
+            <span class="label-text">{% trans "Preferred Theme" %}</span>
+          </label>
+          {{ profile_form.preferred_theme }}
+        </div>
+
+        <div class="divider text-xs opacity-50">{% trans "Your Address" %}</div>
+
+        <div class="form-control mb-3">
+          <label class="label">
+            <span class="label-text">{% trans "Street" %}</span>
+          </label>
+          {{ address_form.street }}
+          {% if address_form.street.errors %}
+            <span class="text-error text-xs mt-1">
+              {{ address_form.street.errors.0 }}
+            </span>
+          {% endif %}
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">{% trans "City" %}</span>
+            </label>
+            {{ address_form.city }}
+            {% if address_form.city.errors %}
+              <span class="text-error text-xs mt-1">
+                {{ address_form.city.errors.0 }}
+              </span>
+            {% endif %}
+          </div>
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">{% trans "ZIP / PIN" %}</span>
+            </label>
+            {{ address_form.zip_code }}
+          </div>
+        </div>
+
+        <div class="form-control mb-6">
+          <label class="label">
+            <span class="label-text">{% trans "Country Code" %}</span>
+          </label>
+          {{ address_form.country_code }}
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full">
+          {% trans "Get Started" %}
+        </button>
+
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

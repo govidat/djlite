@@ -1,0 +1,36 @@
+{% comment %}
+{% load my_filters %}
+recd content:
+:actclass="herocontent.actions_class" :actbuts="herocontent.textblocks.actbut"
+"actbut": [
+    {
+    "order": 3,
+    "css_class": "btn-primary",
+    "ltext": "None",
+    "items": [
+        {
+        "type": "text",
+        "order": 1,
+        "css_class": "None",
+        "values": {
+            "en": {
+            "stext": "Get Started",
+            "ltext": ""
+            },
+            "fr": {
+            "stext": "frGet Started",
+            "ltext": ""
+            },
+            "hi": {
+            "stext": "hiGet Started",
+            "ltext": ""
+            }
+        }
+        }
+    ]
+    }
+]
+{% endcomment %}
+<div class="justify-end {{ actclass|default:"" }}">    
+    <c-buttons :buttons="actbuts"></c-buttons>
+</div>

@@ -1,0 +1,142 @@
+{% comment %}
+input type is :
+
+"component": {
+  "layout": 13,
+  "css_class": "None",
+  "herocontent_class": "None",
+  "overlay": "None",
+  "overlay_style": "None",
+  "comp_id": "hero",
+  "contents": [
+    {
+      "order": 1,
+      "hidden": "None",
+      "type_id": "text",
+      "ltext": "None",
+      "actions_class": "None",
+      "actions_position_id": "end",
+      "textblocks": [
+        {
+          "block_id": "title",
+          "order": 1,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Bahushira Home Page Hero",
+                  "ltext": "ltBahushira Home Page Hero"
+                },
+                "fr": {
+                  "stext": "frBahushira Home Page Hero",
+                  "ltext": "ltfrBahushira Home Page Hero"
+                },
+                "hi": {
+                  "stext": "hiBahushira Home Page Hero",
+                  "ltext": "lthiBahushira Home Page Hero"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "block_id": "content",
+          "order": 2,
+          "css_class": "None",
+          "ltext": "None",
+          "href_page": "None",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "This is a content line for Hero in Home page",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frThis is a content line for Hero in Home page",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiThis is a content line for Hero in Home page",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        },
+        {
+          "block_id": "actbut",
+          "order": 3,
+          "css_class": "btn-primary",
+          "ltext": "None",
+          "href_page": "about",
+          "items": [
+            {
+              "type": "text",
+              "order": 1,
+              "css_class": "None",
+              "values": {
+                "en": {
+                  "stext": "Get Started",
+                  "ltext": ""
+                },
+                "fr": {
+                  "stext": "frGet Started",
+                  "ltext": ""
+                },
+                "hi": {
+                  "stext": "hiGet Started",
+                  "ltext": ""
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "hero": 1,
+      "order": 2,
+      "hidden": "None",
+      "type_id": "figure",
+      "ltext": "None",
+      "figure_class": "px-0 pt-0",
+      "position_id": "start",
+      "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+      "alt": "Spiderman",
+      "css_class": "None"
+    }
+  ]
+}
+
+{% endcomment %}
+
+
+
+{% if component %}   
+      
+      <div class="hero bg-base-200 min-h-screen {{ component.css_class|default:'' }}"
+        style="{% if component.hero_overlay %} {{component.hero_overlay_style|default:''}} {% endif %}"
+      >
+        
+        {% if component.hero_overlay %}
+          <div class="hero-overlay">
+          </div>  
+        {% endif %}
+        <div class="hero-content flex-row {{ component.hero_content_class|default:'' }}">    
+          
+          {% for compslot in component.slots %}
+            <c-compcontent :compslot="compslot"></c-compcontent>
+          {% endfor %}              
+        </div>
+      </div>    
+{% endif %}   

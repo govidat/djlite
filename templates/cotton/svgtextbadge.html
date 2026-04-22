@@ -1,0 +1,44 @@
+
+{% load my_tags %}
+
+{% comment %}
+{% load my_filters %}
+This is to display a svg, text and badge in a single line.
+[
+    {'type': 'text', 'order': 1, 'css_class': None, 'values': {'en': {'stext': 'Bahushira Nav Bar', 'ltext': ''}, 'fr': {'stext': 'frBahushira Nav Bar', 'ltext': ''}, 'hi': {'stext': 'hiBahushira Nav Bar', 'ltext': ''}}},
+    {'type': 'badge', 'order': 1, 'css_class': None, 'values': {'en': {'stext': 'Bahushira Nav Bar', 'ltext': ''}, 'fr': {'stext': 'frBahushira Nav Bar', 'ltext': ''}, 'hi': {'stext': 'hiBahushira Nav Bar', 'ltext': ''}}},
+    {'type': 'svg', 'order': 1, 'css_class': None, 'svg_text': 'xyz'}
+] 
+
+first get the svgitem for this input and then proceed as before
+
+
+{% endcomment %}
+
+
+{% for item in items %}
+    <div class="flex">
+        {% if item.type == 'svg' %}
+            {# svg is brought from raw_svgs using the link of link_id #}
+            {# % mysvg_static_tag item.link_id as dict %} #}
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="size-[1.2em] d={{prefix_svg}}"><path stroke-linecap="round" stroke-linejoin="round" 
+                d="{{item.svg_text}}" /></svg>       
+        {% endif %}
+
+        {% if item.type == 'text' or item.type == 'badge' %}
+            
+            {% mytextv2 item.values 'stext' as result_var %}
+            {% with lv_name=result_var %}
+                {% if item.type == 'text' %}
+                    {{lv_name}}
+                {% endif %}
+                {% if item.type == 'badge' %} 
+                    <div class="badge badge-secondary {{ item.css_class|default:"" }}">
+                        {{lv_name}}    
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+        {% endif %}
+    </div>    
+{% endfor%}   

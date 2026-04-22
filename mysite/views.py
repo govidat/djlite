@@ -189,53 +189,7 @@ def client_logout(request, client_id):
         logout(request)
         request.session['client_id'] = client_id   # restore after logout flushes session
     return redirect('client_page', client_id=client_id)
-"""
-def client_login(request, client_id):
-    
-    get_object_or_404(Client, client_id=client_id)
-    request.session['client_id']      = client_id
-    request.session['user_type']      = 'customer'
-    request.session['login_redirect'] = reverse(
-        'client_page', kwargs={'client_id': client_id}
-    )
-    if request.user.is_authenticated:
-        return redirect('client_page', client_id=request.client.client_id)
-    return redirect('account_login')
 
-
-def client_signup(request, client_id):
-    client = get_object_or_404(Client, client_id=client_id)
-    request.session['client_id'] = client_id
-    request.session['user_type'] = 'customer'
-
-    if request.user.is_authenticated:
-        profile, created = CustomerProfile.objects.get_or_create(
-            user=request.user,
-            client=client,
-        )
-        if created:
-            request.session['onboarding_client_id'] = client_id
-            return redirect('customer_onboarding', client_id=request.client.client_id)
-        return redirect('client_page', client_id=request.client.client_id)
-
-    return redirect('account_signup')
-
-
-def client_logout(request, client_id):
-    get_object_or_404(Client, client_id=client_id)
-    if request.method == 'POST':
-
-        # Keep client_id in session so navbar still works after logout
-        # Only clear user-specific session data
-        request.session.pop('user_type', None)
-        request.session.pop('onboarding_client_id', None)
-        logout(request)   # clears auth but we restore client_id below
-        request.session['client_id'] = client_id   # ← restore after logout
-
-        #request.session.pop('user_type', None)
-        #logout(request)
-    return redirect('client_page', client_id=request.client.client_id)
-"""
 
 # ── Onboarding ────────────────────────────────────────────────────────
 
@@ -269,42 +223,7 @@ def customer_onboarding(request, client_id):
         'address_form': address_form,
         # 'client' and 'theme' come from context_processor
     })
-"""
-@login_required
-def customer_onboarding(request, client_id):
-    client_obj  = get_object_or_404(Client, client_id=client_id)
-    client_dict = fetch_clientstatic(lv_client_id=client_id)
-    client_dict.setdefault("pages", [])
-    client_dict.setdefault("themes", [])
-    profile = get_object_or_404(
-        CustomerProfile, user=request.user, client=client_obj
-    )
 
-    if request.method == 'POST':
-        profile_form = CustomerProfileForm(
-            request.POST, instance=profile, client=client_obj
-        )
-        address_form = CustomerAddressForm(request.POST)
-        if profile_form.is_valid() and address_form.is_valid():
-            profile_form.save()
-            address            = address_form.save(commit=False)
-            address.customer   = profile
-            address.is_default = True
-            address.save()
-            profile.default_address = address
-            profile.save(update_fields=['default_address'])
-            messages.success(request, 'Welcome! Your profile is set up.')
-            return redirect('client_page', client_id=client_id)
-    else:
-        profile_form = CustomerProfileForm(instance=profile, client=client_obj)
-        address_form = CustomerAddressForm()
-
-    return render(request, 'customer/onboarding.html', {
-        'profile_form': profile_form,
-        'address_form': address_form,
-        'client':       client_dict,           # ← dict
-    })
-"""
 
 # ── Profile ───────────────────────────────────────────────────────────
 
@@ -334,37 +253,7 @@ def customer_profile(request, client_id):
         'addresses': profile.addresses.all(),
         # 'client' and 'theme' come from context_processor automatically
     })
-"""
-@login_required
-def customer_profile(request, client_id):
-    client_obj = get_object_or_404(Client, client_id=client_id)
-    profile    = get_object_or_404(
-        CustomerProfile, user=request.user, client=client_obj
-    )
 
-    # Fetch client as dict — same as ClientPageView so templates work
-    client_dict = fetch_clientstatic(lv_client_id=client_id)
-    client_dict.setdefault("pages", [])
-    client_dict.setdefault("themes", [])
-
-    if request.method == 'POST':
-        form = CustomerProfileForm(
-            request.POST, instance=profile, client=client_obj
-        )
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Profile updated successfully.')
-            return redirect('customer_profile', client_id=client_id)
-    else:
-        form = CustomerProfileForm(instance=profile, client=client_obj)
-
-    return render(request, 'customer/profile.html', {
-        'form':      form,
-        'profile':   profile,
-        'client':    client_dict,              # ← dict, not model instance
-        'addresses': profile.addresses.all(),
-    })
-"""
 
 # ── Addresses ─────────────────────────────────────────────────────────
 
@@ -380,25 +269,7 @@ def customer_addresses(request, client_id):
         'profile':   profile,
         # 'client' and 'theme' come from context_processor
     })
-"""
 
-@login_required
-def customer_addresses(request, client_id):
-    client_obj  = get_object_or_404(Client, client_id=client_id)
-    client_dict = fetch_clientstatic(lv_client_id=client_id)
-    client_dict.setdefault("pages", [])
-    client_dict.setdefault("themes", [])
-    profile = get_object_or_404(
-        CustomerProfile, user=request.user, client=client_obj
-    )
-
-    return render(request, 'customer/addresses.html', {
-        'addresses': profile.addresses.all(),
-        'form':      CustomerAddressForm(),
-        'profile':   profile,
-        'client':    client_dict,              # ← dict
-    })
-"""
 @login_required
 def add_address(request, client_id):
     client_obj = request.client or get_object_or_404(Client, client_id=client_id)
@@ -421,37 +292,7 @@ def add_address(request, client_id):
                 'profile':   profile,
             })
     return redirect('customer_addresses', client_id=client_id)
-"""
-@login_required
-def add_address(request, client_id):
-    client_obj  = get_object_or_404(Client, client_id=client_id)
-    client_dict = fetch_clientstatic(lv_client_id=client_id)
-    client_dict.setdefault("pages", [])
-    client_dict.setdefault("themes", [])
-    profile = get_object_or_404(
-        CustomerProfile, user=request.user, client=client_obj
-    )
 
-    if request.method == 'POST':
-        form = CustomerAddressForm(request.POST)
-        if form.is_valid():
-            address            = form.save(commit=False)
-            address.customer   = profile
-            # Set is_default — True if this is the first address
-            address.is_default = not profile.addresses.exists()
-            address.save()
-            messages.success(request, 'Address added.')
-            return redirect('customer_addresses', client_id=client_id)
-        else:
-            return render(request, 'customer/addresses.html', {
-                'addresses': profile.addresses.all(),
-                'form':      form,
-                'profile':   profile,
-                'client':    client_dict,
-            })
-
-    return redirect('customer_addresses', client_id=client_id)
-"""
 
 @login_required
 def set_default_address(request, client_id, address_id):
@@ -467,25 +308,7 @@ def set_default_address(request, client_id, address_id):
         messages.success(request, 'Default address updated.')
     return redirect('customer_addresses', client_id=client_id)
 
-"""
-@login_required
-def set_default_address(request, client_id, address_id):
-    client_obj = get_object_or_404(Client, client_id=client_id)
-    profile    = get_object_or_404(
-        CustomerProfile, user=request.user, client=client_obj
-    )
-    address = get_object_or_404(
-        CustomerAddress, pk=address_id, customer=profile
-    )
-    if request.method == 'POST':
-        profile.addresses.update(is_default=False)
-        address.is_default = True
-        address.save()
-        profile.default_address = address
-        profile.save(update_fields=['default_address'])
-        messages.success(request, 'Default address updated.')
-    return redirect('customer_addresses', client_id=client_id)
-"""
+
 
 @login_required
 def delete_address(request, client_id, address_id):
@@ -780,7 +603,190 @@ def customer_profile(request, client_id):
         'addresses': profile.addresses.all(),
     })
 """
+"""
+def client_login(request, client_id):
+    
+    get_object_or_404(Client, client_id=client_id)
+    request.session['client_id']      = client_id
+    request.session['user_type']      = 'customer'
+    request.session['login_redirect'] = reverse(
+        'client_page', kwargs={'client_id': client_id}
+    )
+    if request.user.is_authenticated:
+        return redirect('client_page', client_id=request.client.client_id)
+    return redirect('account_login')
 
+
+def client_signup(request, client_id):
+    client = get_object_or_404(Client, client_id=client_id)
+    request.session['client_id'] = client_id
+    request.session['user_type'] = 'customer'
+
+    if request.user.is_authenticated:
+        profile, created = CustomerProfile.objects.get_or_create(
+            user=request.user,
+            client=client,
+        )
+        if created:
+            request.session['onboarding_client_id'] = client_id
+            return redirect('customer_onboarding', client_id=request.client.client_id)
+        return redirect('client_page', client_id=request.client.client_id)
+
+    return redirect('account_signup')
+
+
+def client_logout(request, client_id):
+    get_object_or_404(Client, client_id=client_id)
+    if request.method == 'POST':
+
+        # Keep client_id in session so navbar still works after logout
+        # Only clear user-specific session data
+        request.session.pop('user_type', None)
+        request.session.pop('onboarding_client_id', None)
+        logout(request)   # clears auth but we restore client_id below
+        request.session['client_id'] = client_id   # ← restore after logout
+
+        #request.session.pop('user_type', None)
+        #logout(request)
+    return redirect('client_page', client_id=request.client.client_id)
+"""
+"""
+@login_required
+def customer_onboarding(request, client_id):
+    client_obj  = get_object_or_404(Client, client_id=client_id)
+    client_dict = fetch_clientstatic(lv_client_id=client_id)
+    client_dict.setdefault("pages", [])
+    client_dict.setdefault("themes", [])
+    profile = get_object_or_404(
+        CustomerProfile, user=request.user, client=client_obj
+    )
+
+    if request.method == 'POST':
+        profile_form = CustomerProfileForm(
+            request.POST, instance=profile, client=client_obj
+        )
+        address_form = CustomerAddressForm(request.POST)
+        if profile_form.is_valid() and address_form.is_valid():
+            profile_form.save()
+            address            = address_form.save(commit=False)
+            address.customer   = profile
+            address.is_default = True
+            address.save()
+            profile.default_address = address
+            profile.save(update_fields=['default_address'])
+            messages.success(request, 'Welcome! Your profile is set up.')
+            return redirect('client_page', client_id=client_id)
+    else:
+        profile_form = CustomerProfileForm(instance=profile, client=client_obj)
+        address_form = CustomerAddressForm()
+
+    return render(request, 'customer/onboarding.html', {
+        'profile_form': profile_form,
+        'address_form': address_form,
+        'client':       client_dict,           # ← dict
+    })
+"""
+"""
+@login_required
+def customer_profile(request, client_id):
+    client_obj = get_object_or_404(Client, client_id=client_id)
+    profile    = get_object_or_404(
+        CustomerProfile, user=request.user, client=client_obj
+    )
+
+    # Fetch client as dict — same as ClientPageView so templates work
+    client_dict = fetch_clientstatic(lv_client_id=client_id)
+    client_dict.setdefault("pages", [])
+    client_dict.setdefault("themes", [])
+
+    if request.method == 'POST':
+        form = CustomerProfileForm(
+            request.POST, instance=profile, client=client_obj
+        )
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile updated successfully.')
+            return redirect('customer_profile', client_id=client_id)
+    else:
+        form = CustomerProfileForm(instance=profile, client=client_obj)
+
+    return render(request, 'customer/profile.html', {
+        'form':      form,
+        'profile':   profile,
+        'client':    client_dict,              # ← dict, not model instance
+        'addresses': profile.addresses.all(),
+    })
+"""
+"""
+
+@login_required
+def customer_addresses(request, client_id):
+    client_obj  = get_object_or_404(Client, client_id=client_id)
+    client_dict = fetch_clientstatic(lv_client_id=client_id)
+    client_dict.setdefault("pages", [])
+    client_dict.setdefault("themes", [])
+    profile = get_object_or_404(
+        CustomerProfile, user=request.user, client=client_obj
+    )
+
+    return render(request, 'customer/addresses.html', {
+        'addresses': profile.addresses.all(),
+        'form':      CustomerAddressForm(),
+        'profile':   profile,
+        'client':    client_dict,              # ← dict
+    })
+"""
+
+"""
+@login_required
+def add_address(request, client_id):
+    client_obj  = get_object_or_404(Client, client_id=client_id)
+    client_dict = fetch_clientstatic(lv_client_id=client_id)
+    client_dict.setdefault("pages", [])
+    client_dict.setdefault("themes", [])
+    profile = get_object_or_404(
+        CustomerProfile, user=request.user, client=client_obj
+    )
+
+    if request.method == 'POST':
+        form = CustomerAddressForm(request.POST)
+        if form.is_valid():
+            address            = form.save(commit=False)
+            address.customer   = profile
+            # Set is_default — True if this is the first address
+            address.is_default = not profile.addresses.exists()
+            address.save()
+            messages.success(request, 'Address added.')
+            return redirect('customer_addresses', client_id=client_id)
+        else:
+            return render(request, 'customer/addresses.html', {
+                'addresses': profile.addresses.all(),
+                'form':      form,
+                'profile':   profile,
+                'client':    client_dict,
+            })
+
+    return redirect('customer_addresses', client_id=client_id)
+"""
+"""
+@login_required
+def set_default_address(request, client_id, address_id):
+    client_obj = get_object_or_404(Client, client_id=client_id)
+    profile    = get_object_or_404(
+        CustomerProfile, user=request.user, client=client_obj
+    )
+    address = get_object_or_404(
+        CustomerAddress, pk=address_id, customer=profile
+    )
+    if request.method == 'POST':
+        profile.addresses.update(is_default=False)
+        address.is_default = True
+        address.save()
+        profile.default_address = address
+        profile.save(update_fields=['default_address'])
+        messages.success(request, 'Default address updated.')
+    return redirect('customer_addresses', client_id=client_id)
+"""
 """
 
 

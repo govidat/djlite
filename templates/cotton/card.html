@@ -1,0 +1,127 @@
+{% comment %}
+                      "component": {
+                        "layout": 22,
+                        "ltext": "None",
+                        "css_class": "bg-base-100 w-96 shadow-sm",
+                        "body_class": "None",
+                        "comp_id": "card",
+                        "slots": [
+                          {
+                            "card": 2,
+                            "ltext": "None",
+                            "hidden": "None",
+                            "order": 1,
+                            "actions_class": "None",
+                            "actions_position_id": "start",
+                            "type_id": "text",
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "Contact Card Title",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frContact Card Title",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiContact Card Title",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "None",
+                                "ltext": "None",
+                                "href_page": "None",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "A card component has a figure, a body part, and inside body there are title and actions parts",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frA card component has a figure, a body part, and inside body there are title and actions parts",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiA card component has a figure, a body part, and inside body there are title and actions parts",
+                                        "ltext": ""
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "actbut",
+                                "order": 3,
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "None",
+                                    "values": {
+                                      "en": {
+                                        "stext": "Buy Now",
+                                        "ltext": ""
+                                      },
+                                      "fr": {
+                                        "stext": "frBuy Now",
+                                        "ltext": ""
+                                      },
+                                      "hi": {
+                                        "stext": "hiBuy Now",
+                                        "ltext": ""
+                                      }
+                                    },
+                                    "href_page": "None"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "card": 2,
+                            "ltext": "None",
+                            "order": 2,
+                            "figure_class": "None",
+                            "hidden": "None",
+                            "position_id": "start",
+                            "image_url": "https://img.daisyui.com/images/stock/photo-1606107557195-0e29a4b5b4aa.webp",
+                            "alt": "Shoes",
+                            "css_class": "None",
+                            "type_id": "figure"
+                          }
+                        ]
+                      }
+{% endcomment %}
+
+{% if component %}
+
+    <div class="card bg-base-100 w-96 shadow-sm {{ component.css_class|default:"" }}">
+      {% for compslot in component.slots %}
+        <c-compcontent :compslot="compslot"></c-compcontent>                         
+      {% endfor %}
+    </div>
+        
+{% endif %}
+

@@ -1,0 +1,219 @@
+# Tech Stack
+
+## Overview
+
+Server-side rendered Django 5.2 application. Tailwind CSS for styling, `django-cotton` for component templates, `django-modeltranslation` for field-level i18n, and a cached `fetch_clientstatic()` layer as the primary data delivery mechanism. PostgreSQL in production. Deployed to a PaaS (Railway or Render).
+
+---
+
+## Backend
+
+### Core Framework
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `Django` | 5.2.4 | Core web framework |
+| `gunicorn` | latest | WSGI server for production |
+| `whitenoise` | latest | Static file serving on PaaS |
+| `psycopg2-binary` | latest | PostgreSQL adapter (production) |
+
+### Authentication & Authorization
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `django-allauth` | 65.10.0 | Auth flows for both `ClientUserProfile` and `CustomerProfile`. Custom `ClientAwareAccountAdapter` in `mysite/adapters.py`. |
+| `django-allauth-ui` | 1.8.1 | Pre-built Tailwind-compatible allauth templates (`widget_tweaks` + `slippers` are its dependencies — both installed). |
+| `django-guardian` | 3.3.1 | Object-level permissions on `Client`. `ObjectPermissionBackend` is registered in `AUTHENTICATION_BACKENDS`. |
+
+**Auth backend order (as configured):**
+1. `django.contrib.auth.backends.ModelBackend` — Django admin / username login
+2. `guardian.backends.ObjectPermissionBackend` — object-level permissions
+3. `allauth.account.auth_backends.AuthenticationBackend` — email-based login
+
+**Key auth decisions:**
+- Django's built-in `User` is used directly (no `AbstractBaseUser` subclass). `ClientUserProfile` and `CustomerProfile` are profile models hanging off it.
+- `ClientUserProfile` uses `OneToOneField` (one staff role per user).
+- `CustomerProfile` uses `ForeignKey` (one profile per user per client, enforced by `unique_together`).
+- `ACCOUNT_EMAIL_VERIFICATION = "optional"` in development. Must be changed for production.
+
+### Content & Multilingual
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `django-modeltranslation` | 0.20.2 | Installed **before** `django.contrib.admin`. Adds `_<lang>` columns for registered fields (`name`, `nb_title`, etc.) on `Client`, `Page`, `Theme`. Must be listed before `django.contrib.admin` in `INSTALLED_APPS`. |
+
+**Translation architecture — two parallel systems:**
+
+1. **`django-modeltranslation`** — for structural fields on `Client`, `Page`, `Theme` (e.g. page names, navbar titles). Columns are generated at migration time.
+2. **`ComptextBlock` → `TextstbItem` → `SvgtextbadgeValue`** — for component content (titles, body copy, button labels). Language is stored as a plain `language_code` CharField. This keeps component content flexible without generating schema changes per language addition.
+
+### Admin & Content Management
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `django-nested-admin` | 4.1.6 | Installed **before** `django.contrib.admin` in `INSTALLED_APPS`. Enables nested inlines for the `Layout → Component → ComponentSlot → ComptextBlock` hierarchy. |
+| `django-admin-sortable2` | 2.2.8 | Drag-to-reorder for `Layout`, `ComponentSlot`, `Page` ordering fields. |
+
+**Known constraint:** `django-unfold` was trialled but is incompatible with `django-nested-admin` and is **commented out**.
+
+### Developer Utilities
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `django-extensions` | 4.1 | `shell_plus`, `graph_models`, `show_urls`. |
+| `django-debug-toolbar` | 6.0.0 | Loaded conditionally — only when `not TESTING`. Panels: Timer, SQL, Cache, Templates, Request, Settings. History and Profiling panels disabled. |
+
+---
+
+## Frontend
+
+### Styling
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `django-tailwind` | 4.2.0 | `TAILWIND_APP_NAME = 'theme'`. |
+| `django-browser-reload` | 1.18.0 | Currently **commented out** in both `INSTALLED_APPS` and `MIDDLEWARE`. Re-enable when active frontend development is underway. |
+| `django-cotton` | 2.1.3 | Installed via `django_cotton.apps.SimpleAppConfig`. Template dirs: `mydj/templates`. Uses the `cached.Loader` chain. Provides the component template layer for `hero`, `card`, `accordion`, `carousel` component types. |
+
+**Template loader chain (order matters):**
+```python
+"django_cotton.cotton_loader.Loader"
+"django.template.loaders.filesystem.Loader"
+"django.template.loaders.app_directories.Loader"
+```
+Wrapped in `cached.Loader`. `APP_DIRS = False` (required by cotton — overrides the default).
+
+### Interactivity
+
+- **`datastar-py`** was trialled but dropped (`# datastar-py==0.8.0 # NOT WORKING PROPERLY DROPPED`).
+- Currently no HTMX or Datastar in use. Interactive forms (theme switcher, profile, addresses) use standard Django form POST + redirect.
+- **Decision required:** Re-evaluate HTMX vs Datastar for Phase 1 completion — specifically for inline admin editing and the theme switcher (`set_theme` view). See open decisions.
+
+---
+
+## Data Architecture
+
+### Primary Key Strategy
+- Models use Django's default `BigAutoField` (`DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'`).
+- `LowercaseCharField` is used for natural-key ID fields (`client_id`, `page_id`, `theme_id`, etc.) — auto-lowercased on save via `get_prep_value`.
+
+### The `fetch_clientstatic()` Pattern
+The central data delivery mechanism. On every page request:
+1. `CustomerProfileMiddleware` resolves `request.client` from URL/session (one DB query or none if cached).
+2. `client_context` context processor calls `fetch_clientstatic(client_id)`.
+3. `fetch_clientstatic` checks cache first (`clientstatic:{client_id}`). On miss, runs a single deeply-prefetched query across `Client → Page → Layout → Component → ComponentSlot → ComptextBlock → TextstbItem → SvgtextbadgeValue`.
+4. Result is serialised to a plain Python dict by `build_client_payload()` and cached.
+5. Templates consume `{{ client }}`, `{{ page_dict }}`, `{{ theme }}` — never raw ORM calls.
+
+**Current cache backend:** `LocMemCache` (dev). Redis planned for production (config commented in `settings.py`).
+
+**Cache invalidation:** Manual — call `cache.delete(f"clientstatic:{client_id}")` after content edits. A post-save signal or admin action hook is needed (not yet implemented).
+
+### `serialize_model()` Utility
+A reusable helper in `utils/common_functions.py` that serialises a model instance to a dict, automatically:
+- Grouping modeltranslation fields into a `translations` nested dict (e.g. `{'name': {'en': ..., 'hi': ...}}`).
+- Excluding virtual proxy fields and their per-language column variants.
+- Resolving FK fields to their `_id` values.
+
+### Key Model Relationships
+
+```
+Client (client_id, parent→self, language_list, theme_list)
+  ├── Theme (theme_id, themepreset→ThemePreset, overrides JSON)
+  ├── Page (page_id, parent→self, order)
+  │     └── Layout (level 10/20/30/40, parent→self, slug, order)
+  │           └── Component [OneToOne, level=40 only]
+  │                 └── ComponentSlot (slot_type: figure|text, order)
+  │                       └── ComptextBlock [GenericRelation] (block_id: title|content|actbut)
+  │                             └── TextstbItem [GenericRelation] (item_id: text|svg|badge)
+  │                                   └── SvgtextbadgeValue (language_code, stext, ltext)
+  ├── ClientLocation (location_id, location_type)
+  ├── ClientGroup (group_id, role, locations M2M)
+  │     ├── ClientGroupPermission (module, action)
+  │     └── ClientUserMembership (user→User)
+  ├── ClientUserProfile (user→User [OneToOne])
+  └── CustomerProfile (user→User [FK], unique_together user+client)
+        └── CustomerAddress (street, city, zip, country, is_default)
+
+ThemePreset (themepreset_id, colours, typography, spacing, radius, shadow)
+GlobalValCat → GlobalVal (key, keyval — modeltranslation expands keyval_*)
+```
+
+---
+
+## Request / Response Flow
+
+```
+HTTP Request
+    ↓
+SecurityMiddleware → SessionMiddleware → LocaleMiddleware → CommonMiddleware
+    ↓
+CsrfViewMiddleware → AuthenticationMiddleware
+    ↓
+CustomerProfileMiddleware          ← sets request.client, request.active_role,
+    ↓                                 request.client_profile, request.customer_profile
+MessageMiddleware → AccountMiddleware (allauth)
+    ↓
+View (e.g. ClientPageView)
+    ↓
+Context Processors run:
+  • settings_constants             ← LANGUAGE_CODE
+  • auth                           ← request.user
+  • globalval                      ← gv / gvt (UI string lookup)
+  • client_context                 ← client dict, theme tokens, page_dict
+    ↓
+Template renders (cotton components consume client/page/theme dicts)
+```
+
+---
+
+## Infrastructure & Deployment
+
+| Concern | Tool / Service |
+|---------|---------------|
+| PaaS hosting | Railway (primary) or Render (fallback) |
+| Static files | WhiteNoise (served directly from Django) |
+| Media files | PaaS volume mount (Phase 1) → S3 / Cloudflare R2 in Phase 2 |
+| Environment config | `django-environ` or env vars directly |
+| Background tasks | None in Phase 1. Celery + Redis deferred to Phase 2. |
+| Cache (prod) | Redis (config present but commented out in settings) |
+
+---
+
+## Project Structure (Actual)
+
+```
+mydj/                            ← Django project root (settings, urls, wsgi)
+  ├── settings.py                ← Single settings file (dev). Split into base/dev/prod before production.
+  ├── urls.py
+  ├── templates/                 ← Global templates (base.html, landing.html, cotton components)
+  └── context_processors.py     ← settings_constants, globalval, client_context
+
+mysite/                          ← Primary app
+  ├── models.py                  ← All models in one file (Client, Page, Layout, Component, ComponentSlot,
+  │                                 User profiles, Groups, Themes, GlobalVal, ThemePreset, text content tree)
+  ├── views.py                   ← ClientPageView, auth entry points, customer profile/address views
+  ├── adapters.py                ← ClientAwareAccountAdapter (allauth)
+  ├── forms.py                   ← CustomerProfileForm, CustomerAddressForm
+  └── middleware/
+        └── customer_profile.py  ← CustomerProfileMiddleware
+
+utils/
+  ├── common_functions.py        ← fetch_clientstatic(), build_client_payload(), serialize_model(),
+  │                                 build_page(), build_layout(), build_component(), resolve_theme()
+  └── globalval.py               ← get_globalval()
+
+theme/                           ← django-tailwind theme app
+```
+
+---
+
+## Known Issues / Constraints
+
+1. **`settings.py` is a single file** — must be split into `base.py` / `development.py` / `production.py` before production deploy. `SECRET_KEY` is currently hardcoded.
+2. **`ACCOUNT_EMAIL_VERIFICATION = "optional"`** — must be set to `"mandatory"` in production.
+3. **`models.py` is a single large file** — splitting into `models/` package is a natural next step before Phase 2.
+4. **Cache invalidation is not automated** — content edits in Django Admin do not currently invalidate the `clientstatic` cache. A `post_save` signal on `Client`, `Page`, `Layout`, `Component`, `ComponentSlot` is needed.
+5. **`django-browser-reload` is commented out** — re-enable for active frontend development.
+6. **Datastar dropped** — no interactive JS library is currently in use. Decision on HTMX vs Datastar is pending.
+7. **`DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000`** — set to accommodate deep nested admin inlines. Monitor in production.

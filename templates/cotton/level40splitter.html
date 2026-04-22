@@ -1,0 +1,71 @@
+{% comment %}
+input type is :
+"component": {
+    "css_class": "",
+    "herocontent_class": "",
+    "overlay": "False",
+    "overlay_style": "",
+    "herocontents": [
+    {
+        "hidden": "False",
+        "type_id": "text",
+        "order": 1,
+        "ltext": "None",
+        "actions_class": "None",
+        "actions_position": "end",
+        "textblocks": {
+        "title": [
+            {
+            "order": 1,
+            "css_class": "None",
+            "ltext": "None",
+            "items": [
+                {
+                "type": "text",
+                "order": 1,
+                "css_class": "None",
+                "values": {
+                    "en": {
+                    "stext": "Bahushira Home Page Hero",
+                    "ltext": "ltBahushira Home Page Hero"
+                    },
+                    "fr": {
+                    "stext": "frBahushira Home Page Hero",
+                    "ltext": "ltfrBahushira Home Page Hero"
+                    },
+                    "hi": {
+                    "stext": "hiBahushira Home Page Hero",
+                    "ltext": "lthiBahushira Home Page Hero"
+                    }
+                }
+                }
+            ]
+            }
+        ]
+        }
+    },
+    {
+        "hidden": "False",
+        "type_id": "figure",
+        "order": 2,
+        "ltext": "None",
+        "figure_class": "px-0 pt-0",
+        "position_id": "start",
+        "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+        "css_class": "None",
+        "alt": "Spiderman"
+    }
+    ],
+    "comp_id": "hero"
+}
+{% endcomment %}
+    
+    {% if component.comp_id == "card" %}  
+        <c-card :component="component"></c-card>                               
+    {% elif component.comp_id == "hero" %} 
+        <c-hero :component="component"></c-hero>
+    {% elif component.comp_id == "accordion" %} 
+        <c-accordion :component="component"></c-accordion>
+    {% elif component.comp_id == "carousal" %} 
+        <c-carousal :carousal="component"></c-carousal>
+    {% endif %}

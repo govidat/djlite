@@ -1,0 +1,28 @@
+
+<figure class="{{ compslot.figure_class|default:'' }}">
+    {% if compslot.image_url %}
+    <img
+        class="{{ compslot.css_class|default:'' }}"
+        src="{{ compslot.image_url|default:'' }}"
+        alt="{{ compslot.alt|default:'' }}" />
+    {% endif %}
+</figure>
+
+
+{% comment %}
+
+Input is like:
+    {
+      "hero": 1,
+      "order": 2,
+      "hidden": "None",
+      "type_id": "figure",
+      "ltext": "None",
+      "figure_class": "px-0 pt-0",
+      "position_id": "start",
+      "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+      "alt": "Spiderman",
+      "css_class": "None"
+    }
+
+{% endcomment %}

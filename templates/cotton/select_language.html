@@ -1,0 +1,31 @@
+{% load my_tags %}
+{% load my_filters %}
+{% load i18n %}
+{% get_current_language as CURRENT_LANG %}
+
+{% block language_switcher %} 
+  <form method="post" action="{% url 'set_language' %}">
+    {% csrf_token %}
+    {% comment %}
+    {% mytext_labelv2 lang.labels %}
+    {% endcomment %}
+    <select class="select" id="language-select" name="language" onchange="this.form.submit()">
+      {% for lang in languages %}    
+        {% comment %}
+        <option value="{{ lang.language_id }}" 
+          {% if CURRENT_LANG|slice:":2" == lang.language_id %}selected{% endif %}>        
+          {{ lang.language_id }} - {{ gv|dictget:'language'|dictget:lang.language_id }} 
+          
+        </option>
+        {% endcomment %}
+        <option value="{{ lang }}" 
+          {% if CURRENT_LANG|slice:":2" == lang %}selected{% endif %}>        
+          {{ lang }} - {{ gv|dictget:'language'|dictget:lang }} 
+          
+        </option>        
+      {% endfor %}
+    </select>
+  </form>
+{% endblock %}
+
+        
