@@ -124,7 +124,10 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] 404 handling for unknown `client_id` slugs (currently raises `Client.DoesNotExist`, not a clean 404)
 - [ ] 404 handling for unpublished / hidden pages
 - [ ] Homepage routing: `/{client_id}/` → first published page or configurable homepage
-
+- [x] Split `models.py` into `models/` package:
+      base.py, global_config.py, client.py, nav.py,
+      page.py, component.py, users.py
+      Zero migrations generated — app_label unchanged.
 ### Milestone 1.8 — Interactive Forms (Pending decision)
 - [ ] **HTMX vs Datastar decision** — Datastar was dropped. Evaluate HTMX for: theme switcher, language switcher, inline content editing. Spike and decide.
 - [ ] Theme switcher wired with HTMX partial response (currently full-page POST redirect)

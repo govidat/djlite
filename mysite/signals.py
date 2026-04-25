@@ -7,8 +7,8 @@ from django.core.cache import cache
 from guardian.shortcuts import assign_perm, remove_perm
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from .models import User, ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, NavItem, PageContent, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
-
+from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, NavItem, PageContent, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
+from django.contrib.auth.models import User
 """
 @receiver(post_save, sender=GlobalVal)
 @receiver(post_delete, sender=GlobalVal)
