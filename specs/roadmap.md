@@ -18,8 +18,8 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] `django-cotton` installed with correct loader chain (`APP_DIRS=False`, `cached.Loader`)
 - [x] `django-debug-toolbar` installed with conditional loading (`not TESTING` guard)
 - [x] `honcho` + `cookiecutter` for Tailwind dev workflow
-- [ ] Split `settings.py` into `base.py` / `development.py` / `production.py`
-- [ ] Move `SECRET_KEY` to environment variable
+- [x] Split `settings.py` into `base.py` / `development.py` / `production.py`
+- [x] Move `SECRET_KEY` to environment variable
 - [ ] `whitenoise` for static files
 - [ ] PostgreSQL wiring via `DATABASE_URL` env var
 - [ ] Deploy skeleton app to Railway/Render (establish pipeline early)
@@ -30,8 +30,17 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] `client_context` context processor: consumes `request.client`, calls `fetch_clientstatic()`, delivers `client`, `theme`, `page_dict` to all templates
 - [x] `ClientLocation` model: `location_id`, `location_type` (store/branch/warehouse/office), FK to `Client`
 - [x] `LowercaseCharField` custom field for all natural-key IDs
-- [ ] Explicit `AppConfig` for `mysite` (verify app label matches in all migrations)
-- [ ] URL namespace: confirm `/{client_id}/` prefix routes are fully wired in `urls.py`
+- [x] Explicit `AppConfig` for `mysite` (verify app label matches in all migrations)
+- [x] URL namespace: confirm `/{client_id}/` prefix routes are fully wired in `urls.py`
+- [x] `NavItem` model: `name` (translatable), `location` (header/footer/sidebar),
+      `nav_type` (page/url/anchor/label), optional FK to `Page`, `url`,
+      `order`, `open_in_new_tab`, `parent` self-FK for one level of nesting.
+      Decouples navbar from page tree. `get_url()` resolves full path for
+      `page` nav_type. `header_nav` and `footer_nav` added to
+      `fetch_clientstatic` payload.
+- [x] `navbar_v001_l1recur.html` cotton component: recursive, handles all
+      four `nav_type` values, active-state highlighting via `item.url` vs
+      `current_page`, `item.href` for resolved anchor href.
 
 ### Milestone 1.3 — User Model & Auth ✅ Done
 - [x] Django's built-in `User` used directly (no custom AbstractBaseUser)
@@ -83,7 +92,15 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] `GentextBlock` is present but currently unused in `build_client_payload` (commented out) — decide: keep for future use or remove
 - [ ] `django-admin-sortable2` fully wired into admin classes for all sortable models
 
-### Milestone 1.6 — Data Serialisation & Caching Layer ✅ Done
+### Milestone 1.5b — Hybrid Page Authoring (Track A: Raw HTML) ✅ Done
+- [x] `PageContent` model: FK to `Page`, `language_code`, `html` (TextField)
+- [x] `unique_together ('page', 'language_code')` — one blob per language per page
+- [x] `ClientPageView` checks `PageContent` before falling through to component tree
+- [x] Language fallback: active lang → `en` → first available `PageContent` row
+- [x] `PageContentInline` in Django Admin under `Page`
+- [x] Signal: `post_save` / `post_delete` on `PageContent` invalidates `clientstatic` cache
+- [x] `|safe` filter in template — developer-authored HTML only; sanitiser deferred to Phase 2
+- [ ] Document the HTML authoring workflow in README (which tools work, how to paste)
 - [x] `fetch_clientstatic(client_id, use_cache, timeout)` — single deeply-prefetched query + cache
 - [x] `build_client_payload()` — builds full client dict (languages, themes, pages, page_tree)
 - [x] `build_page()` / `build_layout()` / `build_component()` / `build_slot()` — recursive tree builders
@@ -137,7 +154,8 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 | `models.py` split | Single file, growing large | Split into `models/` package before Phase 2 |
 | Staff admin UI | Django Admin (current) | Re-evaluate custom dashboard after Phase 1 with real client feedback |
 | Cache invalidation | Not implemented | Required before production — `post_save` signals on all content models |
-
+| Navbar architecture | ~~Coupled to page_tree~~ → **Resolved**: dedicated `NavItem` model,
+| decoupled from pages, supports external links and footer nav independently | Done |
 ---
 
 ## Phase 2 — Product Catalogue

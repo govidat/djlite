@@ -3,7 +3,7 @@ from django.core.cache import cache
 
 from mysite.models import ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 #from mysite.models import Card, Hero, Accordion, Layout, Page, HeroText, HeroCardText, AccordionText
-from mysite.models import Page, Layout, Component, ComponentSlot
+from mysite.models import Page, Layout, NavItem, Component, ComponentSlot
 
 from django.db.models import Prefetch
 from django.db.models import ForeignKey
@@ -367,7 +367,28 @@ def build_layout(layout, layout_map):
         layout_data["children"] = children
 
     return layout_data
-
+"""
+def build_nav_item(item, client_id):
+    return {
+        'name':           item.name,   # modeltranslation will expand to label_en etc.
+        'url':             item.get_url(client_id),
+        'nav_type':        item.nav_type,
+        'open_in_new_tab': item.open_in_new_tab,
+        'children': [
+            build_nav_item(child, client_id)
+            for child in getattr(item, 'prefetched_children', [])
+        ],
+    }
+"""
+def build_nav_item(item, client_id):
+    data = serialize_model(item, exclude={'id', 'parent_id', 'page_id'})
+    #data['url']      = item.get_url(client_id)
+    data['href'] = item.get_url(client_id)   # ← resolved full URL, separate from raw 'url' field
+    data['children'] = [
+        build_nav_item(child, client_id)
+        for child in getattr(item, 'prefetched_children', [])
+    ]
+    return data
 
 def build_page(page):
     page = visible(page)
@@ -416,6 +437,20 @@ def build_client_payload(client):
             "tokens":     resolve_theme(theme),
         })
 
+    all_nav_items = getattr(client, 'prefetched_nav_items', [])
+    client_id     = client.client_id
+
+    header_nav = [
+        build_nav_item(item, client_id)
+        for item in all_nav_items
+        if item.location == 'header'
+    ]
+    footer_nav = [
+        build_nav_item(item, client_id)
+        for item in all_nav_items
+        if item.location == 'footer'
+    ]
+
     all_pages = list(getattr(client, "prefetched_pages", []))
 
     return {
@@ -426,6 +461,8 @@ def build_client_payload(client):
         #"textblocks": build_blocks(getattr(client, "prefetched_gentextblocks", [])),
         "pages":      [p for p in (build_page(page) for page in all_pages) if p], # [build_page(page) for page in all_pages],
         "page_tree":  build_page_tree([p for p in all_pages if not p.hidden]),
+        'header_nav':  header_nav,
+        'footer_nav':  footer_nav,        
     }
 # temporarily marking use_cache = False. To be changed after debugging
 # instead of gentext block for name, nb_title have alreaady added modeltranslation fields.
@@ -475,7 +512,26 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                         #)
                         .order_by("order"),
                         to_attr="prefetched_themes"
-                ) 
+                ),
+                Prefetch(
+                    "nav_items",
+                    queryset=NavItem.objects
+                        .filter(hidden=False)
+                        .select_related("page")          # to resolve page.page_id for URL building
+                        .prefetch_related(
+                            Prefetch(
+                                "children",
+                                queryset=NavItem.objects
+                                    .filter(hidden=False)
+                                    .select_related("page")
+                                    .order_by("order"),
+                                to_attr="prefetched_children",
+                            )
+                        )
+                        .filter(parent=None)             # root items only — children come via prefetched_children
+                        .order_by("location", "order"),
+                    to_attr="prefetched_nav_items",
+                ),                               
             )
             .get(client_id=lv_client_id)
           )
@@ -514,6 +570,9 @@ Example code
 5. configure daisyui to use these variables: 
 A Constant value "clienttheme" is pushed into daisyui. This takes variable values like b1, b2 etc
 theme > static_src > src > styles.css  (tailwind.config.js file is not visible in django-tailwind setup) 
+django-tailwind 4.x uses styles.css instead of tailwind.config.js for configuration. Tailwind v4 moved away 
+from a JS config file entirely.
+
 Example code
 @plugin "daisyui/theme" {
   name: "clienttheme";
@@ -548,935 +607,495 @@ def resolve_theme(theme):
 
     return data
 
-# some old codes
-# this is a helper used in hero/ card prefetch in layout
-"""
-def get_prefetched(obj, attr):
-    if not hasattr(obj, attr):
-        raise Exception(f"Missing prefetch: {attr}")
-
-    val = getattr(obj, attr)
-
-    if isinstance(val, list):
-        return val[0] if val else None
-
-    return val
-
-"""
-
-"""
-def get_translated_fields(instance):
-
-    try:
-        opts = translator.get_options_for_model(type(instance))
-        translated_field_names = opts.fields.keys()  # e.g. ('name', 'nb_title')
-    except Exception:
-        return {}
-
-    result = {}
-    for field_name in translated_field_names:
-        result[field_name] = {
-            lang_code: getattr(instance, f"{field_name}_{lang_code}", None)
-            for lang_code, _ in settings.LANGUAGES
-        }
-    return result
-
-
-def get_non_translated_fields(instance, exclude_fields=None):
-
-    from django.db.models.fields.related import RelatedField
-    from django.db.models.fields import AutoField
-
-    exclude_fields = set(exclude_fields or [])
-
-    # Get translated field names to exclude them
-    try:
-        opts = translator.get_options_for_model(type(instance))
-        translated_names = set(opts.fields.keys())
-        # Also exclude the language-specific column names e.g. name_en, name_ta
-        for field_name in translated_names:
-            for lang_code, _ in settings.LANGUAGES:
-                translated_names.add(f"{field_name}_{lang_code}")
-    except Exception:
-        translated_names = set()
-
-    result = {}
-    for field in instance._meta.get_fields():
-        # Skip relations, auto fields, translated fields, excluded fields
-        if isinstance(field, (RelatedField, AutoField)):
-            continue
-        if not hasattr(field, 'column'):        # skip reverse relations
-            continue
-        if field.name in translated_names:
-            continue
-        if field.name in exclude_fields:
-            continue
-        result[field.name] = getattr(instance, field.name, None)
-    return result
-"""
-# this is used extensively in build programs to serialize data.
-"""
-def serialize_model(instance, exclude=None):
-    exclude = set(exclude or [])
-    data = {}
-
-    for field in instance._meta.fields:
-        name = field.name
-        if name in exclude:
-            continue
-
-        value = getattr(instance, name)
-        if isinstance(field, ForeignKey):
-            value = getattr(instance, f"{name}_id")
-
-        # Only add key if value is not None
-        if value is not None:
-            data[name] = value
-
-    return data
-"""
-"""
-def build_client_payload(client):
-
-    # Create a lookup dictionary
-
-    languages_qs = Language.objects.filter(
-        language_id__in=client.language_list
-    )
-
-
-    # Preserve client order
-    language_lookup = {l.language_id: l for l in languages_qs}
-    lv_languages = [
-        {
-            "language_id": lang_id,
-            "labels": language_lookup[lang_id].label_obj 
-        }
-        for lang_id in client.language_list
-        if lang_id in language_lookup
-    ]
-
-    # To reconstruct the theme values
-    lv_themes = []
-
-    all_themes = list(getattr(client, "prefetched_themes", []))
-
-    for theme in all_themes:
-
-      resolved_tokens = resolve_theme(theme)
-      lv_themes.append({
-          "theme_id": theme.theme_id,
-          "ltext": theme.ltext,
-          "is_default": theme.is_default,
-          "textblocks": build_blocks(getattr(theme, "prefetched_gentextblocks", [])),
-          "tokens": resolved_tokens,  # fully resolved
-      })
-
-    #all_pages = list(getattr(client, "prefetched_pages", []))
-    all_pages = list(getattr(client, "prefetched_pages", []))    
-    return {
-        "client_id": client.client_id,
-        "languages": lv_languages,
-        "themes": lv_themes,
-        #"parent": client.parent.client_id if client.parent else None,
-        "textblocks": build_blocks(getattr(client, "prefetched_gentextblocks", [])),
-        #"pages": [
-        #    build_page(page)
-        #    for page in all_pages
-        #],
-
-        #"page_tree": build_page_tree(
-        #    [l for l in all_pages if not l.hidden]
-        #), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
-        "pages": [
-            build_page(page)
-            for page in all_pages
-        ],
-        "page_tree": build_page_tree(
-            [l for l in all_pages if not l.hidden]
-        ), # this is for navigation bar requirement. this is nested # xyz.all() without filter works with prefetch
-
-
-    }
-"""
-"""
-def build_client_payload(client):
-    # ── Languages ──────────────────────────────────────────────────
-    languages_qs = Language.objects.filter(language_id__in=client.language_list)
-    language_lookup = {l.language_id: l for l in languages_qs}
-    lv_languages = [
-        {
-            "language_id": lang_id,
-            "labels":      language_lookup[lang_id].label_obj
-        }
-        for lang_id in client.language_list
-        if lang_id in language_lookup
-    ]
-
-    # ── Themes ─────────────────────────────────────────────────────
-    lv_themes = []
-    for theme in getattr(client, "prefetched_themes", []):
-        lv_themes.append({
-            "theme_id":   theme.theme_id,
-
-            # Auto-extract all plain fields (order, is_default, ltext etc.)
-            **get_non_translated_fields(theme, exclude_fields={'theme_id'}),
-
-            # Auto-extract all translated fields (name etc.)
-            "translations": get_translated_fields(theme),
-
-            "textblocks": build_blocks(getattr(theme, "prefetched_gentextblocks", [])),
-            "tokens":     resolve_theme(theme),
-        })
-
-    # ── Pages ──────────────────────────────────────────────────────
-    all_pages = list(getattr(client, "prefetched_pages", []))
-
-    return {
-        # ── Stable identity fields ─────────────────────────────────
-        "client_id":    client.client_id,
-
-        # ── All plain fields auto-extracted ────────────────────────
-        # Captures any new fields added to Client automatically.
-        **get_non_translated_fields(
-            client,
-            exclude_fields={'client_id', 'language_list', 'parent'}
-        ),
-
-        # ── All translated fields auto-extracted ───────────────────
-        # Captures name, nb_title and any future translated fields.
-        "translations": get_translated_fields(client),
-
-        # ── Related data ───────────────────────────────────────────
-        "languages":    lv_languages,
-        "themes":       lv_themes,
-        "textblocks":   build_blocks(getattr(client, "prefetched_gentextblocks", [])),
-        "pages":        [build_page(page) for page in all_pages],
-        "page_tree":    build_page_tree([p for p in all_pages if not p.hidden]),
-    }
-"""
-"""
-def build_page(page):
-    page = visible(page)
-    if not page:
-        return None
-
-    all_layouts = list(getattr(page, "prefetched_layouts3", []))
-
-    layout_map = {}
-    root_layouts = []
-    for layout in all_layouts:
-        if layout.parent_id:
-            layout_map.setdefault(layout.parent_id, []).append(layout)
-        else:
-            root_layouts.append(layout)
-
-    layouts = [build_layout(l, layout_map) for l in root_layouts]
-    layouts = [l for l in layouts if l]
-
-    return {
-        "page_id":    page.page_id,
-        "order":      page.order,
-        "textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
-        "layouts":    layouts,
-    }
-"""
-
-"""
-def build_page(page):
-    page = visible(page)
-    if not page:
-        return None
-
-    all_layouts = list(getattr(page, "prefetched_layouts3", []))
-    layout_map = {}
-    root_layouts = []
-    for layout in all_layouts:
-        if layout.parent_id:
-            layout_map.setdefault(layout.parent_id, []).append(layout)
-        else:
-            root_layouts.append(layout)
-    layouts = [build_layout(l, layout_map) for l in root_layouts]
-    layouts = [l for l in layouts if l]
-
-    return {
-        # ── Stable identity fields ─────────────────────────────────
-        "page_id":          page.page_id,
-
-        # ── All plain fields auto-extracted ────────────────────────
-        # Captures order, hidden, slug, and any future fields added
-        # to Page without needing to update this function.
-        **get_non_translated_fields(page, exclude_fields={'page_id'}),
-
-        # ── All translated fields auto-extracted ───────────────────
-        # Captures name, nb_title etc. for all languages.
-        # Output: {'name': {'en': 'Home', 'ta': 'முகப்பு'}, ...}
-        "translations":     get_translated_fields(page),
-
-        # ── Related data ───────────────────────────────────────────
-        "textblocks":       build_blocks(getattr(page, "prefetched_gentextblocks", [])),
-        "layouts":          layouts,
-    }
-"""
-"""
-
-#Step 2: Component-Level Prefetch
-# Hero subtree
-hero_prefetch = Prefetch(
-    "hero",  # ← reverse OneToOne accessor
-    queryset=Hero.objects
-        .select_related(
-            "herotext",
-            "herofigure",
-            "herocard",
-            "herocard__herocardtext",
-            "herocard__herocardfigure",
-        )
-        .prefetch_related(
-            Prefetch(
-                "herotext__comptextblocks",
-                queryset=ComptextBlock.objects.prefetch_related(
-                    Prefetch(
-                        "textstbitems",
-                        queryset=TextstbItem.objects.prefetch_related(
-                            Prefetch(
-                                "svgtextbadgevalue_set",
-                                queryset=SvgtextbadgeValue.objects.select_related("language"),
-                                to_attr="prefetched_svgtextbadgevalues",
-                            )
-                        ).order_by("order"),
-                        to_attr="prefetched_stbitems",
-                    )
-                ).order_by("order"),
-                to_attr="prefetched_ht_comptextblocks",
-            ),
-            Prefetch(
-                "herocard__herocardtext__comptextblocks",
-                queryset=ComptextBlock.objects.prefetch_related(
-                    Prefetch(
-                        "textstbitems",
-                        queryset=TextstbItem.objects.prefetch_related(
-                            Prefetch(
-                                "svgtextbadgevalue_set",
-                                queryset=SvgtextbadgeValue.objects.select_related("language"),
-                                to_attr="prefetched_svgtextbadgevalues",
-                            )
-                        ).order_by("order"),
-                        to_attr="prefetched_stbitems",
-                    )
-                ).order_by("order"),
-                to_attr="prefetched_hcht_comptextblocks",
-            ),
-        ),
-    #to_attr="prefetched_heros",
-)
-
-# Card subtree
-card_prefetch = Prefetch(
-    "card",       # ← reverse OneToOne accessor
-    queryset=Card.objects
-        .select_related(
-            "cardtext",
-            "cardfigure",
-        )
-        .prefetch_related(
-            Prefetch(
-                "cardtext__comptextblocks",
-                queryset=ComptextBlock.objects.prefetch_related(
-                    Prefetch(
-                        "textstbitems",
-                        queryset=TextstbItem.objects.prefetch_related(
-                            Prefetch(
-                                "svgtextbadgevalue_set",
-                                queryset=SvgtextbadgeValue.objects.select_related("language"),
-                                to_attr="prefetched_svgtextbadgevalues",
-                            )
-                        ).order_by("order"),
-                        to_attr="prefetched_stbitems",
-                    )
-                ).order_by("order"),
-                to_attr="prefetched_ct_comptextblocks",
-            ),
-        ),
-    #to_attr="prefetched_cards",
-)
-
-accordion_prefetch = Prefetch(
-    "accordion",                   # ← reverse OneToOne accessor from Layout
-    queryset=Accordion.objects
-        .prefetch_related(
-            Prefetch(
-                "accordiontext",   # ← reverse FK (multiple AccordionText per Accordion)
-                queryset=AccordionText.objects.prefetch_related(
-                    Prefetch(
-                        "comptextblocks",
-                        queryset=ComptextBlock.objects.prefetch_related(
-                            Prefetch(
-                                "textstbitems",
-                                queryset=TextstbItem.objects.prefetch_related(
-                                    Prefetch(
-                                        "svgtextbadgevalue_set",
-                                        queryset=SvgtextbadgeValue.objects.select_related("language"),
-                                        to_attr="prefetched_svgtextbadgevalues",
-                                    )
-                                ).order_by("order"),
-                                to_attr="prefetched_stbitems",
-                            )
-                        ).order_by("order"),
-                        to_attr="prefetched_at_comptextblocks",  # "at" = accordion text
-                    ),
-                ).order_by("order"),
-                to_attr="prefetched_accordiontext",  # list, since FK not OneToOne
-            ),
-        ),
-    # ← NO to_attr here, same as card/hero
-)
-#Step 3: Layout Tree (Single Fetch, Ordered)
-
-layout_qs = Layout.objects.select_related("parent").order_by("level", "order") 
-
-layout_prefetch = Prefetch(
-    "layouts",
-    queryset=layout_qs.prefetch_related(
-        hero_prefetch,
-        card_prefetch,
-        accordion_prefetch,
-    ),
-    #.order_by("level", "order"),
-    to_attr="prefetched_layouts"
-)
-
-"""
-# Option 1 Individual Builders
-"""
-
-# 4️⃣ Component Builders
-# HeroText
-def build_hero_text(ht):
-    ht = visible(ht)
-    if not ht:
-        return None
-
-    #textblocks = build_blocks(ht.comptextblocks.all())
-    textblocks = build_blocks(getattr(ht, "prefetched_ht_comptextblocks", []))    
-    
-    if not textblocks:
-        return None
-    
-    data = serialize_model(
-        ht,
-        exclude={"id", "content_type", "object_id", "hero"}
-    )
-
-    data["type_id"] = "text"
-    data["textblocks"] = textblocks
-
-    return data    
-
-# HeroFigure
-def build_hero_figure(hf):
-    hf = visible(hf)
-    if not hf:
-        return None
-
-    data = serialize_model(
-        hf,
-        exclude={"id", "content_type", "object_id"}
-    )
-
-    data["type_id"] = "figure"
-
-    return data
-
-
-# HeroCardText
-def build_herocard_text(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-    
-    #textblocks = build_blocks(obj.comptextblocks.all())
-    textblocks = build_blocks(getattr(obj, "prefetched_hcht_comptextblocks", []))
-    if not textblocks:
-        return None
-    
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "herocard_id"}
-    )
-
-    data["type_id"] = "text"
-    data["textblocks"] = textblocks
-
-    return data
-
-# HeroCardFigure
-def build_herocard_figure(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-  
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "herocard_id"}
-    )
-
-    data["type_id"] = "figure"
-
-    return data
-
-
-# HeroCard
-def build_herocard(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    contents = []
-
-    figure = build_herocard_figure(getattr(obj, "herocardfigure", None))
-    if figure:
-        contents.append(figure)
-
-    text = build_herocard_text(getattr(obj, "herocardtext", None))
-    if text:
-        contents.append(text)
-    #SORT IS NOT RELEVANT IN CARD 
-    contents.sort(key=lambda x: x["order"])
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "hero_id"}
-    )
-
-    data["type_id"] = "herocard"
-    data["contents"] = contents
-
-    return data
-
-
-# Hero
-def build_hero(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    contents = []
-
-    figure = build_hero_figure(getattr(obj, "herofigure", None))
-    if figure:
-        contents.append(figure)
-
-    text = build_hero_text(getattr(obj, "herotext", None))
-    if text:
-        contents.append(text)
-
-    herocard = build_herocard(getattr(obj, "herocard", None))
-    if herocard:
-        contents.append(herocard)
-
-    contents.sort(key=lambda x: x["order"])
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "layout_id"}
-    )
-
-    data["comp_id"] = "hero"
-    data["contents"] = contents
-
-    return data
-
-# CardFigure
-def build_card_figure(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "card_id"}
-    )
-
-    data["type_id"] = "figure"
-
-    return data
-
-
-# CardText
-def build_card_text(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-    textblocks = build_blocks(getattr(obj, "prefetched_ct_comptextblocks", []))
-    if not textblocks:
-        return None
-    
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "card_id"}
-    )
-
-    data["type_id"] = "text"
-    data["textblocks"] = textblocks
-
-    return data
-
-# Card
-def build_card(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    contents = []
-
-    figure = build_card_figure(getattr(obj, "cardfigure", None))
-    if figure:
-        contents.append(figure)
-
-    text = build_card_text(getattr(obj, "cardtext", None))
-    if text:
-        contents.append(text)
-
-    contents.sort(key=lambda x: x["order"])
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "layout_id"}
-    )
-
-    data["comp_id"] = "card"
-    data["contents"] = contents
-    
-    return data
-
-
-# AccordionText
-def build_accordion_text(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-    textblocks = build_blocks(getattr(obj, "prefetched_at_comptextblocks", []))
-    if not textblocks:
-        return None
-    
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "accordion_id"}
-    )
-
-    data["type_id"] = "text"
-    data["textblocks"] = textblocks
-
-    return data
-
-# Accordion
-def build_accordion(obj):
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    #contents = []
-
-    # FK = list, so iterate prefetched_accordiontext
-    raw_texts = getattr(obj, "prefetched_accordiontext", [])
-
-    accordion_texts = [
-        build_accordion_text(at)
-        for at in raw_texts
-    ]
-    accordion_texts = [at for at in accordion_texts if at]
-    accordion_texts.sort(key=lambda x: x["order"])
-
-    data = serialize_model(
-        obj,
-        exclude={"id", "content_type", "object_id", "layout_id"}
-    )
-
-    data["comp_id"] = "accordion"
-    data["contents"] = accordion_texts
-    
-    return data
-"""
-
-# Option 2 with Component Registry
-# ── Component Registry ────────────────────────────────────────
-# Each entry describes how to build a component from its model.
-# "children" lists the child accessors and their slot types.
-# "list_children" are FK (one-to-many) children like AccordionText.
-
-"""
-COMPONENT_REGISTRY = {
-    "hero": {
-        "accessor": "hero",
-        "exclude": {"id", "layout_id"},
-        "children": [
+""" jsonclient
+{
+   "client_id":"bahushira",
+   "theme_list":[
+      
+   ],
+   "translations":{
+      "name":{
+         "en":"Bahushira",
+         "hi":"hiBahushira",
+         "fr":"frBahushira",
+         "ta":null
+      },
+      "nb_title":{
+         "en":"Bahushira Title",
+         "hi":"hiBahushira Title",
+         "fr":"frBahushira Title",
+         "ta":null
+      }
+   },
+   "languages":[
+      "en",
+      "hi",
+      "fr"
+   ],
+   "themes":[
+      {
+         "client":1,
+         "theme_id":"light",
+         "themepreset":1,
+         "ltext":"",
+         "order":1,
+         "hidden":false,
+         "is_default":true,
+         "translations":{
+            "name":{
+               "en":"Light",
+               "hi":"hiLight",
+               "fr":"frLight",
+               "ta":null
+            }
+         },
+         "tokens":{
+            "primary":"#570df8",
+            "secondary":"#f000b8",
+            "accent":"#37cdbe",
+            "neutral":"#3d4451",
+            "primary_content":"#ffffff",
+            "secondary_content":"#ffffff",
+            "accent_content":"#163835",
+            "neutral_content":"#ffffff",
+            "base_100":"#ffffff",
+            "base_200":"#f2f2f2",
+            "base_300":"#e5e6e6",
+            "base_content":"#1f2937",
+            "success":"#00c853",
+            "warning":"#ff9800",
+            "error":"#ff5724",
+            "info":"#2094f3",
+            "success_content":"#ffffff",
+            "warning_content":"#ffffff",
+            "error_content":"#ffffff",
+            "info_content":"#ffffff",
+            "font_body":"",
+            "font_heading":"",
+            "base_font_size":"16px",
+            "scale_ratio":1.2,
+            "section_gap":"4rem",
+            "container_padding":"1rem",
+            "radius_btn":"0.5rem",
+            "radius_card":"1rem",
+            "radius_input":"0.5rem",
+            "shadow_sm":"0 1px 2px 0 rgb(0 0 0 / 0.05)",
+            "shadow_md":"0 4px 6px -1px rgb(0 0 0 / 0.1)",
+            "shadow_lg":"0 10px 15px -3px rgb(0 0 0 / 0.1)"
+         }
+      },
+      {
+         "client":1,
+         "theme_id":"dark",
+         "themepreset":2,
+         "ltext":"",
+         "order":2,
+         "hidden":false,
+         "is_default":false,
+         "translations":{
+            "name":{
+               "en":"Dark",
+               "hi":"hiDark",
+               "fr":"frDark",
+               "ta":null
+            }
+         },
+         "tokens":{
+            "primary":"#661ae6",
+            "secondary":"#d926aa",
+            "accent":"#1fb2a6",
+            "neutral":"#191d24",
+            "primary_content":"#ffffff",
+            "secondary_content":"#ffffff",
+            "accent_content":"#ffffff",
+            "neutral_content":"#a6adbb",
+            "base_100":"#2a303c",
+            "base_200":"#242933",
+            "base_300":"#1d232a",
+            "base_content":"#a6adbb",
+            "success":"#36d399",
+            "warning":"#fbbd23",
+            "error":"#f87272",
+            "info":"#3abff8",
+            "success_content":"#000000",
+            "warning_content":"#000000",
+            "error_content":"#000000",
+            "info_content":"#000000",
+            "font_body":"",
+            "font_heading":"",
+            "base_font_size":"16px",
+            "scale_ratio":1.2,
+            "section_gap":"4rem",
+            "container_padding":"1rem",
+            "radius_btn":"0.5rem",
+            "radius_card":"1rem",
+            "radius_input":"0.5rem",
+            "shadow_sm":"0 1px 2px 0 rgb(0 0 0 / 0.05)",
+            "shadow_md":"0 4px 6px -1px rgb(0 0 0 / 0.1)",
+            "shadow_lg":"0 10px 15px -3px rgb(0 0 0 / 0.1)"
+         }
+      }
+   ],
+   "pages":[
+      {
+         "client":1,
+         "page_id":"home",
+         "ltext":"Home Page",
+         "order":1,
+         "hidden":false,
+         "translations":{
+            "name":{
+               "en":"Home",
+               "hi":"hiHome",
+               "fr":"frHome",
+               "ta":null
+            }
+         },
+         "layouts":[
             {
-                "attr": "herofigure",
-                "type_id": "figure",
-                "prefetch_attr": None,  # no textblocks
-            },
+               "level":10,
+               "slug":"a",
+               "order":1,
+               "css_class":"",
+               "children":[
+                  {
+                     "level":20,
+                     "slug":"a",
+                     "order":1,
+                     "css_class":"",
+                     "children":[
+                        {
+                           "level":30,
+                           "slug":"a",
+                           "order":1,
+                           "css_class":"",
+                           "children":[
+                              {
+                                 "level":40,
+                                 "slug":"a",
+                                 "order":1,
+                                 "css_class":"",
+                                 "component":{
+                                    "layout":4,
+                                    "comp_id":"hero",
+                                    "ltext":"Home Hero",
+                                    "css_class":"",
+                                    "card_body_class":"",
+                                    "hero_content_class":"",
+                                    "hero_overlay":true,
+                                    "hero_overlay_style":"",
+                                    "config":{
+                                       
+                                    },
+                                    "hidden":false,
+                                    "order":1,
+                                    "slots":[
+                                       {
+                                          "component":1,
+                                          "slot_type":"text",
+                                          "order":1,
+                                          "hidden":false,
+                                          "ltext":"",
+                                          "css_class":"",
+                                          "figure_class":"",
+                                          "actions_class":"",
+                                          "accordion_checked":false,
+                                          "textblocks":[
+                                             {
+                                                "block_id":"title",
+                                                "order":1,
+                                                "css_class":"",
+                                                "ltext":"Home Title",
+                                                "href_page":"",
+                                                "items":[
+                                                   {
+                                                      "type":"text",
+                                                      "order":1,
+                                                      "css_class":"",
+                                                      "values":{
+                                                         "en":{
+                                                            "stext":"Home Title",
+                                                            "ltext":""
+                                                         },
+                                                         "fr":{
+                                                            "stext":"frHome Title",
+                                                            "ltext":""
+                                                         }
+                                                      }
+                                                   }
+                                                ]
+                                             },
+                                             {
+                                                "block_id":"content",
+                                                "order":2,
+                                                "css_class":"",
+                                                "ltext":"Home content",
+                                                "href_page":"",
+                                                "items":[
+                                                   {
+                                                      "type":"text",
+                                                      "order":1,
+                                                      "css_class":"",
+                                                      "values":{
+                                                         "en":{
+                                                            "stext":"Home Content",
+                                                            "ltext":""
+                                                         },
+                                                         "fr":{
+                                                            "stext":"frHome Content",
+                                                            "ltext":""
+                                                         }
+                                                      }
+                                                   }
+                                                ]
+                                             }
+                                          ]
+                                       },
+                                       {
+                                          "component":1,
+                                          "slot_type":"figure",
+                                          "order":2,
+                                          "hidden":false,
+                                          "ltext":"",
+                                          "css_class":"",
+                                          "image_url":"https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                                          "alt":"Spiderman",
+                                          "figure_class":"px-0 pt-0",
+                                          "actions_class":"",
+                                          "accordion_checked":false
+                                       }
+                                    ]
+                                 }
+                              }
+                           ]
+                        }
+                     ]
+                  }
+               ]
+            }
+         ]
+      },
+      {
+         "client":1,
+         "page_id":"about",
+         "ltext":"About Page",
+         "order":2,
+         "hidden":false,
+         "translations":{
+            "name":{
+               "en":"About",
+               "hi":"hiAbout",
+               "fr":"frAbout",
+               "ta":null
+            }
+         },
+         "layouts":[
             {
-                "attr": "herotext",
-                "type_id": "text",
-                "prefetch_attr": "prefetched_ht_comptextblocks",
-            },
-            {
-                "attr": "herocard",
-                "type_id": "herocard",
-                "prefetch_attr": None,  # herocard has its own children
-                "children": [
-                    {
-                        "attr": "herocardfigure",
-                        "type_id": "figure",
-                        "prefetch_attr": None,
-                    },
-                    {
-                        "attr": "herocardtext",
-                        "type_id": "text",
-                        "prefetch_attr": "prefetched_hcht_comptextblocks",
-                    },
-                ],
-            },
-        ],
-    },
-    "card": {
-        "accessor": "card",
-        "exclude": {"id", "layout_id"},
-        "children": [
-            {
-                "attr": "cardfigure",
-                "type_id": "figure",
-                "prefetch_attr": None,
-            },
-            {
-                "attr": "cardtext",
-                "type_id": "text",
-                "prefetch_attr": "prefetched_ct_comptextblocks",
-            },
-        ],
-    },
-    "accordion": {
-        "accessor": "accordion",
-        "exclude": {"id", "layout_id"},
-        # FK list child — same "children" key, with is_list=True
-        "children": [
-            {
-                "attr": "prefetched_accordiontext",  # already a list from prefetch
-                "type_id": "text",
-                "prefetch_attr": "prefetched_at_comptextblocks",
-                "is_list": True,  # ← this is the only difference
-            },
-        ],
-    },
-}
-
-# ── Single unified recursive builder ─────────────────────────
-
-def build_child(obj, child_config):
-    
-    #Handles both single (OneToOne) and list (FK) children
-    #based on is_list flag in config. Replaces build_child
-    #and build_list_children as separate functions.
-    
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    is_list = child_config.get("is_list", False)
-    attr = child_config["attr"]
-    type_id = child_config["type_id"]
-    prefetch_attr = child_config.get("prefetch_attr")
-    nested_children = child_config.get("children", [])
-
-    # ── List child (FK, one-to-many) ──
-    if is_list:
-        raw_list = getattr(obj, attr, [])
-        results = []
-        for item in raw_list:
-            item = visible(item)
-            if not item:
-                continue
-            data = serialize_model(item, exclude={"id"})
-            data["type_id"] = type_id
-            if prefetch_attr:
-                textblocks = build_blocks(getattr(item, prefetch_attr, []))
-                if textblocks:
-                    data["textblocks"] = textblocks
-            results.append(data)
-        results.sort(key=lambda x: x.get("order", 0))
-        return results  # returns list, not dict
-
-    # ── Single child (OneToOne) ──
-    child_obj = getattr(obj, attr, None)
-    child_obj = visible(child_obj)
-    if not child_obj:
-        return None
-
-    data = serialize_model(child_obj, exclude={"id"})
-    data["type_id"] = type_id
-
-    # Has textblocks (text slot)
-    if prefetch_attr:
-        textblocks = build_blocks(getattr(child_obj, prefetch_attr, []))
-        if not textblocks:
-            return None
-        data["textblocks"] = textblocks
-
-    # Has nested children (e.g. herocard → herocardfigure + herocardtext)
-    if nested_children:
-        contents = []
-        for nc in nested_children:
-            result = build_child(child_obj, nc)
-            if result:
-                if isinstance(result, list):
-                    contents.extend(result)
-                else:
-                    contents.append(result)
-        contents.sort(key=lambda x: x.get("order", 0))
-        data["contents"] = contents
-
-    return data
-
-# ── Top-level component builder driven by registry ───────────
-
-def build_component_from_registry(layout):
-    comp_id = layout.comp_id
-    if not comp_id:
-        return None
-
-    config = COMPONENT_REGISTRY.get(comp_id)
-    if not config:
-        return None
-
-    accessor = config["accessor"]
-    obj = getattr(layout, accessor, None)
-    obj = visible(obj)
-    if not obj:
-        return None
-
-    contents = []
-    for child_config in config.get("children", []):
-        result = build_child(obj, child_config)
-        if result:
-            if isinstance(result, list):
-                contents.extend(result)   # FK list — flatten into contents
-            else:
-                contents.append(result)   # OneToOne — append single item
-
-    contents.sort(key=lambda x: x.get("order", 0))
-
-    data = serialize_model(obj, exclude=config.get("exclude", {"id"}))
-    data["comp_id"] = comp_id
-    data["contents"] = contents
-    return data
-
-# 5️⃣ Layout Builder
-
-def build_layout(layout, layout_map):
-    layout = visible(layout)
-    if not layout:
-        return None
-
-    layout_data = {
-        "level": layout.level,
-        "slug": layout.slug,
-        "order": layout.order,
-        "css_class": layout.css_class,
-        "comp_id": layout.comp_id
-    }
-
-    component = None
-
-    lv_option = 2
-    
-    # Option 1 with individual build functions
-    if lv_option == 1:
-      if layout.comp_id == "hero":
-        hero = getattr(layout, "hero", None)
-        if hero:
-          component = build_hero(hero)    
-        
-      elif layout.comp_id == "card":
-        card = getattr(layout, "card", None)
-        if card:
-          component = build_card(card)  
-          
-      elif layout.comp_id == "accordion":
-          accordion = getattr(layout, "accordion", None)
-          if accordion:
-              component = build_accordion(accordion)            
-
-      if component:
-          layout_data["component"] = component`
-
-    elif lv_option == 2:
-      # Option 2 with common registry
-      if layout.comp_id:
-          component = build_component_from_registry(layout)
-          if component:
-              layout_data["component"] = component
+               "level":10,
+               "slug":"a",
+               "order":1,
+               "css_class":"",
+               "children":[
+                  {
+                     "level":20,
+                     "slug":"a",
+                     "order":1,
+                     "css_class":"",
+                     "children":[
+                        {
+                           "level":30,
+                           "slug":"a",
+                           "order":1,
+                           "css_class":"",
+                           "children":[
+                              {
+                                 "level":40,
+                                 "slug":"a",
+                                 "order":1,
+                                 "css_class":"",
+                                 "component":{
+                                    "layout":8,
+                                    "comp_id":"hero",
+                                    "ltext":"About Hero",
+                                    "css_class":"hero min-h-screen",
+                                    "card_body_class":"",
+                                    "hero_content_class":"",
+                                    "hero_overlay":true,
+                                    "hero_overlay_style":"",
+                                    "config":{
+                                       
+                                    },
+                                    "hidden":false,
+                                    "order":1,
+                                    "slots":[
+                                       {
+                                          "component":2,
+                                          "slot_type":"figure",
+                                          "order":1,
+                                          "hidden":false,
+                                          "ltext":"",
+                                          "css_class":"",
+                                          "image_url":"https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                                          "alt":"Spiderman",
+                                          "figure_class":"px-0 pt-0",
+                                          "actions_class":"",
+                                          "accordion_checked":false
+                                       },
+                                       {
+                                          "component":2,
+                                          "slot_type":"text",
+                                          "order":2,
+                                          "hidden":false,
+                                          "ltext":"",
+                                          "css_class":"",
+                                          "figure_class":"",
+                                          "actions_class":"",
+                                          "accordion_checked":false,
+                                          "textblocks":[
+                                             {
+                                                "block_id":"title",
+                                                "order":1,
+                                                "css_class":"",
+                                                "ltext":"About Title",
+                                                "href_page":"",
+                                                "items":[
+                                                   {
+                                                      "type":"text",
+                                                      "order":1,
+                                                      "css_class":"",
+                                                      "values":{
+                                                         "en":{
+                                                            "stext":"About Title",
+                                                            "ltext":""
+                                                         },
+                                                         "fr":{
+                                                            "stext":"frAbout Title",
+                                                            "ltext":""
+                                                         }
+                                                      }
+                                                   }
+                                                ]
+                                             },
+                                             {
+                                                "block_id":"content",
+                                                "order":2,
+                                                "css_class":"",
+                                                "ltext":"About content",
+                                                "href_page":"",
+                                                "items":[
+                                                   {
+                                                      "type":"text",
+                                                      "order":1,
+                                                      "css_class":"",
+                                                      "values":{
+                                                         "en":{
+                                                            "stext":"About Content",
+                                                            "ltext":""
+                                                         },
+                                                         "fr":{
+                                                            "stext":"frAbout Content",
+                                                            "ltext":""
+                                                         }
+                                                      }
+                                                   }
+                                                ]
+                                             }
+                                          ]
+                                       }
+                                    ]
+                                 }
+                              }
+                           ]
+                        }
+                     ]
+                  }
+               ]
+            }
+         ]
+      }
+   ],
+   "page_tree":[
+      {
+         "client_id":"bahushira",
+         "page_id":"home",
+         "order":1,
+         "translations":{
+            "name":{
+               "en":"Home",
+               "hi":"hiHome",
+               "fr":"frHome",
+               "ta":null
+            }
+         },
+         "children":[
             
-
-    # 🔥 Build children recursively
-    children = [
-        build_layout(child, layout_map)
-        for child in layout_map.get(layout.id, [])
-    ]
-
-    children = [c for c in children if c]
-
-    if children:
-        layout_data["children"] = children
-
-    return layout_data
-
-# 6️⃣ Page Builder
-
-def build_page(page):
-    page = visible(page)
-    if not page:
-        return None
-
-    all_layouts = list(getattr(page, "prefetched_layouts", []))
-    # 🔥 Build parent-child lookup
-    layout_map = {}
-    root_layouts = []
-
-    for layout in all_layouts:
-        if layout.parent_id:
-            layout_map.setdefault(layout.parent_id, []).append(layout)
-        else:
-            root_layouts.append(layout)
-
-    # 🔥 Build tree from roots
-    layouts = [
-        build_layout(layout, layout_map)
-        for layout in root_layouts
-    ]
-
-    layouts = [l for l in layouts if l]
-
-    return {
-        "page_id": page.page_id,
-        "order": page.order,
-        "textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
-        "layouts": layouts,
-    }
-"""
-
-"""
-# Theme Resolution Engine (Core Logic)
-def resolve_theme(theme):
-    base = theme.preset
-    data = {}
-
-    for field in [f.name for f in ThemePreset._meta.fields]:
-        if field in ["id", "name", "slug", "is_system"]:
-            continue
-
-        override = theme.overrides.get(field) if theme.overrides else None
-        data[field] = override or getattr(base, field)
-
-    return data
+         ]
+      },
+      {
+         "client_id":"bahushira",
+         "page_id":"about",
+         "order":2,
+         "translations":{
+            "name":{
+               "en":"About",
+               "hi":"hiAbout",
+               "fr":"frAbout",
+               "ta":null
+            }
+         },
+         "children":[
+            
+         ]
+      }
+   ],
+   "header_nav":[
+      {
+         "client":1,
+         "location":"header",
+         "nav_type":"page",
+         "page":1,
+         "url":"",
+         "order":1,
+         "hidden":false,
+         "open_in_new_tab":false,
+         "translations":{
+            "name":{
+               "en":"home2",
+               "hi":"hihome2",
+               "fr":"frhome2",
+               "ta":null
+            }
+         },
+         "href":"home",
+         "children":[
+            
+         ]
+      },
+      {
+         "client":1,
+         "location":"header",
+         "nav_type":"page",
+         "page":2,
+         "url":"",
+         "order":2,
+         "hidden":false,
+         "open_in_new_tab":false,
+         "translations":{
+            "name":{
+               "en":"about2",
+               "hi":"hiabout2",
+               "fr":"frabout2",
+               "ta":null
+            }
+         },
+         "href":"about",
+         "children":[
+            
+         ]
+      }
+   ],
+   "footer_nav":[
+      
+   ]
+}
 """

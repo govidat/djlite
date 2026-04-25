@@ -11,7 +11,7 @@ from .admin_mixins import ClientScopedMixin, _user_has_admin_role
 # Register your models here.
 from .models import GlobalValCat, GlobalVal, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 
-from .models import Page, Layout, Component, ComponentSlot, ClientUserProfile, CustomerProfile, CustomerAddress
+from .models import NavItem, Page, PageContent, Layout, Component, ComponentSlot, ClientUserProfile, CustomerProfile, CustomerAddress
 
 # using guardian
 from .models import ClientUserMembership, ClientGroup, ClientGroupPermission, ClientLocation
@@ -244,6 +244,12 @@ class LayoutInline(nested_admin.NestedStackedInline):
     class Media:
         js = ("admin/js/layout_admin.js",)
 
+class PageContentInline(nested_admin.NestedStackedInline):
+    model   = PageContent
+    classes = ['collapse']
+    extra   = 0
+    fields  = ['language_code', 'html']
+
 """
 class PageInline(nested_admin.NestedStackedInline):
     model = Page
@@ -255,11 +261,19 @@ class PageInline(ClientLanguageMixin, TranslationBaseModelAdmin, nested_admin.Ne
     model = Page
     extra = 0
     classes = ['collapse']
-    inlines = [LayoutInline]                        # GentextBlockInline,  whatever Page's child inline is
+    inlines = [LayoutInline, PageContentInline]                        # GentextBlockInline,  whatever Page's child inline is
 
     TRANSLATED_FIELDS = ('name',)                   # add more if Page has other translated fields
     non_translated_fields = ('page_id', 'ltext', 'order', 'parent', 'hidden')    # adjust to your actual fields
 
+class NavItemInline(ClientLanguageMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline):
+    model = NavItem
+    extra = 0
+    classes = ['collapse']
+    #inlines = [LayoutInline, PageContentInline]                        # GentextBlockInline,  whatever Page's child inline is
+
+    TRANSLATED_FIELDS = ('name',)                   # add more if Page has other translated fields
+    non_translated_fields = ('location', 'nav_type', 'page', 'url', 'order', 'parent', 'hidden', 'open_in_new_tab')    # adjust to your actual fields
 
 # ── ClientUserProfile inline (under ClientAdmin) ──────────────────────
 
@@ -270,6 +284,7 @@ class ClientUserProfileInline(nested_admin.NestedStackedInline):
     #readonly_fields = ('created_at',)
     autocomplete_fields = ('user',)
     admin_role_only = True   # 🔑 important
+    classes = ['collapse']
     """
     def has_add_permission(self, request, obj=None):
         if request.user.is_superuser:
@@ -301,7 +316,7 @@ class ClientUserProfileInline(nested_admin.NestedStackedInline):
 class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin):
     form         = ClientForm
     list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
-    inlines      = [ThemeInline, PageInline, ClientUserProfileInline]
+    inlines      = [ThemeInline, PageInline, NavItemInline, ClientUserProfileInline]
     TRANSLATED_FIELDS = ('name', 'nb_title')
     admin_role_only = True
 

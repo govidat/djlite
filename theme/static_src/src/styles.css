@@ -153,4 +153,22 @@
   * If your final CSS file is not being updated after code changes, you may want to broaden or narrow
   * the scope of this path.
   */
+/* Safelist — PageContent HTML blobs in DB are not scanned by Tailwind */
+@source inline("{bg,text,border}-{primary,secondary,accent,neutral,base-100,base-200,base-300,base-content,primary-content,secondary-content,accent-content,neutral-content}");
+@source inline("{py,px,my,mx,gap,p,m}-{0,1,2,3,4,5,6,8,10,12,16,20,24}");
+@source inline("text-{sm,base,lg,xl,2xl,3xl,4xl,5xl} font-{normal,bold} leading-{normal,relaxed,loose}");
+@source inline("grid grid-cols-{1,2,3,4} md:grid-cols-{1,2,3,4} flex flex-col flex-row flex-1 items-{start,center,end} justify-{start,center,end,between}");
+@source inline("max-w-{xs,sm,md,lg,xl,2xl,3xl,4xl} mx-auto min-h-{0,screen,64} w-{full,24,12} h-{full,24,12}");
+@source inline("rounded-{none,sm,md,lg,xl,full} shadow{,-sm,-md,-lg} opacity-{60,70,80}");
+@source inline("btn btn-{primary,secondary,accent,outline,lg,sm,xs}");
+@source inline("card card-body card-title card-actions");
+@source inline("badge badge-{primary,secondary,accent,neutral,info,success,warning,error,lg,sm}");
+@source inline("hero hero-content");
+@source inline("stats stats-vertical stat stat-title stat-value stat-desc");
+@source inline("avatar placeholder");
+@source inline("timeline timeline-vertical timeline-start timeline-end timeline-middle timeline-box");
+@source inline("divider");
+@source inline("sm:flex sm:flex-row md:flex md:flex-row md:grid-cols-2 md:grid-cols-3");
+
+
 @source "../../../**/*.{html,py,js}";

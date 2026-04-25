@@ -7,7 +7,7 @@ from django.core.cache import cache
 from guardian.shortcuts import assign_perm, remove_perm
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from .models import User, ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
+from .models import User, ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, NavItem, PageContent, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
 
 """
 @receiver(post_save, sender=GlobalVal)
@@ -34,7 +34,7 @@ def globalval_changed(sender, **kwargs):
 
 # Full CRUD based on role — CMS content models
 CONTENT_MODELS = [
-    Theme, Page, Layout, Component,
+    Theme, Page, NavItem, PageContent, Layout, Component,
     ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem,
 ]
 
@@ -356,8 +356,12 @@ def get_client_id_from_instance(instance):
             return instance.client_id
 
         # One hop via client FK
-        if isinstance(instance, (Theme, Page)):
+        if isinstance(instance, (Theme, Page, NavItem)):
             return instance.client.client_id
+
+        # Two hops: PageContent → page → client
+        if isinstance(instance, PageContent):
+            return instance.page.client.client_id
 
         # Two hops: Layout → page → client
         if isinstance(instance, Layout):
@@ -427,6 +431,8 @@ def register_signals():
         Client,
         Theme,
         Page,
+        PageContent,
+        NavItem,
         Layout,
         Component,
         ComponentSlot,

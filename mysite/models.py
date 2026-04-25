@@ -27,7 +27,7 @@ Client
             ├── Component (onetoone at level=40, compl0_id = hero, card, accordion etc... + some fields at this level)
                      ├── ComponentSlot (foreign key compl1_id= figure, text + some fields that may be applicable for each of this)
                          └── ComptextBlock (only for compll1_id = text GenericRelation)
-
+    ├── NavItem
     ├── Themes
         ├── themepreset
         └── name using modelTranslation #GentextBlock                        
@@ -373,6 +373,82 @@ class Page(models.Model):
         ]
         verbose_name = "00-03-02 Page"
 
+class NavItem(models.Model):
+    NAV_TYPES = [
+        ('page',     'Internal Page'),
+        ('url',      'External URL'),
+        ('anchor',   'Anchor (#section)'),
+        ('label',    'Label only (no link)'),  # dropdown header
+    ]
+    LOCATION_CHOICES = [
+        ('header', 'Header / Appbar'),
+        ('footer', 'Footer'),
+        ('sidebar', 'Sidebar'),
+    ]
+
+    client      = models.ForeignKey(Client, on_delete=models.CASCADE,
+                                    related_name='nav_items')
+    parent      = models.ForeignKey('self', null=True, blank=True,
+                                    on_delete=models.CASCADE,
+                                    related_name='children')
+    location    = models.CharField(max_length=20, choices=LOCATION_CHOICES,
+                                   default='header')
+    nav_type    = models.CharField(max_length=10, choices=NAV_TYPES,
+                                   default='page')
+
+    # If nav_type = 'page'
+    page        = models.ForeignKey(Page, null=True, blank=True,
+                                    on_delete=models.SET_NULL,
+                                    related_name='nav_items')
+
+    # If nav_type = 'url' or 'anchor'
+    url         = models.CharField(max_length=500, blank=True)
+
+    # Display
+    name       = LowercaseCharField(max_length=100)   # modeltranslation expands this
+    order       = models.PositiveIntegerField(default=0)
+    hidden      = models.BooleanField(default=False)
+    open_in_new_tab = models.BooleanField(default=False)
+    svg_pre = models.CharField(max_length=500, blank=True, null=True)
+    svg_suf = models.CharField(max_length=500, blank=True, null=True)    
+
+    class Meta:
+        ordering        = ['client', 'location', 'order']
+        unique_together = ('client', 'location', 'parent', 'order')
+        verbose_name = "00-03-03 NavItem"
+
+    def get_url(self, client_id):
+        if self.nav_type == 'page' and self.page:
+            return self.page.page_id
+        if self.nav_type in ('url', 'anchor'):
+            return self.url
+        return '#'   # label-only — no navigation
+
+    def __str__(self):
+        return f"{self.client.client_id} / {self.location} / {self.name}"
+
+class PageContent(models.Model):
+    """
+    Track A — raw HTML page authoring.
+    One row per page per language. Rendered directly via |safe.
+    Checked before the component tree in ClientPageView.
+    """
+    page          = models.ForeignKey(
+        Page,
+        on_delete=models.CASCADE,
+        related_name='contents'
+    )
+    language_code = LowercaseCharField(max_length=2, blank=False, null=False, default='en')   # stores 'en', 'fr', 'hi' etc.
+    html          = models.TextField()
+
+    class Meta:
+        unique_together = ('page', 'language_code')
+        ordering        = ['page', 'language_code']
+        verbose_name    = '01-02 Page Content (HTML)'
+
+    def __str__(self):
+        return f"{self.page} / {self.language_code}"
+    
 class Layout(models.Model):
     # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
     # client is kept, so that layout can be a separate admin tab. in that we are braching to component type admin.
@@ -551,7 +627,7 @@ class ClientUserProfile(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        verbose_name = "00-03-03 Client Staff Profile"
+        verbose_name = "00-03-04 Client Staff Profile"
 
 
     def __str__(self):

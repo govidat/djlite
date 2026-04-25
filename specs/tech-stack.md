@@ -99,15 +99,39 @@ Wrapped in `cached.Loader`. `APP_DIRS = False` (required by cotton — overrides
 
 ### The `fetch_clientstatic()` Pattern
 The central data delivery mechanism. On every page request:
-1. `CustomerProfileMiddleware` resolves `request.client` from URL/session (one DB query or none if cached).
+1. `CustomerProfileMiddleware` resolves `request.client` from URL path (one DB query or none if cached).
 2. `client_context` context processor calls `fetch_clientstatic(client_id)`.
 3. `fetch_clientstatic` checks cache first (`clientstatic:{client_id}`). On miss, runs a single deeply-prefetched query across `Client → Page → Layout → Component → ComponentSlot → ComptextBlock → TextstbItem → SvgtextbadgeValue`.
 4. Result is serialised to a plain Python dict by `build_client_payload()` and cached.
 5. Templates consume `{{ client }}`, `{{ page_dict }}`, `{{ theme }}` — never raw ORM calls.
+6. `header_nav` and `footer_nav` are built from `NavItem` records prefetched
+  alongside pages and themes. `build_nav_item()` calls `item.get_url(client_id)`
+  to resolve the full path for `page` nav_types, storing it as `item.href`
+  (separate from the raw `item.url` field used for active-state matching).
+  Nav labels use modeltranslation (`name_en`, `name_hi` etc.) and are grouped
+  under `translations.name` by `serialize_model()` — consistent with `Page`
+  and `Client` translatable fields.
+### Dual-Track Page Rendering
 
-**Current cache backend:** `LocMemCache` (dev). Redis planned for production (config commented in `settings.py`).
+Pages can be rendered via two tracks that coexist on the same `Page` model:
 
-**Cache invalidation:** Manual — call `cache.delete(f"clientstatic:{client_id}")` after content edits. A post-save signal or admin action hook is needed (not yet implemented).
+**Track A — `PageContent` (raw HTML, Phase 1 primary path)**
+- `PageContent(page, language_code, html)` stores one HTML blob per page per language.
+- `ClientPageView` checks for a `PageContent` record for the active language before falling through to the component tree.
+- Language fallback: active language → `en` → first available `PageContent` row.
+- HTML is authored externally (any visual tool) and pasted into Django Admin.
+
+**Track B — Component tree (structured, Phase 2+ path)**
+- `fetch_clientstatic()` payload drives rendering via cotton component templates.
+- Used for pages requiring structured, client-editable, queryable content.
+
+**Rendering priority in `ClientPageView`:**
+```
+1. PageContent for active language       → render raw HTML
+2. PageContent for fallback language     → render raw HTML
+3. Component tree from fetch_clientstatic → render via cotton templates
+4. Neither found                          → Http404
+```
 
 ### `serialize_model()` Utility
 A reusable helper in `utils/common_functions.py` that serialises a model instance to a dict, automatically:
@@ -118,15 +142,21 @@ A reusable helper in `utils/common_functions.py` that serialises a model instanc
 ### Key Model Relationships
 
 ```
+
+
 Client (client_id, parent→self, language_list, theme_list)
   ├── Theme (theme_id, themepreset→ThemePreset, overrides JSON)
   ├── Page (page_id, parent→self, order)
-  │     └── Layout (level 10/20/30/40, parent→self, slug, order)
+  │     ├── PageContent (language_code, html)          ← Track A: raw HTML per language
+  │     └── Layout (level 10/20/30/40, parent→self, slug, order)   ← Track B: component tree
   │           └── Component [OneToOne, level=40 only]
   │                 └── ComponentSlot (slot_type: figure|text, order)
-  │                       └── ComptextBlock [GenericRelation] (block_id: title|content|actbut)
-  │                             └── TextstbItem [GenericRelation] (item_id: text|svg|badge)
+  │                       └── ComptextBlock [GenericRelation]
+  │                             └── TextstbItem [GenericRelation]
   │                                   └── SvgtextbadgeValue (language_code, stext, ltext)
+  ├── NavItem (name[translatable], location, nav_type, page→Page[optional],
+  │            url, order, open_in_new_tab, parent→self)
+  │     └── NavItem children (same shape, one level deep)
   ├── ClientLocation (location_id, location_type)
   ├── ClientGroup (group_id, role, locations M2M)
   │     ├── ClientGroupPermission (module, action)
@@ -183,20 +213,33 @@ Template renders (cotton components consume client/page/theme dicts)
 ## Project Structure (Actual)
 
 ```
-mydj/                            ← Django project root (settings, urls, wsgi)
-  ├── settings.py                ← Single settings file (dev). Split into base/dev/prod before production.
+mydj/                            ← Django project root
+  ├── settings/
+  │   ├── base.py                ← shared settings
+  │   ├── development.py         ← DEBUG=True, SQLite, debug-toolbar
+  │   └── production.py          ← DEBUG=False, PostgreSQL, Redis, whitenoise
   ├── urls.py
-  ├── templates/                 ← Global templates (base.html, landing.html, cotton components)
+  ├── templates/                 ← Global templates (base.html, landing.html, 404.html, 500.html)
+  │   ├── cotton/                ← django-cotton component templates (hero, card, accordion, carousel)
+  │   └── client/                ← coming_soon.html
   └── context_processors.py     ← settings_constants, globalval, client_context
 
 mysite/                          ← Primary app
-  ├── models.py                  ← All models in one file (Client, Page, Layout, Component, ComponentSlot,
-  │                                 User profiles, Groups, Themes, GlobalVal, ThemePreset, text content tree)
-  ├── views.py                   ← ClientPageView, auth entry points, customer profile/address views
+  ├── models.py                  ← All models (Client, Page, PageContent, Layout, Component,
+  │                                 ComponentSlot, User profiles, Groups, Themes, GlobalVal,
+  │                                 ThemePreset, text content tree)
+  ├── views/
+  │   ├── __init__.py            ← re-exports all views (urls.py imports unchanged)
+  │   ├── main.py                ← ClientPageView, client_home, landing_page, set_theme,
+  │   │                             custom_404, custom_500
+  │   ├── auth.py                ← client_login, client_signup, client_logout
+  │   └── customer.py            ← customer_onboarding, customer_profile, addresses
+  ├── signals.py                 ← cache invalidation on post_save / post_delete
+  ├── apps.py                    ← MysiteConfig, registers signals in ready()
   ├── adapters.py                ← ClientAwareAccountAdapter (allauth)
   ├── forms.py                   ← CustomerProfileForm, CustomerAddressForm
   └── middleware/
-        └── customer_profile.py  ← CustomerProfileMiddleware
+        └── customer_profile.py  ← CustomerProfileMiddleware (path-based client resolution)
 
 utils/
   ├── common_functions.py        ← fetch_clientstatic(), build_client_payload(), serialize_model(),
@@ -210,10 +253,41 @@ theme/                           ← django-tailwind theme app
 
 ## Known Issues / Constraints
 
-1. **`settings.py` is a single file** — must be split into `base.py` / `development.py` / `production.py` before production deploy. `SECRET_KEY` is currently hardcoded.
-2. **`ACCOUNT_EMAIL_VERIFICATION = "optional"`** — must be set to `"mandatory"` in production.
-3. **`models.py` is a single large file** — splitting into `models/` package is a natural next step before Phase 2.
-4. **Cache invalidation is not automated** — content edits in Django Admin do not currently invalidate the `clientstatic` cache. A `post_save` signal on `Client`, `Page`, `Layout`, `Component`, `ComponentSlot` is needed.
-5. **`django-browser-reload` is commented out** — re-enable for active frontend development.
-6. **Datastar dropped** — no interactive JS library is currently in use. Decision on HTMX vs Datastar is pending.
-7. **`DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000`** — set to accommodate deep nested admin inlines. Monitor in production.
+1. **`models.py` is a single large file** — splitting into `models/` package is a natural next step before Phase 2.
+2. **`django-browser-reload` is commented out** — re-enable for active frontend development.
+3. **Datastar dropped** — no interactive JS library currently in use. HTMX evaluation pending for theme/language switcher.
+4. **`DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000`** — set to accommodate deep nested admin inlines. Monitor in production.
+5. **`PageContent.html` is rendered unsanitised** — content is developer-authored only in Phase 1 so `|safe` is acceptable. If clients ever paste their own HTML in Phase 2, a sanitiser (e.g. `bleach`) must be added before the `|safe` filter.
+
+
+## To Build complete hrml file and push to PageContent
+
+## Stich Prompt: 
+Correct Stitch prompt — when using Google Stitch, use exactly this prompt structure:
+
+"Design an [page type] page for a [business type]. Output plain HTML only — no React, no JSX, no <script> tags. Use only Tailwind CSS utility classes and DaisyUI component classes for all styling. No inline style attributes anywhere."
+
+That last sentence is the critical one — Stitch defaults to inline styles if you don't explicitly forbid them.
+
+## Claude Prompt: 
+"Generate a complete [page type] page in plain HTML. Use only Tailwind CSS v4 utility classes and DaisyUI v5 component classes. No inline styles. No React. Use semantic colour tokens like bg-primary, text-base-content, bg-base-200. The page will be pasted into a Django PageContent field and rendered inside an existing base.html that already has a navbar and footer, so do not include <html>, <head>, or <body> tags."
+
+## v0.dev (Vercel)
+Generates UI from prompts. Defaults to React/shadcn but you can ask for plain HTML + Tailwind. Output quality is high. Requires some cleanup to remove React-specific syntax.
+Prompt addition needed:
+
+"Output plain HTML only. No JSX, no React, no components. Use DaisyUI v5 classes."
+
+Workflow: Generate → copy HTML → strip any className= (change to class=) → paste into PageContent.
+
+## Pinegrow
+A desktop visual editor that works directly with Tailwind and DaisyUI. You design visually, it writes the HTML with proper Tailwind classes. Unlike web-based tools, it has explicit DaisyUI component support.
+Best fit for your workflow if you want a proper visual editor. Free trial available, paid after that.
+Workflow: Design in Pinegrow → Export HTML → paste into PageContent.
+
+## Recommended workflow for Phase 1
+Given you're one developer doing this quickly:
+For structured pages (about, contact, team): use Claude directly with the prompt pattern above. Fast, no conversion, uses your exact DaisyUI tokens.
+For copy-paste sections (hero banners, feature grids, testimonials): use HyperUI or Flowbite — browse, find a section you like, copy HTML, paste. Takes 2 minutes per section.
+For full page layouts: combine the two — use HyperUI for structure, ask Claude to adapt it to DaisyUI component classes and your colour tokens.
+The key constraint to keep in mind for all tools: always check the output for style= attributes and replace them with Tailwind classes, and always remove <html>, <head>, <body> wrapper tags before pasting into PageContent.

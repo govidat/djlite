@@ -30,6 +30,21 @@ The platform starts as a page-builder CMS and grows incrementally into a full-fe
 - Language fallback order: requested language → `settings.LANGUAGE_CODE` (`en`) → first available.
 
 ### 4. Composable Page Builder
+
+The platform supports two parallel page authoring tracks. Both coexist on the same `Page` model and can be mixed across pages within the same client site.
+
+**Track A — Raw HTML (Phase 1 primary authoring path)**
+- A `PageContent` model stores a raw HTML blob per page per language (`language_code` + `html` fields).
+- HTML is authored outside Django using any visual tool (Figma exports, Pinegrow, Locofy, hand-coded) and pasted into Django Admin.
+- The renderer checks for a `PageContent` record first; if found, it renders the blob directly via `{{ content.html|safe }}`.
+- Multilingual: one `PageContent` row per language per page. Language resolution follows the standard fallback: active language → `en` → first available.
+- The navbar is decoupled from the page tree via a dedicated `NavItem` model.
+  Client-facing navigation (header, footer, sidebar) is configured independently
+  of which pages exist, allowing external links, label-only groupings, and
+  different ordering from the page hierarchy.
+- This track is used for all Phase 1 pages where the developer controls content.
+
+**Track B — Structured Component Tree (Phase 2+ client-managed content)**
 - Clients construct pages from a nested content hierarchy:
   ```
   Client → Page → Layout (Section / Row / Col / Cell) → Component → ComponentSlot
@@ -37,8 +52,10 @@ The platform starts as a page-builder CMS and grows incrementally into a full-fe
 - `Layout` is a single self-referential model with a numeric `level` field (`10=Section`, `20=Row`, `30=Col`, `40=Cell`), avoiding separate Section/Row/Column/Cell tables.
 - `Component` (OneToOne to a `level=40` Layout) carries the component type (`hero`, `card`, `accordion`, `carousel`) and all component-level styling fields.
 - `ComponentSlot` (FK to `Component`) is either a `figure` slot (image URL + alt) or a `text` slot (linked to `ComptextBlock` via GenericRelation for multilingual copy).
-- Both `Page` and `Client` support a self-referential parent-child hierarchy for nested navigation trees.
-- The full page + theme payload is serialised into a cacheable Python dict by `fetch_clientstatic()` and delivered to templates via the `client_context` context processor. Templates never query models directly for page rendering.
+- The full page + theme payload is serialised into a cacheable Python dict by `fetch_clientstatic()` and delivered to templates via the `client_context` context processor.
+- This track is used for pages requiring structured, queryable, client-editable content.
+
+Both `Page` and `Client` support a self-referential parent-child hierarchy for nested navigation trees regardless of which track is used.
 
 ### 5. Theme System
 - Themes are per-client (`Theme` FK to `Client`), referencing a system `ThemePreset` for base design tokens.
@@ -68,7 +85,7 @@ The platform starts as a page-builder CMS and grows incrementally into a full-fe
 ## Non-Goals (Phase 1)
 
 - No native mobile app (responsive web only).
-- No drag-and-drop visual page editor (Django Admin enhanced with `django-nested-admin` is the current content UI).
+- No drag-and-drop visual page editor — HTML is authored externally and pasted in. The structured component editor is built in Phase 2.
 - No payment processing.
 - No product catalogue.
 - No subdomain or custom domain routing (path-prefix only).
@@ -77,7 +94,8 @@ The platform starts as a page-builder CMS and grows incrementally into a full-fe
 
 ## Success Criteria (Phase 1)
 
-- A new client can be onboarded and publish a multilingual, multi-page site without code changes.
+- A new client can be onboarded and publish a multilingual, multi-page site by pasting HTML into Django Admin — no code changes required.
+- Pages authored via `PageContent` (Track A) and pages authored via the component tree (Track B) both render correctly from the same `Page` model.
 - Client staff can manage content via Django Admin with role and location-based access control.
 - Customer users can register, log in, and maintain separate profiles per client.
 - Pages render correctly on mobile, tablet, and desktop.

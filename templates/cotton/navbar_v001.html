@@ -33,9 +33,9 @@
   <div class="navbar-center hidden lg:flex">
     <ul class="menu menu-horizontal px-1">
       
-      {% comment %}{% endcomment %}
+      {% comment %}<c-navbar_v001_l1recur :items="client.page_tree"></c-navbar_v001_l1recur>{% endcomment %}
       
-      <c-navbar_v001_l1recur :items="client.page_tree"></c-navbar_v001_l1recur>
+      <c-navbar_v001_l1recur :items="client.header_nav"></c-navbar_v001_l1recur>
       
     </ul>
   </div>

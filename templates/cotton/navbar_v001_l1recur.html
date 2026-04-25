@@ -1,12 +1,102 @@
+{% comment %}
+navbar_v001_l1recur.html
+Recursive navbar component for header_nav items.
+Called with :items="client.header_nav" from parent navbar.
+Self-recurses for children via <c-navbar_v001_l1recur>.
 
+Item shape expected (header_nav):
+  item.url              → page_id string e.g. "home", "about"
+  item.nav_type         → "page" | "url" | "anchor" | "label"
+  item.translations.name → { "en": "Home", "hi": "होम", ... }
+  item.open_in_new_tab  → true | false
+  item.children         → list of child items (same shape)
+{% endcomment %}
 
-{% load my_tags %}
 {% with current_page=request.resolver_match.kwargs.page|default:"home" %}
   {% for item in items %}
-      {% comment %}
-      {% mylist_bykey item.textblocks 'name' 'block_id' as result_var %}
-      <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>
-      {% endcomment %}
+
+    {% if item.children %}
+      {% comment " Dropdown parent" %}{% endcomment %} 
+      <li>
+        <details>
+          <summary>
+            <c-svgtextsvg
+              :textdict="item.translations.name"
+              :svg_pre="item.svg_pre|default:''"
+              :svg_suf="item.svg_suf|default:''">
+            </c-svgtextsvg>
+          </summary>
+          <ul class="p-2">
+            <c-navbar_v001_l1recur :items="item.children">
+            </c-navbar_v001_l1recur>
+          </ul>
+        </details>
+      </li>
+
+    {% else %}
+      {% comment " Leaft" %}{% endcomment %} 
+      {% if item.nav_type == "page" %}
+        <li>
+          <a href="{% url 'client_page' client.client_id item.href %}"
+             {% if item.open_in_new_tab %}target="_blank" rel="noopener"{% endif %}
+             class="{% if item.url == current_page %}active bg-base-300 font-semibold{% endif %}">
+            <c-svgtextsvg
+              :textdict="item.translations.name"
+              :svg_pre="item.svg_pre|default:''"
+              :svg_suf="item.svg_suf|default:''">
+            </c-svgtextsvg>
+          </a>
+        </li>
+
+      {% elif item.nav_type == "url" %}
+        <li>
+          <a href="{{ item.hrefl }}"
+             {% if item.open_in_new_tab %}target="_blank" rel="noopener"{% endif %}>
+            <c-svgtextsvg
+              :textdict="item.translations.name"
+              :svg_pre="item.svg_pre|default:''"
+              :svg_suf="item.svg_suf|default:''">
+            </c-svgtextsvg>
+          </a>
+        </li>
+
+      {% elif item.nav_type == "anchor" %}
+        <li>
+          <a href="{{ item.href }}"
+             {% if item.open_in_new_tab %}target="_blank" rel="noopener"{% endif %}
+             class="{% if item.url == current_page %}active bg-base-300 font-semibold{% endif %}">
+            <c-svgtextsvg
+              :textdict="item.translations.name"
+              :svg_pre="item.svg_pre|default:''"
+              :svg_suf="item.svg_suf|default:''">
+            </c-svgtextsvg>
+          </a>
+        </li>
+
+      {% elif item.nav_type == "label" %}
+        {% comment " Label only — no link, used as a visual group header" %}{% endcomment %} 
+        
+        <li class="menu-title">
+          <c-svgtextsvg
+            :textdict="item.translations.name"
+            :svg_pre="item.svg_pre|default:''"
+            :svg_suf="item.svg_suf|default:''">
+          </c-svgtextsvg>
+        </li>
+
+      {% endif %}
+    {% endif %}
+
+  {% endfor %}
+{% endwith %}
+
+{% comment "" %}
+
+{% load my_tags %}
+{% load my_filters %}
+
+{% with current_page=request.resolver_match.kwargs.page|default:"home" %}
+  {% for item in items %}
           {% if item.children %}  <!-- if the children length > 0 -->
               <li>                
                   <details>
@@ -19,177 +109,99 @@
                   </details>                
               </li>
           {% else %}
-              <li>
-                  <a href="{% url 'client_page' item.client_id item.page_id %}"
-                    class="{% if item.page_id == current_page %}active bg-base-300 font-semibold{% endif %}">
-                      <c-svgtextsvg  :textdict="item.translations.name" :svg_pre="item.svg_pre" :svg_suf="item.svg_suf"></c-svgtextsvg>
-                  </a>
-              </li>
+              {% if item.nav_type=="page" %}        
+                <li>
+                    <a href="{% url 'client_page' client.client_id item.url %}"
+                      class="{% if item.url == current_page %}active bg-base-300 font-semibold{% endif %}">
+                        <c-svgtextsvg  :textdict="item.translations.name" :svg_pre="item.svg_pre" :svg_suf="item.svg_suf"></c-svgtextsvg>
+                    </a>
+                </li>
+              {% endif %}
           {% endif %}
   {% endfor %}
 {% endwith %}
-
+{% endcomment %}
 {% comment %}
 
-Input is like
-
-{
-  "client": 1,
-  "page_id": "home",
-  "ltext": "Home Page",
-  "order": 1,
-  "hidden": false,
-  "translations": {
-    "name": {
-      "en": "Home2",
-      "hi": "hiHome2",
-      "fr": "frHome2",
-      "ta": null
-    }
-  },
-  "textblocks": [
-    {
-      "block_id": "name",
-      "order": 1,
-      "css_class": "",
-      "ltext": "Home",
-      "href_page": null,
-      "items": [
-        {
-          "type": "text",
-          "order": 1,
-          "css_class": "",
-          "values": {
-            "en": {
-              "stext": "Home",
-              "ltext": ""
-            },
-            "fr": {
-              "stext": "frHome",
-              "ltext": ""
-            },
-            "hi": {
-              "stext": "hiHome",
-              "ltext": ""
+New Input is like:
+   "page_tree":[
+      {
+         "client_id":"bahushira",
+         "page_id":"home",
+         "order":1,
+         "translations":{
+            "name":{
+               "en":"Home",
+               "hi":"hiHome",
+               "fr":"frHome",
+               "ta":null
             }
-          }
-        }
-      ]
-    }
-  ],
-  "layouts": [
-    {
-      "level": 10,
-      "slug": "a",
-      "order": 1,
-      "css_class": "",
-      "children": [
-        {
-          "level": 20,
-          "slug": "a",
-          "order": 1,
-          "css_class": "",
-          "children": [
-            {
-              "level": 30,
-              "slug": "a",
-              "order": 1,
-              "css_class": "",
-              "children": [
-                {
-                  "level": 40,
-                  "slug": "a",
-                  "order": 1,
-                  "css_class": "",
-                  "component": {
-                    "layout": 4,
-                    "comp_id": "hero",
-                    "ltext": "Home Hero",
-                    "css_class": "",
-                    "hero_overlay": true,
-                    "hero_overlay_style": "",
-                    "config": {},
-                    "hidden": false,
-                    "order": 1,
-                    "slots": [
-                      {
-                        "component": 1,
-                        "slot_type": "text",
-                        "order": 1,
-                        "hidden": false,
-                        "css_class": "",
-                        "accordion_checked": false,
-                        "textblocks": [
-                          {
-                            "block_id": "title",
-                            "order": 1,
-                            "css_class": "",
-                            "ltext": "Home Title",
-                            "href_page": "",
-                            "items": [
-                              {
-                                "type": "text",
-                                "order": 1,
-                                "css_class": "",
-                                "values": {
-                                  "en": {
-                                    "stext": "Home Title",
-                                    "ltext": ""
-                                  },
-                                  "fr": {
-                                    "stext": "frHome Title",
-                                    "ltext": ""
-                                  }
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "block_id": "content",
-                            "order": 2,
-                            "css_class": "",
-                            "ltext": "Home content",
-                            "href_page": "",
-                            "items": [
-                              {
-                                "type": "text",
-                                "order": 1,
-                                "css_class": "",
-                                "values": {
-                                  "en": {
-                                    "stext": "Home Content",
-                                    "ltext": ""
-                                  },
-                                  "fr": {
-                                    "stext": "frHome Content",
-                                    "ltext": ""
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      {
-                        "component": 1,
-                        "slot_type": "figure",
-                        "order": 2,
-                        "hidden": false,
-                        "css_class": "",
-                        "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
-                        "alt": "Spiderman",
-                        "figure_class": "px-0 pt-0",
-                        "accordion_checked": false
-                      }
-                    ]
-                  }
-                }
-              ]
+         },
+         "children":[
+            
+         ]
+      },
+      {
+         "client_id":"bahushira",
+         "page_id":"about",
+         "order":2,
+         "translations":{
+            "name":{
+               "en":"About",
+               "hi":"hiAbout",
+               "fr":"frAbout",
+               "ta":null
             }
-          ]
-        }
-      ]
-    }
-  ]
-}
+         },
+         "children":[
+            
+         ]
+      }
+   ],
+   "header_nav":[
+      {
+         "client":1,
+         "location":"header",
+         "nav_type":"page",
+         "page":1,
+         "url":"",
+         "order":1,
+         "hidden":false,
+         "open_in_new_tab":false,
+         "translations":{
+            "name":{
+               "en":"home2",
+               "hi":"hihome2",
+               "fr":"frhome2",
+               "ta":null
+            }
+         },
+         "href":"home",
+         "children":[
+            
+         ]
+      },
+      {
+         "client":1,
+         "location":"header",
+         "nav_type":"page",
+         "page":2,
+         "url":"",
+         "order":2,
+         "hidden":false,
+         "open_in_new_tab":false,
+         "translations":{
+            "name":{
+               "en":"about2",
+               "hi":"hiabout2",
+               "fr":"frabout2",
+               "ta":null
+            }
+         },
+         "href":"about",
+         "children":[
+            
+         ]
+      }
+   ],
 {% endcomment %}

@@ -1,5 +1,5 @@
 from modeltranslation.translator import register, TranslationOptions
-from .models import GlobalVal, Client, Theme, Page
+from .models import GlobalVal, Client, Theme, Page, NavItem
 
 @register(GlobalVal)
 class GlobalValTranslationOptions(TranslationOptions):
@@ -20,6 +20,12 @@ class ThemeTranslationOptions(TranslationOptions):
 
 @register(Page)
 class PageTranslationOptions(TranslationOptions):
+    fields = ('name', )
+    # optional: set a required_languages constraint
+    required_languages = ('en',)    
+
+@register(NavItem)
+class NavItemTranslationOptions(TranslationOptions):
     fields = ('name', )
     # optional: set a required_languages constraint
     required_languages = ('en',)    
