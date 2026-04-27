@@ -7,7 +7,7 @@ from modeltranslation.admin import TranslationAdmin, TranslationTabularInline, T
 from .forms import ClientForm, CustomerSignupForm, ClientUserProfileForm, CustomerProfileForm
 from django.conf import settings
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin # admin-sortable2
-from .admin_mixins import ClientScopedMixin, _user_has_admin_role
+from .xxadmin_mixins import ClientScopedMixin, _user_has_admin_role
 # Register your models here.
 from .models import GlobalValCat, GlobalVal, ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
 
