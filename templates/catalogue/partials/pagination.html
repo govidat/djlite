@@ -1,0 +1,40 @@
+<!-- ============================================================
+FILE: templates/catalogue/partials/pagination.html
+HTMX pagination — updates #items-container
+============================================================ -->
+{% if catalogue.pagination.num_pages > 1 %}
+<div class="flex justify-center mt-6">
+  <div class="join">
+
+    <!-- Previous -->
+    {% if catalogue.pagination.has_prev %}
+    <button class="join-item btn btn-sm"
+            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}?page={{ catalogue.pagination.prev_page }}&{{ request.GET.urlencode }}"
+            hx-target="#items-container"
+            hx-swap="innerHTML">
+      «
+    </button>
+    {% else %}
+    <button class="join-item btn btn-sm btn-disabled">«</button>
+    {% endif %}
+
+    <!-- Page indicator -->
+    <button class="join-item btn btn-sm btn-active">
+      {{ catalogue.pagination.page }} / {{ catalogue.pagination.num_pages }}
+    </button>
+
+    <!-- Next -->
+    {% if catalogue.pagination.has_next %}
+    <button class="join-item btn btn-sm"
+            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}?page={{ catalogue.pagination.next_page }}&{{ request.GET.urlencode }}"
+            hx-target="#items-container"
+            hx-swap="innerHTML">
+      »
+    </button>
+    {% else %}
+    <button class="join-item btn btn-sm btn-disabled">»</button>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}

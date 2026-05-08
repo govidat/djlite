@@ -1,0 +1,79 @@
+<!-- ============================================================
+FILE: templates/catalogue/partials/items_list.html
+HTMX target — returned by catalogue_filter view.
+Contains item grid + pagination.
+============================================================ -->
+<!-- {load dict_filters } -->
+
+<!-- Item count and view toggle -->
+<div class="flex items-center justify-between mb-4">
+  <p class="text-sm text-base-content/60">
+    Showing {{ catalogue.pagination.page }} of {{ catalogue.pagination.num_pages }} pages
+    ({{ catalogue.pagination.total_count }} items)
+  </p>
+
+  <!-- View toggle: grid / list -->
+  <div class="btn-group">
+    <button class="btn btn-sm btn-outline btn-active" id="grid-btn"
+            onclick="setView('grid')">
+      ⊞ Grid
+    </button>
+    <button class="btn btn-sm btn-outline" id="list-btn"
+            onclick="setView('list')">
+      ☰ List
+    </button>
+  </div>
+</div>
+
+<!-- Items grid -->
+<div id="items-grid"
+     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+  {% for item in catalogue.items %}
+    {% include "catalogue/partials/item_card.html" with item=item %}
+  {% empty %}
+    <div class="col-span-full text-center py-16 text-base-content/50">
+      <div class="text-5xl mb-4">🔍</div>
+      <p class="text-lg">No items found matching your filters.</p>
+      <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+         class="btn btn-outline btn-sm mt-4">
+        Clear filters
+      </a>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% include "catalogue/partials/pagination.html" %}
+
+<script>
+function setView(mode) {
+  const grid    = document.getElementById('items-grid');
+  const gridBtn = document.getElementById('grid-btn');
+  const listBtn = document.getElementById('list-btn');
+
+  if (!grid) return;
+
+  if (mode === 'list') {
+    grid.className = grid.className
+      .replace('sm:grid-cols-2', '')
+      .replace('lg:grid-cols-3', '')
+      .replace('xl:grid-cols-4', '');
+    gridBtn.classList.remove('btn-active');
+    listBtn.classList.add('btn-active');
+    localStorage.setItem('catalogue-view', 'list');
+  } else {
+    if (!grid.className.includes('sm:grid-cols-2')) {
+      grid.className += ' sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+    }
+    gridBtn.classList.add('btn-active');
+    listBtn.classList.remove('btn-active');
+    localStorage.setItem('catalogue-view', 'grid');
+  }
+}
+
+// Restore last view preference on load
+document.addEventListener('DOMContentLoaded', function() {
+  const saved = localStorage.getItem('catalogue-view');
+  if (saved === 'list') setView('list');
+});
+</script>

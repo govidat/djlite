@@ -175,11 +175,91 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] Celery + Redis: background jobs for bulk product import (CSV)
 - [ ] Split `models.py` into `models/` package (required before this phase)
 
+
+## Phase 2 — Item Catalogue (Implementation Plan)
+ 
+### Sprint 2.1 — Models and Migration
+- [ ] Create `mysite/models/catalogue.py` with `Taxonomy`, `TaxonomyNode`,
+      `Item`, `ItemTaxonomyNode`, `ItemImage`, `ItemVariant`
+- [ ] Add to `mysite/models/__init__.py`
+- [ ] Register translatable fields in `translation.py`:
+      `Taxonomy.name`, `TaxonomyNode.name`, `Item.name`, `Item.description`
+- [ ] `python manage.py makemigrations`
+- [ ] Add PostgreSQL GIN index and path index via `RunSQL` in migration
+- [ ] `python manage.py migrate`
+- [ ] `python manage.py check` — 0 issues
+### Sprint 2.2 — Admin
+- [ ] Create `mysite/admin/catalogue.py`:
+      `TaxonomyAdmin` (with `TaxonomyNodeInline`),
+      `ItemAdmin` (with `ItemTaxonomyNodeInline`, `ItemImageInline`, `ItemVariantInline`)
+- [ ] Register in `mysite/admin/__init__.py`
+- [ ] Verify admin renders correctly for all models
+### Sprint 2.3 — Query Layer
+- [ ] Create `utils/catalogue_queries.py`:
+      `get_resolved_taxonomies()`, `get_taxonomy_tree()`,
+      `get_item_queryset()`, `build_catalogue_payload()`,
+      `get_facet_counts()`, `paginate_items()`
+- [ ] Unit test: global item overridden by client item of same `item_id`
+- [ ] Unit test: subtree filter includes descendants
+- [ ] Unit test: JSONB attribute filter
+### Sprint 2.4 — Views and URLs
+- [ ] Create `mysite/views/catalogue.py`:
+      `catalogue_page`, `catalogue_filter`, `item_detail`
+- [ ] Add to `mysite/views/__init__.py`
+- [ ] Wire URLs in `mydj/urls.py` BEFORE `<str:client_id>/<str:page>/` catch-all
+- [ ] Add `django-htmx` to `requirements.txt` and `MIDDLEWARE`
+### Sprint 2.5 — Templates
+- [ ] `templates/catalogue/page_catalogue.html` (Track B full page)
+- [ ] `templates/catalogue/page_catalogue_html.html` (Track A wrapper)
+- [ ] `templates/catalogue/partials/filter_sidebar.html`
+- [ ] `templates/catalogue/partials/filter_node.html` (recursive)
+- [ ] `templates/catalogue/partials/items_list.html` (HTMX target)
+- [ ] `templates/catalogue/partials/item_card.html`
+- [ ] `templates/catalogue/partials/pagination.html`
+- [ ] `templates/catalogue/item_detail.html`
+- [ ] Add `dict_filters.get_item` to templatetags if not already present
+### Sprint 2.6 — Cache and Signals
+- [ ] Add `Taxonomy`, `TaxonomyNode` to signal invalidation
+- [ ] Add `invalidate_taxonomy_cache()` handler using `delete_pattern`
+      (Redis) or manual key loop (LocMemCache dev)
+- [ ] Verify taxonomy tree cache invalidates on node save
+### Sprint 2.7 — Sample Data and Testing
+- [ ] Create `management/commands/load_sample_products.py`
+- [ ] Run: `python manage.py load_sample_products bahushira`
+- [ ] End-to-end test: visit `/{client_id}/catalogue/`
+- [ ] Test HTMX filter: click category checkbox → items update without reload
+- [ ] Test pagination: next/prev updates items without reload
+- [ ] Test item detail: `/{client_id}/catalogue/tshirt-001/`
+- [ ] Test language switch: item names render in active language
+- [ ] Test global/client override: global item suppressed by client item
+### Sprint 2.8 — Production Hardening
+- [ ] Deploy to PaaS with PostgreSQL
+- [ ] Verify GIN index is active: `EXPLAIN ANALYZE` on attributes filter
+- [ ] Verify path index is active: `EXPLAIN ANALYZE` on subtree query
+- [ ] Load test: 20k items, 50 concurrent filter requests
+
+### Sprint 2.9 (Authorization) added:
+- [ ] Superuser-only GlobalItem admin
+- [ ] ClientAdmin can select from GlobalItems but not create them
+- [ ] TaxonomyNode (client=None) admin restricted to superuser
+---
+ 
+## Open Decisions (Phase 2)
+ 
+| Decision | Options | Target |
+|----------|---------|--------|
+| HTMX adoption | Confirmed for catalogue filters + pagination | Sprint 2.4 |
+| Media file storage | PaaS volume (Phase 2) → S3/Cloudflare R2 (Phase 2.8) | Sprint 2.8 |
+| Bulk import | CSV management command | Sprint 2.7 |
+| Search | `icontains` (Phase 2) → PostgreSQL full-text (Phase 3) | Phase 3 |
+
+
 ---
 
 ## Phase 3 — eCommerce
 
 **Goal**: Customers can purchase products. Clients can manage orders.
+Phase 3 commerce models are Beckn schema-aligned. Full Beckn network participation (BPP role, async callbacks, digital signatures, ONDC registry) is Phase 4.
 
 ### Key Deliverables
 - [ ] `Cart` and `CartItem`: session-based for anonymous, DB-persisted for logged-in customers

@@ -15,14 +15,14 @@ class Page(models.Model):
         )    
     page_id = LowercaseCharField(max_length=10)  
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
-    order = models.PositiveIntegerField(default=0)
-    parent = models.ForeignKey("self", null=True, blank=True, related_name="children",
-        on_delete=models.CASCADE
-    )
+    #order = models.PositiveIntegerField(default=0)
+    #parent = models.ForeignKey("self", null=True, blank=True, related_name="children",
+    #    on_delete=models.CASCADE
+    #)
     hidden = models.BooleanField(default=False)  
     #gentextblocks = GenericRelation(GentextBlock)
     # Translatable fields
-    name = models.CharField(max_length=40, blank=True, null=True)
+    #name = models.CharField(max_length=40, blank=True, null=True)
 
     def __str__(self):
         return f"{self.client.client_id} / {self.page_id}"
@@ -30,9 +30,9 @@ class Page(models.Model):
     # for usage in Admin Panel
     class Meta:
         unique_together = ("client", "page_id")
-        ordering = ["client", "order"]
+        ordering = ["client"]
         indexes = [
-            models.Index(fields=["client", "order"]),
+            models.Index(fields=["client"]),
         ]
         verbose_name = "00-03-02 Page"
 
@@ -68,7 +68,7 @@ class NavItem(models.Model):
     url         = models.CharField(max_length=500, blank=True)
 
     # Display
-    name       = LowercaseCharField(max_length=100)   # modeltranslation expands this
+    name       = models.CharField(max_length=100, blank=True)   # modeltranslation blank=True to be present
     order       = models.PositiveIntegerField(default=0)
     hidden      = models.BooleanField(default=False)
     open_in_new_tab = models.BooleanField(default=False)
@@ -101,16 +101,20 @@ class PageContent(models.Model):
         on_delete=models.CASCADE,
         related_name='contents'
     )
-    language_code = LowercaseCharField(max_length=2, blank=False, null=False, default='en')   # stores 'en', 'fr', 'hi' etc.
-    html          = models.TextField()
-
+    #language_code = LowercaseCharField(max_length=2, blank=False, null=False, default='en')   # stores 'en', 'fr', 'hi' etc.
+    #html          = models.TextField()
+    htmlblob      = models.TextField(blank=True) # modeltranslation blank=True to be present
     class Meta:
-        unique_together = ('page', 'language_code')
-        ordering        = ['page', 'language_code']
+        #unique_together = ('page', 'language_code')
+        #ordering        = ['page', 'language_code']
         verbose_name    = '01-02 Page Content (HTML)'
+        ordering = ["page"]
+        indexes = [
+            models.Index(fields=["page"]),
+        ]
 
     def __str__(self):
-        return f"{self.page} / {self.language_code}"
+        return f"Content for {self.page}"
     
 class Layout(models.Model):
     # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.

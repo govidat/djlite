@@ -3,7 +3,7 @@ import nested_admin
 from django.conf import settings
 from django.contrib import admin
 from modeltranslation.admin import TranslationBaseModelAdmin
-
+from .base import BaseAdminInlinecss
 from mysite.models import (GlobalVal)
 
 class GlobalValInline(TranslationBaseModelAdmin, nested_admin.NestedTabularInline):
@@ -16,7 +16,7 @@ class GlobalValInline(TranslationBaseModelAdmin, nested_admin.NestedTabularInlin
 
 
 
-class GlobalValCatAdmin(nested_admin.NestedModelAdmin):
+class GlobalValCatAdmin(nested_admin.NestedModelAdmin, BaseAdminInlinecss):
     inlines     = [GlobalValInline]
     list_display = ('globalvalcat_id',)
     search_fields = ('globalvalcat_id',)

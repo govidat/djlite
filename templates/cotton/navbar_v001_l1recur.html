@@ -35,6 +35,7 @@ Item shape expected (header_nav):
 
     {% else %}
       {% comment " Leaft" %}{% endcomment %} 
+
       {% if item.nav_type == "page" %}
         <li>
           <a href="{% url 'client_page' client.client_id item.href %}"

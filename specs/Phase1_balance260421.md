@@ -11,7 +11,7 @@ Dependencies between sprints are called out explicitly. Items within a sprint ca
 
 ---
 
-## Sprint 1 — Foundation Fixes (Do First, Unblocks Everything Else)
+## Sprint 1 — Foundation Fixes (Do First, Unblocks Everything Else) - DONE
 
 These are not features — they are structural gaps that will cause pain if done late. Do them before any new feature work.
 
@@ -103,7 +103,7 @@ Depends on: Sprint 1 complete.
 
 ---
 
-### 2.1 — 404 handling for unknown client slugs and hidden pages
+### 2.1 — 404 handling for unknown client slugs and hidden pages - ✅ Done
 **Type:** `[fix]` · **Risk:** 🟢 Low
 
 **Current state:** `CustomerProfileMiddleware` catches `Client.DoesNotExist` and sets `request.client = None`, but views do not consistently handle this — they may raise `AttributeError` or return a confusing 500.
@@ -122,7 +122,7 @@ Depends on: Sprint 1 complete.
 
 ---
 
-### 2.2 — Homepage routing
+### 2.2 — Homepage routing - ✅ Done
 **Type:** `[feature]` · **Risk:** 🟢 Low
 
 **Current state:** `/{client_id}/` has a `landing_page` view that renders a generic template with no client context.
@@ -142,7 +142,7 @@ Depends on: Sprint 1 complete.
 
 ---
 
-### 2.3 — Cotton component templates — audit and complete
+### 2.3 — Cotton component templates — audit and complete ✅ Done
 **Type:** `[feature]` · **Risk:** 🟡 Medium
 
 **Steps:**
@@ -162,7 +162,7 @@ Depends on: Sprint 1 complete.
 
 ---
 
-### 2.4 — `django-modeltranslation` — confirm `translation.py` registrations
+### 2.4 — `django-modeltranslation` — confirm `translation.py` registrations ✅ Done
 **Type:** `[fix]` · **Risk:** 🟡 Medium
 
 **Steps:**
@@ -174,6 +174,14 @@ Depends on: Sprint 1 complete.
 **Acceptance criteria:**
 - `Client._meta.get_field('name_en')` does not raise `FieldDoesNotExist`
 - `python manage.py migrate` runs clean with no errors
+
+
+### 2.5 — NavItem model and decoupled navbar ✅ Done
+- `NavItem` model with `get_url()`, modeltranslation on `name`
+- `build_nav_item()` in `common_functions.py` with `href` vs `url` separation
+- `fetch_clientstatic` prefetch updated
+- `navbar_v001_l1recur.html` handles page / url / anchor / label nav_types
+- `page_tree` retained in payload for sitemap use; navbar now driven by `header_nav`
 
 ---
 
@@ -233,7 +241,7 @@ Depends on: Sprint 1 complete.
 
 ---
 
-### 3.3 — `django-admin-sortable2` fully wired
+### 3.3 — `django-admin-sortable2` fully wired ✅ Done
 **Type:** `[fix]` · **Risk:** 🟢 Low
 
 **Steps:**
@@ -247,7 +255,7 @@ Depends on: Sprint 1 complete.
 
 ---
 
-### 3.4 — Resolve `GentextBlock` status
+### 3.4 — Resolve `GentextBlock` status ✅ Done
 **Type:** `[refactor]` · **Risk:** 🟢 Low
 
 **Current state:** `GentextBlock` is defined in `models.py` but commented out of `build_client_payload`. It was the original mechanism for `Client.name` and `Page.name` — now superseded by `django-modeltranslation` fields directly on the model.
@@ -274,7 +282,7 @@ Depends on: Sprint 1 + Sprint 2.3 (cotton templates) complete.
 
 ---
 
-### 4.1 — Language switcher end-to-end
+### 4.1 — Language switcher end-to-end ✅ Done
 **Type:** `[feature]` · **Risk:** 🟡 Medium
 
 **Current state:** `LocaleMiddleware` is in the middleware stack and `LANGUAGES` is configured, but there is no UI for switching language or persisting the selection per customer per client.
@@ -308,7 +316,7 @@ Depends on: Sprint 1 + Sprint 2.3 (cotton templates) complete.
 
 ---
 
-### 4.2 — Theme switcher — clean up POST redirect
+### 4.2 — Theme switcher — clean up POST redirect ✅ Done
 **Type:** `[fix]` · **Risk:** 🟢 Low
 
 **Current state:** `set_theme` works via full-page POST/redirect. The commented-out Datastar implementation was removed. This is acceptable for Phase 1.
@@ -506,6 +514,6 @@ Sprint 5 (Production Hardening)   ←── needs all above
 
 These appeared in Phase 1 milestone checklists but are not blocking a Phase 1 release:
 
-- `models.py` split into `models/` package — manageable as a single file through Phase 1
+
 - Full guardian enforcement on customer-facing views — middleware scoping is sufficient for Phase 1
 - HTMX adoption beyond theme/language switcher — POST/redirect is acceptable for all other forms in Phase 1

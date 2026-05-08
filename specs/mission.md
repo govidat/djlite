@@ -101,3 +101,27 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
 - Pages render correctly on mobile, tablet, and desktop.
 - `fetch_clientstatic()` serves a fully cached payload describing a client's pages, themes, and content tree with no N+1 queries.
 - Deployment to PaaS (Railway / Render) is automated via a single git push.
+
+## Phase 2 Addition — Generic Item Catalogue
+ 
+### 8. Generic Item Catalogue
+- Items are domain-agnostic (`Item` model) — can represent products, projects,
+  songs, or documents. Domain-specific fields go in a `attributes` JSONB field.
+- Items can be **global** (available to all clients) or **client-specific**.
+  Client-specific items override global items of the same `item_id`.
+- Multiple independent hierarchies (Category, Geography, Department, etc.)
+  are supported via a `Taxonomy` / `TaxonomyNode` model using **materialized
+  path** for efficient subtree queries.
+- Items are tagged to taxonomy nodes via `ItemTaxonomyNode` (M2M).
+- Faceted filter sidebar (checkbox per node, HTMX-powered, no page reloads).
+- Catalogue pages support both Track A (raw HTML blob) and Track B
+  (component tree) — same dual-track pattern as regular pages.
+- `ItemVariant` model is included for Phase 3 eCommerce readiness.
+  `CartItem` and `OrderItem` will FK to `Item` / `ItemVariant` in Phase 3.
+- Two-tier item catalogue: GlobalItem (superuser, GS1-aligned) + Item (client-derived)
+- GS1 GPC 4-level hierarchy: Segment → Family → Class → Brick
+- Attribute inheritance: TaxonomyNode attrs inherited by items, overridable at item level
+- Client can reference and derive from global items and global taxonomy nodes  
+
+## Phase 3 eCoommerce with Beckn
+Phase 3 eCommerce models are designed to be schema-aligned with Beckn Protocol v2.0. Internal models mirror Beckn's core objects (Order, Fulfillment, Billing, Quotation, Payment) with to_beckn() serializer methods on each. This makes adding a Beckn network adapter (BPP participation) in Phase 4 a serialization exercise rather than a model redesign. Full Beckn network participation (ONDC integration) is deferred to Phase 4.

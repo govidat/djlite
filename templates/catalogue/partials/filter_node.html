@@ -1,0 +1,96 @@
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_node.html
+Recursive taxonomy node checkbox.
+hx-include="#filter-form" captures ALL filter inputs at once.
+============================================================ -->
+{% comment %}
+  Input: node            — {id, slug, name, depth, children, count}
+  Input: active_node_ids — list of currently active node PKs (integers)
+  Input: counts          — dict of node_id → item count
+  Input: taxonomy_slug   — slug of parent taxonomy (for recursion context)
+{% endcomment %}
+
+<li class="{% if node.depth > 0 %}pl-{{ node.depth|add:node.depth }}{% endif %}">
+  <label class="flex items-center gap-2 cursor-pointer py-1 hover:text-primary">
+    <input
+      type="checkbox"
+      name="node"
+      value="{{ node.id }}"
+      class="checkbox checkbox-sm checkbox-primary"
+      {% if node.id in active_node_ids %}checked{% endif %}
+      hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+      hx-target="#items-container"
+      hx-swap="innerHTML"
+      hx-include="#filter-form"
+      hx-trigger="change"
+    >
+    <span class="text-sm flex-1">{{ node.name }}</span>
+    {% if counts %}
+    <span class="badge badge-sm badge-ghost">
+      {{ counts|get_item:node.id|default:0 }}
+    </span>
+    {% endif %}
+  </label>
+
+  <!-- Recurse for children -->
+  {% if node.children %}
+  <ul class="ml-3 space-y-1 mt-1 border-l border-base-300 pl-2">
+    {% for child in node.children %}
+      {% include "catalogue/partials/filter_node.html"
+         with node=child
+         active_node_ids=active_node_ids
+         counts=counts
+         taxonomy_slug=taxonomy_slug %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>
+
+{% comment %}
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_node.html
+Recursive taxonomy node with checkbox.
+Self-includes for children.
+============================================================ -->
+
+<!--   Input: node       — {id, slug, name, depth, children}
+  Input: active_node_ids — list of currently active node PKs
+  Input: counts     — dict of node_id → count -->
+
+
+<li class="{% if node.depth > 0 %}ml-{{ node.depth|add:node.depth }}{% endif %}">
+  <label class="flex items-center gap-2 cursor-pointer py-1 hover:text-primary">
+    <input
+      type="checkbox"
+      name="node"
+      value="{{ node.id }}"
+      class="checkbox checkbox-sm checkbox-primary"
+      {% if node.id in active_node_ids %}checked{% endif %}
+      hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+      hx-target="#items-container"
+      hx-swap="innerHTML"
+      hx-include="[name='node']:checked, [name='q']"
+      hx-trigger="change"
+    >
+    <span class="text-sm flex-1">{{ node.name }}</span>
+    {% if counts %}
+    <span class="badge badge-sm badge-ghost">
+      {{ counts|get_item:node.id|default:0 }}
+    </span>
+    {% endif %}
+  </label>
+
+  <!-- Recurse for children -->
+  {% if node.children %}
+  <ul class="ml-4 space-y-1 mt-1">
+    {% for child in node.children %}
+      {% include "catalogue/partials/filter_node.html"
+         with node=child
+         active_node_ids=active_node_ids
+         counts=counts
+         taxonomy_slug=taxonomy_slug %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>
+{% endcomment %}

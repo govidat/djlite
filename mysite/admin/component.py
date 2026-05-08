@@ -2,6 +2,7 @@ import nested_admin
 from django.conf import settings
 from django import forms
 from mysite.models import (Client, SvgtextbadgeValue, TextstbItem, ComptextBlock, GentextBlock, ComponentSlot, Component)
+from .base import BaseAdminInlinecss
 
 class SvgtextbadgeValueInline(nested_admin.NestedTabularInline):
     model  = SvgtextbadgeValue
@@ -43,7 +44,7 @@ class SvgtextbadgeValueInline(nested_admin.NestedTabularInline):
             )
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
-class TextstbItemInline(nested_admin.NestedGenericStackedInline):
+class TextstbItemInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = TextstbItem
     fields = ("item_id", "ltext", "hidden", "order", "css_class", "svg_text")
     extra = 0
@@ -51,14 +52,14 @@ class TextstbItemInline(nested_admin.NestedGenericStackedInline):
     classes = ['collapse']
 
 
-class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
+class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = ComptextBlock
     #fields = ("block_id", "ltext", "hidden", "order", "css_class")
     extra = 0
     inlines = [TextstbItemInline]
     classes = ['collapse']
 
-class GentextBlockInline(nested_admin.NestedGenericStackedInline):
+class GentextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = GentextBlock
     fields = ("block_id", "ltext", "hidden", "order", "css_class")
     extra = 0
@@ -66,7 +67,7 @@ class GentextBlockInline(nested_admin.NestedGenericStackedInline):
     classes = ['collapse']
 
 
-class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
+class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = ComptextBlock
     extra = 0
     classes = ['collapse']
@@ -75,7 +76,7 @@ class ComptextBlockInline(nested_admin.NestedGenericStackedInline):
 # Option 3 Common Component Model
 # ── Component inlines ─────────────────────────────────────────
 
-class ComponentSlotInline(nested_admin.NestedStackedInline):
+class ComponentSlotInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
     model = ComponentSlot
     fk_name = "component"
     extra = 0
@@ -92,7 +93,7 @@ class ComponentSlotInline(nested_admin.NestedStackedInline):
         js = ("admin/js/component_admin.js",)
 
 
-class ComponentInline(nested_admin.NestedStackedInline):
+class ComponentInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
     model = Component
     extra = 0
     classes = ['collapse']

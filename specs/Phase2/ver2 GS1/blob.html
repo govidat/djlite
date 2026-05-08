@@ -1,0 +1,317 @@
+
+
+
+<!--
+
+The rule going forward for all blobs
+Content typeWhere it livesStatic text, headings, marketing copy, layout chromePageContent blobDjango template tags ({% url %}, {% if %}, {% include %}).html template fileDynamic data (catalogue.items, client.client_id).html template fileHTMX attributes (hx-get, hx-target).html template file
+
+
+    Here is the sample blob. Create a PageContent record: page_id=catalogue, language_code=en:
+  Catalogue page — Track A layout shell.
+  Paste into PageContent (page_id=catalogue, language_code=en).
+
+  This blob provides:
+    - Page hero / header
+    - Two-column layout: filter sidebar + items area
+    - Mobile filter drawer toggle
+    - The items grid and pagination are injected by the template
+      via {% include "catalogue/partials/items_list.html" %}
+      and {% include "catalogue/partials/filter_sidebar.html" %}
+
+  Django template variables available here (from context processors):
+    {{ client.client_id }}
+    {{ client.translations.name }}
+    {{ theme }}
+    {{ user }}
+    {{ request }}
+
+  Catalogue-specific variables (from catalogue_page view context):
+    {{ catalogue.pagination.total_count }}
+    {{ catalogue.filters }}
+    These are also available here since the blob is rendered
+    inside page_catalogue_html.html which has the full context.
+-->
+
+<!--
+  Catalogue page hero — static HTML only.
+  No Django template tags here — those live in page_catalogue_html.html.
+  This blob provides: hero banner and any static marketing copy above the catalogue.
+-->
+
+<section class="bg-primary text-primary-content py-10 px-4">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold mb-2">Our Catalogue</h1>
+        <p class="text-primary-content/80 text-lg">
+          Browse our complete range of products.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="bg-primary text-primary-content py-10 px-4">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <h1 class="text-4xl font-bold mb-2">हमारी सूची</h1>
+        <p class="text-primary-content/80 text-lg">
+          हमारे उत्पादों की पूरी श्रृंखला देखें।
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── BELOW PART IS DEPRECATED ─────────────────────────────────────────────── -->
+
+<div class="min-h-screen bg-base-100">
+
+  <!-- ── Page Hero ─────────────────────────────────────────────── -->
+  <section class="bg-primary text-primary-content py-10 px-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 class="text-4xl font-bold mb-2">Our Catalogue</h1>
+          <p class="text-primary-content/80 text-lg">
+            Browse our complete range of products.
+            {% if catalogue.pagination.total_count %}
+              <span class="font-semibold">
+                {{ catalogue.pagination.total_count }} item{{ catalogue.pagination.total_count|pluralize }} available.
+              </span>
+            {% endif %}
+          </p>
+        </div>
+
+        <!-- Search bar -->
+        <form class="flex gap-2 w-full md:w-96"
+              hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+              hx-target="#items-container"
+              hx-swap="innerHTML"
+              hx-trigger="submit, input delay:600ms from:#cat-search">
+          <input id="cat-search"
+                 type="text"
+                 name="q"
+                 value="{{ catalogue.filters.search|default:'' }}"
+                 placeholder="Search products..."
+                 class="input input-bordered bg-primary-content/10
+                        text-primary-content placeholder-primary-content/50
+                        border-primary-content/30 flex-1">
+          <button type="submit"
+                  class="btn btn-outline text-primary-content
+                         border-primary-content/50
+                         hover:bg-primary-content hover:text-primary">
+            Search
+          </button>
+        </form>
+      </div>
+
+      <!-- Active filter badges -->
+      {% if catalogue.filters.node_ids or catalogue.filters.search %}
+      <div class="flex flex-wrap gap-2 mt-4">
+        {% if catalogue.filters.search %}
+        <div class="badge badge-lg gap-2 bg-primary-content/20 text-primary-content border-0">
+          🔍 "{{ catalogue.filters.search }}"
+          <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+             class="hover:text-error">✕</a>
+        </div>
+        {% endif %}
+        {% if catalogue.filters.node_ids %}
+        <div class="badge badge-lg gap-2 bg-primary-content/20 text-primary-content border-0">
+          Filtered
+          <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+             class="hover:text-error">Clear all ✕</a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ── Main Layout: Sidebar + Content ───────────────────────── -->
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex gap-6">
+
+      <!-- ── Filter Sidebar (desktop) ──────────────────────────── -->
+      <aside class="w-72 shrink-0 hidden lg:block">
+
+        <!-- Sticky sidebar wrapper -->
+        <div class="sticky top-20 space-y-4">
+
+          <!-- Sidebar header -->
+          <div class="flex items-center justify-between">
+            <h2 class="font-bold text-base-content text-lg">Filters</h2>
+            {% if catalogue.filters.node_ids %}
+            <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+               class="text-sm text-error hover:underline">
+              Clear all
+            </a>
+            {% endif %}
+          </div>
+
+          <!-- Dynamic filter sidebar — injected by template -->
+          <div id="filter-sidebar-container">
+            {% include "catalogue/partials/filter_sidebar.html" %}
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- ── Items Area ─────────────────────────────────────────── -->
+      <main class="flex-1 min-w-0">
+
+        <!-- Mobile: filter toggle button -->
+        <div class="flex items-center justify-between mb-4 lg:hidden">
+          <label for="filter-drawer-toggle"
+                 class="btn btn-outline btn-sm gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    stroke-width="2" d="M3 4h18M7 8h10M10 12h4"/>
+            </svg>
+            Filters
+            {% if catalogue.filters.node_ids %}
+            <span class="badge badge-primary badge-sm">
+              {{ catalogue.filters.node_ids|length }}
+            </span>
+            {% endif %}
+          </label>
+
+          <!-- Sort dropdown (Phase 3: wire to view) -->
+          <select class="select select-sm select-bordered"
+                  onchange="window.location.href=this.value">
+            <option value="{% url 'catalogue_page' client_id=client.client_id %}">
+              Sort: Default
+            </option>
+          </select>
+        </div>
+
+        <!-- Items container — HTMX swap target -->
+        <div id="items-container">
+          {% include "catalogue/partials/items_list.html" %}
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ── Mobile Filter Drawer ──────────────────────────────────── -->
+  <input type="checkbox" id="filter-drawer-toggle" class="sr-only peer/drawer">
+  <div class="fixed inset-0 z-40 bg-black/50 opacity-0 pointer-events-none
+              peer-checked/drawer:opacity-100 peer-checked/drawer:pointer-events-auto
+              transition-opacity duration-300 lg:hidden"
+       onclick="document.getElementById('filter-drawer-toggle').checked=false">
+  </div>
+  <div class="fixed top-0 left-0 h-full w-80 bg-base-100 z-50 shadow-2xl
+              -translate-x-full peer-checked/drawer:translate-x-0
+              transition-transform duration-300 overflow-y-auto p-4 lg:hidden">
+
+    <!-- Drawer header -->
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold text-lg">Filters</h2>
+      <label for="filter-drawer-toggle" class="btn btn-ghost btn-sm btn-circle">✕</label>
+    </div>
+
+    <!-- Same filter sidebar inside the drawer -->
+    {% include "catalogue/partials/filter_sidebar.html" %}
+
+  </div>
+
+</div>
+
+
+<!-- Hindi Version -->
+ <div class="min-h-screen bg-base-100">
+
+  <section class="bg-primary text-primary-content py-10 px-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 class="text-4xl font-bold mb-2">हमारी सूची</h1>
+          <p class="text-primary-content/80 text-lg">
+            हमारे उत्पादों की पूरी श्रृंखला देखें।
+            {% if catalogue.pagination.total_count %}
+              <span class="font-semibold">
+                {{ catalogue.pagination.total_count }} उत्पाद उपलब्ध।
+              </span>
+            {% endif %}
+          </p>
+        </div>
+
+        <form class="flex gap-2 w-full md:w-96"
+              hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+              hx-target="#items-container"
+              hx-swap="innerHTML"
+              hx-trigger="submit, input delay:600ms from:#cat-search-hi">
+          <input id="cat-search-hi"
+                 type="text"
+                 name="q"
+                 value="{{ catalogue.filters.search|default:'' }}"
+                 placeholder="उत्पाद खोजें..."
+                 class="input input-bordered bg-primary-content/10
+                        text-primary-content placeholder-primary-content/50
+                        border-primary-content/30 flex-1">
+          <button type="submit"
+                  class="btn btn-outline text-primary-content
+                         border-primary-content/50
+                         hover:bg-primary-content hover:text-primary">
+            खोजें
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex gap-6">
+
+      <aside class="w-72 shrink-0 hidden lg:block">
+        <div class="sticky top-20 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-bold text-base-content text-lg">फ़िल्टर</h2>
+            {% if catalogue.filters.node_ids %}
+            <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+               class="text-sm text-error hover:underline">सभी हटाएं</a>
+            {% endif %}
+          </div>
+          <div id="filter-sidebar-container">
+            {% include "catalogue/partials/filter_sidebar.html" %}
+          </div>
+        </div>
+      </aside>
+
+      <main class="flex-1 min-w-0">
+        <div class="flex items-center justify-between mb-4 lg:hidden">
+          <label for="filter-drawer-toggle-hi"
+                 class="btn btn-outline btn-sm gap-2">
+            फ़िल्टर
+          </label>
+        </div>
+        <div id="items-container">
+          {% include "catalogue/partials/items_list.html" %}
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <input type="checkbox" id="filter-drawer-toggle-hi" class="sr-only peer/drawer-hi">
+  <div class="fixed inset-0 z-40 bg-black/50 opacity-0 pointer-events-none
+              peer-checked/drawer-hi:opacity-100 peer-checked/drawer-hi:pointer-events-auto
+              transition-opacity duration-300 lg:hidden"
+       onclick="document.getElementById('filter-drawer-toggle-hi').checked=false">
+  </div>
+  <div class="fixed top-0 left-0 h-full w-80 bg-base-100 z-50 shadow-2xl
+              -translate-x-full peer-checked/drawer-hi:translate-x-0
+              transition-transform duration-300 overflow-y-auto p-4 lg:hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold text-lg">फ़िल्टर</h2>
+      <label for="filter-drawer-toggle-hi" class="btn btn-ghost btn-sm btn-circle">✕</label>
+    </div>
+    {% include "catalogue/partials/filter_sidebar.html" %}
+  </div>
+
+</div>

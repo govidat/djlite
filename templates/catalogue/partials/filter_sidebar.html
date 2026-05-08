@@ -1,0 +1,213 @@
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_sidebar.html
+Reusable filter sidebar — used in full page and mobile drawer.
+Wrapped in a single <form id="filter-form"> so all checkboxes
+are captured by hx-include="#filter-form" on any checkbox change.
+============================================================ -->
+{% comment %}
+  Input: catalogue.taxonomies — list of {slug, name, tree, attr_types, counts}
+  Input: catalogue.filters.node_ids — currently active node PKs
+  Input: catalogue.filters.brands   — currently active brand names
+{% endcomment %}
+
+{# Single form wrapping ALL filter inputs — this is the hx-include target #}
+<form id="filter-form" class="space-y-6">
+
+  {# Hidden search field so search term is preserved on filter change #}
+  <input type="hidden" name="q" value="{{ catalogue.filters.search|default:'' }}">
+
+  <!-- Mobile: close button -->
+  <div class="flex items-center justify-between lg:hidden">
+    <h2 class="font-semibold text-base-content">Filters</h2>
+    <button type="button"
+            class="btn btn-ghost btn-sm"
+            onclick="document.getElementById('filter-drawer-toggle').checked=false">
+      ✕
+    </button>
+  </div>
+
+  <!-- Clear all filters -->
+  {% if catalogue.filters.node_ids or catalogue.filters.search or catalogue.filters.brands %}
+  <div>
+    <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+       class="btn btn-outline btn-sm btn-error w-full">
+      Clear All Filters
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Results count -->
+  <div class="text-sm text-base-content/60">
+    {{ catalogue.pagination.total_count }}
+    item{{ catalogue.pagination.total_count|pluralize }}
+  </div>
+
+  <!-- ── Taxonomy node filters ────────────────────────────────── -->
+  {% for taxonomy in catalogue.taxonomies %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm text-base-content">
+      {{ taxonomy.name }}
+    </div>
+    <div class="collapse-content pt-2">
+      <ul class="space-y-1">
+        {% for node in taxonomy.tree %}
+          {% include "catalogue/partials/filter_node.html"
+             with node=node
+             active_node_ids=catalogue.filters.node_ids
+             counts=taxonomy.counts
+             taxonomy_slug=taxonomy.slug %}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- ── Attribute value filters ──────────────────────────────── -->
+  {% for taxonomy in catalogue.taxonomies %}
+    {% if taxonomy.attr_types %}
+    <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+      <input type="checkbox" checked />
+      <div class="collapse-title font-semibold text-sm text-base-content">
+        Attributes
+      </div>
+      <div class="collapse-content space-y-4 pt-2">
+        {% for attr in taxonomy.attr_types %}
+        {% if attr.values %}
+        <div>
+          <p class="text-xs font-semibold text-base-content/60 uppercase mb-2">
+            {{ attr.name }}
+          </p>
+          <ul class="space-y-1">
+            {% for val in attr.values %}
+            <li>
+              <label class="flex items-center gap-2 cursor-pointer
+                            py-0.5 hover:text-primary">
+                <input
+                  type="checkbox"
+                  name="attr_val_{{ attr.id }}"
+                  value="{{ val.id }}"
+                  class="checkbox checkbox-xs checkbox-primary"
+                  hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                  hx-target="#items-container"
+                  hx-swap="innerHTML"
+                  hx-include="#filter-form"
+                  hx-trigger="change"
+                >
+                <span class="text-sm">{{ val.name }}</span>
+              </label>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  {% comment "" %}
+  <!-- ── Brand filter ─────────────────────────────────────────── -->
+  {% if catalogue.brands %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm text-base-content">
+      Brand
+    </div>
+    <div class="collapse-content pt-2">
+      <ul class="space-y-1">
+        {% for brand in catalogue.brands %}
+        <li>
+          <label class="flex items-center gap-2 cursor-pointer
+                        py-1 hover:text-primary">
+            <input
+              type="checkbox"
+              name="brand"
+              value="{{ brand.name }}"
+              class="checkbox checkbox-sm checkbox-primary"
+              {% if brand.name in catalogue.filters.brands %}checked{% endif %}
+              hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+              hx-target="#items-container"
+              hx-swap="innerHTML"
+              hx-include="#filter-form"
+              hx-trigger="change"
+            >
+            <span class="text-sm flex-1">{{ brand.name }}</span>
+            <span class="badge badge-sm badge-ghost">
+              {{ brand.count }}
+            </span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+  {% endcomment %}
+</form>
+{# End #filter-form — every hx-include="#filter-form" above captures #}
+{# ALL inputs in this form: node checkboxes, attr_val checkboxes,   #}
+{# brand checkboxes, and the hidden q field.                         #}
+
+
+{% comment %}
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_sidebar.html
+Reusable filter sidebar — used in full page and mobile drawer
+HTMX: filters update #items-container on change
+============================================================ -->
+
+<!--   Input: catalogue.taxonomies — list of {slug, name, tree, counts} -->
+<!--   Input: catalogue.filters.node_ids — currently active node PKs -->
+
+
+<div class="space-y-6">
+
+  <!-- Mobile: close button (shown only in drawer) -->
+  <div class="flex items-center justify-between lg:hidden">
+    <h2 class="font-semibold text-base-content">Filters</h2>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('filter-drawer').checked=false">
+      ✕
+    </button>
+  </div>
+
+  <!-- Clear all filters -->
+  {% if catalogue.filters.node_ids or catalogue.filters.search %}
+  <div>
+    <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+       class="btn btn-outline btn-sm btn-error w-full">
+      Clear All Filters
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Results count -->
+  <div class="text-sm text-base-content/60">
+    {{ catalogue.pagination.total_count }} item{{ catalogue.pagination.total_count|pluralize }}
+  </div>
+
+  <!-- Taxonomy filters -->
+  {% for taxonomy in catalogue.taxonomies %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm text-base-content">
+      {{ taxonomy.name }}
+    </div>
+    <div class="collapse-content">
+      <ul class="space-y-1">
+        {% for node in taxonomy.tree %}
+          {% include "catalogue/partials/filter_node.html"
+             with node=node
+             active_node_ids=catalogue.filters.node_ids
+             counts=taxonomy.counts
+             taxonomy_slug=taxonomy.slug %}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+{% endcomment %}

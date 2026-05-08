@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "widget_tweaks", # allauth ui
     "slippers", # allauth ui
     "guardian", # client level authorization
+    "django_htmx",
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 
@@ -84,6 +85,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'allauth.account.middleware.AccountMiddleware',     # allauth
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django_htmx.middleware.HtmxMiddleware",
 ]
 
 #if DEBUG:   # tailwind

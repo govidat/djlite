@@ -1,3 +1,5 @@
+# mysite/views/main.py
+
 from django.views.generic import TemplateView
 from django.shortcuts import render, redirect
 from django.http import Http404
@@ -33,9 +35,9 @@ class ClientPageView(TemplateView):
 
         #return super().get(request, *args, **kwargs)
         # ── Track A: check for raw HTML content first ─────────────
-        active_lang = get_language() or settings.LANGUAGE_CODE
+        #active_lang = get_language() or settings.LANGUAGE_CODE
         raw_html = self._resolve_page_content(
-            client_obj, page_id, active_lang
+            client_obj, page_id, #active_lang
         )
 
         if raw_html is not None:
@@ -47,13 +49,57 @@ class ClientPageView(TemplateView):
 
         # ── Track B: component tree (cotton templates) ────────────
         return super().get(request, *args, **kwargs)
+    
+    # This is specifically kept page wise lookup as teh blob values of pages may be largeg and there is no need to bring all the values into memory
+    def _resolve_page_content(self, client_obj, page_id):
+        #Returns translated htmlblob for the page.
+        #Fallback handled automatically by django-modeltranslation.
 
+        from mysite.models import PageContent
+
+        content = (
+            PageContent.objects
+            .select_related('page')
+            .filter(
+                page__client=client_obj,
+                page__page_id=page_id
+            )
+            .first()
+        )
+
+        if not content:
+            return None
+
+        return content.htmlblob or None
+    """
     def _resolve_page_content(self, client_obj, page_id, active_lang):
-        """
-        Returns the HTML string for the best available language match,
-        or None if no PageContent exists for this page.
-        Priority: active_lang → 'en' → first available row
-        """
+        
+        #Returns translated htmlblob for the page.
+        #Fallback handled automatically by django-modeltranslation.
+        
+        from mysite.models import Page, PageContent
+
+        try:
+            page_obj = Page.objects.get(
+                client=client_obj,
+                page_id=page_id
+            )
+        except Page.DoesNotExist:
+            return None
+
+        try:
+            content = PageContent.objects.get(page=page_obj)
+        except PageContent.DoesNotExist:
+            return None
+
+        return content.htmlblob or None
+    
+    def _resolve_page_content(self, client_obj, page_id, active_lang):
+        
+        #Returns the HTML string for the best available language match,
+        #or None if no PageContent exists for this page.
+        #Priority: active_lang → 'en' → first available row
+        
         from mysite.models import Page, PageContent
 
         try:
@@ -82,7 +128,7 @@ class ClientPageView(TemplateView):
             or content_map.get('en')
             or contents[0]['html']   # first available
         )        
-
+    """
 
 def landing_page(request):
     """

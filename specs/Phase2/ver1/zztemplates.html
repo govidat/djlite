@@ -1,0 +1,470 @@
+<!-- ============================================================
+FILE: templates/catalogue/page_catalogue.html
+Track B — component tree layout (extends base.html)
+============================================================ -->
+{% extends "base.html" %}
+{% load my_tags %}
+
+{% block content %}
+<div class="flex min-h-screen bg-base-100">
+
+  <!-- ── Filter Sidebar ─────────────────────────────────────── -->
+  <aside class="w-64 shrink-0 border-r border-base-300 p-4 hidden lg:block">
+    {% include "catalogue/partials/filter_sidebar.html" %}
+  </aside>
+
+  <!-- ── Main Content ───────────────────────────────────────── -->
+  <main class="flex-1 p-4 lg:p-6">
+
+    <!-- Search bar -->
+    <div class="mb-6">
+      <form hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+            hx-target="#items-container"
+            hx-swap="innerHTML"
+            hx-trigger="submit, input delay:500ms from:#search-input"
+            class="flex gap-2">
+        <input id="search-input"
+               type="text"
+               name="q"
+               value="{{ catalogue.filters.search|default:'' }}"
+               placeholder="Search items..."
+               class="input input-bordered flex-1">
+        <button type="submit" class="btn btn-primary">Search</button>
+      </form>
+    </div>
+
+    <!-- Items container — HTMX target -->
+    <div id="items-container">
+      {% include "catalogue/partials/items_list.html" %}
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+ 
+
+<!-- ============================================================
+FILE: templates/catalogue/page_catalogue_html.html
+Track A — wraps raw HTML blob but injects catalogue data
+============================================================ -->
+<!-- Note: save this as a separate file -->
+{% comment %}
+{% extends "base.html" %}
+{% block content %}
+  {% if raw_html %}
+    {{ raw_html|safe }}
+  {% endif %}
+  <!-- Catalogue data injected below the raw HTML -->
+  <div id="items-container" class="p-4">
+    {% include "catalogue/partials/items_list.html" %}
+  </div>
+{% endblock %}
+{% endcomment %}
+
+
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_sidebar.html
+Reusable filter sidebar — used in full page and mobile drawer
+HTMX: filters update #items-container on change
+============================================================ -->
+{% comment %}
+  Input: catalogue.taxonomies — list of {slug, name, tree, counts}
+  Input: catalogue.filters.node_ids — currently active node PKs
+{% endcomment %}
+
+<div class="space-y-6">
+
+  <!-- Mobile: close button (shown only in drawer) -->
+  <div class="flex items-center justify-between lg:hidden">
+    <h2 class="font-semibold text-base-content">Filters</h2>
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('filter-drawer').checked=false">
+      ✕
+    </button>
+  </div>
+
+  <!-- Clear all filters -->
+  {% if catalogue.filters.node_ids or catalogue.filters.search %}
+  <div>
+    <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+       class="btn btn-outline btn-sm btn-error w-full">
+      Clear All Filters
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Results count -->
+  <div class="text-sm text-base-content/60">
+    {{ catalogue.pagination.total_count }} item{{ catalogue.pagination.total_count|pluralize }}
+  </div>
+
+  <!-- Taxonomy filters -->
+  {% for taxonomy in catalogue.taxonomies %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm text-base-content">
+      {{ taxonomy.name }}
+    </div>
+    <div class="collapse-content">
+      <ul class="space-y-1">
+        {% for node in taxonomy.tree %}
+          {% include "catalogue/partials/filter_node.html"
+             with node=node
+             active_node_ids=catalogue.filters.node_ids
+             counts=taxonomy.counts
+             taxonomy_slug=taxonomy.slug %}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_node.html
+Recursive taxonomy node with checkbox.
+Self-includes for children.
+============================================================ -->
+{% comment %}
+  Input: node       — {id, slug, name, depth, children}
+  Input: active_node_ids — list of currently active node PKs
+  Input: counts     — dict of node_id → count
+{% endcomment %}
+
+<li class="{% if node.depth > 0 %}ml-{{ node.depth|add:node.depth }}{% endif %}">
+  <label class="flex items-center gap-2 cursor-pointer py-1 hover:text-primary">
+    <input
+      type="checkbox"
+      name="node"
+      value="{{ node.id }}"
+      class="checkbox checkbox-sm checkbox-primary"
+      {% if node.id in active_node_ids %}checked{% endif %}
+      hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+      hx-target="#items-container"
+      hx-swap="innerHTML"
+      hx-include="[name='node']:checked, [name='q']"
+      hx-trigger="change"
+    >
+    <span class="text-sm flex-1">{{ node.name }}</span>
+    {% if counts %}
+    <span class="badge badge-sm badge-ghost">
+      {{ counts|get_item:node.id|default:0 }}
+    </span>
+    {% endif %}
+  </label>
+
+  <!-- Recurse for children -->
+  {% if node.children %}
+  <ul class="ml-4 space-y-1 mt-1">
+    {% for child in node.children %}
+      {% include "catalogue/partials/filter_node.html"
+         with node=child
+         active_node_ids=active_node_ids
+         counts=counts
+         taxonomy_slug=taxonomy_slug %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>
+
+
+<!-- ============================================================
+FILE: templates/catalogue/partials/items_list.html
+HTMX target — returned by catalogue_filter view.
+Contains item grid + pagination.
+============================================================ -->
+{% load dict_filters %}
+
+<!-- Item count and view toggle -->
+<div class="flex items-center justify-between mb-4">
+  <p class="text-sm text-base-content/60">
+    Showing {{ catalogue.pagination.page }} of {{ catalogue.pagination.num_pages }} pages
+    ({{ catalogue.pagination.total_count }} items)
+  </p>
+
+  <!-- View toggle: grid / list -->
+  <div class="btn-group">
+    <button class="btn btn-sm btn-outline btn-active" id="grid-btn"
+            onclick="setView('grid')">
+      ⊞ Grid
+    </button>
+    <button class="btn btn-sm btn-outline" id="list-btn"
+            onclick="setView('list')">
+      ☰ List
+    </button>
+  </div>
+</div>
+
+<!-- Items grid -->
+<div id="items-grid"
+     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+  {% for item in catalogue.items %}
+    {% include "catalogue/partials/item_card.html" with item=item %}
+  {% empty %}
+    <div class="col-span-full text-center py-16 text-base-content/50">
+      <div class="text-5xl mb-4">🔍</div>
+      <p class="text-lg">No items found matching your filters.</p>
+      <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+         class="btn btn-outline btn-sm mt-4">
+        Clear filters
+      </a>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% include "catalogue/partials/pagination.html" %}
+
+
+<!-- ============================================================
+FILE: templates/catalogue/partials/item_card.html
+Single item card — used in grid view.
+Phase 3: add "Add to Cart" button here.
+============================================================ -->
+{% comment %}
+  Input: item — serialised item dict from _serialize_item()
+{% endcomment %}
+
+<div class="card bg-base-100 border border-base-300 hover:shadow-md
+            transition-shadow duration-200 cursor-pointer group">
+
+  <!-- Image -->
+  <a href="{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}">
+    <figure class="aspect-square overflow-hidden bg-base-200 rounded-t-2xl">
+      {% if item.image_url %}
+        <img src="{{ item.image_url }}"
+             alt="{{ item.image_alt|default:item.name }}"
+             class="w-full h-full object-cover
+                    group-hover:scale-105 transition-transform duration-300"
+             loading="lazy">
+      {% else %}
+        <div class="w-full h-full flex items-center justify-center
+                    text-base-content/30 text-4xl">
+          📦
+        </div>
+      {% endif %}
+    </figure>
+  </a>
+
+  <div class="card-body p-4">
+
+    <!-- Name -->
+    <a href="{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}"
+       class="card-title text-sm font-semibold text-base-content
+              hover:text-primary line-clamp-2">
+      {{ item.name }}
+    </a>
+
+    <!-- SKU -->
+    {% if item.sku %}
+    <p class="text-xs text-base-content/40 font-mono">{{ item.sku }}</p>
+    {% endif %}
+
+    <!-- Price (Phase 3: replace with proper price model) -->
+    {% if item.price %}
+    <p class="text-lg font-bold text-primary">
+      {{ item.currency }} {{ item.price }}
+    </p>
+    {% endif %}
+
+    <!-- Phase 3: Add to Cart button placeholder -->
+    <div class="card-actions justify-end mt-2">
+      <a href="{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}"
+         class="btn btn-primary btn-sm w-full">
+        View Details
+      </a>
+      {# Phase 3: replace with:
+      <button class="btn btn-primary btn-sm w-full"
+              hx-post="{% url 'cart_add' client_id=client.client_id item_id=item.item_id %}"
+              hx-target="#cart-count"
+              hx-swap="innerHTML">
+        Add to Cart
+      </button>
+      #}
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ============================================================
+FILE: templates/catalogue/partials/pagination.html
+HTMX pagination — updates #items-container
+============================================================ -->
+{% if catalogue.pagination.num_pages > 1 %}
+<div class="flex justify-center mt-6">
+  <div class="join">
+
+    <!-- Previous -->
+    {% if catalogue.pagination.has_prev %}
+    <button class="join-item btn btn-sm"
+            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}?page={{ catalogue.pagination.prev_page }}&{{ request.GET.urlencode }}"
+            hx-target="#items-container"
+            hx-swap="innerHTML">
+      «
+    </button>
+    {% else %}
+    <button class="join-item btn btn-sm btn-disabled">«</button>
+    {% endif %}
+
+    <!-- Page indicator -->
+    <button class="join-item btn btn-sm btn-active">
+      {{ catalogue.pagination.page }} / {{ catalogue.pagination.num_pages }}
+    </button>
+
+    <!-- Next -->
+    {% if catalogue.pagination.has_next %}
+    <button class="join-item btn btn-sm"
+            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}?page={{ catalogue.pagination.next_page }}&{{ request.GET.urlencode }}"
+            hx-target="#items-container"
+            hx-swap="innerHTML">
+      »
+    </button>
+    {% else %}
+    <button class="join-item btn btn-sm btn-disabled">»</button>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ============================================================
+FILE: templates/catalogue/item_detail.html
+Item detail page. Phase 3: add variant + cart here.
+============================================================ -->
+{% comment %}
+Extends base.html.
+Input: item, images, variants
+{% endcomment %}
+
+<!-- NOTE: In actual file, add {% extends "base.html" %} at top -->
+<!-- and wrap in {% block content %}...{% endblock %} -->
+
+<div class="max-w-5xl mx-auto px-4 py-8">
+  <div class="flex flex-col md:flex-row gap-8">
+
+    <!-- Images -->
+    <div class="md:w-1/2">
+      {% if images %}
+        <figure class="aspect-square bg-base-200 rounded-2xl overflow-hidden mb-4">
+          <img src="{{ images.0.image_url }}"
+               alt="{{ images.0.alt|default:item.name }}"
+               class="w-full h-full object-cover"
+               id="main-image">
+        </figure>
+        {% if images|length > 1 %}
+        <div class="flex gap-2 overflow-x-auto">
+          {% for img in images %}
+          <img src="{{ img.image_url }}"
+               alt="{{ img.alt }}"
+               class="w-16 h-16 object-cover rounded-lg cursor-pointer
+                      border-2 border-transparent hover:border-primary"
+               onclick="document.getElementById('main-image').src='{{ img.image_url }}'">
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% elif item.image_url %}
+        <figure class="aspect-square bg-base-200 rounded-2xl overflow-hidden">
+          <img src="{{ item.image_url }}" alt="{{ item.image_alt|default:item.name }}"
+               class="w-full h-full object-cover">
+        </figure>
+      {% endif %}
+    </div>
+
+    <!-- Details -->
+    <div class="md:w-1/2 space-y-4">
+      <h1 class="text-3xl font-bold text-base-content">{{ item.name }}</h1>
+
+      {% if item.attributes.sku %}
+      <p class="text-sm text-base-content/40 font-mono">
+        SKU: {{ item.attributes.sku }}
+      </p>
+      {% endif %}
+
+      {% if item.attributes.price %}
+      <p class="text-3xl font-bold text-primary">
+        {{ item.attributes.currency|default:"INR" }} {{ item.attributes.price }}
+      </p>
+      {% endif %}
+
+      <!-- Description -->
+      {% if item.description %}
+      <div class="prose text-base-content/80 max-w-none">
+        <p>{{ item.description }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Variants (Phase 3: add selection + cart) -->
+      {% if variants %}
+      <div class="space-y-2">
+        <p class="font-semibold text-sm">Options:</p>
+        <div class="flex flex-wrap gap-2">
+          {% for variant in variants %}
+          <label class="cursor-pointer">
+            <input type="radio" name="variant" value="{{ variant.variant_id }}"
+                   class="sr-only peer" {% if forloop.first %}checked{% endif %}>
+            <span class="btn btn-sm btn-outline peer-checked:btn-primary">
+              {{ variant.name }}
+              {% if variant.price %}
+                ({{ variant.price }})
+              {% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Phase 3: Add to Cart -->
+      <div class="pt-4">
+        {# Phase 3 placeholder — replace with HTMX cart form #}
+        <button class="btn btn-primary w-full" disabled>
+          Add to Cart (Coming Soon)
+        </button>
+      </div>
+
+      <!-- Attributes table -->
+      {% if item.attributes %}
+      <div class="collapse collapse-arrow border border-base-300 rounded-lg mt-4">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold text-sm">Specifications</div>
+        <div class="collapse-content">
+          <table class="table table-sm w-full">
+            {% for key, value in item.attributes.items %}
+            {% if key not in "price,currency,sku" %}
+            <tr>
+              <td class="text-base-content/60 capitalize w-1/3">{{ key }}</td>
+              <td class="font-medium">{{ value }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<script>
+// View toggle for grid/list
+function setView(mode) {
+  const grid = document.getElementById('items-grid');
+  const gridBtn = document.getElementById('grid-btn');
+  const listBtn = document.getElementById('list-btn');
+  if (mode === 'list') {
+    grid.classList.remove('grid-cols-1','sm:grid-cols-2','lg:grid-cols-3','xl:grid-cols-4');
+    grid.classList.add('grid-cols-1');
+    gridBtn.classList.remove('btn-active');
+    listBtn.classList.add('btn-active');
+  } else {
+    grid.classList.add('grid-cols-1','sm:grid-cols-2','lg:grid-cols-3','xl:grid-cols-4');
+    grid.classList.remove();
+    gridBtn.classList.add('btn-active');
+    listBtn.classList.remove('btn-active');
+  }
+}
+</script>

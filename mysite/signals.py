@@ -9,6 +9,9 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, NavItem, PageContent, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
 from django.contrib.auth.models import User
+
+from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
+
 """
 @receiver(post_save, sender=GlobalVal)
 @receiver(post_delete, sender=GlobalVal)
@@ -45,11 +48,21 @@ ADMIN_ONLY_MODELS = [
     ClientGroupPermission,
     ClientUserMembership,
     ClientUserProfile,    # ← add — clientadmin can manage staff profiles
+    Taxonomy,
+    TaxonomyNode,
+    NodeAttributeType,
+    NodeAttributeValue,
+    Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
 ]
 
 # ADMIN Add only for Admin — needed for user creation
 ADMIN_ADD_ONLY_MODELS = [
     User,
+]
+
+# ADMIN View only for Admin — to check if needed
+ADMIN_VIEW_ONLY_MODELS = [
+    GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue
 ]
 
 # Actions per role per category
@@ -137,6 +150,20 @@ def _get_model_permissions(role):
                     ))
                 except Permission.DoesNotExist:
                     pass
+
+    # View-only (Global) — ONLY for admin role, for autocomplete
+    if role == 'admin':
+        for model in ADMIN_VIEW_ONLY_MODELS:
+            ct = ContentType.objects.get_for_model(model)
+            for action in ['view']:
+                try:
+                    perms.append(Permission.objects.get(
+                        codename=f"{action}_{model._meta.model_name}",
+                        content_type=ct,
+                    ))
+                except Permission.DoesNotExist:
+                    pass
+
     return perms
     
 
@@ -421,12 +448,61 @@ def invalidate_client_cache(sender, instance, **kwargs):
         cache_key = f"clientstatic:{client_id}"
         cache.delete(cache_key)
 
+def invalidate_taxonomy_cache(sender, instance, **kwargs):
+    """
+    Invalidates taxonomy tree cache entries.
+    Only Taxonomy and TaxonomyNode trigger this.
+    """
+    client = getattr(instance, 'client', None)
+
+    # Safe delete_pattern — works on Redis, gracefully skips on LocMemCache
+    if hasattr(cache, 'delete_pattern'):
+        # django-redis is available
+        if client:
+            cache.delete_pattern(f'taxonomy_tree:{client.client_id}:*')
+        else:
+            cache.delete_pattern('taxonomy_tree:*')
+    else:
+        # LocMemCache (dev) — no pattern delete available.
+        # Brute-force: clear known keys for this client,
+        # or just clear the entire cache in dev (acceptable).
+        if client:
+            # We don't know all taxonomy slugs, so clear what we can.
+            # In dev this is fine — cache TTL is short anyway.
+            slugs = Taxonomy.objects.filter(
+                client=client
+            ).values_list('slug', flat=True)
+            for slug in slugs:
+                cache.delete(f'taxonomy_tree:{client.client_id}:{slug}')
+        else:
+            # Global taxonomy changed — no safe way to clear without
+            # delete_pattern on LocMemCache. Clear all in dev.
+            cache.clear()
 
 # ── Registration helper (called from AppConfig.ready) ─────────────────
 
 def register_signals():
 
+    # ── CMS content models → invalidate clientstatic cache ───────────
+    CMS_MODELS = [
+        Client, Theme, Page, PageContent, NavItem,
+        Layout, Component, ComponentSlot,
+        ComptextBlock, TextstbItem, SvgtextbadgeValue,
+    ]
+    for model in CMS_MODELS:
+        post_save.connect(invalidate_client_cache, sender=model)
+        post_delete.connect(invalidate_client_cache, sender=model)
 
+    # ── Taxonomy models → invalidate taxonomy tree cache ─────────────
+    TAXONOMY_MODELS = [Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue]
+    for model in TAXONOMY_MODELS:
+        post_save.connect(invalidate_taxonomy_cache, sender=model)
+        post_delete.connect(invalidate_taxonomy_cache, sender=model)
+
+    # ── Item and sub-models → no cache to invalidate ─────────────────
+    # Items are queried per request with filters — not cached in bulk.
+    # No signal needed here until you add item-level caching in Phase 3.
+    """
     models_to_watch = [
         Client,
         Theme,
@@ -444,5 +520,4 @@ def register_signals():
     for model in models_to_watch:
         post_save.connect(invalidate_client_cache, sender=model)
         post_delete.connect(invalidate_client_cache, sender=model)
-
-
+    """

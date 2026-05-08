@@ -1,3 +1,5 @@
+# mysite/views/__init__.py
+
 from mysite.views.main import (
     ClientPageView,
     landing_page,
@@ -17,4 +19,10 @@ from mysite.views.customer import (
     add_address,
     set_default_address,
     delete_address,
+)
+
+from mysite.views.catalogue import (
+    catalogue_page,
+    catalogue_filter,
+    item_detail,
 )

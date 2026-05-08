@@ -2,7 +2,7 @@ import nested_admin
 from django.contrib import admin
 from django.contrib.auth.models import User
 from mysite.models import (Client, ClientUserProfile, ClientGroupPermission, ClientLocation, ClientUserMembership)
-from .base import _user_has_admin_role
+from .base import _user_has_admin_role, BaseAdminInlinecss
 from .base import ClientScopedMixin
 
 from django.contrib.auth.admin import UserAdmin
@@ -361,7 +361,7 @@ class ClientUserMembershipInline(admin.TabularInline):
         return self.has_add_permission(request, obj)
 
 
-class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin):
+class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
     inlines       = [ClientGroupPermissionInline, ClientUserMembershipInline]
     list_display  = ('name', 'client', 'role', 'is_active')
     list_filter   = ('role', 'is_active')

@@ -1,0 +1,10 @@
+.djn-fieldset details > summary {
+    display: list-item;   /* keeps native marker behavior */
+}
+
+.djn-fieldset details > summary h2 {
+    display: inline;
+    text-transform: none;
+    font-weight: 600;
+    letter-spacing: 0.2px;  /* subtle improvement */
+}

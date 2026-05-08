@@ -6,8 +6,11 @@ from modeltranslation.translator import translator, TranslationOptions
 # translation.py before the models package __init__ has finished loading.
 from mysite.models.global_config import GlobalVal
 from mysite.models.client import Client, Theme
-from mysite.models.page import Page, NavItem
-
+from mysite.models.page import NavItem, PageContent #Page, 
+from mysite.models.catalogue import (
+    Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, 
+    GlobalItem, Item, ProductItem, SongItem, ItemVariant
+)
 
 class GlobalValTranslationOptions(TranslationOptions):
     fields = ('keyval',)
@@ -21,13 +24,44 @@ class ThemeTranslationOptions(TranslationOptions):
     fields = ('name',)
     required_languages = ('en',)
 
-class PageTranslationOptions(TranslationOptions):
-    fields = ('name',)
+#class PageTranslationOptions(TranslationOptions):
+#    fields = ('name',)
+#    required_languages = ('en',)
+class PageContentTranslationOptions(TranslationOptions):
+    fields = ('htmlblob',)
     required_languages = ('en',)
 
 class NavItemTranslationOptions(TranslationOptions):
     fields = ('name',)
     required_languages = ('en',)
+
+class TaxonomyTranslationOptions(TranslationOptions):
+    fields = ('name', 'description')
+
+class TaxonomyNodeTranslationOptions(TranslationOptions):
+    fields = ('name',)
+
+class NodeAttributeTypeTranslationOptions(TranslationOptions):
+    fields = ('name',)
+
+class NodeAttributeValueTranslationOptions(TranslationOptions):
+    fields = ('name',)
+
+class GlobalItemTranslationOptions(TranslationOptions):
+    fields = ('name', 'description', 'care_instructions')
+
+class ItemTranslationOptions(TranslationOptions):
+    fields = ('name', 'description', 'care_instructions')    
+
+#class ProductItemTranslationOptions(TranslationOptions):
+#    fields = ('short_description', 'care_instructions',)    
+
+class SongItemTranslationOptions(TranslationOptions):
+    fields = ('artist', 'album',) 
+
+class ItemVariantTranslationOptions(TranslationOptions):
+    fields = ('name', )     
+
 
 """
 # Register using get_model — avoids circular import during startup
@@ -42,8 +76,19 @@ NavItem   = apps.get_model('mysite', 'NavItem')
 translator.register(GlobalVal, GlobalValTranslationOptions)
 translator.register(Client,    ClientTranslationOptions)
 translator.register(Theme,     ThemeTranslationOptions)
-translator.register(Page,      PageTranslationOptions)
+#translator.register(Page,      PageTranslationOptions)
+translator.register(PageContent,      PageContentTranslationOptions)
 translator.register(NavItem,   NavItemTranslationOptions)
+
+translator.register(Taxonomy,      TaxonomyTranslationOptions)
+translator.register(TaxonomyNode,  TaxonomyNodeTranslationOptions)
+translator.register(NodeAttributeType,   NodeAttributeTypeTranslationOptions)
+translator.register(NodeAttributeValue,  NodeAttributeValueTranslationOptions)
+translator.register(GlobalItem,          GlobalItemTranslationOptions)
+translator.register(Item,          ItemTranslationOptions)
+#translator.register(ProductItem,   ProductItemTranslationOptions)
+translator.register(SongItem,      SongItemTranslationOptions)
+translator.register(ItemVariant,      ItemVariantTranslationOptions)
 
 """
 

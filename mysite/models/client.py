@@ -3,19 +3,21 @@ from .base import (
     LowercaseCharField, default_languages, default_themes, text_field_validators
 )
 #from .global_config import (ThemePreset)
+from django.conf import settings
 
 class Client(models.Model):
     client_id = LowercaseCharField(max_length=25, unique=True, db_index=True)    
 
     parent = models.ForeignKey("self", null=True, blank=True, related_name="children", on_delete=models.CASCADE)
     language_list = models.JSONField(null = True, blank = True, default=default_languages, help_text="A JSON array of selected values from Language.")
+    default_language = models.CharField(max_length=10, choices=settings.LANGUAGES, default=settings.LANGUAGE_CODE)
     theme_list = models.JSONField(null = True, blank = True, default=default_themes)
     # Add this to allow: client_instance.translations.all()
     #translations = GenericRelation(TextItemValue)
     #gentextblocks = GenericRelation(GentextBlock)
     # Translatable fields
-    name = models.CharField(max_length=100, blank=True, null=True)
-    nb_title = models.CharField(max_length=100, blank=True, null=True) 
+    name = models.CharField(max_length=100, blank=True, null=True) # modeltranslation blank=True to be present 
+    nb_title = models.CharField(max_length=100, blank=True, null=True) # modeltranslation blank=True to be present
 
     nb_title_svg_pre = models.CharField(max_length=500, blank=True, null=True)
     nb_title_svg_suf = models.CharField(max_length=500, blank=True, null=True)
@@ -67,8 +69,7 @@ class Theme(models.Model):
     is_default = models.BooleanField(default=False)    
 
     # Translatable fields
-    name = models.CharField(max_length=40, blank=True, null=True)
-
+    name = models.CharField(max_length=40, blank=True, null=True) # modeltranslation blank=True to be present
 
     def __str__(self):
         return f"{self.client.client_id} / {self.theme_id}"

@@ -153,7 +153,7 @@ layout_prefetch = Prefetch(
     queryset=Layout.objects.select_related("parent").prefetch_related(
         component_prefetch,
     ).order_by("level", "order"),
-    to_attr="prefetched_layouts3",
+    to_attr="prefetched_layouts",
 )
 
 
@@ -257,8 +257,8 @@ def build_blocks(blocks_queryset):
     ]
     """
 
-# 6️⃣B Page tree for Navigation bar
-def build_page_tree(pages):
+# 6️⃣B Page tree for Navigation bar - THIS IS DEPRECATED AND MOVED TO Navigation
+def zzbuild_page_tree(pages):
     node_map = {}
     roots = []
     
@@ -395,7 +395,7 @@ def build_page(page):
     if not page:
         return None
 
-    all_layouts = list(getattr(page, "prefetched_layouts3", []))
+    all_layouts = list(getattr(page, "prefetched_layouts", []))
     layout_map = {}
     root_layouts = []
     for layout in all_layouts:
@@ -460,7 +460,7 @@ def build_client_payload(client):
         "themes":     lv_themes,
         #"textblocks": build_blocks(getattr(client, "prefetched_gentextblocks", [])),
         "pages":      [p for p in (build_page(page) for page in all_pages) if p], # [build_page(page) for page in all_pages],
-        "page_tree":  build_page_tree([p for p in all_pages if not p.hidden]),
+        #"page_tree":  build_page_tree([p for p in all_pages if not p.hidden]),
         'header_nav':  header_nav,
         'footer_nav':  footer_nav,        
     }
@@ -495,12 +495,15 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                 #gentextblock_prefetch,
                 Prefetch(
                     "pages",
-                    queryset=Page.objects.select_related(
-                        "parent"
-                    ).prefetch_related(
+                    queryset=Page.objects.
+                    #select_related(
+                    #    "parent"
+                    #).
+                    prefetch_related(
                         #gentextblock_prefetch,
                         layout_prefetch,
-                    ).order_by("order"),
+                    ),
+                    #.order_by("order"),
                     to_attr="prefetched_pages"
                 ),                
                 Prefetch(
@@ -1011,40 +1014,6 @@ def resolve_theme(theme):
                   }
                ]
             }
-         ]
-      }
-   ],
-   "page_tree":[
-      {
-         "client_id":"bahushira",
-         "page_id":"home",
-         "order":1,
-         "translations":{
-            "name":{
-               "en":"Home",
-               "hi":"hiHome",
-               "fr":"frHome",
-               "ta":null
-            }
-         },
-         "children":[
-            
-         ]
-      },
-      {
-         "client_id":"bahushira",
-         "page_id":"about",
-         "order":2,
-         "translations":{
-            "name":{
-               "en":"About",
-               "hi":"hiAbout",
-               "fr":"frAbout",
-               "ta":null
-            }
-         },
-         "children":[
-            
          ]
       }
    ],

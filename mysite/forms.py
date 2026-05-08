@@ -17,10 +17,16 @@ class ClientForm(forms.ModelForm):
         label="Select Source Languages",
         initial=['en'],
     )    
- 
+
+    default_language = forms.ChoiceField(
+        choices=settings.LANGUAGES,
+        required=True,
+        label="Default Language"
+    ) 
+
     class Meta:
         model = Client
-        fields = ['client_id', 'parent', 'language_list', 'name', 'nb_title', 'nb_title_svg_pre', 'nb_title_svg_suf'] # Include all fields
+        fields = ['client_id', 'parent', 'name', 'nb_title', 'nb_title_svg_pre', 'nb_title_svg_suf'] # Include all fields
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -30,13 +36,25 @@ class ClientForm(forms.ModelForm):
             # MultipleChoiceField just needs that list directly
             self.fields['language_choices'].initial = self.instance.language_list
 
+    def clean(self):
+        cleaned = super().clean()
+        default_lang = cleaned.get('default_language')
+        lang_list = cleaned.get('language_choices', [])
+
+        if default_lang and default_lang not in lang_list:
+            raise forms.ValidationError(
+                "Default language must be part of selected languages."
+            )
+        return cleaned
+    
     def save(self, commit=True):
         instance = super().save(commit=False)
-        # cleaned_data returns e.g. ['en', 'ta'] directly — no queryset to iterate
         instance.language_list = self.cleaned_data['language_choices']
+        instance.default_language = self.cleaned_data['default_language']
         if commit:
             instance.save()
-        return instance
+        return instance    
+
     
 # ── Type 2: Customer signup form ──────────────────────────────────────
 

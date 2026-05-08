@@ -260,6 +260,71 @@ theme/                           ← django-tailwind theme app
 5. **`PageContent.html` is rendered unsanitised** — content is developer-authored only in Phase 1 so `|safe` is acceptable. If clients ever paste their own HTML in Phase 2, a sanitiser (e.g. `bleach`) must be added before the `|safe` filter.
 
 
+## Phase 2 Additions — Catalogue Stack
+ 
+### New Models (mysite/models/catalogue.py)
+ 
+| Model | Purpose |
+|-------|---------|
+| `Taxonomy` | Hierarchy type (Category, Geography, etc.). Global or client-scoped. |
+| `TaxonomyNode` | Tree node using materialized path (`path` CharField). |
+| `Item` | Generic item (product, document, etc.). Global or client-scoped. |
+| `ItemTaxonomyNode` | M2M: Item ↔ TaxonomyNode across any hierarchy. |
+| `ItemImage` | Additional images per item. |
+| `ItemVariant` | Optional variants (size, colour). Phase 3 eCommerce hook. |
+
+  New models: GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue,
+              NodeAttributeType, NodeAttributeValue, ItemAttributeValue
+  GS1 fields: gtin (GTIN-8/12/13/14), gpc_brick_code (8-digit)
+  Derivation pattern: Item.global_item FK, resolved_name()/resolved_attributes() methods
+  Attribute inheritance: NodeAttributeType → NodeAttributeValue → GlobalItemAttributeValue
+                         → ItemAttributeValue (deepest wins)
+                          
+### Query Pattern — Catalogue vs clientstatic
+ 
+| Data | Cached in clientstatic? | Reason |
+|------|------------------------|--------|
+| Taxonomy trees | Yes — separately (`taxonomy_tree:{client}:{slug}`) | Small, stable, reusable |
+| Item list | No — queried per request | Filter-dependent, too large |
+| Item detail | No — queried per request | Single record, indexed |
+ 
+### HTMX Integration
+- `django-htmx` middleware added to `MIDDLEWARE`
+- Filter checkboxes: `hx-get` → `catalogue_filter` view → returns `items_list.html` partial
+- Pagination: `hx-get` with `?page=N` → same partial
+- `hx-target="#items-container"`, `hx-swap="innerHTML"`
+- `hx-include="[name='node']:checked, [name='q']"` — includes all active filters
+### Performance
+- PostgreSQL JSONB GIN index on `Item.attributes` for attribute filtering
+- `text_pattern_ops` B-tree index on `TaxonomyNode.path` for subtree queries
+- Taxonomy trees cached in Redis (1 hour TTL, invalidated on node save)
+- Items never cached in bulk — queried with `select_related` + `prefetch_related`
+- Default pagination: 24 items/page (fits 3-col and 4-col grids)
+### Key Model Relationships (updated)
+ 
+```
+Client
+  ├── Taxonomy (slug, global or client-scoped)
+  │     └── TaxonomyNode (materialized path, parent→self)
+  ├── Item (item_id, status, attributes JSONB, global or client-scoped)
+  │     ├── ItemTaxonomyNode → TaxonomyNode (M2M)
+  │     ├── ItemImage (order, is_primary)
+  │     └── ItemVariant (variant_id, price, stock, attributes)
+  └── ... (existing models unchanged)
+
+Item (base — id, name, description, status, image, order, client)
+  ├── ProductItem    (price, currency, sku, weight_g, dimensions)  [OneToOne]
+  ├── SongItem       (duration_s, bpm, key, artist, album)         [OneToOne]
+  ├── DocumentItem   (page_count, format, file_url, version)       [OneToOne]
+  └── attributes     (JSONField on Item — catches anything else)
+
+```
+
+## Phase 3 eCommerce models with Beckn
+
+Commerce models follow Beckn v2.0 schema vocabulary. BecknFulfillment, BecknBilling, BecknQuotation are standalone models (not embedded in Order) matching Beckn's structural separation. Each has a to_beckn() method for future API adapter. CustomerAddress adds gps, area_code, state, landmark fields to match Beckn Location.address schema.
+
+------------------------------------------------------------------------------------------------------------------------------
 ## To Build complete hrml file and push to PageContent
 
 ## Stich Prompt: 

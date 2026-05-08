@@ -46,3 +46,24 @@ from .users import (
     ClientGroupPermission,
     ClientUserMembership,
 )
+
+from .catalogue import (
+    NodeAttributeType,
+    NodeAttributeValue,
+    GlobalItem,
+    GlobalItemTaxonomyNode,
+    GlobalItemAttributeValue,
+
+    Taxonomy,
+    TaxonomyNode,
+
+    Item,
+    ProductItem,
+    SongItem,
+    DocumentItem,
+    ServiceItem,
+    ItemTaxonomyNode,
+    ItemAttributeValue,
+    ItemMedia,
+    ItemVariant
+)

@@ -1,0 +1,123 @@
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_sidebar_mobile.html
+Mobile version of filter sidebar.
+Uses form id="filter-form-mobile" to avoid DOM id conflict
+with the desktop filter-form when both are rendered.
+============================================================ -->
+
+<form id="filter-form-mobile" class="space-y-6">
+
+  <input type="hidden" name="q" value="{{ catalogue.filters.search|default:'' }}">
+
+  {% if catalogue.filters.node_ids or catalogue.filters.search or catalogue.filters.brands %}
+  <div>
+    <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+       class="btn btn-outline btn-sm btn-error w-full">
+      Clear All Filters
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="text-sm text-base-content/60">
+    {{ catalogue.pagination.total_count }}
+    item{{ catalogue.pagination.total_count|pluralize }}
+  </div>
+
+  {% for taxonomy in catalogue.taxonomies %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm text-base-content">
+      {{ taxonomy.name }}
+    </div>
+    <div class="collapse-content pt-2">
+      <ul class="space-y-1">
+        {% for node in taxonomy.tree %}
+          {% include "catalogue/partials/filter_node_mobile.html"
+             with node=node
+             active_node_ids=catalogue.filters.node_ids
+             counts=taxonomy.counts
+             taxonomy_slug=taxonomy.slug %}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% for taxonomy in catalogue.taxonomies %}
+    {% if taxonomy.attr_types %}
+    <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+      <input type="checkbox" checked />
+      <div class="collapse-title font-semibold text-sm text-base-content">
+        Attributes
+      </div>
+      <div class="collapse-content space-y-4 pt-2">
+        {% for attr in taxonomy.attr_types %}
+        {% if attr.values %}
+        <div>
+          <p class="text-xs font-semibold text-base-content/60 uppercase mb-2">
+            {{ attr.name }}
+          </p>
+          <ul class="space-y-1">
+            {% for val in attr.values %}
+            <li>
+              <label class="flex items-center gap-2 cursor-pointer py-0.5">
+                <input
+                  type="checkbox"
+                  name="attr_val_{{ attr.id }}"
+                  value="{{ val.id }}"
+                  class="checkbox checkbox-xs checkbox-primary"
+                  hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                  hx-target="#items-container"
+                  hx-swap="innerHTML"
+                  hx-include="#filter-form-mobile"
+                  hx-trigger="change"
+                >
+                <span class="text-sm">{{ val.name }}</span>
+              </label>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  {% comment "" %}
+  {% if catalogue.brands %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm text-base-content">
+      Brand
+    </div>
+    <div class="collapse-content pt-2">
+      <ul class="space-y-1">
+        {% for brand in catalogue.brands %}
+        <li>
+          <label class="flex items-center gap-2 cursor-pointer py-1">
+            <input
+              type="checkbox"
+              name="brand"
+              value="{{ brand.name }}"
+              class="checkbox checkbox-sm checkbox-primary"
+              {% if brand.name in catalogue.filters.brands %}checked{% endif %}
+              hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+              hx-target="#items-container"
+              hx-swap="innerHTML"
+              hx-include="#filter-form-mobile"
+              hx-trigger="change"
+            >
+            <span class="text-sm flex-1">{{ brand.name }}</span>
+            <span class="badge badge-sm badge-ghost">{{ brand.count }}</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+  {% endcomment %}
+
+</form>

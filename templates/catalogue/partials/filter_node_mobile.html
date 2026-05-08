@@ -1,0 +1,46 @@
+<!-- ============================================================
+FILE: templates/catalogue/partials/filter_node_mobile.html
+Mobile version of filter_node — uses #filter-form-mobile.
+Identical to filter_node.html except hx-include target.
+============================================================ -->
+{% comment %}
+  Input: node            — {id, slug, name, depth, children, count}
+  Input: active_node_ids — list of currently active node PKs
+  Input: counts          — dict of node_id → count
+  Input: taxonomy_slug   — parent taxonomy slug
+{% endcomment %}
+
+<li class="{% if node.depth > 0 %}pl-{{ node.depth|add:node.depth }}{% endif %}">
+  <label class="flex items-center gap-2 cursor-pointer py-1 hover:text-primary">
+    <input
+      type="checkbox"
+      name="node"
+      value="{{ node.id }}"
+      class="checkbox checkbox-sm checkbox-primary"
+      {% if node.id in active_node_ids %}checked{% endif %}
+      hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+      hx-target="#items-container"
+      hx-swap="innerHTML"
+      hx-include="#filter-form-mobile"
+      hx-trigger="change"
+    >
+    <span class="text-sm flex-1">{{ node.name }}</span>
+    {% if counts %}
+    <span class="badge badge-sm badge-ghost">
+      {{ counts|get_item:node.id|default:0 }}
+    </span>
+    {% endif %}
+  </label>
+
+  {% if node.children %}
+  <ul class="ml-3 space-y-1 mt-1 border-l border-base-300 pl-2">
+    {% for child in node.children %}
+      {% include "catalogue/partials/filter_node_mobile.html"
+         with node=child
+         active_node_ids=active_node_ids
+         counts=counts
+         taxonomy_slug=taxonomy_slug %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>
