@@ -132,17 +132,49 @@ class CustomerProfileMiddleware:
         """
 
         # ── Resolve profiles (ONLY if logged in) ─────────────────
-        if request.user.is_authenticated and request.client:
+        user = getattr(request, "user", None)
+        if (
+            user
+            and user.is_authenticated
+            and request.client
+        ):
+        #if request.user.is_authenticated and request.client:
 
             # ✅ Try staff profile FIRST (since it's exclusive)
+            # Staff profile
+            request.client_profile = getattr(
+                user,
+                'client_profile',
+                None
+            )
+
+            if (
+                request.client_profile
+                and request.client_profile.client_id == request.client.id
+            ):
+                request.active_role = 'staff'
+            """
             try:
                 request.client_profile = request.user.client_profile
                 if request.client_profile.client_id == request.client.id:
                     request.active_role = 'staff'
             except ClientUserProfile.DoesNotExist:
                 pass
-
+            """
             # ✅ Try customer profile
+            # Customer profile
+            if not request.active_role:
+                request.customer_profile = (
+                    CustomerProfile.objects.filter(
+                        user=user,
+                        client=request.client,
+                        is_active=True,
+                    ).first()
+                )
+
+                if request.customer_profile:
+                    request.active_role = 'customer'
+            """
             if not request.active_role:
                 try:
                     request.customer_profile = CustomerProfile.objects.get(
@@ -153,6 +185,7 @@ class CustomerProfileMiddleware:
                     request.active_role = 'customer'
                 except CustomerProfile.DoesNotExist:
                     pass
+            """
 
         return self.get_response(request)
 

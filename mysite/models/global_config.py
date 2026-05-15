@@ -80,11 +80,12 @@ class GlobalVal(models.Model):
         related_name='globalvals'
     )
     key    = models.CharField(max_length=100)
-    keyval = models.CharField(max_length=500)   # modeltranslation expands to keyval_en, keyval_hi etc.
+    keyval = models.CharField(max_length=500, blank=True, null=True) # modeltranslation blank=True to be present
 
     class Meta:
         unique_together = ('globalvalcat', 'key')
         ordering        = ['globalvalcat__globalvalcat_id', 'key']
 
     def __str__(self):
-        return f"{self.globalvalcat_id}.{self.key}"
+        cat_id = getattr(self.globalvalcat, 'globalvalcat_id', '?')
+        return f"{cat_id}.{self.key}"

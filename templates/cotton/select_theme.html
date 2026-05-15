@@ -95,7 +95,7 @@
                  {% if t.theme_id == request.session.active_theme_id %}
                  btn-active
                  {% endif %}">
-          <c-svgtextsvg  :textdict="t.translations.name" :svg_pre="t.svg_pre" :svg_suf="t.svg_suf"></c-svgtextsvg>
+          <c-svgtextsvg  :text="t.name" :svg_pre="t.svg_pre" :svg_suf="t.svg_suf"></c-svgtextsvg>
         </button>
       </li>
       {% endfor %}

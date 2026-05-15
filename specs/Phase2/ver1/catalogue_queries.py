@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 
 from mysite.models.catalogue import (
-    Taxonomy, TaxonomyNode, Item, ItemTaxonomyNode, ItemImage
+    Taxonomy, TaxonomyNode, Item, ItemTaxonomyNode
 )
 
 
@@ -121,30 +121,34 @@ def get_item_queryset(client, filters=None):
     filters = filters or {}
 
     # Base queryset — global + client items
-    qs = Item.objects.filter(
+    qs = (
+        Item.objects.filter(
         Q(client=None) | Q(client=client),
         status='active',
-    ).select_related(
+        )
+        .select_related(
         'client', 
         'product_detail',
         'song_detail',
         'document_detail',
-        'service_detail')
-    .prefetch_related(
-        Prefetch(
-            'images',
-            queryset=ItemImage.objects.filter(is_active=True).order_by('order')
-                     if hasattr(ItemImage, 'is_active')
-                     else ItemImage.objects.order_by('order'),
-            to_attr='prefetched_images'
-        ),
-        Prefetch(
-            'taxonomy_mappings',
-            queryset=ItemTaxonomyNode.objects.select_related(
-                'node', 'node__taxonomy'
+        'service_detail',
+        )
+        .prefetch_related(
+            #Prefetch(
+            #    'images',
+            #    queryset=ItemImage.objects.filter(is_active=True).order_by('order')
+            #            if hasattr(ItemImage, 'is_active')
+            #            else ItemImage.objects.order_by('order'),
+            #    to_attr='prefetched_images'
+            #),
+            Prefetch(
+                'taxonomy_mappings',
+                queryset=ItemTaxonomyNode.objects.select_related(
+                    'node', 'node__taxonomy'
+                ),
+                to_attr='prefetched_taxonomy_mappings'
             ),
-            to_attr='prefetched_taxonomy_mappings'
-        ),
+        )
     )
 
     # ── Hierarchy / node filter ───────────────────────────────────────

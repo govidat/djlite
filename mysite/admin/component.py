@@ -2,20 +2,54 @@ import nested_admin
 from django.conf import settings
 from django import forms
 from mysite.models import (Client, SvgtextbadgeValue, TextstbItem, ComptextBlock, GentextBlock, ComponentSlot, Component)
-from .base import BaseAdminInlinecss
+#from .base import BaseAdminInlinecss
 
+from modeltranslation.admin import TranslationBaseModelAdmin
+from .base import ClientLanguageMixinV2, BaseAdminInlinecss
+
+class SvgtextbadgeValueInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, nested_admin.NestedStackedInline):
+    model   = SvgtextbadgeValue
+    classes = ['collapse']
+    extra   = 0
+    #fields  = ['language_code', 'html']
+
+    def get_fieldsets(self, request, obj=None):
+
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request,
+            ['text'],
+            obj
+        )
+        return (
+            ('General', {
+                'fields': ('language_code', 'stext', 'ltext'),
+                'classes': ('collapse',),
+            }),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+            ('Other Languages', {
+                'fields': other_ln_fields,
+                'classes': ('collapse',),
+            })            
+        )  
+"""
 class SvgtextbadgeValueInline(nested_admin.NestedTabularInline):
     model  = SvgtextbadgeValue
     extra  = 0
     fields = ('language_code', 'stext', 'ltext')
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('textstbitem')    
+
     def get_language_choices(self, request):
-        """
-        Resolve client's language_list from the URL's object_id.
-        Caches result on the request object so Client is queried
-        only once per page load, regardless of how many inline
-        rows are rendered.
-        """
+        
+        #Resolve client's language_list from the URL's object_id.
+        #Caches result on the request object so Client is queried
+        #only once per page load, regardless of how many inline
+        #rows are rendered.
+        
         # Return cached result if already resolved this request
         if hasattr(request, '_cached_client_lang_choices'):
             return request._cached_client_lang_choices
@@ -43,6 +77,7 @@ class SvgtextbadgeValueInline(nested_admin.NestedTabularInline):
                 choices=self.get_language_choices(request)
             )
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+"""
 
 class TextstbItemInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = TextstbItem
@@ -50,6 +85,12 @@ class TextstbItemInline(nested_admin.NestedGenericStackedInline, BaseAdminInline
     extra = 0
     inlines = [SvgtextbadgeValueInline]
     classes = ['collapse']
+    def get_queryset(self, request):
+        # Generic FKs can't use select_related on the generic side,
+        # but we CAN prefetch the reverse generic relation
+        return super().get_queryset(request).prefetch_related(
+            'values'  # or whatever your related_name is
+        )    
 
 
 class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
@@ -58,6 +99,10 @@ class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInli
     extra = 0
     inlines = [TextstbItemInline]
     classes = ['collapse']
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related(
+            'textstbitems',  # your GenericRelation name
+        )    
 
 class GentextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = GentextBlock
@@ -65,13 +110,16 @@ class GentextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlin
     extra = 0
     inlines = [TextstbItemInline]
     classes = ['collapse']
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related(
+            'textstbitems',  # your GenericRelation name
+        )
 
-
-class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
-    model = ComptextBlock
-    extra = 0
-    classes = ['collapse']
-    inlines = [TextstbItemInline]
+#class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
+#    model = ComptextBlock
+#    extra = 0
+#    classes = ['collapse']
+#    inlines = [TextstbItemInline]
 
 # Option 3 Common Component Model
 # ── Component inlines ─────────────────────────────────────────
@@ -88,7 +136,16 @@ class ComponentSlotInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
         "accordion_checked",                             # accordion text slot
     ]
     inlines = [ComptextBlockInline]
-
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related(
+            'comptextblocks',  
+        )    
+    #def get_queryset(self, request):
+    #    return super().get_queryset(request).select_related(
+    #        'component__layout__page__client'  # climb the tree
+    #    ).prefetch_related(
+    #        'comptextblocks',
+    #    )
     class Media:
         js = ("admin/js/component_admin.js",)
 
@@ -105,6 +162,15 @@ class ComponentInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
         "config",
     ]
     inlines = [ComponentSlotInline]
-
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related(
+            'slots',
+        )    
+    #def get_queryset(self, request):
+    #    return super().get_queryset(request).select_related(
+    #        'layout__page__client'
+    #    ).prefetch_related(
+    #        'slots',
+    #    )
     class Media:
         js = ("admin/js/component_admin.js",)

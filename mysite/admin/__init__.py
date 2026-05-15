@@ -6,7 +6,8 @@ from django.contrib.auth.models import User
 from mysite.admin.global_config import (
     ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline
 )
-from mysite.admin.client import ClientAdmin  
+from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin #ClientTemplateAdmin
+#from mysite.admin.page import ClientTemplateAdmin
 
 #from mysite.admin.page import PageInline, LayoutInline, PageContentInline, NavItemInline
 
@@ -20,8 +21,10 @@ from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, Ta
 
 from mysite.models import (
     ThemePreset, GlobalValCat, GlobalVal,
-    Client, Theme, ClientLocation,
-    NavItem, Page, 
+    Client, ClientBlock,
+    ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper,
+    Theme, ClientLocation,
+    NavItem, Page, ClientTemplate,
     ClientGroup, 
     Layout, Component,
     ClientUserProfile, CustomerProfile, ClientUserMembership,
@@ -32,9 +35,17 @@ from mysite.models import (
 
 
 # All registrations in one place — easy to see what's registered
+admin.site.register(ClientBlock,          ClientBlockAdmin)
+
 admin.site.register(ThemePreset,          ThemePresetAdmin)
 admin.site.register(GlobalValCat,         GlobalValCatAdmin)
 admin.site.register(Client,               ClientAdmin)
+admin.site.register(ClientContentStructured,  ClientContentStructuredAdmin)
+admin.site.register(ClientContentHtml,  ClientContentHtmlAdmin)
+admin.site.register(ClientStaff,  ClientStaffAdmin)
+admin.site.register(ClientTemplatewrapper,  ClientTemplatewrapperAdmin)
+
+#admin.site.register(ClientTemplate,  ClientTemplateAdmin)
 admin.site.register(ClientLocation,       ClientLocationAdmin)
 admin.site.register(ClientGroup,          ClientGroupAdmin)
 admin.site.register(User,                 CustomUserAdmin)

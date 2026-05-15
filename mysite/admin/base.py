@@ -8,11 +8,27 @@ from django.core.exceptions import PermissionDenied
 
 # Derive app label dynamically — never hardcode 'myapp' or 'mysite'
 APP_LABEL = Client._meta.app_label   # → 'mysite'
-
+"""
 def _user_has_admin_role(user):
-    """User has admin role in ANY active client group."""
+    #User has admin role in ANY active client group.
     if user.is_superuser:
         return True
+    return ClientGroup.objects.filter(
+        memberships__user=user,
+        role='admin',
+        is_active=True,
+    ).exists()
+"""
+def _user_has_admin_role(user):
+    #User has admin role in ANY active client group.
+
+    # IMPORTANT: admin login page uses AnonymousUser
+    if not user or not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
     return ClientGroup.objects.filter(
         memberships__user=user,
         role='admin',
@@ -234,7 +250,78 @@ class ClientScopedMixin:
         from utils.permissions import has_module_perm
         return has_module_perm(request.user, client, module, action)
     
+    def get_queryset(self, request):
 
+        qs = super().get_queryset(request)
+
+        if request.user.is_superuser:
+            return qs
+
+        permitted_clients = self._permitted_clients(request)
+
+        model_fields = [f.name for f in self.model._meta.fields]
+
+        # Direct client FK
+        if 'client' in model_fields:
+            return qs.filter(
+                client__in=permitted_clients
+            )
+
+        # Page → Client
+        if 'page' in model_fields:
+            return qs.filter(
+                page__client__in=permitted_clients
+            )
+
+        # Layout → Page → Client
+        if 'layout' in model_fields:
+            return qs.filter(
+                layout__page__client__in=permitted_clients
+            )
+
+        # Component → Layout → Page → Client
+        if 'component' in model_fields:
+            return qs.filter(
+                component__layout__page__client__in=permitted_clients
+            )
+
+        # Slot → Component → Layout → Page → Client
+        if 'slot' in model_fields:
+            return qs.filter(
+                slot__component__layout__page__client__in=permitted_clients
+            )
+
+        return qs
+
+    def formfield_for_foreignkey(
+        self,
+        db_field,
+        request,
+        **kwargs
+    ):
+
+        if request.user.is_superuser:
+            return super().formfield_for_foreignkey(
+                db_field,
+                request,
+                **kwargs
+            )
+
+        permitted_clients = self._permitted_clients(request)
+
+        related_model = db_field.remote_field.model
+
+        if hasattr(related_model, 'client'):
+
+            kwargs["queryset"] = related_model.objects.filter(
+                client__in=permitted_clients
+            )
+
+        return super().formfield_for_foreignkey(
+            db_field,
+            request,
+            **kwargs
+        )
 
 class ClientLanguageMixin:
     """

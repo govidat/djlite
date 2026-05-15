@@ -4,6 +4,7 @@ HTMX target — returned by catalogue_filter view.
 Contains item grid + pagination.
 ============================================================ -->
 <!-- {load dict_filters } -->
+{% load my_tags %}
 
 <!-- Item count and view toggle -->
 <div class="flex items-center justify-between mb-4">
@@ -25,11 +26,13 @@ Contains item grid + pagination.
   </div>
 </div>
 
-<!-- Items grid -->
+<!-- Items grid catalogue/partials/item_card.html -->
 <div id="items-grid"
      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+  
   {% for item in catalogue.items %}
-    {% include "catalogue/partials/item_card.html" with item=item %}
+    {% render_client_template 'catalogue_item_card' item=item %}
+      
   {% empty %}
     <div class="col-span-full text-center py-16 text-base-content/50">
       <div class="text-5xl mb-4">🔍</div>
@@ -76,4 +79,25 @@ document.addEventListener('DOMContentLoaded', function() {
   const saved = localStorage.getItem('catalogue-view');
   if (saved === 'list') setView('list');
 });
+
+
+// Save scroll position before navigating to item detail
+document.querySelectorAll('a[href*="/catalogue/"]').forEach(link => {
+  link.addEventListener('click', () => {
+    sessionStorage.setItem(
+      'catalogue_scroll_{{ client.client_id }}',
+      window.scrollY
+    );
+  });
+});
+
+// Restore on page load
+const savedScroll = sessionStorage.getItem(
+  'catalogue_scroll_{{ client.client_id }}'
+);
+if (savedScroll && document.referrer.includes('/catalogue/')) {
+  window.scrollTo(0, parseInt(savedScroll));
+  sessionStorage.removeItem('catalogue_scroll_{{ client.client_id }}');
+}
+
 </script>

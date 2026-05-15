@@ -44,15 +44,17 @@ class TextstbItem(models.Model):
         verbose_name = "01-06b Text SVG/Text/Badge item"                
 
 class SvgtextbadgeValue(models.Model):
-    textstbitem = models.ForeignKey(TextstbItem, on_delete=models.CASCADE)
-    #zzlanguage = models.ForeignKey(Language, on_delete=models.CASCADE) 
-    language_code = LowercaseCharField(max_length=2, blank=True)   # stores 'en', 'fr', 'hi' etc.
-    stext = models.CharField(max_length=255, blank=True, validators=text_field_validators)
-    ltext = models.TextField(blank=True, validators=text_field_validators)
+    textstbitem = models.OneToOneField(TextstbItem, on_delete=models.CASCADE, related_name='value')
+    text = models.TextField(blank=True, validators=text_field_validators)
+
     def __str__(self):
-        return f"{self.stext} / ({self.ltext})"
+        return self.text[:50]
+
     class Meta:
-        unique_together = ("textstbitem", "language_code" )
+        verbose_name = "01-06c Svg Text Badge(STB) Item value"
+
+    class Meta:
+        #unique_together = ("textstbitem", "language_code" )
         verbose_name = "01-06c Svg Text Badge(STB) Item value"
 
 class ComptextBlock(models.Model):

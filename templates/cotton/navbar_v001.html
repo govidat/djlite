@@ -2,6 +2,7 @@
 {% load my_filters %}
 {% endcomment %}
 {% load my_tags %}
+
 <div class="navbar bg-base-100 shadow-sm fixed top-0 left-0 w-full z-50">
   <div class="navbar-start">
     <div class="dropdown">
@@ -26,7 +27,7 @@
         <h1 class="text-xl font-bold {{result_var.css_class|default:""}}">
         <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>      
       {% endcomment %}
-      <c-svgtextsvg  :textdict="client.translations.nb_title" :svg_pre="client.translations.nb_title_svg_pre" :svg_suf="client.translations.nb_title_svg_suf"></c-svgtextsvg>
+      <c-svgtextsvg  :text="client.nb_title" :svg_pre="client.nb_title_svg_pre" :svg_suf="client.nb_title_svg_suf"></c-svgtextsvg>
     </h1>
 
   </div>

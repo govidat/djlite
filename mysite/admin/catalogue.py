@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import admin
 from mysite.models.catalogue import (
     TaxonomyNode, NodeAttributeType, NodeAttributeValue,
-    GlobalItemTaxonomyNode, GlobalItemAttributeValue,
+    GlobalItemTaxonomyNode, GlobalItemAttributeValue, GlobalItemMedia,
     ItemTaxonomyNode, ItemAttributeValue, ItemMedia, ItemVariant,
     ProductItem, SongItem, DocumentItem, ServiceItem,
 )
@@ -79,6 +79,7 @@ class NodeAttributeValueInline(SharedOrClientScopedMixin, TranslationBaseModelAd
     #fieldsets = ()       
 
 class NodeAttributeValueAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2):
+    list_select_related = ('client', 'attribute_type')
     search_fields = ('slug', 'name', 'gpc_value_code')
     #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
     #non_translated_fields = ('client', 'slug', 'order', 'gpc_value_code')    # adjust to your actual fields
@@ -105,10 +106,22 @@ class NodeAttributeValueAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdm
             }),
         )
     #fieldsets = () 
-    """
+    
     def has_module_perms(self, request):
         return request.user.is_superuser or _user_has_admin_role(request.user)
-    """
+    
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+        
 class NodeAttributeTypeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline, ClientLanguageMixinV2):
     model  = NodeAttributeType
     extra  = 0
@@ -141,6 +154,7 @@ class NodeAttributeTypeInline(SharedOrClientScopedMixin, TranslationBaseModelAdm
     #fieldsets = ()    
 
 class NodeAttributeTypeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
+    list_select_related = ('client', 'node')
     search_fields = ('slug', 'name', 'gpc_attribute_code')
     #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
     #non_translated_fields = ('client', 'slug', 'field_type', 'is_required', 'is_filterable', 'order', 'gpc_attribute_code'                       )    # adjust to your actual fields  
@@ -167,12 +181,28 @@ class NodeAttributeTypeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmi
             }),
         )
         #fieldsets = () 
-    """
+    
     def has_module_perms(self, request):
         return request.user.is_superuser or _user_has_admin_role(request.user)
-    """
+    
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+    
 class TaxonomyNodeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline, ClientLanguageMixinV2, BaseAdminInlinecss):
     model = TaxonomyNode
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'node', 'node__taxonomy', 'node__client'
+        )    
     extra = 0
     classes = ['collapse']
     #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
@@ -203,6 +233,7 @@ class TaxonomyNodeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, n
         )    
 
 class TaxonomyNodeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
+    list_select_related = ('taxonomy', 'client', 'parent')
     search_fields   = ('slug', 'name', 'path', 'gpc_code')
     #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
     #non_translated_fields = ('client', 'parent', 'slug', 'path', 'depth', 'order', 'metadata', 'gpc_code', 'global_node', 'is_active')    # adjust to your actual fields
@@ -233,11 +264,21 @@ class TaxonomyNodeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, ne
                 'classes': ('collapse',),
             }),
         ) 
-       
+    
+    def has_module_perms(self, request):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+    
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
 
-        
-    #def has_module_perms(self, request):
-    #    return request.user.is_superuser or _user_has_admin_role(request.user)
+    def has_add_permission(self, request):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser or _user_has_admin_role(request.user)
     
 class TaxonomyAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
     #list_display = ('slug', 'client', 'taxonomy_type', 'order', 'is_active', 'gpc_segment_code')
@@ -246,6 +287,7 @@ class TaxonomyAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested
     #non_translated_fields = ('slug', 'client', 'taxonomy_type', 'order', 'is_active', 'gpc_segment_code')    # adjust to your actual fields    
     admin_role_only = True
     search_fields = ('slug', 'name')
+    raw_id_fields = ('client',)
     def get_fieldsets(self, request, obj=None):
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request,
@@ -281,7 +323,31 @@ class TaxonomyAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested
     """
 
 # ── Global Item Admin ─────────────────────────────────────────────────
-
+class GlobalItemMediaInline(TranslationBaseModelAdmin, ClientLanguageMixinV2, nested_admin.NestedStackedInline):
+    model  = GlobalItemMedia
+    extra               = 0
+    classes             = ['collapse']
+    #fields = ('media_type', 'media_url', 'alt', 'order', 'is_primary')
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request,
+            ['text_content'],
+            obj
+        )
+        return (
+            ('General', {
+                'fields': ('media_type', 'media_url', 'alt', 'order', 'is_primary'),
+                'classes': ('collapse',),
+            }),
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+            ('Other Languages', {
+                'fields': other_ln_fields,
+                'classes': ('collapse',),
+            }),
+        )
 
 class GlobalItemAttributeValueInline(nested_admin.NestedStackedInline):
     model       = GlobalItemAttributeValue
@@ -305,11 +371,12 @@ class GlobalItemAdmin(TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, 
     #non_translated_fields = ('global_item_id', 'domain', 'brand', 'gtin',
     #                   'barcode', 'weight_g', 'length_mm', 'width_mm', 'height_mm',
     #                   'gpc_brick_code', 'status', 'manufacturer', 'country_of_origin', 'image_url', 'image_alt', 'attributes')    # adjust to your actual fields        
+    list_select_related = True   # select_related on all FK fields
     admin_role_only = True    
     list_filter     = ('domain', 'status')
     search_fields   = ('global_item_id', 'name', 'gtin', 'gpc_brick_code')
     readonly_fields = ('created_at', 'updated_at')
-    inlines         = [GlobalItemTaxonomyNodeInline, GlobalItemAttributeValueInline,]
+    inlines         = [GlobalItemTaxonomyNodeInline, GlobalItemAttributeValueInline, GlobalItemMediaInline]
 
     
     def get_fieldsets(self, request, obj=None):
@@ -390,12 +457,31 @@ class ItemTaxonomyNodeInline(nested_admin.NestedStackedInline):
     autocomplete_fields = ['node']
     #inlines         = [ItemAttributeValueInline] -- part of ItemAdmin
 
-class ItemMediaInline(nested_admin.NestedStackedInline):
+class ItemMediaInline(TranslationBaseModelAdmin, ClientLanguageMixinV2, nested_admin.NestedStackedInline):
     model  = ItemMedia
     extra               = 0
     classes             = ['collapse']
-    fields = ('media_type', 'media_url', 'alt', 'order', 'is_primary')
-
+    #fields = ('media_type', 'media_url', 'alt', 'order', 'is_primary')
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request,
+            ['text_content'],
+            obj
+        )
+        return (
+            ('General', {
+                'fields': ('media_type', 'media_url', 'alt', 'order', 'is_primary'),
+                'classes': ('collapse',),
+            }),
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+            ('Other Languages', {
+                'fields': other_ln_fields,
+                'classes': ('collapse',),
+            }),
+        )
 
 class ItemVariantInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInline, ClientLanguageMixinV2):
     model  = ItemVariant
@@ -477,11 +563,14 @@ class ServiceItemInline(nested_admin.NestedStackedInline):
 
 
 class ItemAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss ):
+    list_select_related = ('client', 'global_item', 'product_detail', 'song_detail', 'document_detail', 'service_detail')
     admin_role_only = True    
     list_filter     = ('client', 'domain', 'status')
     search_fields   = ('item_id', 'name', 'gtin')
     readonly_fields = ('created_at', 'updated_at')
     autocomplete_fields = ['global_item']
+    raw_id_fields = ('client', 'global_item')
+
     """
     inlines         = [
         ItemTaxonomyNodeInline,
@@ -525,7 +614,7 @@ class ItemAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_adm
                 'classes': ('collapse',),
             }),            
             ('GS1 Identification', {
-                'fields': ('gtin', 'gpc_brick_code', 'item_id', 'global_item', 'domain', 'status', 'order'),
+                'fields': ('gtin', 'gpc_brick_code', 'item_id', 'global_item', 'inherit_global_media', 'domain', 'status', 'order'),
                 'classes': ('collapse',),
                 'description': 'GTIN: 8/12/13/14 digit GS1 identifier. '
                             'GPC Brick Code: 8-digit GS1 GPC code.'              

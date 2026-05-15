@@ -18,14 +18,21 @@ from .global_config import (
 
 from .client import (
     Client,
-    Theme,
+    Theme, ClientTemplate, ClientBlock
+)
+from .admin_proxies import (
+    ClientContentStructured,
+    ClientContentHtml,    
+    ClientStaff,
+    ClientTemplatewrapper
 )
 
 from .page import (
     Page,
     NavItem,
-    PageContent,
+    PageContent, 
     Layout,
+    #ClientTemplate,
 )
 
 from .component import (

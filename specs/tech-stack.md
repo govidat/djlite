@@ -319,6 +319,71 @@ Item (base — id, name, description, status, image, order, client)
   └── attributes     (JSONField on Item — catches anything else)
 
 ```
+bash
+cat >> /home/claude/specs/tech-stack.md << 'EOF'
+
+---
+
+## Phase 2 Completed — Catalogue Stack (Actual)
+
+### Caching Strategy
+
+| Cache key | Content | TTL | Invalidated by |
+|-----------|---------|-----|---------------|
+| `clientstatic:{client_id}` | Full CMS payload | 1 hour | post_save on CMS models |
+| `taxonomy_tree:{client}:{slug}` | Taxonomy node tree | 1 hour | post_save on TaxonomyNode |
+| `catalogue_base_ids:{client}:{status}` | Base item ID set | 5 min | post_save on Item |
+| `client_templates:{client_id}` | Template resolution dict | 1 hour | post_save on ClientTemplate |
+
+### Admin Performance
+
+- `list_select_related` on all ModelAdmin classes with FK to Client
+- `raw_id_fields = ('client',)` on catalogue admin to prevent 207× Client query
+- Inline `get_queryset()` overrides with `select_related` on FK chains
+- `ClientTemplate` resolution cached (was 15ms per catalogue request)
+
+### Key Architectural Decisions Made
+
+| Decision | Outcome |
+|----------|---------|
+| HTMX vs Datastar | HTMX adopted for catalogue filters and pagination |
+| Brand in taxonomy vs model field | Brand removed from Item/GlobalItem — taxonomy only |
+| GlobalItem media inheritance | `Item.inherit_global_media` flag + `resolved_medias()` model method |
+| Client template customisation | `ClientTemplate` DB model + `render_client_template` template tag |
+| Filter state preservation | `hx-push-url="true"` on filter interactions |
+| Catalogue page caching | Base item IDs cached 5min; taxonomy trees cached 1hr |
+| `I18nFallbackMixin` | Mixin on Item providing `resolve_i18n_field()` — 5-level priority |
+
+### Models Added in Phase 2
+
+```
+GlobalItem → GlobalItemTaxonomyNode, GlobalItemAttributeValue, GlobalItemMedia
+Taxonomy → TaxonomyNode → NodeAttributeType → NodeAttributeValue
+Item → ItemTaxonomyNode, ItemAttributeValue, ItemMedia, ItemVariant
+       → ProductItem, SongItem, DocumentItem, ServiceItem
+ClientTemplate (client-specific template fragments stored in DB)
+```
+
+### `I18nFallbackMixin` — Field resolution priority
+
+```
+1. Item.{field}_{active_lang}
+2. Item.{field}_{client_base_lang}
+3. GlobalItem.{field}_{active_lang}
+4. GlobalItem.{field}_{client_base_lang}
+5. Empty string
+```
+
+Applied to: `name`, `description`, `care_instructions` on `Item`.
+
+### `Item.resolved_medias()` — Media inheritance
+
+When `Item.inherit_global_media=True` and `GlobalItem` is set:
+- `ItemMedia` records always included
+- `GlobalItemMedia` records appended for types not covered by ItemMedia
+- `SimpleNamespace` wrapper makes GlobalItemMedia template-compatible
+- Result sorted by `order`
+- Prefetch paths: `medias` → `prefetched_medias`, `global_item__medias` → `prefetched_global_medias`
 
 ## Phase 3 eCommerce models with Beckn
 

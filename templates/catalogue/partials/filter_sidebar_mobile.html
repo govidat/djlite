@@ -85,7 +85,7 @@ with the desktop filter-form when both are rendered.
     {% endif %}
   {% endfor %}
 
-  {% comment "" %}
+  <!-- ── Brand filter ─────────────────────────────────────────── -->
   {% if catalogue.brands %}
   <div class="collapse collapse-arrow border border-base-300 rounded-lg">
     <input type="checkbox" checked />
@@ -96,21 +96,24 @@ with the desktop filter-form when both are rendered.
       <ul class="space-y-1">
         {% for brand in catalogue.brands %}
         <li>
-          <label class="flex items-center gap-2 cursor-pointer py-1">
+          <label class="flex items-center gap-2 cursor-pointer
+                        py-1 hover:text-primary">
             <input
               type="checkbox"
-              name="brand"
-              value="{{ brand.name }}"
+              name="node"
+              value="{{ brand.id }}"
               class="checkbox checkbox-sm checkbox-primary"
               {% if brand.name in catalogue.filters.brands %}checked{% endif %}
               hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
               hx-target="#items-container"
               hx-swap="innerHTML"
-              hx-include="#filter-form-mobile"
+              hx-include="#filter-form"
               hx-trigger="change"
             >
             <span class="text-sm flex-1">{{ brand.name }}</span>
-            <span class="badge badge-sm badge-ghost">{{ brand.count }}</span>
+            <span class="badge badge-sm badge-ghost">
+              {{ brand.count }}
+            </span>
           </label>
         </li>
         {% endfor %}
@@ -118,6 +121,148 @@ with the desktop filter-form when both are rendered.
     </div>
   </div>
   {% endif %}
-  {% endcomment %}
+
+  {% if catalogue.price_stats.max > 0 %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm text-base-content">
+      Price Range
+    </div>
+    <div class="collapse-content pt-2">
+      <div class="flex gap-2 items-center mb-3">
+        <input type="number"
+              name="price_min"
+              id="price-min"
+              value="{{ catalogue.filters.price_min|default:catalogue.price_stats.min|floatformat:0 }}"
+              min="{{ catalogue.price_stats.min|floatformat:0 }}"
+              max="{{ catalogue.price_stats.max|floatformat:0 }}"
+              class="input input-sm input-bordered w-24"
+              placeholder="Min">
+        <span class="text-base-content/40">—</span>
+        <input type="number"
+              name="price_max"
+              id="price-max"
+              value="{{ catalogue.filters.price_max|default:catalogue.price_stats.max|floatformat:0 }}"
+              min="{{ catalogue.price_stats.min|floatformat:0 }}"
+              max="{{ catalogue.price_stats.max|floatformat:0 }}"
+              class="input input-sm input-bordered w-24"
+              placeholder="Max">
+      </div>
+      <p class="text-xs text-base-content/40 mb-3">
+        Range: ₹{{ catalogue.price_stats.min|floatformat:0 }}
+        — ₹{{ catalogue.price_stats.max|floatformat:0 }}
+      </p>
+      <button type="button"
+              class="btn btn-sm btn-outline w-full"
+              onclick="applyPriceFilter()">
+        Apply Price Filter
+      </button>
+    </div>
+  </div>
+  {% endif %}
+ 
+  <!-- In Stock Filter -->
+  {% if catalogue.price_stats.max > 0 %}
+  <div class="form-control">
+    <label class="flex items-center gap-3 cursor-pointer py-1">
+      <input type="checkbox"
+            name="in_stock"
+            value="1"
+            class="checkbox checkbox-sm checkbox-primary"
+            {% if catalogue.filters.in_stock %}checked{% endif %}
+            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+            hx-target="#items-container"
+            hx-swap="innerHTML"
+            hx-include="#filter-form"
+            hx-trigger="change">
+      <span class="text-sm font-medium">In Stock Only</span>
+    </label>
+  </div>
+  {% endif %}
+
+  <!-- Genre — shown only if songs exist -->
+  {% if catalogue.domain_filters.genres %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm">Genre</div>
+    <div class="collapse-content pt-2">
+      <ul class="space-y-1">
+        {% for genre in catalogue.domain_filters.genres %}
+        <li>
+          <label class="flex items-center gap-2 cursor-pointer py-0.5">
+            <input type="checkbox" name="genre" value="{{ genre }}"
+                  class="checkbox checkbox-xs checkbox-primary"
+                  {% if genre == catalogue.filters.genre %}checked{% endif %}
+                  hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                  hx-target="#items-container"
+                  hx-swap="innerHTML"
+                  hx-include="#filter-form"
+                  hx-trigger="change">
+            <span class="text-sm">{{ genre }}</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Format — shown only if documents exist -->
+  {% if catalogue.domain_filters.formats %}
+  <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+    <input type="checkbox" checked />
+    <div class="collapse-title font-semibold text-sm">Format</div>
+    <div class="collapse-content pt-2">
+      <ul class="space-y-1">
+        {% for fmt in catalogue.domain_filters.formats %}
+        <li>
+          <label class="flex items-center gap-2 cursor-pointer py-0.5">
+            <input type="checkbox" name="format" value="{{ fmt }}"
+                  class="checkbox checkbox-xs checkbox-primary"
+                  {% if fmt == catalogue.filters.format %}checked{% endif %}
+                  hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                  hx-target="#items-container"
+                  hx-swap="innerHTML"
+                  hx-include="#filter-form"
+                  hx-trigger="change">
+            <span class="text-sm">{{ fmt }}</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Free documents toggle -->
+  {% if catalogue.domain_filters.has_free_documents %}
+  <label class="flex items-center gap-3 cursor-pointer py-2">
+    <input type="checkbox" name="is_free" value="1"
+          class="checkbox checkbox-sm checkbox-primary"
+          hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+          hx-target="#items-container"
+          hx-swap="innerHTML"
+          hx-include="#filter-form"
+          hx-trigger="change">
+    <span class="text-sm font-medium">Free Documents Only</span>
+  </label>
+  {% endif %}  
 
 </form>
+
+<script>
+function applyPriceFilter() {
+  const min = document.getElementById('price-min').value;
+  const max = document.getElementById('price-max').value;
+ 
+  // Trigger HTMX request with all current filters + new price range
+  htmx.ajax('GET',
+    '{% url "catalogue_filter" client_id=client.client_id %}',
+    {
+      target: '#items-container',
+      swap:   'innerHTML',
+      values: Object.fromEntries(new FormData(document.getElementById('filter-form')))
+    }
+  );
+}
+</script>

@@ -35,7 +35,9 @@ class ClientUserProfile(models.Model):
 
 
     def __str__(self):
-        return f"{self.user.email} @ {self.client.client_id} [staff]"
+        client_id = getattr(self.client, 'client_id', '?')
+        email = getattr(self.user, 'email', '?')
+        return f"{email} @ {client_id} [staff]"
 
 
 # ── Type 2: Customer ──────────────────────────────────────────────────
@@ -73,7 +75,9 @@ class CustomerProfile(models.Model):
         verbose_name    = 'Customer Profile'
 
     def __str__(self):
-        return f"{self.user.email} @ {self.client.client_id} [customer]"
+        client_id = getattr(self.client, 'client_id', '?')
+        email = getattr(self.user, 'email', '?')        
+        return f"{email} @ {client_id} [customer]"
 
 
 class CustomerAddress(models.Model):
@@ -123,7 +127,8 @@ class ClientLocation(models.Model):
         ordering        = ['client', 'location_id']
         verbose_name = "00-05 Client Location"
     def __str__(self):
-        return f"{self.client.client_id} / {self.location_id} ({self.location_type})"
+        client_id = getattr(self.client, 'client_id', '?')       
+        return f"{client_id} / {self.location_id} ({self.location_type})"
 
 # ── Client Group ──────────────────────────────────────────────────────
 
@@ -159,7 +164,9 @@ class ClientGroup(models.Model):
         ordering        = ['client', 'group_id']
         verbose_name = "00-04 Client Group"
     def __str__(self):
-        return f"{self.client.client_id} / {self.name} ({self.role})"
+        client_id = getattr(self.client, 'client_id', '?')
+                
+        return f"{client_id} / {self.name} ({self.role})"
 
     def has_location_access(self, location):
         #Empty locations = all access. Otherwise check membership.

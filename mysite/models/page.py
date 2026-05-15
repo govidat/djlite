@@ -2,8 +2,7 @@ from django.db import models
 from .base import (
     LowercaseCharField, text_field_validators
 )
-#from .global_config import (ThemePreset)
-#from .client import (Client)
+
 from django.core.exceptions import ValidationError
 
 class Page(models.Model):
@@ -15,17 +14,13 @@ class Page(models.Model):
         )    
     page_id = LowercaseCharField(max_length=10)  
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
-    #order = models.PositiveIntegerField(default=0)
-    #parent = models.ForeignKey("self", null=True, blank=True, related_name="children",
-    #    on_delete=models.CASCADE
-    #)
+
     hidden = models.BooleanField(default=False)  
-    #gentextblocks = GenericRelation(GentextBlock)
-    # Translatable fields
-    #name = models.CharField(max_length=40, blank=True, null=True)
+
 
     def __str__(self):
-        return f"{self.client.client_id} / {self.page_id}"
+        client_id = getattr(self.client, 'client_id', '?')
+        return f"{client_id} / {self.page_id}"
       
     # for usage in Admin Panel
     class Meta:
@@ -88,7 +83,8 @@ class NavItem(models.Model):
         return '#'   # label-only — no navigation
 
     def __str__(self):
-        return f"{self.client.client_id} / {self.location} / {self.name}"
+        client_id = getattr(self.client, 'client_id', '?')
+        return f"{client_id} / {self.location} / {self.name}"
 
 class PageContent(models.Model):
     """
@@ -101,8 +97,7 @@ class PageContent(models.Model):
         on_delete=models.CASCADE,
         related_name='contents'
     )
-    #language_code = LowercaseCharField(max_length=2, blank=False, null=False, default='en')   # stores 'en', 'fr', 'hi' etc.
-    #html          = models.TextField()
+
     htmlblob      = models.TextField(blank=True) # modeltranslation blank=True to be present
     class Meta:
         #unique_together = ('page', 'language_code')
@@ -115,7 +110,43 @@ class PageContent(models.Model):
 
     def __str__(self):
         return f"Content for {self.page}"
-    
+
+# mysite/models/page.py — add alongside PageContent
+""" Moved to Client.py
+class ClientTemplate(models.Model):
+
+    TEMPLATE_CHOICES = [
+        ('catalogue_filter_sidebar', 'Catalogue: Filter Sidebar'),
+        ('catalogue_item_card',      'Catalogue: Item Card'),
+        ('catalogue_item_detail',    'Catalogue: Item Detail'),        
+        ('catalogue_items_list',     'Catalogue: Items List'),
+        ('catalogue_pagination',     'Catalogue: Pagination'),
+        ('navbar',                   'Navbar'),
+        ('footer',                   'Footer'),
+    ]
+
+    client          = models.ForeignKey(
+        'mysite.Client', on_delete=models.CASCADE,
+        related_name='templates'
+    )
+    template_key    = models.CharField(
+        max_length=50, choices=TEMPLATE_CHOICES,
+        help_text="Which template this overrides"
+    )
+
+    htmlblob      = models.TextField(blank=True, help_text="Django template HTML. Has access to all context variables.") # modeltranslation blank=True to be present    
+    is_active       = models.BooleanField(default=True)
+    updated_at      = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('client', 'template_key')
+        ordering        = ['client', 'template_key']
+        verbose_name = "00-03E Client Templates"
+        verbose_name_plural = "00-03E Client Templates"
+    def __str__(self):
+        client_id = getattr(self.client, 'client_id', '?')
+        return f"{client_id} / {self.template_key}"
+"""
 class Layout(models.Model):
     # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
     # client is kept, so that layout can be a separate admin tab. in that we are braching to component type admin.
@@ -170,5 +201,6 @@ class Layout(models.Model):
         #    raise ValidationError("Page and Layout Clients need to be same !")
 
     def __str__(self):
-        return f"{self.page.client.client_id} / {self.page.page_id} / {self.level} / {self.slug}"
+        #return f"{self.page.client.client_id} / {self.page.page_id} / {self.level} / {self.slug}"
+        return f"{self.page} / {self.level} / {self.slug}"    
 

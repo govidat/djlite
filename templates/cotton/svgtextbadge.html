@@ -10,11 +10,25 @@ This is to display a svg, text and badge in a single line.
     {'type': 'svg', 'order': 1, 'css_class': None, 'svg_text': 'xyz'}
 ] 
 
+"items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "",
+                                    "values": [
+                                      {
+                                        "id": 17,
+                                        "text": "Home Content22"
+                                      }
+                                    ]
+                                  }
+                                ]
+
 first get the svgitem for this input and then proceed as before
 
 
 {% endcomment %}
-
+ 
 
 {% for item in items %}
     <div class="flex">
@@ -26,18 +40,21 @@ first get the svgitem for this input and then proceed as before
         {% endif %}
 
         {% if item.type == 'text' or item.type == 'badge' %}
+            {% comment %}
+            { mytextv2 item.values 'stext' as result_var }
+            { with lv_name=result_var }
+                {% with lv_name=item.value %}
+            {% endcomment %}
+                        
+            {% if item.type == 'text' %}
+                {{item.value|default:""}}
+            {% endif %}
+            {% if item.type == 'badge' %} 
+                <div class="badge badge-secondary {{ item.css_class|default:"" }}">
+                    {{item.value|default:""}}    
+                </div>
+            {% endif %}
             
-            {% mytextv2 item.values 'stext' as result_var %}
-            {% with lv_name=result_var %}
-                {% if item.type == 'text' %}
-                    {{lv_name}}
-                {% endif %}
-                {% if item.type == 'badge' %} 
-                    <div class="badge badge-secondary {{ item.css_class|default:"" }}">
-                        {{lv_name}}    
-                    </div>
-                {% endif %}
-            {% endwith %}
             
         {% endif %}
     </div>    

@@ -20,7 +20,7 @@ from django.contrib.auth.models import User
 from .client import Client
 from django.utils.translation import get_language
 from django.core.exceptions import ObjectDoesNotExist
-
+from types import SimpleNamespace
 
 # ── 0. Scope helper ──────────────────────────────────────────────────
 """
@@ -219,8 +219,8 @@ class Taxonomy(models.Model):
     taxonomy_type = models.CharField(
         max_length=20, choices=TAXONOMY_TYPES, default='custom'
     )
-    name        = models.CharField(max_length=100, blank=True)   # modeltranslation expands blank=True to be added
-    description = models.CharField(max_length=300, blank=True) # modeltranslation expands
+    name        = models.CharField(max_length=100, blank=True)   # modeltranslation blank=True to be present expands blank=True to be added
+    description = models.CharField(max_length=300, blank=True) # modeltranslation blank=True to be present expands
 
     order       = models.PositiveIntegerField(default=0)
     is_active   = models.BooleanField(default=True)
@@ -241,7 +241,8 @@ class Taxonomy(models.Model):
         ]
 
     def __str__(self):
-        scope = self.client.client_id if self.client else 'GLOBAL'
+        scope = getattr(self.client, 'client_id', '?') if self.client else 'GLOBAL' 
+        #scope = self.client.client_id if self.client else 'GLOBAL'
         return f"[{scope}] {self.slug}"
     
 
@@ -291,7 +292,7 @@ class TaxonomyNode(models.Model):
         related_name='children'
     )
     slug        = LowercaseCharField(max_length=100, db_index=True)
-    name        = models.CharField(max_length=150, blank=True)   # modeltranslation expands
+    name        = models.CharField(max_length=150, blank=True)   # modeltranslation blank=True to be present expands
     path        = models.CharField(
         max_length=500, db_index=True,
         help_text="Materialized path e.g. '001.002.003'. Auto-managed."
@@ -326,8 +327,10 @@ class TaxonomyNode(models.Model):
         ]
 
     def __str__(self):
-        scope = self.client.client_id if self.client else 'GLOBAL'
-        return f"[{scope}] {self.taxonomy.slug} / {self.path} / {self.slug}"
+        scope = getattr(self.client, 'client_id', '?') if self.client else 'GLOBAL'
+        #scope = self.client.client_id if self.client else 'GLOBAL'
+        taxslug = getattr(self.taxonomy, 'slug', '?') if self.taxonomy else '?'
+        return f"[{scope}] {taxslug} / {self.path} / {self.slug}"
 
     def save(self, *args, **kwargs):
         if self.parent:
@@ -409,7 +412,7 @@ class NodeAttributeType(models.Model):
         help_text="Null = global attribute type"
     )
     slug        = LowercaseCharField(max_length=50)
-    name        = models.CharField(max_length=100, blank=True)    # modeltranslation
+    name        = models.CharField(max_length=100, blank=True)    # modeltranslation blank=True to be present
     field_type  = models.CharField(max_length=20, choices=FIELD_TYPES, default='text')
     is_required = models.BooleanField(default=False)
     is_filterable = models.BooleanField(
@@ -446,7 +449,7 @@ class NodeAttributeValue(models.Model):
         help_text="Null = global value"
     )
     slug        = LowercaseCharField(max_length=50)
-    name        = models.CharField(max_length=200, blank=True)    # modeltranslation
+    name        = models.CharField(max_length=200, blank=True)    # modeltranslation blank=True to be present
     order       = models.PositiveIntegerField(default=0)
 
     # GS1 GPC Brick Attribute Value code (optional)
@@ -458,7 +461,8 @@ class NodeAttributeValue(models.Model):
         verbose_name    = '01-04 Item Node Attribute Value'
 
     def __str__(self):
-        return f"{self.attribute_type.slug} = {self.name}"
+        attslug = getattr(self.attribute_type, 'slug', '?') if self.attribute_type else '?'
+        return f"{attslug} = {self.name}"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -518,8 +522,8 @@ class GlobalItem(models.Model):
     )
 
     # Core translatable content
-    name           = models.CharField(max_length=200, blank=True)     # modeltranslation
-    description    = models.TextField(blank=True)          # modeltranslation
+    name           = models.CharField(max_length=200, blank=True)     # modeltranslation blank=True to be present
+    description    = models.TextField(blank=True)          # modeltranslation blank=True to be present
     #brand          = models.CharField(max_length=100, blank=True) -- moved to Taxonomy
     #subbrand       = models.CharField(max_length=100, blank=True) -- moved to Taxonomy   
     #manufacturer   = models.CharField(max_length=100, blank=True) -- moved to Taxonomy
@@ -561,6 +565,7 @@ class GlobalItem(models.Model):
         ]
 
     def __str__(self):
+        
         return f"[GLOBAL] {self.global_item_id} — {self.name}"
 
 
@@ -612,6 +617,46 @@ class GlobalItemAttributeValue(models.Model):
             return str(self.value_number)
         return self.value_text
 
+
+class GlobalItemMedia(models.Model):
+    """
+    Media attached to a GlobalItem.
+    Inherited by client Items when Item.inherit_global_media=True.
+    """
+    MEDIA_CHOICES = [
+        ('image', 'Image'),
+        ('audio', 'Audio'),
+        ('video', 'Video'),
+        ('pdf',   'PDF Document'),
+        ('text',  'Structured Text'),
+    ]
+
+    global_item = models.ForeignKey(
+        GlobalItem, on_delete=models.CASCADE,
+        related_name='medias'
+    )
+    media_type  = models.CharField(max_length=20, choices=MEDIA_CHOICES, db_index=True)
+    media_url   = models.URLField(max_length=500, blank=True,
+                                   help_text="URL for image/audio/video/pdf")
+    alt         = models.CharField(max_length=200, blank=True)
+    order       = models.PositiveIntegerField(default=0)
+    is_primary  = models.BooleanField(default=False)
+    # For 'text' media_type only
+    text_content = models.JSONField(
+        default=list, blank=True,
+        help_text="Structured text: [{title, children: [{subtitle, content: [para...]}]}]"
+    )  #modeltranslation blank=True to be present
+
+    class Meta:
+        ordering = ['global_item', 'order']
+        verbose_name = 'Global Item Media'
+
+    def __str__(self):
+        global_item_id = getattr(self.global_item, 'global_item_id', '?')
+           
+        return f"[GLOBAL] {global_item_id} / {self.media_type} {self.order}"
+        #return f"[GLOBAL] {self.global_item.global_item_id} / {self.media_type} {self.order}"
+
 # ═══════════════════════════════════════════════════════════════════
 # PART C: CLIENT ITEM
 # ═══════════════════════════════════════════════════════════════════
@@ -661,7 +706,12 @@ class Item(I18nFallbackMixin, models.Model):
         help_text="Global reference item this derives from. "
                   "Unset fields fall back to GlobalItem values."
     )
-
+    inherit_global_media = models.BooleanField(
+        default=True,
+        help_text="If true, GlobalItem media is inherited and merged with "
+                  "this item's own media records. Item media shown first, "
+                  "then global media (excluding types already covered by item media)."
+    )
     # GS1 identification (copied or overridden from global_item)
     gtin           = models.CharField(max_length=14, blank=True, db_index=True)
     gpc_brick_code = models.CharField(max_length=8, blank=True, db_index=True)
@@ -677,8 +727,8 @@ class Item(I18nFallbackMixin, models.Model):
     order          = models.PositiveIntegerField(default=0)
 
     # Override fields — None/blank means "use GlobalItem value"
-    name           = models.CharField(max_length=200, blank=True)   # modeltranslation
-    description    = models.TextField(blank=True)                    # modeltranslation
+    name           = models.CharField(max_length=200, blank=True)   # modeltranslation blank=True to be present
+    description    = models.TextField(blank=True)                    # modeltranslation blank=True to be present
 
     #brand          = models.CharField(max_length=100, blank=True)-- moved to Taxonomy
     #subbrand       = models.CharField(max_length=100, blank=True)-- moved to Taxonomy   
@@ -693,7 +743,7 @@ class Item(I18nFallbackMixin, models.Model):
     length_mm         = models.PositiveIntegerField(null=True, blank=True)
     width_mm          = models.PositiveIntegerField(null=True, blank=True)
     height_mm         = models.PositiveIntegerField(null=True, blank=True)
-    care_instructions = models.TextField(blank=True)                   # modeltranslation
+    care_instructions = models.TextField(blank=True)                   # modeltranslation blank=True to be present
 
 
     # Overflow attributes
@@ -723,7 +773,8 @@ class Item(I18nFallbackMixin, models.Model):
         ]
 
     def __str__(self):
-        scope = self.client.client_id if self.client else 'SHARED'
+        scope = getattr(self.client, 'client_id', '?') if self.client else 'SHARED'       
+        #scope = self.client.client_id if self.client else 'SHARED'
         return f"[{scope}] {self.item_id}"
 
     # ── Field resolution: client override → global fallback ──────────
@@ -882,8 +933,117 @@ class Item(I18nFallbackMixin, models.Model):
         resolved.update(self.resolved_attributes())
 
         return resolved
+    """
+    def resolved_medias(self):
+        
+        #Merge ItemMedia + inherited GlobalItemMedia.
 
+        #Rules:
+        #1. Item media always included
+        #2. Global media included only if inherit_global_media=True
+        #3. Item media takes precedence by media_type + order semantics
+        #4. Result sorted by order
 
+        medias = list(
+            getattr(self, 'prefetched_medias', [])
+        )
+
+        if not self.inherit_global_media or not self.global_item:
+            return sorted(medias, key=lambda m: m.order)
+
+        global_medias = getattr(
+            self.global_item,
+            'prefetched_global_medias',
+            None
+        )
+
+        if global_medias is None:
+            global_medias = self.global_item.medias.all().order_by('order')
+
+        # Optional precedence logic
+        #existing_types = {
+        #    (m.media_type, m.order)
+        #    for m in medias
+        #}
+
+        for gm in global_medias:
+
+            #key = (gm.media_type, gm.order)
+
+            #if key in existing_types:
+            #    continue
+
+            medias.append(
+                SimpleNamespace(
+                    media_type=gm.media_type,
+                    media_url=gm.media_url,
+                    alt=gm.alt,
+                    order=gm.order,
+                    is_primary=gm.is_primary,
+                    text_content=gm.text_content,
+                    is_inherited=True,
+                )
+            )
+
+        return sorted(medias, key=lambda m: m.order)  
+    """  
+    def resolved_medias(self):
+        
+        #Item media + optional inherited GlobalItem media.
+        #Uses prefetched data if available.
+        
+
+        medias = list(getattr(self, 'prefetched_medias', []))
+
+        if self.inherit_global_media and self.global_item:
+
+            global_medias = getattr(
+                self.global_item,
+                'prefetched_global_medias',
+                None
+            )
+
+            if global_medias is None:
+                global_medias = self.global_item.medias.all()
+
+            for gm in global_medias:
+
+                gm.is_inherited = True
+                medias.append(gm)
+
+        medias.sort(key=lambda m: m.order)
+
+        return medias
+    """ 
+    def resolved_images(self):
+        return [
+            m for m in self.resolved_medias()
+            if m.media_type == 'image'
+        ]
+
+    def resolved_audios(self):
+        return [
+            m for m in self.resolved_medias()
+            if m.media_type == 'audio'
+        ]
+
+    def resolved_videos(self):
+        return [
+            m for m in self.resolved_medias()
+            if m.media_type == 'video'
+        ]    
+    
+    def resolved_pdfs(self):
+        return [
+            m for m in self.resolved_medias()
+            if m.media_type == 'pdf'
+        ]    
+    def resolved_texts(self):
+        return [
+            m for m in self.resolved_medias()
+            if m.media_type == 'text'
+        ]            
+    """
 class ItemTaxonomyNode(models.Model):
     """Maps a client Item to TaxonomyNodes (global or client nodes)."""
     item        = models.ForeignKey(
@@ -907,7 +1067,10 @@ class ItemTaxonomyNode(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.item} → {self.node}"
+        itemname = getattr(self.item, 'name', '?')
+        nodename = getattr(self.item, 'name', '?')
+        return f"{itemname}→ {nodename}"        
+        #return f"{self.item} → {self.node}"
 
 
 class ItemAttributeValue(models.Model):
@@ -945,7 +1108,10 @@ class ItemAttributeValue(models.Model):
         return self.value_text
 
     def __str__(self):
-        return f"{self.item} / {self.attribute_type.slug} = {self.resolved_value()}"
+        itemname = getattr(self.item, 'name', '?')
+        attslug = getattr(self.attribute_type, 'slug', '?') 
+        return f"{itemname} / {attslug} = {self.resolved_value()}"
+        #return f"{self.item} / {self.attribute_type.slug} = {self.resolved_value()}"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -981,7 +1147,8 @@ class ProductItem(models.Model):
         verbose_name = 'Product Detail'
 
     def __str__(self):
-        return f"Product: {self.item}"
+        itemname = getattr(self.item, 'name', '?')
+        return f"Product: {itemname}"
 
     def to_beckn_tags(self):
         return {
@@ -1074,19 +1241,26 @@ class ItemMedia(models.Model):
     MEDIA_CHOICES = [
         ('image',  'Image'),
         ('audio',  'Audio'),
-        ('video',     'Video')
+        ('video',     'Video'),
+        ('pdf',   'PDF Document'),
+        ('text',  'Structured Text'),        
     ]    
     media_type  = models.CharField(max_length=20, choices=MEDIA_CHOICES, db_index=True)    
     media_url   = models.URLField(max_length=500)
     alt         = models.CharField(max_length=200, blank=True)
     order       = models.PositiveIntegerField(default=0)
     is_primary  = models.BooleanField(default=False)
-
+    text_content = models.JSONField(
+        default=list, blank=True,
+        help_text="For media_type='text' only. "
+                  "Structure: [{title, children: [{subtitle, content: [para...]}]}]"
+    ) #modeltranslation blank=True to be present
     class Meta:
         ordering = ['item', 'order']
 
     def __str__(self):
-        return f"{self.item} / media {self.order}"
+        itemname = getattr(self.item, 'name', '?')
+        return f"{itemname} / media {self.order}"
 
 # ── 6. ItemVariant (Phase 3 eCommerce ready) ─────────────────────────
 
@@ -1100,7 +1274,7 @@ class ItemVariant(models.Model):
         Item, on_delete=models.CASCADE, related_name='variants'
     )
     variant_id   = LowercaseCharField(max_length=50)
-    name         = models.CharField(max_length=100, blank=True) # modeltranslation
+    name         = models.CharField(max_length=100, blank=True) # modeltranslation blank=True to be present
     sku          = models.CharField(max_length=100, blank=True, db_index=True)
     gtin         = models.CharField(max_length=14, blank=True,
                                      help_text="Variant-level GTIN if different from item")
@@ -1121,7 +1295,8 @@ class ItemVariant(models.Model):
         verbose_name    = 'Item Variant'
 
     def __str__(self):
-        return f"{self.item} / {self.variant_id}"
+        itemname = getattr(self.item, 'name', '?')        
+        return f"{itemname} / {self.variant_id}"
 
     def effective_price(self):
         """Variant price overrides item-level price."""

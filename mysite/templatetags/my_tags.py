@@ -6,219 +6,10 @@ from django.utils.safestring import mark_safe
 
 register = template.Library()
 
+from django.template import Context, Template
+from django.core.cache import cache
+from django.template.loader import render_to_string
 
-@register.simple_tag(takes_context=True)
-def xxxmytext_static_tag(context, lv_token_id='', lv_ln=''):
-
-    
-    """
-    Input is a lv_token; optional lv_ln = "en', 'hi'...
-    Output is a text. 
-    This has to be derived from texts_static_dict which is of form:
-    texts_static_dict - {token_id: {client_id: {page_id: {en: val1, fr: val2}}}}
-    client_hierarchy_list = ['bahushira', parent, grandparent, 'default']
-    LANGUAGE_CODE 
-    CURRENT_LANGUAGE_CODE
-    page_id
-
-    """    
-    cv_client_hier_list = context.get("client_hierarchy_list")
-    cv_data_dict = context.get("texts_static_dict")
-    cv_base_ln_code = context.get("LANGUAGE_CODE")
-    cv_curr_ln_code = get_language()
-    cv_page_id = context.get("page")
-
-    # a hierarchy of page is with global followed by current page
-    cv_ln_hier_list = [cv_curr_ln_code]
-    if cv_base_ln_code != cv_curr_ln_code:
-        cv_ln_hier_list.append(cv_base_ln_code)
-    # if a lv_ln is passed to the function ie. the preferred ln code, then put this as the first entry in ln_hier_list
-    if lv_ln != '':
-        if lv_ln in cv_ln_hier_list:
-            cv_ln_hier_list.remove(lv_ln) # Removes the first occurrence by value
-        cv_ln_hier_list.insert(0, lv_ln) # Inserts the item at index 0 (the beginning)
-
-    cv_page_hier_list = [cv_page_id, 'global']
-    """
-    Attempts to retrieve a value from a 4-level nested dictionary 
-    using predefined paths in order of preference.
-    
-    Returns the value found or None if no valid path exists.
-    token > client > ln > page 
-    token > client > ln > general 
-    token > client > baseln > page 
-    token > client > baseln > general 
-
-    token > client_parent...
-    token > default ....
-      
-    # If none of the paths are found
-    return None
-    """
-    """
-    default = 'ERR001'
-
-    token_data = cv_data_dict.get(lv_token_id)
-    if not token_data:
-        return default
-
-    for client_id in cv_client_hier_list:
-        client_data = token_data.get(client_id)
-        if not client_data:
-            continue
-
-        for language_id in cv_ln_hier_list:
-            lang_data = client_data.get(language_id)
-            if not lang_data:
-                continue
-
-            for page_id in cv_page_hier_list:
-                if page_id in lang_data:
-                    return lang_data[page_id]
-
-    return default
-
-    """
-    # Check if the target token_id exists in the main dictionary
-    if lv_token_id not in cv_data_dict:
-        return 'ERR001'
-
-    # Get the dictionary for the specific token
-    client_dict = cv_data_dict[lv_token_id]
-
-    # Iterate through the client priorities
-    for client_id in cv_client_hier_list:
-        if client_id in client_dict:
-            language_dict = client_dict[client_id]
-            
-
-            # Iterate through the language priorities
-            for language_id in cv_ln_hier_list:
-                if language_id in language_dict:
-                    page_dict = language_dict[language_id]
-                                
-                    # Iterate through the page priorities
-                    for page_id in cv_page_hier_list:
-                        if page_id in page_dict:
-                            # Found the first prioritized value
-                            return page_dict[page_id]
-                            
-    # If no value was found after checking all priorities
-    return 'ERR001'
-    
-@register.simple_tag(takes_context=True)
-def xxxmyimage_static_tag(context, lv_token_id=''):
-
-    
-    """
-    Input is a image_id
-    Output is an object of form {image_url: xyz , alt: xyz}. 
-    This has to be derived from images_static_dict which is of form:
-    images_static_dict - {image_id: {client_id: {page_id: {image_url: xyz, alt: xyz}}}}
-    client_hierarchy_list = ['bahushira', parent, grandparent, 'default']
-    page_id
-
-    """    
-    cv_client_hier_list = context.get("client_hierarchy_list")
-    cv_data_dict = context.get("images_static_dict")
-    cv_page_id = context.get("page")
-
-    # a hierarchy of page is with current_page followed by global
-    cv_page_hier_list = [cv_page_id, 'global']
-    """
-    Attempts to retrieve a value from a 4-level nested dictionary 
-    using predefined paths in order of preference.
-    
-    Returns the value found or None if no valid path exists.
-    token > client > page 
-    token > client > general 
-    token > client2 > page 
-    token > client2 > general 
-
-    token > client_parent...
-    token > default ....
-      
-    # If none of the paths are found
-    return None
-    """
-
-    # Check if the target token_id exists in the main dictionary
-    if lv_token_id not in cv_data_dict:
-        return {'image_url': '', 'alt': 'ERR001'}
-
-    # Get the dictionary for the specific token
-    client_dict = cv_data_dict[lv_token_id]
-
-    # Iterate through the client priorities
-    for client_id in cv_client_hier_list:
-        if client_id in client_dict:
-            page_dict = client_dict[client_id]
-                        
-            # Iterate through the page priorities
-            for page_id in cv_page_hier_list:
-                if page_id in page_dict:
-                    # Found the first prioritized value
-                    return page_dict[page_id]
-                            
-    # If no value was found after checking all priorities
-    return {'image_url': '', 'alt': 'ERR001'}    
-
-@register.simple_tag(takes_context=True)
-def xxxmysvg_static_tag(context, lv_token_id=''):
-
-    
-    """
-    Input is a svg_id
-    Output is an object of form {svg_text: xyz}. 
-    This has to be derived from svgs_static_dict which is of form:
-    svgs_static_dict - {svg_id: {client_id: {page_id: {svg_text: xyz}}}}
-    client_hierarchy_list = ['bahushira', parent, grandparent, 'default']
-    page_id
-
-    """    
-    cv_client_hier_list = context.get("client_hierarchy_list")
-    cv_data_dict = context.get("svgs_static_dict")
-    cv_page_id = context.get("page")
-
-    # a hierarchy of page is with current_page followed by global
-    cv_page_hier_list = [cv_page_id, 'global']
-    """
-    Attempts to retrieve a value from a 4-level nested dictionary 
-    using predefined paths in order of preference.
-    
-    Returns the value found or None if no valid path exists.
-    token > client > page 
-    token > client > general 
-    token > client2 > page 
-    token > client2 > general 
-
-    token > client_parent...
-    token > default ....
-      
-    # If none of the paths are found
-    return None
-    """
-
-    # Check if the target token_id exists in the main dictionary
-    if lv_token_id not in cv_data_dict:
-        return {'svg_text': ''}
-
-    # Get the dictionary for the specific token
-    client_dict = cv_data_dict[lv_token_id]
-
-    # Iterate through the client priorities
-    for client_id in cv_client_hier_list:
-        if client_id in client_dict:
-            page_dict = client_dict[client_id]
-                        
-            # Iterate through the page priorities
-            for page_id in cv_page_hier_list:
-                if page_id in page_dict:
-                    # Found the first prioritized value
-                    return page_dict[page_id]
-                            
-    # If no value was found after checking all priorities
-    return {'svg_text': ''}
 
 # this is to be used for getting the gentext like name, nb_title for further passing to svgtextbadge
 @register.simple_tag(takes_context=True)
@@ -331,237 +122,8 @@ def mylist_bykey(context, lv_list=[], lv_val0="name", lv_key0="block_id"):
     return filtered
 
 
-# this is to be used for getting the gentext like name, nb_title for further passing to svgtextbadge
 @register.simple_tag(takes_context=True)
-def xxxmytext_l0dict(context, lv_list=[], lv_val0="name", lv_key0="block_id", lv_position0=0):
-     
-    """ 
-    Input:
-      "textblocks": [
-            {
-            "block_id": "name",
-            "order": 1,
-            "css_class": "None",
-            "ltext": "None",
-            "href_page": "None",
-            "items": [
-                {
-                "type": "text",
-                "order": 1,
-                "css_class": "None",
-                "values": {
-                    "en": {
-                    "stext": "Bahushira",
-                    "ltext": "ltBahushira"
-                    },
-                    "fr": {
-                    "stext": "frBahushira",
-                    "ltext": "ltfrBahushira"
-                    },
-                    "hi": {
-                    "stext": "hiBahushira",
-                    "ltext": "lthiBahushira"
-                    }
-                }
-                }
-            ]
-            },
-            {
-            "block_id": "nb_title",
-            "order": 1,
-            "css_class": "None",
-            "ltext": "None",
-            "href_page": "None",
-            "items": [
-                {
-                "type": "text",
-                "order": 1,
-                "css_class": "None",
-                "values": {
-                    "en": {
-                    "stext": "Bahushira Nav Bar",
-                    "ltext": ""
-                    },
-                    "fr": {
-                    "stext": "frBahushira Nav Bar",
-                    "ltext": ""
-                    },
-                    "hi": {
-                    "stext": "hiBahushira Nav Bar",
-                    "ltext": ""
-                    }
-                }
-                }
-            ]
-            }
-        ],
-
-        Output expected is:
-            {
-            "block_id": "name",
-            "order": 1,
-            "css_class": "None",
-            "ltext": "None",
-            "href_page": "None",
-            "items": [
-                {
-                "type": "text",
-                "order": 1,
-                "css_class": "None",
-                "values": {
-                    "en": {
-                    "stext": "Bahushira",
-                    "ltext": "ltBahushira"
-                    },
-                    "fr": {
-                    "stext": "frBahushira",
-                    "ltext": "ltfrBahushira"
-                    },
-                    "hi": {
-                    "stext": "hiBahushira",
-                    "ltext": "lthiBahushira"
-                    }
-                }
-                }
-            ]
-            }
-
-    """    
-    """
-    # Get the dictionary
-    lv0_filtered_list = [item for item in lv_list if item.get(lv_key0) == lv_val0]
-    lv0_dict = lv0_filtered_list[lv_position0]  # {block_id: name... items:[]}
-    return lv0_dict
-    """
-    filtered = [
-        item for item in (lv_list or [])
-        if item.get(lv_key0) == lv_val0
-    ]
-
-    return filtered[lv_position0] if lv_position0 < len(filtered) else {}
-
-
-
-# deprecated
-# this is to be used for getting the gentext like name, nb_title etc
-@register.simple_tag(takes_context=True)
-def zzmytext_gen(context, lv_list=[], lv_val0="name", lv_ln='', lv_key0="block_id", lv_position0=0, lv_key1="type", lv_val1="text", lv_position1=0, lv_key='stext'):
-     
-    """ 
-    Input:
-      "textblocks": [
-            {
-            "block_id": "name",
-            "order": 1,
-            "css_class": "None",
-            "ltext": "None",
-            "href_page": "None",
-            "items": [
-                {
-                "type": "text",
-                "order": 1,
-                "css_class": "None",
-                "values": {
-                    "en": {
-                    "stext": "Bahushira",
-                    "ltext": "ltBahushira"
-                    },
-                    "fr": {
-                    "stext": "frBahushira",
-                    "ltext": "ltfrBahushira"
-                    },
-                    "hi": {
-                    "stext": "hiBahushira",
-                    "ltext": "lthiBahushira"
-                    }
-                }
-                }
-            ]
-            },
-            {
-            "block_id": "nb_title",
-            "order": 1,
-            "css_class": "None",
-            "ltext": "None",
-            "href_page": "None",
-            "items": [
-                {
-                "type": "text",
-                "order": 1,
-                "css_class": "None",
-                "values": {
-                    "en": {
-                    "stext": "Bahushira Nav Bar",
-                    "ltext": ""
-                    },
-                    "fr": {
-                    "stext": "frBahushira Nav Bar",
-                    "ltext": ""
-                    },
-                    "hi": {
-                    "stext": "hiBahushira Nav Bar",
-                    "ltext": ""
-                    }
-                }
-                }
-            ]
-            }
-        ],
-
-    Optional lv_ln = "en', 'hi'...
-    Output is a text. 
-
-    LANGUAGE_CODE 
-    CURRENT_LANGUAGE_CODE
-
-    """    
-    cv_base_ln_code = context.get("LANGUAGE_CODE")
-    cv_curr_ln_code = get_language()
-
-    # a hierarchy of page is with global followed by current page
-    cv_ln_hier_list = [cv_curr_ln_code]
-    if cv_base_ln_code != cv_curr_ln_code:
-        cv_ln_hier_list.append(cv_base_ln_code)
-    # if a lv_ln is passed to the function ie. the preferred ln code, then put this as the first entry in ln_hier_list
-    if lv_ln != '':
-        if lv_ln in cv_ln_hier_list:
-            cv_ln_hier_list.remove(lv_ln) # Removes the first occurrence by value
-        cv_ln_hier_list.insert(0, lv_ln) # Inserts the item at index 0 (the beginning)
-
-    """
-    Attempts to retrieve a value from a nested dictionary 
-    using predefined paths in order of preference.
-    
-    # If none of the paths are found
-    return None
-    """
-
-    # Get the dictionary
-    """
-    Option 1
-    """
-    lv0_filtered_list = [item for item in lv_list if item.get(lv_key0) == lv_val0]
-    lv0_dict = lv0_filtered_list[lv_position0]  # {block_id: name... items:[]}
-    lv1_list = lv0_dict["items"]  # [{type: text, values:[]}]
-    lv1_filtered_list = [item for item in lv1_list if item.get(lv_key1) == lv_val1] # [{type: text, values:[]}]
-    lv1_dict = lv1_filtered_list[lv_position1]  # {type: text, values:[]}
-
-    lv_values_dict = lv1_dict["values"]
-        #lv_values_dict = lv_dict
-         
-
-    # Iterate through the language priorities
-    for language_id in cv_ln_hier_list:
-        if language_id in lv_values_dict:
-            return lv_values_dict[language_id][lv_key]
-                                
-
-                            
-    # If no value was found after checking all priorities
-    return 'ERR001'
-
-@register.simple_tag(takes_context=True)
-def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
+def zzmytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
      
     """ 
     Input is :
@@ -672,7 +234,7 @@ def mytextv2(context, lv_dict={}, lv_key='stext', lv_ln=''):
     """
 
 @register.simple_tag(takes_context=True)
-def mytext_labelv2(context, lv_dict={}):
+def zzmytext_labelv2(context, lv_dict={}):
      
     """ 
     Option 2
@@ -723,3 +285,86 @@ def mytext_labelv2(context, lv_dict={}):
                             
     # If no value was found after checking all priorities
     return 'ERR001'    
+
+@register.simple_tag(takes_context=True)
+def render_client_template(context, template_key, **extra_context):
+    """
+    Renders a client-specific template from DB, falling back to
+    the filesystem template if no DB record exists.
+
+    Usage in templates:
+      {% load client_template_tags %}
+      {% render_client_template 'catalogue_item_card' item=item %}
+    """
+    request = context.get('request')
+    client  = context.get('client', {})
+    client_id = client.get('client_id') if isinstance(client, dict) else getattr(client, 'client_id', None)
+
+    if not client_id:
+        return ''
+
+    #active_lang = get_language() or 'en'
+
+    # Cache key per client + template_key + language
+    # cache_key = f"client_template:{client_id}:{template_key}:{active_lang}"
+
+    # modeltranslation already resolves language automatically
+    cache_key = f"client_template:{client_id}:{template_key}"
+
+    cached_html = cache.get(cache_key)
+
+
+
+    if cached_html is None:
+        from mysite.models.client import ClientTemplate
+        # Try active language first, then 'all', then None (not found)
+        db_template = (
+            ClientTemplate.objects
+            .filter(
+                client__client_id=client_id,
+                template_key=template_key,
+                is_active=True,
+            )
+            .first()
+            #.filter(
+            #    models.Q(language_code=active_lang) |
+            #    models.Q(language_code='all')
+            #)
+            #.order_by('-language_code')  # active_lang before 'all'
+            #.first()
+        )
+        # IMPORTANT:
+        # htmlblob auto-resolves to current language
+ 
+        cached_html = db_template.htmlblob if db_template else ''
+        cache.set(cache_key, cached_html, timeout=3600)
+
+    if cached_html:
+        # Render the DB template string with the current context
+        # Merge context + extra_context
+        render_context = dict(context.flatten())
+        render_context.update(extra_context)
+        try:
+            t = Template(cached_html)
+            return t.render(Context(render_context))
+        except Exception:
+            return ''  # fail silently — don't break the page
+
+    # Fallback to filesystem template
+    # from django.template.loader import render_to_string
+    filesystem_map = {
+        'catalogue_filter_sidebar': 'catalogue/partials/filter_sidebar.html',
+        'catalogue_item_card':      'catalogue/partials/item_card.html',
+        'catalogue_items_list':     'catalogue/partials/items_list.html',
+        'catalogue_pagination':     'catalogue/partials/pagination.html',
+        'catalogue_item_detail':    'catalogue/partials/item_detail.html',  # have put a wrapper and moved content to partials
+        'navbar':                   'cotton/navbar_v001.html',
+        'footer':                   'cotton/footer.html',
+    }
+    fs_template = filesystem_map.get(template_key)
+    if fs_template:
+        render_context = dict(context.flatten())
+        render_context.update(extra_context)
+        return render_to_string(fs_template, render_context, request=request)
+
+    return ''

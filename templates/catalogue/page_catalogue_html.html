@@ -1,15 +1,51 @@
 {% extends "base.html" %}
 {% load i18n %}
+{% load my_tags %}
 
 {% comment %}
 FILE: templates/catalogue/page_catalogue_html.html
 Track A — renders PageContent blob as hero/header,
 then injects the full catalogue layout (sidebar + items).
 
-The blob (raw_html from PageContent) provides ONLY static
-marketing content — headings, hero banners, intro copy.
-ALL dynamic parts (filters, items, pagination, search) are
-rendered here as Django template includes.
+tag render_client_template
+
+    Renders a client-specific template from DB, falling back to
+    the filesystem template if no DB record exists.
+
+    Usage in templates:
+      {% load my_tags %}
+      {% render_client_template 'catalogue_item_card' item=item %}
+
+    templates available from db
+    filesystem_map = {
+        'catalogue_filter_sidebar': 'catalogue/partials/filter_sidebar.html',
+        'catalogue_item_card':      'catalogue/partials/item_card.html',
+        'catalogue_items_list':     'catalogue/partials/items_list.html',
+        'catalogue_pagination':     'catalogue/partials/pagination.html',
+        'catalogue_item_detail':    'catalogue/item_detail.html',
+        'navbar':                   'cotton/navbar_v001.html',
+        'footer':                   'cotton/footer.html',
+    }
+
+
+
+Usage in page_catalogue_html.html — replace hardcoded includes with:
+  {% render_client_template 'catalogue_filter_sidebar' item=item %}
+  {% render_client_template 'catalogue_items_list' item=item %}
+  instead of:
+  {% include catalogue.template_info.filter_sidebar %}
+  {% include catalogue.template_info.items_list %}
+
+Usage in items_list.html — replace hardcoded item_card include with:
+  {% render_client_template 'catalogue_item_card' item=item %}
+  instead of:
+  {% include catalogue.template_info.item_card with item=item %}
+
+Usage in page_catalogue.html
+  {% render_client_template 'catalogue_filter_sidebar' item=item %}
+This gives each client a fully customised catalogue UI without
+code changes — just drop template files in their named folder.
+
 {% endcomment %}
 
 {% block content %}
@@ -34,7 +70,8 @@ rendered here as Django template includes.
       {# ── Desktop filter sidebar ─────────────────────────────── #}
       <aside class="w-72 shrink-0 hidden lg:block">
         <div class="sticky top-20">
-          {% include "catalogue/partials/filter_sidebar.html" %}
+          {% render_client_template 'catalogue_filter_sidebar' %}
+          <!-- include catalogue.template_info.filter_sidebar  -->
         </div>
       </aside>
 
@@ -43,9 +80,11 @@ rendered here as Django template includes.
 
         {# Search bar #}
         <div class="mb-4">
-          <form hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+          <form id="filter-form"
+                hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
                 hx-target="#items-container"
                 hx-swap="innerHTML"
+                hx-push-url="true"
                 hx-trigger="submit, input delay:600ms from:#cat-search"
                 class="flex gap-2">
             {# Include all active node/brand/attr filters with search #}
@@ -114,7 +153,8 @@ rendered here as Django template includes.
 
         {# ── HTMX swap target — items grid + pagination ────────── #}
         <div id="items-container">
-          {% include "catalogue/partials/items_list.html" %}
+          {% render_client_template 'catalogue_items_list' %}
+          <!-- include catalogue.template_info.items_list  -->
         </div>
 
       </main>
@@ -158,7 +198,8 @@ rendered here as Django template includes.
     {# hx-include="#filter-form" will target the desktop form   #}
     {# if both are in DOM. To avoid ambiguity on mobile,        #}
     {# use a dedicated mobile form id below.                    #}
-    {% include "catalogue/partials/filter_sidebar_mobile.html" %}
+    {% render_client_template 'catalogue_filter_sidebar' %}
+    <!-- include catalogue.template_info.filter_sidebar -->
 
   </div>
 
@@ -166,6 +207,8 @@ rendered here as Django template includes.
 {% endblock %}
 
 {% comment "" %}
+
+    {% include "catalogue/partials/filter_sidebar_mobile.html" %}
 
 {% extends "base.html" %}
 {% load i18n %}

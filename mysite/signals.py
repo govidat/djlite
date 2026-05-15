@@ -7,7 +7,7 @@ from django.core.cache import cache
 from guardian.shortcuts import assign_perm, remove_perm
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, NavItem, PageContent, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
+from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, NavItem, PageContent, ClientTemplate, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
 from django.contrib.auth.models import User
 
 from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
@@ -37,7 +37,7 @@ def globalval_changed(sender, **kwargs):
 
 # Full CRUD based on role — CMS content models
 CONTENT_MODELS = [
-    Theme, Page, NavItem, PageContent, Layout, Component,
+    Theme, Page, NavItem, PageContent, ClientTemplate, Layout, Component,
     ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem,
 ]
 
@@ -383,7 +383,7 @@ def get_client_id_from_instance(instance):
             return instance.client_id
 
         # One hop via client FK
-        if isinstance(instance, (Theme, Page, NavItem)):
+        if isinstance(instance, (Theme, Page, NavItem, ClientTemplate)):
             return instance.client.client_id
 
         # Two hops: PageContent → page → client
@@ -485,7 +485,7 @@ def register_signals():
 
     # ── CMS content models → invalidate clientstatic cache ───────────
     CMS_MODELS = [
-        Client, Theme, Page, PageContent, NavItem,
+        Client, Theme, Page, PageContent, ClientTemplate, NavItem,
         Layout, Component, ComponentSlot,
         ComptextBlock, TextstbItem, SvgtextbadgeValue,
     ]
@@ -508,6 +508,7 @@ def register_signals():
         Theme,
         Page,
         PageContent,
+        ClientTemplate,
         NavItem,
         Layout,
         Component,

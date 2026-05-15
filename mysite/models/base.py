@@ -25,8 +25,13 @@ ComptextBlock (content_type) (title / content / actbut)  # used in HeroText, Car
     └── SvgtextbadgeValue (per language)
            
            
-TextstbItem (content_type) (text / svg / badge)
-└── SvgtextbadgeValue (per language)
+MODIFIED TextstbItem (content_type) (text / svg / badge)
+└── MODIFIED SvgtextbadgeValue (per language)
+
+Modified with modelTranslation
+TextstbItem
+    └── SvgtextbadgeValue
+            └── text (translated)
 """
 
 def default_languages():

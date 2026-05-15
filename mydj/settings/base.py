@@ -81,7 +81,8 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     # IMPORTANT: must come AFTER AuthenticationMiddleware
-    "mysite.middleware.customer_profile.CustomerProfileMiddleware", # CustomerProfile    
+    "mysite.middleware.customer_profile.CustomerProfileMiddleware", # CustomerProfile  
+    'mysite.middleware.client_block.ClientBlockMiddleware',  # Client_Block  
     'django.contrib.messages.middleware.MessageMiddleware',
     'allauth.account.middleware.AccountMiddleware',     # allauth
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -173,6 +174,8 @@ def _make_templates(debug):
                 'loaders': loaders,
                 'builtins': [
                     'django_cotton.templatetags.cotton',
+                    'mysite.templatetags.my_tags',       # now no need to call in templates
+                    'mysite.templatetags.my_filters',  # # now no need to call in templates
                 ],
             },
         },

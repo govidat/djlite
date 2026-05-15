@@ -1,0 +1,1000 @@
+
+{% comment %}
+FILE: templates/catalogue/item_detail.html
+
+Context variables (all pre-resolved in view):
+  name, description, care_instructions
+  image_url, image_alt
+  images, audios, videos   — lists of ItemMedia instances
+  price, compare_price, currency, sku, stock
+  gtin, gpc_brick_code, barcode, country_of_origin
+  attr_values      — dict {attr_type_name: resolved_value}  (structured)
+  attributes       — dict JSONB overflow
+  dimensions       — dict {label: value} for physical dimensions
+  taxonomy_chains  — list of {taxonomy_name, nodes, chain}
+  variants         — list of ItemVariant instances
+  item             — Item model instance
+  domain_obj       — typed sub-model (ProductItem etc.)
+  client           — from context processor
+{% endcomment %}
+
+<div class="max-w-5xl mx-auto px-4 py-8">
+
+  <!-- ── Breadcrumb ──────────────────────────────────────────── -->
+  <div class="text-sm breadcrumbs text-base-content/60 mb-6">
+    <ul>
+      <li><a href="/{{ client.client_id }}/">Home</a></li>
+      <li>
+        <a href="{% url 'catalogue_page' client_id=client.client_id %}">
+          Catalogue
+        </a>
+      </li>
+      <li class="text-base-content font-medium">{{ name }}</li>
+    </ul>
+  </div>
+
+  <!-- ── Main 2-column layout ──────────────────────────────── -->
+  <div class="flex flex-col md:flex-row gap-8">
+
+    <!-- ════════════════════════════════════════════════════════
+         LEFT COLUMN — Media tabs
+    ════════════════════════════════════════════════════════ -->
+    <div class="md:w-1/2">
+
+      {% if images or audios or videos or pdfs or texts %}
+
+        <!-- DaisyUI v5 radio tabs: label wraps input -->
+        <div class="tabs tabs-bordered mb-4">
+
+          <!-- Images tab -->
+          {% if images %}
+          <label class="tab gap-1">
+            <input type="radio" name="media_tabs" checked />
+            🖼
+            <span>Images</span>
+            {% if images|length > 1 %}
+            <span class="badge badge-sm badge-ghost">{{ images|length }}</span>
+            {% endif %}
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+
+            <!-- Primary image -->
+            <figure class="aspect-square bg-base-200 rounded-2xl
+                           overflow-hidden mb-3">
+              <img src="{{ images.0.media_url }}"
+                   alt="{{ images.0.alt|default:name }}"
+                   class="w-full h-full object-cover"
+                   id="main-image"
+                   loading="eager">
+            </figure>
+
+            <!-- Thumbnails -->
+            {% if images|length > 1 %}
+            <div class="flex gap-2 overflow-x-auto pb-2">
+              {% for img in images %}
+              <button type="button"
+                      onclick="
+                        document.getElementById('main-image').src='{{ img.media_url }}';
+                        document.querySelectorAll('.thumb-btn').forEach(
+                          b => b.classList.remove('border-primary')
+                        );
+                        this.classList.add('border-primary');
+                      "
+                      class="thumb-btn shrink-0 w-16 h-16 rounded-lg
+                             overflow-hidden border-2
+                             {% if forloop.first %}border-primary{% else %}border-transparent{% endif %}
+                             hover:border-primary focus:border-primary
+                             transition-colors focus:outline-none">
+                <img src="{{ img.media_url }}"
+                     alt="{{ img.alt|default:name }}"
+                     class="w-full h-full object-cover"
+                     loading="lazy">
+              </button>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+          </div>
+          {% endif %}
+
+          <!-- Audio tab -->
+          {% if audios %}
+          <label class="tab gap-1">
+            <input type="radio" name="media_tabs"
+                   {% if not images %}checked{% endif %} />
+            🎵
+            <span>Audio</span>
+            {% if audios|length > 1 %}
+            <span class="badge badge-sm badge-ghost">{{ audios|length }}</span>
+            {% endif %}
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+
+            {% if image_url %}
+            <div class="aspect-video bg-base-200 rounded-2xl overflow-hidden
+                        mb-4 relative">
+              <img src="{{ image_url }}" alt="{{ image_alt }}"
+                   class="w-full h-full object-cover opacity-25">
+              <div class="absolute inset-0 flex items-center
+                           justify-center text-6xl">
+                🎵
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="space-y-3">
+              {% for audio in audios %}
+              <div class="card bg-base-200">
+                <div class="card-body p-4 gap-2">
+                  {% if audio.alt %}
+                  <p class="text-sm font-medium">{{ audio.alt }}</p>
+                  {% endif %}
+                  <audio controls class="w-full" preload="metadata">
+                    <source src="{{ audio.media_url }}">
+                    <a href="{{ audio.media_url }}"
+                       class="link link-primary text-sm">
+                      Download audio
+                    </a>
+                  </audio>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+          </div>
+          {% endif %}
+
+          <!-- Video tab -->
+          {% if videos %}
+          <label class="tab gap-1">
+            <input type="radio" name="media_tabs"
+                   {% if not images and not audios %}checked{% endif %} />
+            🎬
+            <span>Video</span>
+            {% if videos|length > 1 %}
+            <span class="badge badge-sm badge-ghost">{{ videos|length }}</span>
+            {% endif %}
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+
+            <div class="space-y-4">
+              {% for video in videos %}
+              <div class="rounded-2xl overflow-hidden bg-base-200">
+                {% if video.alt %}
+                <p class="text-sm font-medium px-4 pt-3">{{ video.alt }}</p>
+                {% endif %}
+                <video controls class="w-full" preload="metadata"
+                       poster="{{ image_url }}">
+                  <source src="{{ video.media_url }}">
+                  <a href="{{ video.media_url }}"
+                     class="link link-primary text-sm p-4 block">
+                    Download video
+                  </a>
+                </video>
+              </div>
+              {% endfor %}
+            </div>
+
+          </div>
+          {% endif %}
+
+          <!-- PDF tab -->
+          {% if pdfs %}
+          <label class="tab gap-1">
+            <input type="radio" name="media_tabs"
+                  {% if not images and not audios and not videos %}checked{% endif %} />
+            📄
+            <span>Documents</span>
+            {% if pdfs|length > 1 %}
+            <span class="badge badge-sm badge-ghost">{{ pdfs|length }}</span>
+            {% endif %}
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+            <div class="space-y-3">
+              {% for pdf in pdfs %}
+              <div class="card bg-base-200">
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                      <span class="text-3xl">📄</span>
+                      <div>
+                        <p class="font-medium text-sm">
+                          {{ pdf.alt|default:"Document" }}
+                        </p>
+                        {% if pdf.is_inherited %}
+                        <p class="text-xs text-base-content/40">Global document</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="flex gap-2">
+                      <!-- Open in new tab -->
+                      <a href="{{ pdf.media_url }}"
+                        target="_blank"
+                        rel="noopener"
+                        class="btn btn-sm btn-outline gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10
+                                  a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                        Open
+                      </a>
+                      <!-- Download -->
+                      <a href="{{ pdf.media_url }}"
+                        download
+                        class="btn btn-sm btn-primary gap-1">
+                        ↓ Download
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Inline PDF viewer — loads only when tab is active -->
+                  <div class="mt-3">
+                    <iframe src="{{ pdf.media_url }}"
+                            class="w-full rounded-lg border border-base-300"
+                            style="height: 500px;"
+                            title="{{ pdf.alt|default:'Document' }}"
+                            loading="lazy">
+                      <p class="text-sm p-4">
+                        Your browser cannot display PDFs inline.
+                        <a href="{{ pdf.media_url }}" class="link link-primary">
+                          Download instead
+                        </a>
+                      </p>
+                    </iframe>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Structured Text tab -->
+          {% if texts %}
+          <label class="tab gap-1">
+            <input type="radio" name="media_tabs"
+                  {% if not images and not audios and not videos and not pdfs %}checked{% endif %} />
+            📝
+            <span>Content</span>
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+            {% for text_media in texts %}
+            <div class="prose prose-sm max-w-none text-base-content/90">
+
+              {% comment %}
+              text_content structure:
+              [
+                {
+                  "title": "Section Title",
+                  "children": [
+                    {
+                      "subtitle": "Subsection",
+                      "content": ["Paragraph 1", "Paragraph 2"]
+                    }
+                  ]
+                }
+              ]
+              {% endcomment %}
+
+              {% for section in text_media.text_content %}
+              <section class="mb-8">
+                {% if section.title %}
+                <h2 class="text-xl font-bold text-base-content mb-4 border-b
+                            border-base-300 pb-2">
+                  {{ section.title }}
+                </h2>
+                {% endif %}
+
+                {% for child in section.children %}
+                <div class="mb-4">
+                  {% if child.subtitle %}
+                  <h3 class="text-base font-semibold text-base-content mb-2">
+                    {{ child.subtitle }}
+                  </h3>
+                  {% endif %}
+
+                  {% for para in child.content %}
+                  <p class="text-base-content/80 mb-2 leading-relaxed">
+                    {{ para }}
+                  </p>
+                  {% endfor %}
+                </div>
+                {% endfor %}
+              </section>
+              {% endfor %}
+
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+
+
+        </div>
+        <!-- End .tabs -->
+
+      {% elif image_url %}
+        <!-- No ItemMedia — show resolved primary image only -->
+        <figure class="aspect-square bg-base-200 rounded-2xl overflow-hidden">
+          <img src="{{ image_url }}" alt="{{ image_alt }}"
+               class="w-full h-full object-cover">
+        </figure>
+
+      {% else %}
+        <!-- No media at all -->
+        <figure class="aspect-square bg-base-200 rounded-2xl overflow-hidden
+                       flex items-center justify-center">
+          <span class="text-7xl text-base-content/20">📦</span>
+        </figure>
+      {% endif %}
+
+    </div>
+    <!-- End left column -->
+
+    <!-- ════════════════════════════════════════════════════════
+         RIGHT COLUMN — Product details
+    ════════════════════════════════════════════════════════ -->
+    <div class="md:w-1/2 space-y-5">
+
+      <!-- Name -->
+      <h1 class="text-3xl font-bold text-base-content leading-tight">
+        {{ name }}
+      </h1>
+
+      <!-- Identifiers -->
+      {% if sku or gtin or barcode %}
+      <div class="flex flex-wrap gap-2">
+        {% if sku %}
+        <span class="badge badge-ghost badge-sm font-mono">
+          SKU: {{ sku }}
+        </span>
+        {% endif %}
+        {% if gtin %}
+        <span class="badge badge-ghost badge-sm font-mono">
+          GTIN: {{ gtin }}
+        </span>
+        {% endif %}
+        {% if barcode %}
+        <span class="badge badge-ghost badge-sm font-mono">
+          Barcode: {{ barcode }}
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Price -->
+      {% if price %}
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <p class="text-3xl font-bold text-primary">
+          {{ currency }} {{ price }}
+        </p>
+        {% if compare_price and compare_price > price %}
+        <p class="text-lg text-base-content/40 line-through">
+          {{ currency }} {{ compare_price }}
+        </p>
+        <span class="badge badge-error badge-sm">Sale</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Stock -->
+      {% if stock is not None %}
+      <div>
+        {% if stock > 10 %}
+        <span class="badge badge-success gap-1">✓ In Stock</span>
+        {% elif stock > 0 %}
+        <span class="badge badge-warning gap-1">
+          Only {{ stock }} left
+        </span>
+        {% else %}
+        <span class="badge badge-error gap-1">Out of Stock</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Description -->
+      {% if description %}
+      <div class="prose prose-sm text-base-content/80 max-w-none">
+        <p>{{ description }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Variants -->
+      {% if variants %}
+      <div class="space-y-2">
+        <p class="font-semibold text-sm">Options:</p>
+        <div class="flex flex-wrap gap-2">
+          {% for variant in variants %}
+          <label class="cursor-pointer">
+            <input type="radio" name="variant"
+                   value="{{ variant.variant_id }}"
+                   class="sr-only peer"
+                   {% if forloop.first %}checked{% endif %}>
+            <span class="btn btn-sm btn-outline peer-checked:btn-primary
+                         transition-colors">
+              {{ variant.name }}
+              {% if variant.price %}
+              <span class="text-xs opacity-70 ml-1">
+                {{ currency }} {{ variant.price }}
+              </span>
+              {% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Add to Cart — Phase 3 -->
+      <div class="pt-1">
+        <button class="btn btn-primary w-full" disabled>
+          Add to Cart
+          <span class="badge badge-sm badge-outline ml-2">Coming Soon</span>
+        </button>
+      </div>
+
+      {% if attr_values or attributes or dimensions %}
+      <div class="divider my-1"></div>
+      {% endif %}
+
+      <!-- Structured attribute values (NodeAttributeType → resolved value) -->
+      {% if attr_values %}
+      <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+        <input type="checkbox" checked />
+        <div class="collapse-title font-semibold text-sm">Specifications</div>
+        <div class="collapse-content">
+          <table class="table table-sm w-full mt-2">
+            <tbody>
+              {% for attr_name, attr_value in attr_values.items %}
+              <tr class="hover">
+                <td class="text-base-content/60 font-medium w-2/5">
+                  {{ attr_name }}
+                </td>
+                <td class="font-semibold text-base-content">
+                  {{ attr_value }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Physical dimensions -->
+      {% if dimensions %}
+      <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold text-sm">
+          Physical Details
+        </div>
+        <div class="collapse-content">
+          <table class="table table-sm w-full mt-2">
+            <tbody>
+              {% for label, value in dimensions.items %}
+              <tr class="hover">
+                <td class="text-base-content/60 font-medium w-2/5">
+                  {{ label }}
+                </td>
+                <td class="font-medium">{{ value }}</td>
+              </tr>
+              {% endfor %}
+              {% if country_of_origin %}
+              <tr class="hover">
+                <td class="text-base-content/60 font-medium w-2/5">
+                  Country of Origin
+                </td>
+                <td class="font-medium">{{ country_of_origin }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- JSONB overflow attributes -->
+      {% if attributes %}
+      <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold text-sm">
+          Additional Details
+        </div>
+        <div class="collapse-content">
+          <table class="table table-sm w-full mt-2">
+            <tbody>
+              {% for key, value in attributes.items %}
+              <tr class="hover">
+                <td class="text-base-content/60 capitalize w-2/5">
+                  {{ key|cut:"_" }}
+                </td>
+                <td class="font-medium">{{ value }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Care instructions -->
+      {% if care_instructions %}
+      <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold text-sm">
+          Care Instructions
+        </div>
+        <div class="collapse-content prose prose-sm text-base-content/80">
+          <p>{{ care_instructions }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+    <!-- End right column -->
+
+  </div>
+  <!-- End main 2-column layout -->
+
+  <!-- ── Taxonomy chains at bottom ──────────────────────────── -->
+  {% if taxonomy_chains %}
+  <div class="mt-8 pt-6 border-t border-base-300">
+    <p class="text-xs text-base-content/40 uppercase tracking-widest mb-3">
+      Classification
+    </p>
+    <div class="space-y-2">
+      {% for chain in taxonomy_chains %}
+      <div class="flex items-start gap-3">
+
+        <!-- Taxonomy name label -->
+        <span class="badge badge-outline badge-sm shrink-0 mt-0.5 min-w-20
+                     text-base-content/50">
+          {{ chain.taxonomy_name }}
+        </span>
+
+        <!-- Full ancestor chain: Root › Parent › Node -->
+        <div class="flex flex-wrap items-center gap-1">
+          {% for node in chain.nodes %}
+            {% if not forloop.first %}
+            <span class="text-base-content/30 text-xs">›</span>
+            {% endif %}
+            <span class="badge badge-sm
+                         {% if forloop.last %}
+                           badge-primary
+                         {% else %}
+                           badge-ghost text-base-content/50
+                         {% endif %}">
+              {{ node.name }}
+            </span>
+          {% endfor %}
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+
+{% comment %}
+
+
+{% extends "base.html" %}
+{% load my_tags %}
+
+
+
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8">
+
+  <!-- ── Breadcrumb ─────────────────────────────────────────── -->
+  <div class="text-sm breadcrumbs text-base-content/60 mb-6">
+    <ul>
+      <li>
+        <a href="/{{ client.client_id }}/">Home</a>
+      </li>
+      <li>
+        <a href="{% url 'catalogue_page' client_id=client.client_id %}">
+          Catalogue
+        </a>
+      </li>
+      <li class="text-base-content font-medium">{{ name }}</li>
+    </ul>
+  </div>
+
+  <!-- ── Main 2-column layout ──────────────────────────────── -->
+  <div class="flex flex-col md:flex-row gap-8">
+
+    <!-- ══════════════════════════════════════════════════════
+         LEFT COLUMN — Media
+    ══════════════════════════════════════════════════════ -->
+    <div class="md:w-1/2">
+
+      {% if images or audios or videos %}
+
+        {# DaisyUI v5 radio tabs — label wraps input #}
+        <div class="tabs tabs-bordered mb-4">
+
+          {# ── Images tab ────────────────────────────────── #}
+          {% if images %}
+          <label class="tab">
+            <input type="radio"
+                   name="media_tabs"
+                   {% if images %}checked{% endif %} />
+            🖼 Images
+            {% if images|length > 1 %}
+            <span class="badge badge-sm badge-ghost ml-1">
+              {{ images|length }}
+            </span>
+            {% endif %}
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+
+            {# Primary image — largest display #}
+            <figure class="aspect-square bg-base-200 rounded-2xl
+                           overflow-hidden mb-3">
+              <img src="{{ images.0.media_url }}"
+                   alt="{{ images.0.alt|default:name }}"
+                   class="w-full h-full object-cover"
+                   id="main-image"
+                   loading="eager">
+            </figure>
+
+            {# Thumbnails — only if more than one image #}
+            {% if images|length > 1 %}
+            <div class="flex gap-2 overflow-x-auto pb-2">
+              {% for img in images %}
+              <button type="button"
+                      onclick="
+                        document.getElementById('main-image').src='{{ img.media_url }}';
+                        document.querySelectorAll('.thumb-btn').forEach(
+                          b => b.classList.remove('border-primary')
+                        );
+                        this.classList.add('border-primary');
+                      "
+                      class="thumb-btn shrink-0 w-16 h-16 rounded-lg
+                             overflow-hidden border-2
+                             {% if forloop.first %}border-primary{% else %}border-transparent{% endif %}
+                             hover:border-primary focus:border-primary
+                             transition-colors focus:outline-none">
+                <img src="{{ img.media_url }}"
+                     alt="{{ img.alt|default:name }}"
+                     class="w-full h-full object-cover"
+                     loading="lazy">
+              </button>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+          </div>
+          {% endif %}
+          {# ── End Images tab ────────────────────────────── #}
+
+          {# ── Audio tab ─────────────────────────────────── #}
+          {% if audios %}
+          <label class="tab">
+            <input type="radio"
+                   name="media_tabs"
+                   {% if not images %}checked{% endif %} />
+            🎵 Audio
+            {% if audios|length > 1 %}
+            <span class="badge badge-sm badge-ghost ml-1">
+              {{ audios|length }}
+            </span>
+            {% endif %}
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+
+            {# Show primary image as backdrop if available #}
+            {% if image_url %}
+            <figure class="aspect-video bg-base-200 rounded-2xl
+                           overflow-hidden mb-4 relative">
+              <img src="{{ image_url }}"
+                   alt="{{ image_alt }}"
+                   class="w-full h-full object-cover opacity-30">
+              <div class="absolute inset-0 flex items-center
+                           justify-center text-5xl">
+                🎵
+              </div>
+            </figure>
+            {% endif %}
+
+            <div class="space-y-3">
+              {% for audio in audios %}
+              <div class="card bg-base-200">
+                <div class="card-body p-4 gap-2">
+                  {% if audio.alt %}
+                  <p class="text-sm font-medium text-base-content">
+                    {{ audio.alt }}
+                  </p>
+                  {% endif %}
+                  <audio controls
+                         class="w-full"
+                         preload="metadata">
+                    <source src="{{ audio.media_url }}">
+                    <p class="text-sm text-base-content/60">
+                      Your browser does not support audio playback.
+                      <a href="{{ audio.media_url }}"
+                         class="link link-primary">
+                        Download audio
+                      </a>
+                    </p>
+                  </audio>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+          </div>
+          {% endif %}
+          {# ── End Audio tab ─────────────────────────────── #}
+
+          {# ── Video tab ─────────────────────────────────── #}
+          {% if videos %}
+          <label class="tab">
+            <input type="radio"
+                   name="media_tabs"
+                   {% if not images and not audios %}checked{% endif %} />
+            🎬 Video
+            {% if videos|length > 1 %}
+            <span class="badge badge-sm badge-ghost ml-1">
+              {{ videos|length }}
+            </span>
+            {% endif %}
+          </label>
+          <div class="tab-content border-base-300 pt-4">
+
+            <div class="space-y-4">
+              {% for video in videos %}
+              <div class="rounded-2xl overflow-hidden bg-base-200">
+                {% if video.alt %}
+                <p class="text-sm font-medium text-base-content px-4 pt-3">
+                  {{ video.alt }}
+                </p>
+                {% endif %}
+                <video controls
+                       class="w-full rounded-2xl"
+                       preload="metadata"
+                       poster="{{ image_url }}">
+                  <source src="{{ video.media_url }}">
+                  <p class="text-sm text-base-content/60 p-4">
+                    Your browser does not support video playback.
+                    <a href="{{ video.media_url }}"
+                       class="link link-primary">
+                      Download video
+                    </a>
+                  </p>
+                </video>
+              </div>
+              {% endfor %}
+            </div>
+
+          </div>
+          {% endif %}
+          {# ── End Video tab ─────────────────────────────── #}
+
+        </div>
+        {# End .tabs #}
+
+      {% elif image_url %}
+
+        {# No ItemMedia records — use resolved primary image only, no tabs #}
+        <figure class="aspect-square bg-base-200 rounded-2xl overflow-hidden">
+          <img src="{{ image_url }}"
+               alt="{{ image_alt }}"
+               class="w-full h-full object-cover">
+        </figure>
+
+      {% else %}
+
+        {# No media at all #}
+        <figure class="aspect-square bg-base-200 rounded-2xl overflow-hidden
+                       flex items-center justify-center">
+          <span class="text-7xl text-base-content/20">📦</span>
+        </figure>
+
+      {% endif %}
+
+    </div>
+    {# End left column #}
+
+    <!-- ══════════════════════════════════════════════════════
+         RIGHT COLUMN — Product Details
+    ══════════════════════════════════════════════════════ -->
+    <div class="md:w-1/2 space-y-5">
+
+      {# Brand #}
+      {% if brand %}
+      <p class="text-sm font-semibold text-base-content/50
+                uppercase tracking-widest">
+        {{ brand }}
+      </p>
+      {% endif %}
+
+      {# Name #}
+      <h1 class="text-3xl font-bold text-base-content leading-tight">
+        {{ name }}
+      </h1>
+
+      {# SKU / GTIN identifiers #}
+      {% if sku or gtin %}
+      <div class="flex flex-wrap gap-3 text-xs text-base-content/50
+                  font-mono">
+        {% if sku %}
+        <span class="badge badge-ghost badge-sm">SKU: {{ sku }}</span>
+        {% endif %}
+        {% if gtin %}
+        <span class="badge badge-ghost badge-sm">GTIN: {{ gtin }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Price #}
+      {% if price %}
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <p class="text-3xl font-bold text-primary">
+          {{ currency }} {{ price }}
+        </p>
+        {% if compare_price and compare_price > price %}
+        <p class="text-lg text-base-content/40 line-through">
+          {{ currency }} {{ compare_price }}
+        </p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Stock status #}
+      {% if stock is not None %}
+      <div>
+        {% if stock > 10 %}
+        <span class="badge badge-success gap-1">
+          ✓ In Stock
+        </span>
+        {% elif stock > 0 %}
+        <span class="badge badge-warning gap-1">
+          Only {{ stock }} left
+        </span>
+        {% else %}
+        <span class="badge badge-error gap-1">
+          Out of Stock
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Description #}
+      {% if description %}
+      <div class="prose prose-sm text-base-content/80 max-w-none">
+        <p>{{ description }}</p>
+      </div>
+      {% endif %}
+
+      {# Variants #}
+      {% if variants %}
+      <div class="space-y-2">
+        <p class="font-semibold text-sm text-base-content">Options:</p>
+        <div class="flex flex-wrap gap-2">
+          {% for variant in variants %}
+          <label class="cursor-pointer">
+            <input type="radio"
+                   name="variant"
+                   value="{{ variant.variant_id }}"
+                   class="sr-only peer"
+                   {% if forloop.first %}checked{% endif %}>
+            <span class="btn btn-sm btn-outline
+                         peer-checked:btn-primary
+                         transition-colors">
+              {{ variant.name }}
+              {% if variant.price %}
+              <span class="text-xs opacity-70 ml-1">
+                {{ currency }} {{ variant.price }}
+              </span>
+              {% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Add to Cart — Phase 3 placeholder #}
+      <div class="pt-1">
+        <button class="btn btn-primary w-full" disabled>
+          Add to Cart
+          <span class="badge badge-sm badge-outline ml-2">
+            Coming Soon
+          </span>
+        </button>
+      </div>
+
+      {# Divider before specs #}
+      {% if attr_values or attributes %}
+      <div class="divider my-2"></div>
+      {% endif %}
+
+      {# Structured attribute values from NodeAttributeType/Value #}
+      {% if attr_values %}
+      <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+        <input type="checkbox" checked />
+        <div class="collapse-title font-semibold text-sm">
+          Specifications
+        </div>
+        <div class="collapse-content">
+          <table class="table table-sm w-full mt-2">
+            <tbody>
+              {% for attr_name, attr_value in attr_values.items %}
+              <tr class="hover">
+                <td class="text-base-content/60 font-medium w-2/5">
+                  {{ attr_name }}
+                </td>
+                <td class="font-semibold text-base-content">
+                  {{ attr_value }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {# JSONB overflow attributes #}
+      {% if attributes %}
+      <div class="collapse collapse-arrow border border-base-300 rounded-lg">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold text-sm">
+          Additional Details
+        </div>
+        <div class="collapse-content">
+          <table class="table table-sm w-full mt-2">
+            <tbody>
+              {% for key, value in attributes.items %}
+              <tr class="hover">
+                <td class="text-base-content/60 capitalize w-2/5">
+                  {{ key|cut:"_" }}
+                </td>
+                <td class="font-medium text-base-content">
+                  {{ value }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+    {# End right column #}
+
+  </div>
+  {# End main 2-column layout #}
+  {# Taxonomy tags at bottom #}
+  {% if taxonomy_mappings %}
+  <div class="mt-8 pt-6 border-t border-base-300">
+
+    <p class="text-xs text-base-content/40 uppercase tracking-wide mb-2">
+      Categories
+    </p>
+
+    <div class="flex flex-wrap gap-2">
+      {% for mapping in taxonomy_mappings %}
+        <span class="badge badge-outline badge-sm">
+          {{ mapping.node.name }}
+        </span>
+      {% endfor %}
+    </div>
+
+  </div>
+  {% endif %}
+
+
+</div>
+{% endblock %}
+{% endcomment %}

@@ -12,17 +12,17 @@ from modeltranslation.translator import translator, NotRegistered
 from django.conf import settings
 
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import get_language
+#from utils.i18n import resolve_translated_value
+from utils.serializers import serialize_model_resolved
 
 # Plain model, no translated fields
-#serialize_model(layout, exclude={'id'})
 
 # Model with translated fields (name, nb_title)
 #serialize_model(client, exclude={'parent', 'language_list'})
 # Output includes 'translations': {'name': {'en': ..., 'ta': ...}, 'nb_title': {...}}
 
-# Skip translations if not needed
-#serialize_model(client, exclude={'parent'}, include_translations=False)
-
+"""
 def serialize_model(instance, exclude=None, include_translations=True):
     exclude = set(exclude or [])
 
@@ -69,9 +69,10 @@ def serialize_model(instance, exclude=None, include_translations=True):
         }
 
     return data
+"""
 #Step 1: Universal Prefetch for TextContent Tree
 # Universal Text Block Tree
-
+"""
 stbitem_qs = (
     TextstbItem.objects
     .prefetch_related(
@@ -83,6 +84,29 @@ stbitem_qs = (
     )
     .order_by("order")
 )
+"""
+stbitem_qs = (
+    TextstbItem.objects
+    .select_related("value")
+    .order_by("order")
+)
+"""
+stbitem_qs = (
+    TextstbItem.objects
+    .prefetch_related(
+        Prefetch(
+            "values",
+            queryset=SvgtextbadgeValue.objects.only(
+                "id",
+                "textstbitem_id",
+                "text",
+            ),
+            to_attr="prefetched_values"
+        )
+    )
+    .order_by("order")
+)
+"""
 
 stbitem_prefetch = Prefetch(
     "textstbitems",
@@ -114,7 +138,7 @@ gentextblock_prefetch = Prefetch(
 )
 
 # Option 3 Ccommon Components
-
+"""
 comptextblock_qs = ComptextBlock.objects.prefetch_related(
     Prefetch(
         "textstbitems",
@@ -128,6 +152,35 @@ comptextblock_qs = ComptextBlock.objects.prefetch_related(
         to_attr="prefetched_stbitems",
     )
 ).order_by("order")
+"""
+comptextblock_qs = (
+    ComptextBlock.objects
+    .prefetch_related(
+        Prefetch(
+            "textstbitems",
+            queryset=TextstbItem.objects.select_related(
+                "value"
+            ).order_by("order"),
+            to_attr="prefetched_stbitems",
+        )
+    )
+    .order_by("order")
+)
+"""
+comptextblock_qs = ComptextBlock.objects.prefetch_related(
+    Prefetch(
+        "textstbitems",
+        queryset=TextstbItem.objects.prefetch_related(
+            Prefetch(
+                "values",
+                queryset=SvgtextbadgeValue.objects.all(),  # no select_related needed
+                to_attr="prefetched_values",
+            )
+        ).order_by("order"),
+        to_attr="prefetched_stbitems",
+    )
+).order_by("order")
+"""
 
 slot_qs = ComponentSlot.objects.prefetch_related(
     Prefetch(
@@ -162,9 +215,11 @@ def visible(obj):
 
 
 # 1️⃣ Lowest Layer — SvgtextbadgeValue
-
+"""
 def build_values(item):
     values = getattr(item, "prefetched_svgtextbadgevalues", None)
+
+    
     if values is None:
         # Fallback — no select_related needed, language_code is a plain column
         values = item.svgtextbadgevalue_set.all()
@@ -176,6 +231,41 @@ def build_values(item):
         }
         for val in values
     }
+
+def build_values(item):
+    
+    #Returns prefetched SvgtextbadgeValue objects.
+    #modeltranslation automatically resolves:
+    #    value.text
+    #to current active language.
+    
+    values = getattr(item, "prefetched_values", None)
+
+    if values is None:
+        values = item.values.all()
+
+    return values
+"""
+
+def build_values(item):
+    """
+    Returns translated text.
+
+    modeltranslation automatically resolves:
+        value.text
+    according to active language.
+    """
+
+    value = getattr(item, "prefetched_value", None)
+
+    if value is None:
+        try:
+            value = item.value
+        except SvgtextbadgeValue.DoesNotExist:
+            return ""
+
+    return value.text or ""
+
 
 # 2️⃣ TextstbItem Builder
 
@@ -194,8 +284,8 @@ def build_stb_item(item):
         data["svg"] = item.svg_text
     else:
         # ✅ Use optimized function
-        data["values"] = build_values(item)
-
+        #data["values"] = build_values(item)
+        data["value"] = build_values(item)
     return data
 
 # 3️⃣ Generic Block Builder
@@ -257,53 +347,28 @@ def build_blocks(blocks_queryset):
     ]
     """
 
-# 6️⃣B Page tree for Navigation bar - THIS IS DEPRECATED AND MOVED TO Navigation
-def zzbuild_page_tree(pages):
-    node_map = {}
-    roots = []
-    
-    # Step 1: create flat nodes
-    for page in pages:
-        page_vis = visible(page)
-        if not page_vis:
-            return None        
-        
-        # Use serialize_model to get the grouped translations dict
-        # just like build_page does — exclude layout-irrelevant fields
-        serialized = serialize_model(
-            page,
-            exclude={'id', 'ltext', 'hidden'},
-            include_translations=True
-        )
-
-        node_map[page.id] = {
-            "client_id": page.client.client_id,
-            "page_id": page.page_id,
-            "order": page.order,
-            "translations": serialized.get('translations', {}),
-            #"textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
-            "children": []
-        }
-
-    # Step 2: attach children
-    for page in pages:
-        page_vis = visible(page)
-        if not page_vis:
-            return None         
-
-        node = node_map[page.id]
-
-        if page.parent_id:
-            parent_node = node_map.get(page.parent_id)
-            if parent_node:
-                parent_node["children"].append(node)
-        else:
-            roots.append(node)
-
-    return roots
-
 
 # Option 3 common Components
+def build_slot(slot, client):
+
+    slot = visible(slot)
+    if not slot:
+        return None
+    data = serialize_model_resolved(
+        slot,
+        exclude={"id", "component_id"},
+        client=client,
+    )
+
+    textblocks = build_blocks(
+        getattr(slot, "prefetched_comptextblocks", [])
+    )
+
+    if textblocks:
+        data["textblocks"] = textblocks
+
+    return data
+"""
 def build_slot(slot):
     slot = visible(slot)
     if not slot:
@@ -320,8 +385,34 @@ def build_slot(slot):
         data["textblocks"] = textblocks
 
     return data
+"""
+def build_component(layout, client):
 
+    obj = getattr(layout, "component", None)
+    obj = visible(obj)
+    if not obj:
+        return None
 
+    slots = getattr(obj, "prefetched_slots", [])
+    built_slots = [
+        build_slot(s, client)
+        for s in slots
+    ]
+
+    built_slots = [
+        s for s in built_slots if s
+    ]
+
+    data = serialize_model_resolved(
+        obj,
+        exclude={"id", "layout_id"},
+        client=client,
+    )
+
+    data["slots"] = built_slots
+
+    return data
+"""
 def build_component(layout):
     obj = getattr(layout, "component", None)
     obj = visible(obj)
@@ -337,9 +428,9 @@ def build_component(layout):
     data["slots"] = built_slots
 
     return data
+"""
 
-
-def build_layout(layout, layout_map):
+def build_layout(layout, layout_map, client):
     layout = visible(layout)
     if not layout:
         return None
@@ -354,12 +445,12 @@ def build_layout(layout, layout_map):
 
     #if layout.comp_id and layout.level == 40:
     if layout.level == 40:        
-        component = build_component(layout)
+        component = build_component(layout, client)
         if component:
             layout_data["component"] = component
 
     children = [
-        build_layout(child, layout_map)
+        build_layout(child, layout_map, client)
         for child in layout_map.get(layout.id, [])
     ]
     children = [c for c in children if c]
@@ -380,16 +471,63 @@ def build_nav_item(item, client_id):
         ],
     }
 """
-def build_nav_item(item, client_id):
-    data = serialize_model(item, exclude={'id', 'parent_id', 'page_id'})
+def build_nav_item(item, client):
+    #data = serialize_model(item, exclude={'id', 'parent_id', 'page_id'})
+    data = serialize_model_resolved(item, client=client)    
     #data['url']      = item.get_url(client_id)
-    data['href'] = item.get_url(client_id)   # ← resolved full URL, separate from raw 'url' field
+
+    data['href'] = item.get_url(client.client_id)   # ← resolved full URL, separate from raw 'url' field
     data['children'] = [
-        build_nav_item(child, client_id)
+        build_nav_item(child, client)
         for child in getattr(item, 'prefetched_children', [])
     ]
     return data
 
+def build_page(page, client):
+
+    page = visible(page)
+
+    if not page:
+        return None
+
+    all_layouts = list(
+        getattr(page, "prefetched_layouts", [])
+    )
+
+    layout_map = {}
+    root_layouts = []
+
+    for layout in all_layouts:
+
+        if layout.parent_id:
+            layout_map.setdefault(
+                layout.parent_id,
+                []
+            ).append(layout)
+
+        else:
+            root_layouts.append(layout)
+
+    layouts = [
+        build_layout(l, layout_map, client)
+        for l in root_layouts
+    ]
+
+    layouts = [
+        l for l in layouts if l
+    ]
+
+    return {
+
+        **serialize_model_resolved(
+            page,
+            exclude={'id'},
+            client=client,
+        ),
+
+        "layouts": layouts,
+    }
+"""
 def build_page(page):
     page = visible(page)
     if not page:
@@ -411,23 +549,68 @@ def build_page(page):
         #"textblocks": build_blocks(getattr(page, "prefetched_gentextblocks", [])),
         "layouts":    layouts,
     }
-
+"""
 
 # 7️⃣ FINAL: build_client_payload()
-
 def build_client_payload(client):
-    """
-    languages_qs = Language.objects.filter(language_id__in=client.language_list)
-    language_lookup = {l.language_id: l for l in languages_qs}
-    lv_languages = [
-        {
-            "language_id": lang_id,
-            "labels":      language_lookup[lang_id].label_obj
-        }
-        for lang_id in client.language_list
-        if lang_id in language_lookup
+
+    lv_themes = []
+
+    for theme in getattr(client, "prefetched_themes", []):
+
+        lv_themes.append({
+            **serialize_model_resolved(
+                theme,
+                exclude={'id'},
+                client=client,
+            ),
+            "tokens": resolve_theme(theme),
+        })
+
+    all_nav_items = getattr(client, 'prefetched_nav_items', [])
+
+    header_nav = [
+        build_nav_item(item, client)
+        for item in all_nav_items
+        if item.location == 'header'
     ]
-    """
+
+    footer_nav = [
+        build_nav_item(item, client)
+        for item in all_nav_items
+        if item.location == 'footer'
+    ]
+
+    all_pages = list(
+        getattr(client, "prefetched_pages", [])
+    )
+
+    return {
+
+        **serialize_model_resolved(
+            client,
+            exclude={'id', 'parent', 'language_list'},
+            client=client,
+        ),
+
+        "languages": client.language_list,
+
+        "themes": lv_themes,
+
+        "pages": [
+            p for p in (
+                build_page(page, client)
+                for page in all_pages
+            )
+            if p
+        ],
+
+        'header_nav': header_nav,
+        'footer_nav': footer_nav,
+    }
+
+"""
+def build_client_payload(client):
 
     lv_themes = []
     for theme in getattr(client, "prefetched_themes", []):
@@ -441,12 +624,12 @@ def build_client_payload(client):
     client_id     = client.client_id
 
     header_nav = [
-        build_nav_item(item, client_id)
+        build_nav_item(item, client)
         for item in all_nav_items
         if item.location == 'header'
     ]
     footer_nav = [
-        build_nav_item(item, client_id)
+        build_nav_item(item, client)
         for item in all_nav_items
         if item.location == 'footer'
     ]
@@ -464,19 +647,22 @@ def build_client_payload(client):
         'header_nav':  header_nav,
         'footer_nav':  footer_nav,        
     }
+"""    
 # temporarily marking use_cache = False. To be changed after debugging
 # instead of gentext block for name, nb_title have alreaady added modeltranslation fields.
 # TBD in PRD use_cache=True
+
+  
 def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout=3600):
     """
     Fetch clientstatic with optional caching.
-    Works when client_id as primary key.
+    Works when client_id as primary key. Language specific
     """
-    
+    lang = get_language() or settings.LANGUAGE_CODE
     # Build cache key
     cache_key = None
     if use_cache and lv_client_id:
-        cache_key = f"clientstatic:{lv_client_id}"
+        cache_key = f"clientstatic:{lv_client_id}-{lang}"
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             return cached_data
@@ -1066,5 +1252,394 @@ def resolve_theme(theme):
    "footer_nav":[
       
    ]
+}
+"""
+
+
+"""
+{
+  "client_id": "bahushira",
+  "default_language": "en",
+  "theme_list": [],
+  "name": "Bahushira",
+  "nb_title": "Bahushira Title",
+  "languages": [
+    "en",
+    "hi",
+    "fr"
+  ],
+  "themes": [
+    {
+      "client": 1,
+      "theme_id": "light",
+      "themepreset": 1,
+      "order": 1,
+      "hidden": false,
+      "is_default": true,
+      "name": "Light",
+      "tokens": {
+        "primary": "#570df8",
+        "secondary": "#f000b8",
+        "accent": "#37cdbe",
+        "neutral": "#3d4451",
+        "primary_content": "#ffffff",
+        "secondary_content": "#ffffff",
+        "accent_content": "#163835",
+        "neutral_content": "#ffffff",
+        "base_100": "#ffffff",
+        "base_200": "#f2f2f2",
+        "base_300": "#e5e6e6",
+        "base_content": "#1f2937",
+        "success": "#00c853",
+        "warning": "#ff9800",
+        "error": "#ff5724",
+        "info": "#2094f3",
+        "success_content": "#ffffff",
+        "warning_content": "#ffffff",
+        "error_content": "#ffffff",
+        "info_content": "#ffffff",
+        "font_body": "",
+        "font_heading": "",
+        "base_font_size": "16px",
+        "scale_ratio": 1.2,
+        "section_gap": "4rem",
+        "container_padding": "1rem",
+        "radius_btn": "0.5rem",
+        "radius_card": "1rem",
+        "radius_input": "0.5rem",
+        "shadow_sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "shadow_md": "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        "shadow_lg": "0 10px 15px -3px rgb(0 0 0 / 0.1)"
+      }
+    },
+    {
+      "client": 1,
+      "theme_id": "dark",
+      "themepreset": 2,
+      "order": 2,
+      "hidden": false,
+      "is_default": false,
+      "name": "Dark",
+      "tokens": {
+        "primary": "#661ae6",
+        "secondary": "#d926aa",
+        "accent": "#1fb2a6",
+        "neutral": "#191d24",
+        "primary_content": "#ffffff",
+        "secondary_content": "#ffffff",
+        "accent_content": "#ffffff",
+        "neutral_content": "#a6adbb",
+        "base_100": "#2a303c",
+        "base_200": "#242933",
+        "base_300": "#1d232a",
+        "base_content": "#a6adbb",
+        "success": "#36d399",
+        "warning": "#fbbd23",
+        "error": "#f87272",
+        "info": "#3abff8",
+        "success_content": "#000000",
+        "warning_content": "#000000",
+        "error_content": "#000000",
+        "info_content": "#000000",
+        "font_body": "",
+        "font_heading": "",
+        "base_font_size": "16px",
+        "scale_ratio": 1.2,
+        "section_gap": "4rem",
+        "container_padding": "1rem",
+        "radius_btn": "0.5rem",
+        "radius_card": "1rem",
+        "radius_input": "0.5rem",
+        "shadow_sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "shadow_md": "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        "shadow_lg": "0 10px 15px -3px rgb(0 0 0 / 0.1)"
+      }
+    }
+  ],
+  "pages": [
+    {
+      "client": 1,
+      "page_id": "home",
+      "ltext": "Home Page",
+      "hidden": false,
+      "layouts": [
+        {
+          "level": 10,
+          "slug": "a",
+          "order": 1,
+          "css_class": "",
+          "children": [
+            {
+              "level": 20,
+              "slug": "a",
+              "order": 1,
+              "css_class": "",
+              "children": [
+                {
+                  "level": 30,
+                  "slug": "a",
+                  "order": 1,
+                  "css_class": "",
+                  "children": [
+                    {
+                      "level": 40,
+                      "slug": "a",
+                      "order": 1,
+                      "css_class": "",
+                      "component": {
+                        "layout": 4,
+                        "comp_id": "hero",
+                        "ltext": "Home Hero",
+                        "hero_overlay": true,
+                        "config": {},
+                        "hidden": false,
+                        "order": 1,
+                        "slots": [
+                          {
+                            "component": 1,
+                            "slot_type": "text",
+                            "order": 1,
+                            "hidden": false,
+                            "accordion_checked": false,
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "",
+                                "ltext": "Home Title",
+                                "href_page": "",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "",
+                                    "value": "Home Title22"
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "",
+                                "ltext": "Home content",
+                                "href_page": "",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "",
+                                    "value": "Home Content22"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "component": 1,
+                            "slot_type": "figure",
+                            "order": 2,
+                            "hidden": false,
+                            "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                            "alt": "Spiderman",
+                            "figure_class": "px-0 pt-0",
+                            "accordion_checked": false
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "client": 1,
+      "page_id": "about",
+      "ltext": "About Page",
+      "hidden": false,
+      "layouts": [
+        {
+          "level": 10,
+          "slug": "a",
+          "order": 1,
+          "css_class": "",
+          "children": [
+            {
+              "level": 20,
+              "slug": "a",
+              "order": 1,
+              "css_class": "",
+              "children": [
+                {
+                  "level": 30,
+                  "slug": "a",
+                  "order": 1,
+                  "css_class": "",
+                  "children": [
+                    {
+                      "level": 40,
+                      "slug": "a",
+                      "order": 1,
+                      "css_class": "",
+                      "component": {
+                        "layout": 8,
+                        "comp_id": "hero",
+                        "ltext": "About Hero",
+                        "css_class": "hero min-h-screen",
+                        "hero_overlay": true,
+                        "config": {},
+                        "hidden": false,
+                        "order": 1,
+                        "slots": [
+                          {
+                            "component": 2,
+                            "slot_type": "figure",
+                            "order": 1,
+                            "hidden": false,
+                            "image_url": "https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp",
+                            "alt": "Spiderman",
+                            "figure_class": "px-0 pt-0",
+                            "accordion_checked": false
+                          },
+                          {
+                            "component": 2,
+                            "slot_type": "text",
+                            "order": 2,
+                            "hidden": false,
+                            "accordion_checked": false,
+                            "textblocks": [
+                              {
+                                "block_id": "title",
+                                "order": 1,
+                                "css_class": "",
+                                "ltext": "About Title",
+                                "href_page": "",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "",
+                                    "value": ""
+                                  }
+                                ]
+                              },
+                              {
+                                "block_id": "content",
+                                "order": 2,
+                                "css_class": "",
+                                "ltext": "About content",
+                                "href_page": "",
+                                "items": [
+                                  {
+                                    "type": "text",
+                                    "order": 1,
+                                    "css_class": "",
+                                    "value": ""
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "client": 1,
+      "page_id": "catalogue",
+      "hidden": false,
+      "layouts": []
+    },
+    {
+      "client": 1,
+      "page_id": "terms",
+      "hidden": false,
+      "layouts": []
+    },
+    {
+      "client": 1,
+      "page_id": "privacy",
+      "hidden": false,
+      "layouts": []
+    }
+  ],
+  "header_nav": [
+    {
+      "id": 1,
+      "client": 1,
+      "location": "header",
+      "nav_type": "page",
+      "page": 1,
+      "name": "Home",
+      "order": 1,
+      "hidden": false,
+      "open_in_new_tab": false,
+      "href": "home",
+      "children": []
+    },
+    {
+      "id": 2,
+      "client": 1,
+      "location": "header",
+      "nav_type": "page",
+      "page": 2,
+      "name": "About",
+      "order": 2,
+      "hidden": false,
+      "open_in_new_tab": false,
+      "href": "about",
+      "children": []
+    },
+    {
+      "id": 3,
+      "client": 1,
+      "location": "header",
+      "nav_type": "page",
+      "page": 3,
+      "name": "Catalogue",
+      "order": 3,
+      "hidden": false,
+      "open_in_new_tab": false,
+      "href": "catalogue",
+      "children": []
+    },
+    {
+      "id": 4,
+      "client": 1,
+      "location": "header",
+      "nav_type": "page",
+      "page": 4,
+      "name": "Terms",
+      "order": 3,
+      "hidden": false,
+      "open_in_new_tab": false,
+      "href": "terms",
+      "children": []
+    },
+    {
+      "id": 5,
+      "client": 1,
+      "location": "header",
+      "nav_type": "page",
+      "page": 5,
+      "name": "Privacy",
+      "order": 4,
+      "hidden": false,
+      "open_in_new_tab": false,
+      "href": "privacy",
+      "children": []
+    }
+  ],
+  "footer_nav": []
 }
 """

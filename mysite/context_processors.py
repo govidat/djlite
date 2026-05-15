@@ -34,6 +34,13 @@ def theme_processor(request):
         "current_theme": request.session.get("theme", "light")
     }
 """    
+
+def globalval(request):
+
+    return {
+        'gv': get_globalval(),
+    }
+"""
 def globalval(request):
     lang = request.session.get('lang', settings.LANGUAGE_CODE)
     raw  = get_globalval()
@@ -51,6 +58,7 @@ def globalval(request):
         'gv':  resolved,  # {{ gv.accounts.logout }} → "Logout"
         'gvt': raw,       # {{ gvt.accounts.logout.hi }} → "hiLogout"
     }
+"""
 """
 Template usage:
 {# Active language #}

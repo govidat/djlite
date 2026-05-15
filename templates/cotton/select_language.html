@@ -1,5 +1,5 @@
 {# templates/cotton/select_language.html #}
-{% load my_tags %}
+
 {% load my_filters %}
 {% load i18n %}
 {% get_current_language as CURRENT_LANG %}
@@ -13,6 +13,8 @@
     <select class="select" id="language-select" name="language" onchange="this.form.submit()">
       {% for lang in languages %}    
         {% comment %}
+        { load my_tags }
+         { load i18n }
         <option value="{{ lang.language_id }}" 
           {% if CURRENT_LANG|slice:":2" == lang.language_id %}selected{% endif %}>        
           {{ lang.language_id }} - {{ gv|dictget:'language'|dictget:lang.language_id }} 
