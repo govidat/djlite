@@ -313,3 +313,41 @@ class ClientBlockAdmin(nested_admin.NestedModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
+
+
+class ClientFeatureControlAdmin(admin.ModelAdmin):
+
+    list_display = (
+        'client',
+        'feature',
+        'is_disabled',
+        'from_date',
+        'to_date',
+    )
+
+    list_filter = (
+        'feature',
+        'is_disabled',
+    )
+
+    search_fields = (
+        'client__client_id',
+    )
+
+    def target_client(self, obj):
+        return obj.client.client_id if obj.client else "ALL CLIENTS"
+        
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser

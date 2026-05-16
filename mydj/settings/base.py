@@ -82,7 +82,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     # IMPORTANT: must come AFTER AuthenticationMiddleware
     "mysite.middleware.customer_profile.CustomerProfileMiddleware", # CustomerProfile  
-    'mysite.middleware.client_block.ClientBlockMiddleware',  # Client_Block  
+    'mysite.middleware.client_block.ClientBlockMiddleware',  # Client_Block 
+    'mysite.middleware.feature_control.ClientFeatureControlMiddleware',  # Client Features block for Caalogie eCommerce 
+    
     'django.contrib.messages.middleware.MessageMiddleware',
     'allauth.account.middleware.AccountMiddleware',     # allauth
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

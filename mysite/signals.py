@@ -7,7 +7,7 @@ from django.core.cache import cache
 from guardian.shortcuts import assign_perm, remove_perm
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, Theme, Page, NavItem, PageContent, ClientTemplate, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
+from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, ClientFeatureControl, Theme, Page, NavItem, PageContent, ClientTemplate, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
 from django.contrib.auth.models import User
 
 from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
@@ -479,6 +479,24 @@ def invalidate_taxonomy_cache(sender, instance, **kwargs):
             # delete_pattern on LocMemCache. Clear all in dev.
             cache.clear()
 
+# for ClientFeatureControl
+
+@receiver([post_save, post_delete], sender=ClientFeatureControl)
+def clear_feature_control_cache(sender, instance, **kwargs):
+
+    feature = instance.feature
+
+    # Clear global cache
+    cache.delete(
+        f"feature_control:global:{feature}"
+    )
+
+    # Clear client cache if client exists
+    if instance.client:
+        cache.delete(
+            f"feature_control:{instance.client.client_id}:{feature}"
+        )
+
 # ── Registration helper (called from AppConfig.ready) ─────────────────
 
 def register_signals():
@@ -498,6 +516,11 @@ def register_signals():
     for model in TAXONOMY_MODELS:
         post_save.connect(invalidate_taxonomy_cache, sender=model)
         post_delete.connect(invalidate_taxonomy_cache, sender=model)
+
+    #SUPERADMN_MODELS = [ClientFeatureControl]
+    #for model in SUPERADMN_MODELS:
+    #    post_save.connect(clear_feature_control_cache, sender=model)
+    #    post_delete.connect(clear_feature_control_cache, sender=model)
 
     # ── Item and sub-models → no cache to invalidate ─────────────────
     # Items are queried per request with filters — not cached in bulk.

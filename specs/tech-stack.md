@@ -319,10 +319,7 @@ Item (base — id, name, description, status, image, order, client)
   └── attributes     (JSONField on Item — catches anything else)
 
 ```
-bash
-cat >> /home/claude/specs/tech-stack.md << 'EOF'
 
----
 
 ## Phase 2 Completed — Catalogue Stack (Actual)
 
@@ -330,7 +327,7 @@ cat >> /home/claude/specs/tech-stack.md << 'EOF'
 
 | Cache key | Content | TTL | Invalidated by |
 |-----------|---------|-----|---------------|
-| `clientstatic:{client_id}` | Full CMS payload | 1 hour | post_save on CMS models |
+| `clientstatic:{client_id} - {lang}` | Full CMS payload | 1 hour | post_save on CMS models |
 | `taxonomy_tree:{client}:{slug}` | Taxonomy node tree | 1 hour | post_save on TaxonomyNode |
 | `catalogue_base_ids:{client}:{status}` | Base item ID set | 5 min | post_save on Item |
 | `client_templates:{client_id}` | Template resolution dict | 1 hour | post_save on ClientTemplate |
@@ -341,6 +338,13 @@ cat >> /home/claude/specs/tech-stack.md << 'EOF'
 - `raw_id_fields = ('client',)` on catalogue admin to prevent 207× Client query
 - Inline `get_queryset()` overrides with `select_related` on FK chains
 - `ClientTemplate` resolution cached (was 15ms per catalogue request)
+- If Client is fully nested then 400 + queries
+- Client admin broken down to sub sets using admin_proxies to reduce the query load
+  - Client
+  - ClientContentStructured - for Page > Layout
+  - ClientContentHtml - for Page > Htmlblob
+  - ClientTemplatewrapper - To call Client specific template blobs for catalogue > item_details, filters
+  - ClientStaff - for user definitions
 
 ### Key Architectural Decisions Made
 
@@ -362,17 +366,25 @@ Taxonomy → TaxonomyNode → NodeAttributeType → NodeAttributeValue
 Item → ItemTaxonomyNode, ItemAttributeValue, ItemMedia, ItemVariant
        → ProductItem, SongItem, DocumentItem, ServiceItem
 ClientTemplate (client-specific template fragments stored in DB)
+ClientBlock - Kill switch for any Client or all Clients for a specific period
+ClientFeatureControl - Kill switch to disallow features like Catalogue, eCommerce
+  > Middleware > Template
+  > Signals.py catches any changes to ClientFeatureControl and kills cache
+  > utils.py > feature_control
 ```
 
-### `I18nFallbackMixin` — Field resolution priority
-
+### utils > i18n.py > resolve_translated_value — resolve modelTranslation field values
 ```
 1. Item.{field}_{active_lang}
 2. Item.{field}_{client_base_lang}
-3. GlobalItem.{field}_{active_lang}
-4. GlobalItem.{field}_{client_base_lang}
-5. Empty string
+3. Empty string
 ```
+Applied to: `name`, `description`, `care_instructions` on `Item`.
+
+### `ClientLanguageMixinV2` — More flexible language helper in admin screens
+Applied in Admin where modelTranslation fields are required
+BaseAdminInlinecss - to have single line collapse headers
+
 
 Applied to: `name`, `description`, `care_instructions` on `Item`.
 

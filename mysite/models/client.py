@@ -4,6 +4,7 @@ from .base import (
 )
 #from .global_config import (ThemePreset)
 from django.conf import settings
+from django.utils import timezone
 
 class Client(models.Model):
     client_id = LowercaseCharField(max_length=25, unique=True, db_index=True)    
@@ -172,8 +173,8 @@ class ClientBlock(models.Model):
 
     class Meta:
         ordering = ['-from_date']
-        verbose_name = "00-00 Client Block"
-        verbose_name_plural = "00-00 Client Blocks"
+        verbose_name = "00-00A Client Block"
+        verbose_name_plural = "00-00A Client Blocks"
         indexes = [
             models.Index(fields=['is_active', 'from_date', 'to_date']),
             models.Index(fields=['client']),
@@ -190,4 +191,67 @@ class ClientBlock(models.Model):
         return (
             f"{target} "
             f"({self.from_date} → {self.to_date})"
+        )
+    
+class ClientFeatureControl(models.Model):
+    """
+    Superadmin-controlled feature access switch.
+
+    If client=NULL:
+        applies globally to ALL clients.
+
+    Used for:
+        - disable catalogue
+        - disable ecommerce
+        - maintenance rollout
+        - phased enablement
+    """
+
+    FEATURE_CHOICES = [
+        ('catalogue', 'Catalogue'),
+        ('ecommerce', 'E-Commerce'),
+    ]
+
+    client = models.ForeignKey(
+        'mysite.Client',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='feature_controls',
+        help_text='Empty = applies to ALL clients'
+    )
+
+    feature = models.CharField(
+        max_length=30,
+        choices=FEATURE_CHOICES,
+    )
+
+    is_disabled = models.BooleanField(default=True)
+
+    from_date = models.DateTimeField()
+    to_date   = models.DateTimeField()
+
+    message = models.TextField(
+        blank=True,
+        default='This feature is temporarily unavailable.'
+    )
+
+    remarks = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "00-00B Client Feature Control"
+        verbose_name_plural = "00-00B Client Feature Controls"
+
+    def __str__(self):
+        target = self.client.client_id if self.client else "ALL CLIENTS"
+        return f"{target} / {self.feature}"
+
+    @property
+    def is_active(self):
+        now = timezone.now()
+        return (
+            self.is_disabled and
+            self.from_date <= now <= self.to_date
         )

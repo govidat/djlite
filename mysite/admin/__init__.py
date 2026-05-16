@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from mysite.admin.global_config import (
     ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline
 )
-from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin #ClientTemplateAdmin
+from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientFeatureControlAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin #ClientTemplateAdmin
 #from mysite.admin.page import ClientTemplateAdmin
 
 #from mysite.admin.page import PageInline, LayoutInline, PageContentInline, NavItemInline
@@ -21,7 +21,7 @@ from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, Ta
 
 from mysite.models import (
     ThemePreset, GlobalValCat, GlobalVal,
-    Client, ClientBlock,
+    Client, ClientBlock, ClientFeatureControl, 
     ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper,
     Theme, ClientLocation,
     NavItem, Page, ClientTemplate,
@@ -36,6 +36,8 @@ from mysite.models import (
 
 # All registrations in one place — easy to see what's registered
 admin.site.register(ClientBlock,          ClientBlockAdmin)
+admin.site.register(ClientFeatureControl,          ClientFeatureControlAdmin)
+
 
 admin.site.register(ThemePreset,          ThemePresetAdmin)
 admin.site.register(GlobalValCat,         GlobalValCatAdmin)

@@ -1,0 +1,19 @@
+{# templates/system/feature_disabled.html #}
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="max-w-2xl mx-auto py-16 text-center">
+
+    <h1 class="text-3xl font-bold mb-6">
+        Service Temporarily Unavailable
+    </h1>
+
+    <p class="text-lg">
+        {{ message }}
+    </p>
+
+</div>
+
+{% endblock %}
