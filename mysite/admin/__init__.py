@@ -7,11 +7,6 @@ from mysite.admin.global_config import (
     ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline
 )
 from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientFeatureControlAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin #ClientTemplateAdmin
-#from mysite.admin.page import ClientTemplateAdmin
-
-#from mysite.admin.page import PageInline, LayoutInline, PageContentInline, NavItemInline
-
-#from mysite.admin.component import SvgtextbadgeValueInline, TextstbItemInline, ComptextBlockInline, GentextBlockInline, ComptextBlockInline, ComponentSlotInline
 
 from mysite.admin.users import (
     ClientUserProfileInline, CustomUserAdmin, ClientGroupPermissionInline, 

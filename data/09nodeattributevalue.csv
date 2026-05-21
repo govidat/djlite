@@ -1,0 +1,12 @@
+taxonomy_slug,node_slug,type_slug,slug,name_en,name_hi,name_fr,name_ta,order,gpc_value_code,client_id
+gpc,spark-plugs,thread-size,m14,M14 x 1.25 v2,,,,1,,
+gpc,spark-plugs,thread-size,m18,M18 x 1.5,,,,2,,
+gpc,spark-plugs,thread-size,m10,M10 x 1.0,,,,3,,
+gpc,spark-plugs,plug-type,standard,Standard (Copper),स्टैंडर्ड (कॉपर),,,1,,
+gpc,spark-plugs,plug-type,iridium,Iridium,इरिडियम,,,2,,
+gpc,spark-plugs,plug-type,platinum,Platinum,प्लैटिनम,,,3,,
+gpc,spark-plugs,plug-type,double-platinum,Double Platinum,डबल प्लैटिनम,,,4,,
+gpc,spark-plugs,heat-range,cold-5,5 (Cold),,,,1,,
+gpc,spark-plugs,heat-range,medium-6,6 (Medium),,,,2,,
+gpc,spark-plugs,heat-range,hot-7,7 (Hot),,,,3,,
+gpc,spark-plugs,heat-range,hot-8,8 (Very Hot),,,,4,,

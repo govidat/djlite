@@ -1,0 +1,4 @@
+client_id,item_id,variant_id,name_en,name_hi,name_fr,name_ta,sku,gtin,price,stock,is_active,order,image_url,attributes
+bosch,bosch-fr7dc,std,Standard,स्टैंडर्ड,,,BOSCH-FR7DC-STD,4047024119328,299,120,1,,,"{""gap_mm"":0.7,""material"":""copper""}"
+bosch,bosch-fr7dc,iridium,Iridium,इरिडियम,,,BOSCH-FR7DC-IR,4047024119335,499,50,1,,,"{""gap_mm"":0.8,""material"":""iridium""}"
+bosch,bosch-fr7dc,racing,Racing,रेसिंग,,,BOSCH-FR7DC-RACE,,699,10,0,,,"{""gap_mm"":1.0,""performance"":""high""}"

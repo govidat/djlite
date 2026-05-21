@@ -43,7 +43,7 @@ class NavItem(models.Model):
         ('footer', 'Footer'),
         ('sidebar', 'Sidebar'),
     ]
-
+ 
     client      = models.ForeignKey('mysite.Client', on_delete=models.CASCADE,
                                     related_name='nav_items')
     parent      = models.ForeignKey('self', null=True, blank=True,

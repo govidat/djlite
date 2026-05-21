@@ -1,0 +1,4 @@
+global_item_id,media_type,media_url,alt,order,is_primary,text_key
+bosch-fr7dc,image,https://picsum.photos/seed/bosch1/800/800,Bosch Spark Plugv2,1,1,
+bosch-fr7dc,pdf,https://example.com/bosch.pdf,Bosch Datasheet,2,0,
+bosch-fr7dc,text,,,3,0,bosch-fr7dc-description

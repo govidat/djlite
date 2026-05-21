@@ -1,0 +1,17 @@
+client_id,item_id,taxonomy_slug,node_slug,attribute_client_id,attribute_slug,predefined_client_id,predefined_value_slug,value_text,value_number
+bahushira,bosch-fr7dc,gpc,spark-plugs,,thread-size,,m14,,
+bahushira,bosch-fr7dc,gpc,spark-plugs,,plug-type,,standard,,
+bahushira,bosch-fr7dc,gpc,spark-plugs,,electrode-gap-mm,,,,0.7
+bahushira,bosch-fr7dc,gpc,spark-plugs,,heat-range,,medium-6,,
+bahushira,bosch-fr8dc,gpc,spark-plugs,,thread-size,,m14,,
+bahushira,bosch-fr8dc,gpc,spark-plugs,,electrode-gap-mm,,,,0.8
+bahushira,bosch-fr8dc,gpc,spark-plugs,,plug-type,,standard,,
+bahushira,bosch-fr8dc,gpc,spark-plugs,,heat-range,,hot-7,,
+bahushira,ngk-bpr6es,gpc,spark-plugs,,thread-size,,m14,,
+bahushira,ngk-bpr6es,gpc,spark-plugs,,electrode-gap-mm,,,,0.7
+bahushira,ngk-bpr6es,gpc,spark-plugs,,plug-type,,standard,,
+bahushira,ngk-bpr6es,gpc,spark-plugs,,heat-range,,cold-5,,
+bahushira,ngk-iridium-ix-br6,gpc,spark-plugs,,thread-size,,m14,,
+bahushira,ngk-iridium-ix-br6,gpc,spark-plugs,,electrode-gap-mm,,,,0.7
+bahushira,ngk-iridium-ix-br6,gpc,spark-plugs,,plug-type,,iridium,,
+bahushira,ngk-iridium-ix-br6,gpc,spark-plugs,,heat-range,,cold-5,,

@@ -1,0 +1,350 @@
+client_id,page_id,htmlblob_en,htmlblob_fr,htmlblob_hi,htmlblob_ta
+bahushira,about,"<!-- 
+  About page — Tailwind + DaisyUI only. No inline styles.
+  Paste into PageContent.html in Django Admin.
+  Theme switching works because all colours use DaisyUI semantic tokens.
+  
+  How to get this from Google Stitch:
+  Prompt: ""Design an about page for a small business. 
+           Use only Tailwind CSS utility classes and DaisyUI component classes.
+           No inline styles. No custom CSS. No React. Plain HTML only.""
+-->
+
+<main>
+
+  <!-- ── Hero ───────────────────────────────────────────────────── -->
+  <section class=""hero min-h-64 bg-primary text-primary-content"">
+    <div class=""hero-content text-center"">
+      <div class=""max-w-2xl"">
+        <h1 class=""text-5xl font-bold mb-4"">About Us V3</h1>
+        <p class=""text-xl opacity-80"">
+          A passionate team building great products for our customers since 2018.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Our Story ──────────────────────────────────────────────── -->
+  <section class=""py-16 px-4 bg-base-100"">
+    <div class=""max-w-4xl mx-auto"">
+      <div class=""flex flex-col md:flex-row gap-12 items-center"">
+
+        <div class=""flex-1"">
+          <h2 class=""text-3xl font-bold text-base-content mb-6"">Our Story</h2>
+          <p class=""text-base-content/70 text-lg leading-relaxed mb-4"">
+            Founded with a simple belief — that great service and quality products
+            should be accessible to everyone — we started as a small team with big
+            ambitions. Today we serve hundreds of happy customers across the region.
+          </p>
+          <p class=""text-base-content/70 text-lg leading-relaxed"">
+            Every product we carry is carefully selected, and every interaction with
+            our team is designed to leave you with a smile.
+          </p>
+        </div>
+
+        <div class=""flex-1 flex justify-center"">
+          <div class=""stats stats-vertical shadow"">
+            <div class=""stat"">
+              <div class=""stat-title"">Happy Customers</div>
+              <div class=""stat-value text-primary"">500+</div>
+              <div class=""stat-desc"">Across the region</div>
+            </div>
+            <div class=""stat"">
+              <div class=""stat-title"">Years in Business</div>
+              <div class=""stat-value text-secondary"">6</div>
+              <div class=""stat-desc"">Since 2018</div>
+            </div>
+            <div class=""stat"">
+              <div class=""stat-title"">Team Members</div>
+              <div class=""stat-value text-accent"">12</div>
+              <div class=""stat-desc"">And growing</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Values ─────────────────────────────────────────────────── -->
+  <section class=""py-16 px-4 bg-base-200"">
+    <div class=""max-w-4xl mx-auto"">
+      <h2 class=""text-3xl font-bold text-base-content text-center mb-12"">
+        What We Stand For
+      </h2>
+      <div class=""grid grid-cols-1 md:grid-cols-3 gap-6"">
+
+        <div class=""card bg-base-100 shadow"">
+          <div class=""card-body items-center text-center"">
+            <div class=""badge badge-primary badge-lg p-4 mb-4 text-2xl"">🤝</div>
+            <h3 class=""card-title"">Trust</h3>
+            <p class=""text-base-content/70"">
+              We build lasting relationships through honesty and transparency
+              in everything we do.
+            </p>
+          </div>
+        </div>
+
+        <div class=""card bg-base-100 shadow"">
+          <div class=""card-body items-center text-center"">
+            <div class=""badge badge-secondary badge-lg p-4 mb-4 text-2xl"">⭐</div>
+            <h3 class=""card-title"">Quality</h3>
+            <p class=""text-base-content/70"">
+              Every product and service we offer meets a standard we are
+              genuinely proud of.
+            </p>
+          </div>
+        </div>
+
+        <div class=""card bg-base-100 shadow"">
+          <div class=""card-body items-center text-center"">
+            <div class=""badge badge-accent badge-lg p-4 mb-4 text-2xl"">💡</div>
+            <h3 class=""card-title"">Innovation</h3>
+            <p class=""text-base-content/70"">
+              We keep improving and finding better ways to serve our customers
+              every day.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Team ───────────────────────────────────────────────────── -->
+  <section class=""py-16 px-4 bg-base-100"">
+    <div class=""max-w-4xl mx-auto"">
+      <h2 class=""text-3xl font-bold text-base-content text-center mb-12"">
+        Meet the Team
+      </h2>
+      <div class=""grid grid-cols-1 md:grid-cols-3 gap-8"">
+
+        <div class=""flex flex-col items-center text-center gap-4"">
+          <div class=""avatar placeholder"">
+            <div class=""bg-primary text-primary-content rounded-full w-24"">
+              <span class=""text-3xl"">PS</span>
+            </div>
+          </div>
+          <div>
+            <p class=""font-bold text-lg text-base-content"">Priya Sharma</p>
+            <p class=""text-base-content/60 text-sm"">Founder &amp; CEO</p>
+          </div>
+          <p class=""text-base-content/70 text-sm"">
+            Passionate about building products that make a real difference
+            in people's daily lives.
+          </p>
+        </div>
+
+        <div class=""flex flex-col items-center text-center gap-4"">
+          <div class=""avatar placeholder"">
+            <div class=""bg-secondary text-secondary-content rounded-full w-24"">
+              <span class=""text-3xl"">AM</span>
+            </div>
+          </div>
+          <div>
+            <p class=""font-bold text-lg text-base-content"">Arjun Menon</p>
+            <p class=""text-base-content/60 text-sm"">Head of Operations</p>
+          </div>
+          <p class=""text-base-content/70 text-sm"">
+            Keeps everything running smoothly so our team can focus on
+            what matters most — the customer.
+          </p>
+        </div>
+
+        <div class=""flex flex-col items-center text-center gap-4"">
+          <div class=""avatar placeholder"">
+            <div class=""bg-accent text-accent-content rounded-full w-24"">
+              <span class=""text-3xl"">KN</span>
+            </div>
+          </div>
+          <div>
+            <p class=""font-bold text-lg text-base-content"">Kavya Nair</p>
+            <p class=""text-base-content/60 text-sm"">Customer Experience</p>
+          </div>
+          <p class=""text-base-content/70 text-sm"">
+            Dedicated to making every customer interaction feel personal,
+            warm, and effortless.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Timeline ───────────────────────────────────────────────── -->
+  <section class=""py-16 px-4 bg-base-200"">
+    <div class=""max-w-2xl mx-auto"">
+      <h2 class=""text-3xl font-bold text-base-content text-center mb-12"">
+        Our Journey
+      </h2>
+      <ul class=""timeline timeline-vertical"">
+        <li>
+          <div class=""timeline-start timeline-box"">Founded in Bengaluru</div>
+          <div class=""timeline-middle"">
+            <div class=""badge badge-primary"">2018</div>
+          </div>
+          <hr class=""bg-primary""/>
+        </li>
+        <li>
+          <hr class=""bg-primary""/>
+          <div class=""timeline-middle"">
+            <div class=""badge badge-primary"">2020</div>
+          </div>
+          <div class=""timeline-end timeline-box"">Reached 100 customers</div>
+          <hr class=""bg-primary""/>
+        </li>
+        <li>
+          <hr class=""bg-primary""/>
+          <div class=""timeline-middle"">
+            <div class=""badge badge-secondary"">2022</div>
+          </div>
+          <div class=""timeline-start timeline-box"">Expanded to 3 locations</div>
+          <hr class=""bg-secondary""/>
+        </li>
+        <li>
+          <hr class=""bg-secondary""/>
+          <div class=""timeline-middle"">
+            <div class=""badge badge-accent"">2024</div>
+          </div>
+          <div class=""timeline-end timeline-box"">Launched online platform</div>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── CTA ────────────────────────────────────────────────────── -->
+  <section class=""py-16 px-4 bg-primary text-primary-content text-center"">
+    <div class=""max-w-2xl mx-auto"">
+      <h2 class=""text-3xl font-bold mb-4"">Want to Get in Touch?</h2>
+      <p class=""text-xl opacity-80 mb-8"">
+        We would love to hear from you.
+      </p>
+      <div class=""flex flex-col sm:flex-row gap-4 justify-center"">
+        <a href=""mailto:hello@example.com""
+           class=""btn btn-outline text-primary-content border-primary-content
+                  hover:bg-primary-content hover:text-primary"">
+          Email Us
+        </a>
+        <a href=""#""
+           class=""btn btn-outline text-primary-content border-primary-content
+                  hover:bg-primary-content hover:text-primary"">
+          Visit a Store
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>",,"<div class=""min-h-screen bg-base-100"">
+
+  <section class=""bg-primary text-primary-content py-20 px-4"">
+    <div class=""max-w-4xl mx-auto text-center"">
+      <h1 class=""text-5xl font-bold mb-4"">हमारे बारे में</h1>
+      <p class=""text-xl opacity-80"">
+        हम एक उत्साही टीम हैं जो अपने ग्राहकों के लिए बेहतरीन उत्पाद बनाती है।
+      </p>
+    </div>
+  </section>
+
+  <section class=""py-16 px-4"">
+    <div class=""max-w-4xl mx-auto"">
+      <h2 class=""text-3xl font-bold text-base-content mb-6"">हमारी कहानी</h2>
+      <p class=""text-base-content/70 text-lg leading-relaxed mb-4"">
+        एक सरल विश्वास के साथ स्थापित — कि उच्च गुणवत्ता की सेवाएं और उत्पाद
+        सभी के लिए सुलभ होने चाहिए — हमने एक छोटी टीम के रूप में शुरुआत की।
+        आज हम क्षेत्र भर के सैकड़ों खुश ग्राहकों की सेवा करते हैं।
+      </p>
+    </div>
+  </section>
+
+  <section class=""bg-primary text-primary-content py-16 px-4 text-center"">
+    <h2 class=""text-3xl font-bold mb-4"">संपर्क करें</h2>
+    <p class=""text-xl opacity-80 mb-8"">हम आपसे सुनना पसंद करेंगे।</p>
+    <a href=""/{{ client.client_id }}/contact/""
+       class=""btn btn-outline btn-lg text-primary-content border-primary-content"">
+      संपर्क करें
+    </a>
+  </section>
+
+</div>",
+bahushira,catalogue,"<!--
+  Catalogue page hero — static HTML only.
+  No Django template tags here — those live in page_catalogue_html.html.
+  This blob provides: hero banner and any static marketing copy above the catalogue.
+-->
+
+<section class=""bg-primary text-primary-content py-10 px-4"">
+  <div class=""max-w-7xl mx-auto"">
+    <div class=""flex flex-col md:flex-row md:items-end md:justify-between gap-4"">
+      <div>
+        <h1 class=""text-4xl font-bold mb-2"">Our Catalogue V2</h1>
+        <p class=""text-primary-content/80 text-lg"">
+          Browse our complete range of products.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>",,"<section class=""bg-primary text-primary-content py-10 px-4"">
+  <div class=""max-w-7xl mx-auto"">
+    <div class=""flex flex-col md:flex-row md:items-end md:justify-between gap-4"">
+      <div>
+        <h1 class=""text-4xl font-bold mb-2"">हमारी सूची</h1>
+        <p class=""text-primary-content/80 text-lg"">
+          हमारे उत्पादों की पूरी श्रृंखला देखें।
+        </p>
+      </div>
+    </div>
+  </div>
+</section>",
+bahushira,terms,"<!-- PageContent for page_id=terms, language_code=en -->
+<div class=""max-w-3xl mx-auto px-4 py-12"">
+
+  <h1 class=""text-3xl font-bold text-base-content mb-2"">
+    Terms of Service
+  </h1>
+  <p class=""text-base-content/50 text-sm mb-8"">
+    Last updated: May 2026
+  </p>
+
+  <div class=""prose prose-sm max-w-none text-base-content/80"">
+
+    <h2>1. Acceptance of Terms</h2>
+    <p>By accessing this website you agree to be bound by these terms...</p>
+
+    <h2>2. Use of Service</h2>
+    <p>You may use the service only for lawful purposes...</p>
+
+    <!-- Add all your terms content here as plain HTML -->
+
+  </div>
+</div>",,,
+bahushira,privacy,"<!-- PageContent for page_id=privacy, language_code=en -->
+<div class=""max-w-4xl mx-auto px-4 py-12"">
+
+  <div class=""flex items-center justify-between mb-6"">
+    <h1 class=""text-3xl font-bold text-base-content"">Privacy Policy</h1>
+    <a href=""https://your-storage-url/privacy-policy.pdf""
+       download
+       class=""btn btn-outline btn-sm gap-2"">
+      ↓ Download PDF
+    </a>
+  </div>
+
+  <!-- Inline PDF viewer -->
+  <div class=""rounded-2xl overflow-hidden border border-base-300 shadow-sm"">
+    <iframe
+      src=""https://your-storage-url/privacy-policy.pdf""
+      class=""w-full""
+      style=""height: 80vh; min-height: 600px;""
+      title=""Privacy Policy"">
+      <div class=""p-8 text-center"">
+        <p class=""text-base-content/60 mb-4"">
+          Unable to display PDF inline.
+        </p>
+        <a href=""https://your-storage-url/privacy-policy.pdf""
+           class=""btn btn-primary"">
+          Download Privacy Policy
+        </a>
+      </div>
+    </iframe>
+  </div>
+</div>",,,

@@ -85,7 +85,8 @@ class ComptextBlock(models.Model):
         ]        
     def __str__(self):
         return f"{self.block_id} {self.ltext}"    
-               
+
+"""  DEPRECATED             
 class GentextBlock(models.Model):
     # This is to be deprecated. Initially planned to use this for Page Name, Client name etc. Now modelTranslation is being used.
     #textcontent = models.ForeignKey(TextContent, related_name="blocks", on_delete=models.CASCADE)
@@ -112,7 +113,7 @@ class GentextBlock(models.Model):
         ]        
     def __str__(self):
         return f"{self.block_id} {self.ltext}" 
-    
+"""   
 class Component(models.Model):
     """L0 — one per Layout cell (level=40)"""
     layout = models.OneToOneField(

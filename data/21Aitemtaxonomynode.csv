@@ -1,0 +1,9 @@
+client_id,item_id,taxonomy_slug,node_client_id,node_slug,is_primary,order
+bahushira,bosch-fr7dc,gpc,,spark-plugs,1,1
+bahushira,bosch-fr8dc,gpc,,spark-plugs,1,1
+bahushira,ngk-bpr6es,gpc,,spark-plugs,1,1
+bahushira,ngk-iridium-ix-br6,gpc,,spark-plugs,1,1
+bahushira,bosch-fr7dc,brand,,bosch-automotive,0,2
+bahushira,bosch-fr8dc,brand,,bosch-automotive,0,2
+bahushira,ngk-bpr6es,brand,,ngk-standard,0,2
+bahushira,ngk-iridium-ix-br6,brand,,ngk-iridium-ix,0,2

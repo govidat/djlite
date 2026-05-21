@@ -17,6 +17,17 @@ Server-side rendered Django 5.2 application. Tailwind CSS for styling, `django-c
 | `whitenoise` | latest | Static file serving on PaaS |
 | `psycopg2-binary` | latest | PostgreSQL adapter (production) |
 
+Phase 3 addition
+ Package | Version | Purpose |
+|---------|---------|---------|
+| `djangorestframework` | latest stable | REST API layer for mobile / Beckn adapter; used for commerce document endpoints |
+| `django-filter` | latest stable | DRF filter backend for Order / Delivery list APIs |
+| `celery` | 5.x | Background task queue — order confirmation email, pricing recalculation, document promotion jobs |
+| `redis` | latest | Celery broker + result backend; replaces LocMemCache in production |
+| `djmoney` | latest | `MoneyField` — stores `(amount, currency)` pairs; integrates with `py-moneyed` for arithmetic |
+| `babel` | latest | Currency formatting and locale-aware number rendering |
+
+
 ### Authentication & Authorization
 
 | Package | Version | Notes |
@@ -396,10 +407,334 @@ When `Item.inherit_global_media=True` and `GlobalItem` is set:
 - `SimpleNamespace` wrapper makes GlobalItemMedia template-compatible
 - Result sorted by `order`
 - Prefetch paths: `medias` → `prefetched_medias`, `global_item__medias` → `prefetched_global_medias`
+## Phase 3B — Demand Planning Stack
+ 
+### New Python Packages
+ 
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `statsforecast` | latest stable (Nixtla) | Fast statistical forecasting — AutoETS, AutoARIMA, CrostonSBA, Theta. Handles thousands of SKUs efficiently via vectorised Numba backend |
+| `hierarchicalforecast` | latest stable (Nixtla) | Hierarchical reconciliation — MinTrace (OLS/WLS), BottomUp, TopDown (AHP). Constructs and applies the summing matrix `S` |
+| `polars` | latest stable | In-process DataFrame library for fast SKU × Customer × Month matrix construction and aggregation. Significantly faster than pandas for 10K SKU × 200 customer × 36 month tensors |
+| `duckdb` | latest stable | In-process OLAP engine. Used inside Celery forecast tasks for fast hierarchical rollups from PostgreSQL tables without loading full tables into memory |
+| `prophet` | latest stable (Meta) | Optional per-series model for series with strong seasonality + holidays; used when AutoETS/AutoARIMA underperform |
+| `celery` | 5.x | Already in Phase 3A. Forecast jobs run as long-running Celery tasks |
+| `redis` | latest | Already in Phase 3A. Celery broker |
+| `djmoney` | latest | Already in Phase 3A. `MoneyField` on `ActualSale.revenue`, `ActualSaleLocation.total_revenue` |
+| `openpyxl` | latest | Excel import/export for actuals upload and forecast download (planners live in Excel) |
+| `pandas` | latest | Required by `statsforecast` and `hierarchicalforecast` internally; also used in import pipeline for CSV/Excel parsing |
+ 
+### Demand Planning Model Package Layout
+ 
+```
+mysite/models/
+    demand/
+        __init__.py
+        hierarchy.py        # SalesNode, CustomerSalesAssignment
+                            # ClientLocation.parent (self-FK added via migration)
+        actuals.py          # ActualSale, ActualSaleLocation, ActualSaleImport
+        forecast.py         # ForecastVersion, ForecastLine, ForecastAggregate,
+                            #   ForecastOverride, OverrideSplitWeight, ForecastAccuracy
+```
+ 
+### Key Model Relationships (Phase 3B)
+ 
+```
+Client
+  ├── ClientLocation (existing; gains parent→self + materialized path)
+  │     └── SalesNode (client, name, level_label, parent→self, location FK nullable)
+  │           └── CustomerSalesAssignment (customer, sales_node, valid_from, valid_to)
+  ├── ActualSale (item, variant, customer, location, year, month, qty, revenue)
+  ├── ActualSaleLocation (location, year, month, total_qty, total_revenue)
+  ├── ActualSaleImport (job tracking)
+  └── ForecastVersion (version_label, base_period_end, horizon_months, engine_config, status)
+        ├── ForecastLine (item, customer, location, year, month,
+        │                 statistical_qty, override_qty, final_qty)
+        ├── ForecastAggregate (agg_level, agg_key JSONField, year, month,
+        │                      statistical_qty, override_qty, final_qty)
+        ├── ForecastOverride (override_level, override_key JSONField, year, month,
+        │                     override_qty, override_pct, override_note, created_by)
+        │     └── OverrideSplitWeight (child_key, weight)
+        └── ForecastAccuracy (item, customer, location, year, month,
+                              actual_qty, forecast_qty, mape, bias)
+```
+ 
+### Forecasting Engine Architecture
+ 
+#### Celery Task: `run_forecast(version_id)`
+ 
+```
+1. Load actuals from PostgreSQL:
+   DuckDB in-process query over ActualSale for client + period window
+   → Polars DataFrame (columns: unique_id, ds, y)
+   where unique_id = f"{item_id}|{customer_id}|{location_id}"
+ 
+2. Build hierarchy summing matrix S:
+   Walk TaxonomyNode tree (product_planning slug)
+   Walk ClientLocation parent tree
+   Walk SalesNode tree
+   Construct S matrix as a numpy array (Nixtla HierarchicalForecast format)
+ 
+3. Run StatsForecast:
+   models = [AutoETS(), AutoARIMA(), CrostonSBA()]  # CrostonSBA for intermittent
+   sf = StatsForecast(models=models, freq='MS', n_jobs=-1)
+   forecasts_df = sf.forecast(df=actuals_df, h=horizon_months)
+ 
+4. Run HierarchicalForecast reconciliation:
+   hrec = HierarchicalReconciliation(reconcilers=[MinTrace(method='ols')])
+   reconciled_df = hrec.reconcile(Y_hat_df=forecasts_df, Y_df=actuals_df, S=S, tags=tags)
+ 
+5. Write ForecastLine records (bulk_create, batch 5000)
+6. Write ForecastAggregate records for each agg_level
+7. Update ForecastVersion.status = 'READY'
+8. Notify requesting user via Django message / email
+```
+ 
+#### Celery Task: `propagate_override(override_id)`
+ 
+```
+1. Load ForecastOverride record
+2. Identify leaf ForecastLine records within override_key subtree
+3. Determine disaggregation method (PROPORTIONAL / EQUAL / CUSTOM)
+4. For PROPORTIONAL: compute shares from ActualSale for same period last year
+5. Update ForecastLine.override_qty for each leaf
+6. Recompute ForecastAggregate roll-ups for affected keys
+7. If subtree < 500 leaves: run synchronously; else submit Celery task
+```
+ 
+#### Celery Task: `compute_forecast_accuracy(version_id, period_year, period_month)`
+ 
+```
+1. Load approved ForecastLine for version + period
+2. Load ActualSale for same period
+3. Join on (item, customer, location)
+4. Compute MAPE, Bias, WMAPE per leaf and per aggregate level
+5. Write ForecastAccuracy records
+```
+ 
+### Data Import Pipeline
+ 
+**CSV / Excel upload** (monthly actuals):
+- `ActualSaleImport` job created on upload
+- Celery task `process_actuals_import(import_id)`:
+  - Reads file with `pandas.read_excel` / `pandas.read_csv`
+  - Validates: item exists, customer exists, location exists, year/month valid
+  - `INSERT ... ON CONFLICT DO UPDATE` on `ActualSale` (idempotent)
+  - Writes errors to `ActualSaleImport.errors` JSONField
+  - Updates status: `PENDING → PROCESSING → COMPLETE / FAILED`
+**Summary-level upload** (location × month totals):
+- Same pipeline writes to `ActualSaleLocation`
+- Used as cross-check against SKU-level rollups; discrepancy > 5% flagged
+### Database Indexes (Phase 3B)
+ 
+Add via `RunSQL` in migration:
+ 
+```sql
+-- Fast actuals matrix pull for forecast runs
+CREATE INDEX ix_actualsale_client_period
+    ON mysite_actualsale (client_id, year, month);
+ 
+CREATE INDEX ix_actualsale_item_customer
+    ON mysite_actualsale (item_id, customer_id, location_id);
+ 
+-- ForecastLine lookups by version
+CREATE INDEX ix_forecastline_version
+    ON mysite_forecastline (version_id, year, month);
+ 
+-- ForecastAggregate lookups
+CREATE INDEX ix_forecastaggregate_version_level
+    ON mysite_forecastaggregate (version_id, agg_level, year, month);
+ 
+-- SalesNode materialized path
+CREATE INDEX ix_salesnode_path
+    ON mysite_salesnode USING btree (path text_pattern_ops);
+ 
+-- ClientLocation parent tree (already has id PK; add path)
+CREATE INDEX ix_clientlocation_path
+    ON mysite_clientlocation USING btree (path text_pattern_ops);
+```
+ 
+### Frontend (Phase 3B)
+ 
+The demand planning UI is a **separate React SPA** served under `/{client_id}/planning/`. It communicates with Django via DRF REST endpoints. It is **not** part of the cotton/DaisyUI Django template system.
+ 
+| Component | Library | Purpose |
+|-----------|---------|---------|
+| Grid / pivot override table | AG Grid (Community) | Spreadsheet-like consensus grid; planners edit override_qty cells inline |
+| Time series charts | Apache ECharts | Forecast vs actuals line chart with drill-down |
+| Hierarchy navigator | React Tree component | Navigate product / geography / sales hierarchy |
+| State management | Zustand | Lightweight; no Redux needed at this scale |
+| API client | axios + React Query | Forecast version polling; override submission |
+ 
+**Key UI views:**
+1. **Actuals Dashboard** — Location × Month heatmap; SKU-level drill-down.
+2. **Forecast Run** — Trigger new forecast run; monitor Celery task progress via polling.
+3. **Consensus Override Grid** — AG Grid showing `ForecastVersion` lines; editable `override_qty` cells; save submits `ForecastOverride` records.
+4. **Version Comparison** — Two forecast versions side-by-side at any aggregate level.
+5. **Accuracy Report** — MAPE / Bias / WMAPE by product group / geography / sales node.
+### REST API Endpoints (Phase 3B, under `mysite/api/demand/`)
+ 
+| Endpoint | Method | Notes |
+|----------|--------|-------|
+| `/actuals/upload/` | POST | Multipart file upload; creates `ActualSaleImport` job |
+| `/actuals/upload/{id}/` | GET | Poll import job status |
+| `/actuals/` | GET | Filtered actuals query (item, customer, location, year, month range) |
+| `/forecast-versions/` | GET, POST | List versions; trigger new run |
+| `/forecast-versions/{id}/` | GET | Version detail + status |
+| `/forecast-versions/{id}/lines/` | GET | Leaf-level lines (paginated, filterable) |
+| `/forecast-versions/{id}/aggregates/` | GET | Roll-up data by agg_level |
+| `/forecast-versions/{id}/overrides/` | GET, POST | List / create overrides |
+| `/forecast-versions/{id}/approve/` | POST | Transition status to APPROVED |
+| `/forecast-versions/{id}/accuracy/` | GET | Accuracy metrics for version |
+| `/sales-hierarchy/` | GET | Full SalesNode tree for client |
+| `/location-hierarchy/` | GET | ClientLocation tree for client |
+ 
+### Caching (Phase 3B additions)
+ 
+| Cache key | Content | TTL | Invalidated by |
+|-----------|---------|-----|----------------|
+| `sales_hierarchy:{client_id}` | SalesNode tree | 1 hour | post_save on SalesNode |
+| `location_hierarchy:{client_id}` | ClientLocation tree | 1 hour | post_save on ClientLocation |
+| `forecast_aggregates:{version_id}:{agg_level}` | Pre-computed aggregates | Until version status changes | ForecastVersion status post_save |
+ 
+### `ClientFeatureControl` Keys Added (Phase 3B)
+ 
+`demand_planning`, `actuals_upload`, `forecast_run`, `consensus_override`, `forecast_approval`.
 
 ## Phase 3 eCommerce models with Beckn
 
 Commerce models follow Beckn v2.0 schema vocabulary. BecknFulfillment, BecknBilling, BecknQuotation are standalone models (not embedded in Order) matching Beckn's structural separation. Each has a to_beckn() method for future API adapter. CustomerAddress adds gps, area_code, state, landmark fields to match Beckn Location.address schema.
+# tech-stack.md — Delta Updates (Phase 3)
+
+
+## Phase 3 — eCommerce Stack
+
+### Commerce Models Package Layout
+
+```
+mysite/models/
+    commerce/
+        __init__.py
+        inquiry.py          # Inquiry, InquiryLine
+        quotation.py        # Quotation, QuotationLine
+        order.py            # Order, OrderLine
+        delivery.py         # Delivery, DeliveryLine
+        picking.py          # Picking, PickingLine  [optional]
+        packing.py          # Packing, PackingLine  [optional]
+        transportation.py   # Transportation, TransportationDelivery [optional]
+        billing.py          # Invoice, InvoiceLine, InvoiceDelivery
+        payment.py          # Payment, PaymentAllocation
+        returns.py          # Return, ReturnLine, Refund
+        pricing.py          # PricingProcedure, PricingStep, ConditionType,
+                            # ConditionAccessSequence, ConditionRecord,
+                            # ConditionScale, PricingResultLine
+        currency.py         # ClientCurrencyRule, Money value object helpers
+```
+
+### Key Model Relationships (Phase 3 additions)
+
+```
+Client
+  ├── allowed_currencies (JSONField)
+  ├── base_currency (CharField)
+  ├── allow_delivery_split (BooleanField)
+  ├── allow_partial_shipment (BooleanField)
+  ├── multi_location_dispatch (BooleanField)
+  ├── PricingProcedure (FK → Client)
+  │     └── PricingStep (ordered; FK → PricingProcedure, ConditionType, AccessSequence)
+  ├── ClientCurrencyRule (client_country, customer_country → currency)
+  └── ClientLocation
+        ├── allow_delivery_split (BooleanField)
+        ├── allow_partial_shipment (BooleanField)
+        ├── is_dispatch_location (BooleanField)
+        ├── enable_picking (BooleanField)
+        ├── enable_packing (BooleanField)
+        ├── enable_transportation (BooleanField)
+        └── enable_billing_consolidation (BooleanField)
+
+CustomerProfile
+  └── CustomerAddress (address_type: BILL_TO / SHIP_TO / BOTH, gps, area_code, state, landmark)
+
+Inquiry (source_doc_type=None, source_doc_id=None, currency, bill_to, ship_to)
+  └── InquiryLine (item, qty, unit_price, ship_to_override)
+
+Quotation (source_doc → Inquiry or None, currency, pricing_result)
+  └── QuotationLine → PricingResultLine (per step per line)
+
+Order (source_doc → Quotation or None, bill_to, ship_to, allow_delivery_split override)
+  └── OrderLine (ship_to_address override, bill_to_address override, open_qty, closed_qty)
+
+Delivery (order, source_lines M2M OrderLine, dispatch_location → ClientLocation)
+  └── DeliveryLine (order_line, delivered_qty)
+  → TransportationDelivery (M2M)
+  → InvoiceDelivery (M2M)
+
+Picking (delivery, optional)
+Packing (picking or delivery, optional)
+Transportation (consolidates Deliveries)
+Invoice (consolidates Deliveries, currency, payment_terms)
+  └── InvoiceLine
+Payment → PaymentAllocation → Invoice
+Return → ReturnLine → Refund
+```
+
+### Money / Currency Architecture
+
+- `djmoney.MoneyField` is used on all monetary columns: `unit_price`, `line_total`, `discount_amount`, `tax_amount`, `gross_total`, etc.
+- `MoneyField` stores two DB columns: `{field}_amount` (NUMERIC) + `{field}_currency` (CHAR 3).
+- Currency on a document is set at header level and propagated to lines; line-level currency override is not supported (all lines must share the document currency).
+- `Client.allowed_currencies` drives the dropdown on Inquiry / Quotation / Order header. `Client.base_currency` is the default selection.
+- `ClientCurrencyRule(client, client_country, customer_country, currency)` is evaluated after `base_currency` default and before user override.
+
+### Pricing Engine Implementation Notes
+
+- `PricingProcedure` is per-Client. On Client creation a signal copies the system default procedure.
+- `PricingStep` fields: `step_number` (ordering), `condition_type` (FK), `access_sequence` (FK), `apply_at` (LINE / HEADER), `is_statistical`, `group_key`, `requirement` (dotted-path string to a callable), `from_step` (base amount reference for % conditions).
+- `ConditionRecord` fields: `condition_type`, `key_combination` (JSONField — the resolved access key), `valid_from`, `valid_to`, `amount` (MoneyField or decimal for %), `scale` (FK to ConditionScale or null).
+- `ConditionScale` fields: `condition_record`, `scale_type` (VALUE / QTY), `breaks` (JSONField array of `{from, rate_or_amount}`).
+- `PricingResultLine` fields: `document_ct` (GenericFK to Order/Quotation), `line_ref`, `step_number`, `condition_type`, `base_amount`, `condition_value`, `result_amount`, `is_statistical`.
+
+### Document Promotion Flow (technical)
+
+A `promote_document(source_instance, target_model)` service function handles all flow variants:
+1. Validates source document status allows promotion.
+2. Deep-copies header fields to target model, sets `source_doc_type` + `source_doc_id`.
+3. Creates target lines from source lines (preserving quantities, item refs, address overrides).
+4. If target is `Order`: runs pricing engine and stores `PricingResultLine` records.
+5. Returns the target instance in `DRAFT` status for user editing before confirmation.
+
+### REST API Layer (for mobile / Beckn adapter)
+
+- `djangorestframework` added; routers under `mysite/api/`.
+- Phase 3 endpoints: `InquiryViewSet`, `QuotationViewSet`, `OrderViewSet`, `DeliveryViewSet`, `InvoiceViewSet`.
+- Authentication: DRF Token Auth for internal use; JWT deferred to Phase 4.
+- Serializers expose `to_beckn()` output via a `?format=beckn` query param on detail endpoints.
+
+### Caching (Phase 3 additions)
+
+| Cache key | Content | TTL | Invalidated by |
+|-----------|---------|-----|----------------|
+| `pricing_procedure:{client_id}` | Serialised PricingProcedure + steps | 1 hour | post_save on PricingProcedure / PricingStep |
+| `condition_records:{client_id}:{condition_type}` | ConditionRecord lookup table | 15 min | post_save on ConditionRecord |
+| `currency_rules:{client_id}` | ClientCurrencyRule list | 1 hour | post_save on ClientCurrencyRule |
+
+### Background Tasks (Celery)
+
+| Task | Trigger | Notes |
+|------|---------|-------|
+| `send_order_confirmation` | Order status → CONFIRMED | Email to Customer + Client staff |
+| `send_quotation_email` | Quotation status → SENT | Email with PDF attachment |
+| `recalculate_pricing` | ConditionRecord post_save | Recomputes open Quotation / Order pricing in background |
+| `generate_invoice_pdf` | Invoice status → ISSUED | Renders PDF, stores URL on Invoice |
+
+### `ClientFeatureControl` / `ClientLocation` Flags Added (Phase 3)
+
+Extend existing `ClientFeatureControl` model with Phase 3 feature keys:
+`inquiry`, `quotation`, `picking`, `packing`, `transportation`, `billing_consolidation`, `multi_currency`, `partial_shipment`.
+
+Extend `ClientLocation` with boolean fields:
+`enable_picking`, `enable_packing`, `enable_transportation`, `enable_billing_consolidation`,
+`allow_delivery_split`, `allow_partial_shipment`, `is_dispatch_location`.
 
 ------------------------------------------------------------------------------------------------------------------------------
 ## To Build complete hrml file and push to PageContent

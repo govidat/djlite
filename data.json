@@ -6,24 +6,7 @@
             "parent_page_id": "",
             "ltext": "Home Page",
             "order": 1,
-            "gentextblocks": [
-                {
-                    "block_id": "name",
-                    "ltext": "Home",
-                    "order": 1,
-                    "items": [
-                        {
-                            "item_id": "text",
-                            "order": 1,
-                            "values": {
-                                "en": {"stext": "Home", "ltext": ""},
-                                "fr": {"stext": "frHome", "ltext": ""},
-                                "hi": {"stext": "hiHome", "ltext": ""}
-                            }
-                        }
-                    ]
-                }
-            ],
+
             "layouts": [
                 {
                     "slug": "a",
@@ -137,24 +120,7 @@
             "parent_page_id": "",
             "ltext": "About Page",
             "order": 2,
-            "gentextblocks": [
-                {
-                    "block_id": "name",
-                    "ltext": "About",
-                    "order": 1,
-                    "items": [
-                        {
-                            "item_id": "text",
-                            "order": 1,
-                            "values": {
-                                "en": {"stext": "About", "ltext": ""},
-                                "fr": {"stext": "frAbout", "ltext": ""},
-                                "hi": {"stext": "hiAbout", "ltext": ""}
-                            }
-                        }
-                    ]
-                }
-            ],
+
             "layouts": [
                 {
                     "slug": "a",

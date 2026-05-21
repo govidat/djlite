@@ -201,8 +201,13 @@ class TaxonomyNodeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, n
     model = TaxonomyNode
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
-            'node', 'node__taxonomy', 'node__client'
-        )    
+            'taxonomy',
+            'client',
+        )
+    #def get_queryset(self, request):
+    #    return super().get_queryset(request).select_related(
+    #        'node', 'node__taxonomy', 'node__client'
+    #    )    
     extra = 0
     classes = ['collapse']
     #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
@@ -233,7 +238,7 @@ class TaxonomyNodeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, n
         )    
 
 class TaxonomyNodeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
-    list_select_related = ('taxonomy', 'client', 'parent')
+    list_select_related = ('taxonomy', 'client', 'parent', 'global_node')
     search_fields   = ('slug', 'name', 'path', 'gpc_code')
     #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
     #non_translated_fields = ('client', 'parent', 'slug', 'path', 'depth', 'order', 'metadata', 'gpc_code', 'global_node', 'is_active')    # adjust to your actual fields
@@ -279,12 +284,9 @@ class TaxonomyNodeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, ne
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser or _user_has_admin_role(request.user)
-    
+     
 class TaxonomyAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
-    #list_display = ('slug', 'client', 'taxonomy_type', 'order', 'is_active', 'gpc_segment_code')
     inlines      = [TaxonomyNodeInline]
-    #TRANSLATED_FIELDS = ('name', 'description')
-    #non_translated_fields = ('slug', 'client', 'taxonomy_type', 'order', 'is_active', 'gpc_segment_code')    # adjust to your actual fields    
     admin_role_only = True
     search_fields = ('slug', 'name')
     raw_id_fields = ('client',)

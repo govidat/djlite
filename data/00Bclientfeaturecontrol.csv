@@ -1,0 +1,3 @@
+id,feature,is_disabled,from_date,to_date,message,remarks,created_at,client_id
+1,catalogue,0,2026-05-16 07:00:52,2026-05-17 07:01:02,This feature is temporarily unavailable as Bahushira catalogue is under maintenance.,,2026-05-16 07:02:36.371763,1
+2,catalogue,0,2026-05-16 08:15:31,2026-05-17 08:15:38,This feature is temporarily unavailable due to maintenance.,,2026-05-16 08:16:41.394561,

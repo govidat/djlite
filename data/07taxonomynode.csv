@@ -1,0 +1,12 @@
+slug,order,is_active,metadata,taxonomy_slug,name_en,name_fr,name_hi,name_ta,client_id,gpc_code,parent_slug,global_node_id
+automotive,1,1,{},gpc,Automotive Parts & Accessoriesv2,,ऑटोमोटिव पार्ट्स और सहायक उपकरण,,,47,,
+engine-parts,1,1,{},gpc,Engine Parts,,इंजन पार्ट्स,,,4701,automotive,
+ignition-system,1,1,{},gpc,Ignition System,,इग्निशन सिस्टम,,,470101,engine-parts,
+spark-plugs,1,1,{},gpc,Spark Plugs,,स्पार्क प्लग,,,47010101,ignition-system,
+oil-filters,2,1,{},gpc,Oil Filters,,ऑयल फिल्टर,,bahushira,470102,ignition-system,
+bosch,1,1,{},brand,Robert Bosch GmbHv2,,रॉबर्ट बॉश GmbH,,,,,
+ngk,2,1,{},brand,NGK Spark Plugs Co. Ltd,,NGK स्पार्क प्लग कं. लि.,,,,,
+bosch-automotive,1,1,{},brand,Bosch Automotive,,,,,,bosch,
+ngk-standard,1,1,{},brand,NGK Standard,,,,,,ngk,
+ngk-premium,2,1,{},brand,NGK Premium,,,,,,ngk,
+ngk-iridium-ix,1,1,{},brand,NGK Iridium IX,,NGK इरिडियम IX,,,,ngk-premium,

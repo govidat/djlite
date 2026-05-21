@@ -1,7 +1,7 @@
 import nested_admin
 from django.conf import settings
 from django import forms
-from mysite.models import (Client, SvgtextbadgeValue, TextstbItem, ComptextBlock, GentextBlock, ComponentSlot, Component)
+from mysite.models import (Client, SvgtextbadgeValue, TextstbItem, ComptextBlock, ComponentSlot, Component)
 #from .base import BaseAdminInlinecss
 
 from modeltranslation.admin import TranslationBaseModelAdmin
@@ -103,7 +103,7 @@ class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInli
         return super().get_queryset(request).prefetch_related(
             'textstbitems',  # your GenericRelation name
         )    
-
+"""
 class GentextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = GentextBlock
     fields = ("block_id", "ltext", "hidden", "order", "css_class")
@@ -114,7 +114,7 @@ class GentextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlin
         return super().get_queryset(request).prefetch_related(
             'textstbitems',  # your GenericRelation name
         )
-
+"""
 #class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
 #    model = ComptextBlock
 #    extra = 0

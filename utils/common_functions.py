@@ -1,7 +1,7 @@
 from collections import defaultdict
 from django.core.cache import cache
 
-from mysite.models import ThemePreset, Client, Theme, ComptextBlock, GentextBlock, TextstbItem, SvgtextbadgeValue
+from mysite.models import ThemePreset, Client, Theme, ComptextBlock, TextstbItem, SvgtextbadgeValue
 #from mysite.models import Card, Hero, Accordion, Layout, Page, HeroText, HeroCardText, AccordionText
 from mysite.models import Page, Layout, NavItem, Component, ComponentSlot
 
@@ -126,6 +126,7 @@ comptextblock_prefetch = Prefetch(
     to_attr="prefetched_comptextblocks"
 )
 """
+"""
 gentextblock_qs = GentextBlock.objects.prefetch_related(
     stbitem_prefetch
 ).order_by("order")
@@ -136,7 +137,7 @@ gentextblock_prefetch = Prefetch(
     queryset= gentextblock_qs,
     to_attr="prefetched_gentextblocks"
 )
-
+"""
 # Option 3 Ccommon Components
 """
 comptextblock_qs = ComptextBlock.objects.prefetch_related(
@@ -678,7 +679,6 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
             Client.objects
             #.select_related("parent")  # Add this if you access parent -- also modify build_client_payload
             .prefetch_related(
-                #gentextblock_prefetch,
                 Prefetch(
                     "pages",
                     queryset=Page.objects.
@@ -686,7 +686,6 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                     #    "parent"
                     #).
                     prefetch_related(
-                        #gentextblock_prefetch,
                         layout_prefetch,
                     ),
                     #.order_by("order"),
@@ -696,9 +695,6 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                     "themes",
                     queryset=Theme.objects
                         .select_related("themepreset")  # IMPORTANT
-                        #.prefetch_related(
-                        #    gentextblock_prefetch,
-                        #)
                         .order_by("order"),
                         to_attr="prefetched_themes"
                 ),

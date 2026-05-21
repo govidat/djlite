@@ -1,0 +1,9 @@
+global_item_id,taxonomy_slug,node_slug,is_primary
+bosch-fr7dc,gpc,spark-plugs,1
+bosch-fr8dc,gpc,spark-plugs,1
+ngk-bpr6es,gpc,spark-plugs,1
+ngk-iridium-ix-br6,gpc,spark-plugs,1
+bosch-fr7dc,brand,bosch-automotive,0
+bosch-fr8dc,brand,bosch-automotive,0
+ngk-bpr6es,brand,ngk-standard,0
+ngk-iridium-ix-br6,brand,ngk-iridium-ix,0

@@ -1,0 +1,6 @@
+id,page_id,ltext,hidden,client_id
+1,home,Home Page,0,bahushira
+2,about,About Page,0,bahushira
+3,catalogue,,0,bahushira
+4,terms,,0,bahushira
+5,privacy,,1,bahushira

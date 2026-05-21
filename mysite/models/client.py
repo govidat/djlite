@@ -13,9 +13,6 @@ class Client(models.Model):
     language_list = models.JSONField(null = True, blank = True, default=default_languages, help_text="A JSON array of selected values from Language.")
     default_language = models.CharField(max_length=10, choices=settings.LANGUAGES, default=settings.LANGUAGE_CODE)
     theme_list = models.JSONField(null = True, blank = True, default=default_themes)
-    # Add this to allow: client_instance.translations.all()
-    #translations = GenericRelation(TextItemValue)
-    #gentextblocks = GenericRelation(GentextBlock)
     # Translatable fields
     name = models.CharField(max_length=100, blank=True, null=True) # modeltranslation blank=True to be present 
     nb_title = models.CharField(max_length=100, blank=True, null=True) # modeltranslation blank=True to be present

@@ -3,10 +3,30 @@ from django.core.exceptions import ValidationError
 from html.parser import HTMLParser
 
 """
+DATABASE
+   ↓
+QuerySet Builder
+(get_item_queryset) This is just a query function and it lazy loads. DB is still not hit
+
+   ↓
+Optimized Loading
+(select_related/prefetch_related)  - Now this is a python list. No accidental db calls 
+
+   ↓
+Model Business Logic
+(resolved_* methods) - this is in model
+
+   ↓
+Serializer/Builder
+(serialize_item/build_catalogue_payload) - this is is in helper function
+
+   ↓
+Cache / JSON / Template
+
 Client
-    ├── name using modelTranslation #GentextBlock    
+    ├── name using modelTranslation   
     ├── Page
-        ├── name using modelTranslation #GentextBlock    
+        ├── name using modelTranslation     
         ├── Layout @level 40
             ├── Component (onetoone at level=40, compl0_id = hero, card, accordion etc... + some fields at this level)
                      ├── ComponentSlot (foreign key compl1_id= figure, text + some fields that may be applicable for each of this)
@@ -14,7 +34,7 @@ Client
     ├── NavItem
     ├── Themes
         ├── themepreset
-        └── name using modelTranslation #GentextBlock                        
+        └── name using modelTranslation                         
            
 GentextBlock Presently NOT USED (content_type) (name / nb_title / nb_logo) # used in Client, Page
 └──TextstbItem (content_type) (text / svg / badge)

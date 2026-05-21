@@ -16,7 +16,7 @@ class ThemeInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInline, C
     model = Theme
     extra = 0
     classes = ['collapse']
-    #inlines = [GentextBlockInline]
+
 
     #TRANSLATED_FIELDS = ('name',)
     #non_translated_fields = ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default')   # adjust to your actual fields

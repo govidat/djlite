@@ -1,0 +1,2 @@
+client_id,item_id,price,compare_price,currency,sku,barcode,track_inventory,stock_quantity,attributes
+bahushira,bosch-fr7dc-local,199,249,INR,BOSCHFR7LOCAL,BAR001,1,120,"{""warehouse"": ""A1""}"

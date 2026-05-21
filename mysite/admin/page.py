@@ -60,7 +60,7 @@ class PageInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
     model = Page
     extra = 0
     classes = ['collapse']
-    inlines = [LayoutInline, PageContentInline]                        # GentextBlockInline,  whatever Page's child inline is
+    inlines = [LayoutInline, PageContentInline]                        
     fields  = ['page_id', 'ltext', 'hidden']
 """
 

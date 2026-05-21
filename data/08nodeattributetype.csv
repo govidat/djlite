@@ -1,0 +1,5 @@
+taxonomy_slug,node_slug,slug,name_en,name_hi,name_fr,name_ta,field_type,is_required,is_filterable,order,gpc_attribute_code,client_id
+gpc,spark-plugs,thread-size,Thread Sizev2,थ्रेड साइज़,,,select,1,1,1,AT001,
+gpc,spark-plugs,electrode-gap-mm,Electrode Gap (mm),इलेक्ट्रोड गैप (मिमी),,,number,1,1,2,AT002,
+gpc,spark-plugs,plug-type,Plug Type,प्लग प्रकार,,,select,1,1,3,AT003,
+gpc,spark-plugs,heat-range,Heat Range,हीट रेंज,,,select,0,1,4,,

@@ -1,0 +1,492 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); }
+  .page { padding: 1.5rem 0; }
+
+  /* Tab nav */
+  .tabs { display: flex; gap: 6px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .tab { font-size: 13px; padding: 6px 14px; border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary); cursor: pointer;
+    background: var(--color-background-primary); color: var(--color-text-secondary);
+    transition: all .15s; }
+  .tab.active { background: var(--color-background-info); color: var(--color-text-info);
+    border-color: var(--color-border-info); font-weight: 500; }
+  .tab:hover:not(.active) { background: var(--color-background-secondary); }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Sprint cards */
+  .sprint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .sprint-card { background: var(--color-background-primary); border-radius: var(--border-radius-lg);
+    border: 0.5px solid var(--color-border-tertiary); padding: 1rem 1.1rem; }
+  .sprint-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .sprint-badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px;
+    white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+  .badge-gray { background: var(--color-background-secondary); color: var(--color-text-secondary); }
+  .badge-purple { background: #EEEDFE; color: #3C3489; }
+  .badge-teal { background: #E1F5EE; color: #085041; }
+  .badge-amber { background: #FAEEDA; color: #633806; }
+  .badge-coral { background: #FAECE7; color: #712B13; }
+  .badge-blue { background: #E6F1FB; color: #0C447C; }
+  .badge-green { background: #EAF3DE; color: #27500A; }
+  @media (prefers-color-scheme: dark) {
+    .badge-purple { background: #26215C; color: #CECBF6; }
+    .badge-teal { background: #04342C; color: #9FE1CB; }
+    .badge-amber { background: #412402; color: #FAC775; }
+    .badge-coral { background: #4A1B0C; color: #F5C4B3; }
+    .badge-blue { background: #042C53; color: #B5D4F4; }
+    .badge-green { background: #173404; color: #C0DD97; }
+  }
+  .sprint-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); line-height: 1.3; }
+  .sprint-meta { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 10px; }
+  .sprint-tasks { list-style: none; }
+  .sprint-tasks li { font-size: 12px; color: var(--color-text-secondary);
+    padding: 3px 0; border-top: 0.5px solid var(--color-border-tertiary);
+    display: flex; align-items: flex-start; gap: 6px; line-height: 1.45; }
+  .sprint-tasks li:first-child { border-top: none; }
+  .task-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-border-secondary);
+    flex-shrink: 0; margin-top: 5px; }
+  .deliverable { font-size: 12px; color: var(--color-text-secondary); margin-top: 8px;
+    padding: 6px 8px; background: var(--color-background-secondary);
+    border-radius: var(--border-radius-md); border-left: 2px solid var(--color-border-info);
+    line-height: 1.4; }
+  .deliverable strong { color: var(--color-text-info); font-weight: 500; }
+
+  /* Section headers inside panels */
+  .section-label { font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--color-text-tertiary); margin: 1.5rem 0 .75rem; }
+  .section-label:first-child { margin-top: 0; }
+
+  /* Effort table */
+  .effort-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .effort-table th { text-align: left; font-weight: 500; font-size: 12px;
+    color: var(--color-text-secondary); padding: 6px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .effort-table td { padding: 7px 10px; border-bottom: 0.5px solid var(--color-border-tertiary);
+    color: var(--color-text-primary); vertical-align: middle; }
+  .effort-table tr:last-child td { border-bottom: none; font-weight: 500; }
+  .effort-table tr.total-row td { background: var(--color-background-secondary); }
+  .effort-bar { height: 6px; border-radius: 3px; background: var(--color-border-tertiary); }
+  .effort-fill { height: 100%; border-radius: 3px; }
+  .days-cell { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; }
+
+  /* Risk table */
+  .risk-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;
+    padding-bottom: 10px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .risk-row:last-child { border-bottom: none; margin-bottom: 0; }
+  .risk-label { font-size: 12px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 3px; }
+  .risk-text { font-size: 12px; color: var(--color-text-secondary); line-height: 1.45; }
+  .risk-icon { font-size: 14px; margin-right: 4px; vertical-align: -1px; }
+  .mitig-text { font-size: 12px; color: var(--color-text-secondary); line-height: 1.45;
+    padding-left: 8px; border-left: 2px solid var(--color-border-success); }
+
+  /* DoD checklist */
+  .dod-item { display: flex; gap: 10px; padding: 7px 0;
+    border-bottom: 0.5px solid var(--color-border-tertiary); align-items: flex-start; }
+  .dod-item:last-child { border-bottom: none; }
+  .dod-check { width: 16px; height: 16px; border-radius: 50%;
+    border: 1.5px solid var(--color-border-secondary); flex-shrink: 0; margin-top: 1px; }
+  .dod-text { font-size: 13px; color: var(--color-text-primary); line-height: 1.45; }
+  .dod-tag { font-size: 11px; color: var(--color-text-tertiary); margin-left: 6px; }
+
+  /* Summary metrics */
+  .metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.2rem; }
+  .metric-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md);
+    padding: .75rem 1rem; }
+  .metric-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .metric-value { font-size: 22px; font-weight: 500; color: var(--color-text-primary); }
+  .metric-sub { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+
+  /* Sequencing diagram */
+  .seq-block { display: flex; flex-direction: column; gap: 0; }
+  .seq-row { display: flex; align-items: stretch; gap: 0; min-height: 52px; }
+  .seq-label { width: 90px; flex-shrink: 0; font-size: 11px; font-weight: 500;
+    color: var(--color-text-tertiary); display: flex; align-items: center;
+    padding-right: 10px; text-align: right; justify-content: flex-end; }
+  .seq-bars { flex: 1; position: relative; padding: 6px 0; display: flex; align-items: center; }
+  .seq-bar { height: 28px; border-radius: 6px; display: flex; align-items: center;
+    padding: 0 10px; font-size: 11px; font-weight: 500; white-space: nowrap;
+    position: absolute; }
+  .seq-connector { width: 90px; flex-shrink: 0; }
+  .seq-row-divider { height: 0.5px; background: var(--color-border-tertiary); margin: 0 0 0 90px; }
+  .seq-note { font-size: 11px; color: var(--color-text-tertiary); margin-top: 10px; line-height: 1.5; }
+</style>
+
+<div class="page">
+  <div class="metric-row">
+    <div class="metric-card">
+      <div class="metric-label">Sprints</div>
+      <div class="metric-value">10</div>
+      <div class="metric-sub">3B.0 → 3B.9</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Estimated effort</div>
+      <div class="metric-value">31–44</div>
+      <div class="metric-sub">days, solo developer</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Can parallelise</div>
+      <div class="metric-value">3B.4 + 5</div>
+      <div class="metric-sub">+ SPA after 3B.3 stubs</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="show('sprints', this)">Sprints</div>
+    <div class="tab" onclick="show('effort', this)">Effort & sequence</div>
+    <div class="tab" onclick="show('risks', this)">Risks</div>
+    <div class="tab" onclick="show('dod', this)">Definition of done</div>
+  </div>
+
+  <!-- SPRINTS -->
+  <div id="panel-sprints" class="panel active">
+    <div class="sprint-grid">
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-gray">3B.0</span>
+          <div class="sprint-title">Foundation & prerequisites</div>
+        </div>
+        <div class="sprint-meta">1–2 days · no dependencies</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>Add statsforecast, hierarchicalforecast, polars, duckdb, prophet, openpyxl, pandas to requirements.txt</li>
+          <li><span class="task-dot"></span>Add ClientFeatureControl keys: demand_planning, actuals_upload, forecast_run, consensus_override, forecast_approval</li>
+          <li><span class="task-dot"></span>Add ClientLocation.parent self-FK + path CharField + index (text_pattern_ops)</li>
+          <li><span class="task-dot"></span>makemigrations → migrate → manage.py check</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Clean migrations; all packages installed; location tree fields present</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-purple">3B.1</span>
+          <div class="sprint-title">Sales hierarchy models</div>
+        </div>
+        <div class="sprint-meta">2–3 days · needs 3B.0</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>SalesNode(client, name, level_label, parent→self, location FK nullable, path) + pre_save signal for materialized path</li>
+          <li><span class="task-dot"></span>CustomerSalesAssignment(customer, sales_node, valid_from, valid_to)</li>
+          <li><span class="task-dot"></span>ix_salesnode_path index via RunSQL</li>
+          <li><span class="task-dot"></span>Admin: tree display with indent; CustomerSalesAssignmentInline</li>
+          <li><span class="task-dot"></span>REST: GET /api/demand/sales-hierarchy/ and /location-hierarchy/</li>
+          <li><span class="task-dot"></span>Tests: path on create/reparent; subtree query; date effectivity</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Full sales org tree configurable in Admin; hierarchy APIs return correct nested JSON</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-teal">3B.2</span>
+          <div class="sprint-title">Actuals models & import pipeline</div>
+        </div>
+        <div class="sprint-meta">3–4 days · needs 3B.1</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>ActualSale(client, item, variant, customer, location, year, month, qty, revenue) + unique constraint + indexes</li>
+          <li><span class="task-dot"></span>ActualSaleLocation (summary-level); ActualSaleImport (job tracking)</li>
+          <li><span class="task-dot"></span>Celery task process_actuals_import: parse CSV/Excel, FK validation, bulk_create with update_conflicts=True</li>
+          <li><span class="task-dot"></span>REST: POST /actuals/upload/, GET /actuals/upload/{id}/ (poll), GET /actuals/ (filtered query)</li>
+          <li><span class="task-dot"></span>generate_actuals_template management command → .xlsx download</li>
+          <li><span class="task-dot"></span>Tests: idempotent re-upload; bad FK → error row only; row count correct</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Client staff can upload monthly SKU × Customer × Location actuals; import is idempotent</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-teal">3B.3</span>
+          <div class="sprint-title">Forecast models & version management</div>
+        </div>
+        <div class="sprint-meta">3–4 days · needs 3B.2</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>ForecastVersion(client, version_label, base_period_end, horizon_months, engine_config JSONField, status, created_by, approved_by, approved_at)</li>
+          <li><span class="task-dot"></span>ForecastLine(version, item, customer, location, year, month, statistical_qty, override_qty, final_qty) — final_qty computed on save</li>
+          <li><span class="task-dot"></span>ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy</li>
+          <li><span class="task-dot"></span>Status machine: DRAFT → IN_REVIEW → APPROVED → LOCKED</li>
+          <li><span class="task-dot"></span>REST: CRUD on /forecast-versions/, /lines/, /aggregates/, /approve/</li>
+          <li><span class="task-dot"></span>Tests: final_qty logic; LOCKED rejects edits; version copy</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Forecast version lifecycle works; REST endpoints stubbed for SPA development to begin</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-amber">3B.4</span>
+          <div class="sprint-title">Statistical forecast engine</div>
+        </div>
+        <div class="sprint-meta">5–7 days · needs 3B.3 · <strong>parallel with 3B.5</strong></div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>utils/demand/forecast_engine.py: build_actuals_dataframe (DuckDB → Polars), build_summing_matrix S + tags for 3 hierarchies</li>
+          <li><span class="task-dot"></span>run_statsforecast: AutoETS, AutoARIMA, CrostonSBA (auto-selected for intermittent series > X% zero months), Theta</li>
+          <li><span class="task-dot"></span>run_hierarchical_reconciliation: MinTrace OLS/WLS, BottomUp, TopDown AHP — configurable per client</li>
+          <li><span class="task-dot"></span>write_forecast_lines (bulk_create batched 5000) + write_forecast_aggregates</li>
+          <li><span class="task-dot"></span>Celery task run_forecast(version_id): orchestrates pipeline, updates version status, notifies user</li>
+          <li><span class="task-dot"></span>Tests: S matrix shape; reconciled top-level = bottom-up sum; CrostonSBA selection; bulk_create row count</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Triggering a ForecastVersion run produces auditable ForecastLine records with reconciled quantities</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-amber">3B.5</span>
+          <div class="sprint-title">Consensus override engine</div>
+        </div>
+        <div class="sprint-meta">4–5 days · needs 3B.3 · <strong>parallel with 3B.4</strong></div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>utils/demand/override_engine.py: resolve_leaf_lines (subtree walk via materialized path), compute_proportional_shares (from ActualSale history)</li>
+          <li><span class="task-dot"></span>apply_override → updates ForecastLine.override_qty per leaf</li>
+          <li><span class="task-dot"></span>recompute_aggregates for affected agg_keys</li>
+          <li><span class="task-dot"></span>Routing: < 500 leaves → synchronous; ≥ 500 → Celery task propagate_override(override_id)</li>
+          <li><span class="task-dot"></span>REST: POST/DELETE /overrides/ — delete reverts leaf lines to statistical_qty</li>
+          <li><span class="task-dot"></span>Tests: disagg sums to total; revert restores statistical; LOCKED rejects POST</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Planner can override at any hierarchy level; disaggregation reaches leaf ForecastLines correctly</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-coral">3B.6</span>
+          <div class="sprint-title">Accuracy tracking</div>
+        </div>
+        <div class="sprint-meta">2–3 days · needs 3B.4 + 3B.5</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>Celery task compute_forecast_accuracy(version_id, year, month): join ForecastLine (approved) with ActualSale; compute MAPE, Bias, WMAPE per leaf and aggregate</li>
+          <li><span class="task-dot"></span>Write ForecastAccuracy records (bulk_create, update_conflicts=True)</li>
+          <li><span class="task-dot"></span>Monthly Celery beat schedule triggers for all clients with demand_planning enabled</li>
+          <li><span class="task-dot"></span>REST: GET /forecast-versions/{id}/accuracy/</li>
+          <li><span class="task-dot"></span>Tests: MAPE formula; WMAPE aggregate; division-by-zero guard (actual=0)</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> After actuals close, accuracy metrics are computed automatically and accessible via API</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-blue">3B.7</span>
+          <div class="sprint-title">React SPA frontend</div>
+        </div>
+        <div class="sprint-meta">7–10 days · can start after 3B.3 stubs · parallel with 3B.4+3B.5</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>Vite + TypeScript scaffold under frontend/planning/; served at /{client_id}/planning/ via Django catch-all</li>
+          <li><span class="task-dot"></span>Auth: Django session cookie; DRF SessionAuthentication on all demand endpoints</li>
+          <li><span class="task-dot"></span>View 1 — Actuals Dashboard: drag-drop upload widget + poll; ECharts Location×Month heatmap; AG Grid SKU drill-down</li>
+          <li><span class="task-dot"></span>View 2 — Forecast Run: period/horizon/method selectors; submit → poll status; progress bar</li>
+          <li><span class="task-dot"></span>View 3 — Consensus Grid: AG Grid editable cells; colour coding (white/yellow/grey); POST override on edit</li>
+          <li><span class="task-dot"></span>View 4 — Version Comparison: two-version ECharts overlay at any aggregate level</li>
+          <li><span class="task-dot"></span>View 5 — Accuracy Report: MAPE/Bias/WMAPE AG Grid + worst-SKUs bar chart</li>
+          <li><span class="task-dot"></span>Vitest: cell edit → correct API call; polling logic; share display</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Planners can upload, run forecasts, override, compare versions, and view accuracy — all in the browser</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-green">3B.8</span>
+          <div class="sprint-title">Phase 3A integration</div>
+        </div>
+        <div class="sprint-meta">2–3 days · needs 3B.7 + Phase 3A Sprint 3.3</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>OrderLine.forecast_line nullable FK → ForecastLine</li>
+          <li><span class="task-dot"></span>On Quotation/Order creation: query approved ForecastVersion for Customer × Item → show suggested qty as hint on line form</li>
+          <li><span class="task-dot"></span>ForecastAccuracy extended: actual_order_qty column populated from OrderLine quantities in addition to ActualSale uploads</li>
+          <li><span class="task-dot"></span>Tests: suggested qty shown when approved version exists; FK set on acceptance</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Approved forecasts surface as suggested order quantities; plan-to-order loop closed</div>
+      </div>
+
+      <div class="sprint-card">
+        <div class="sprint-header">
+          <span class="sprint-badge badge-gray">3B.9</span>
+          <div class="sprint-title">Production hardening</div>
+        </div>
+        <div class="sprint-meta">2–3 days · needs all prior sprints</div>
+        <ul class="sprint-tasks">
+          <li><span class="task-dot"></span>Deploy Celery worker with CELERYD_TASK_SOFT_TIME_LIMIT=1800 (forecast jobs up to 30 min)</li>
+          <li><span class="task-dot"></span>Verify DuckDB pure-Python wheel installs cleanly in production container</li>
+          <li><span class="task-dot"></span>EXPLAIN ANALYZE on actuals matrix pull; confirm indexes used</li>
+          <li><span class="task-dot"></span>Load test: 10K SKU × 200 customer × 36 month run &lt; 15 minutes</li>
+          <li><span class="task-dot"></span>Load test: 50K row actuals upload &lt; 60 seconds</li>
+          <li><span class="task-dot"></span>E2E: upload → run → override → approve → order suggestion visible</li>
+          <li><span class="task-dot"></span>Wire ClientGroupPermission (demand_planning module) to all demand API endpoints</li>
+        </ul>
+        <div class="deliverable"><strong>Deliverable:</strong> Phase 3B live in production; load tests passed; permissions enforced</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EFFORT & SEQUENCE -->
+  <div id="panel-effort" class="panel">
+    <div class="section-label">Effort by sprint</div>
+    <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; margin-bottom: 1.5rem;">
+      <table class="effort-table">
+        <thead>
+          <tr>
+            <th style="width:70px">Sprint</th>
+            <th>Name</th>
+            <th style="width:120px">Effort</th>
+            <th style="width:90px" class="days-cell">Days range</th>
+          </tr>
+        </thead>
+        <tbody id="effort-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="section-label">Recommended sequencing</div>
+    <div style="background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem 1.1rem; margin-bottom: 1rem;">
+      <div class="seq-block" id="seq-block"></div>
+      <div class="seq-note">
+        Grey arrows show sequential dependency. Colour bars show work that can proceed in parallel once 3B.3 REST endpoints are stubbed.
+        Sprint 3B.7 (React SPA) is the longest single sprint and drives the critical path for 3B.8.
+      </div>
+    </div>
+
+    <div class="section-label">Overall build order (3B relative to 3A)</div>
+    <div style="font-size:13px; color: var(--color-text-secondary); line-height:1.8; padding: 0.75rem 1rem;
+      background: var(--color-background-secondary); border-radius: var(--border-radius-md);">
+      <div><strong style="color:var(--color-text-primary)">Step 1</strong> — 3B.0–3B.6: actuals ingestion + forecast engine, no UI yet (~20 days)</div>
+      <div style="margin-left:1rem; color: var(--color-border-secondary)">↓ parallel start:</div>
+      <div><strong style="color:var(--color-text-primary)">Step 2a</strong> — 3B.7: React SPA frontend (~8–10 days, can start once 3B.3 endpoints stubbed)</div>
+      <div><strong style="color:var(--color-text-primary)">Step 2b</strong> — 3A.0–3A.3: eCommerce foundation, pricing, inquiry, order (~20 days)</div>
+      <div style="margin-left:1rem; color: var(--color-border-secondary)">↓</div>
+      <div><strong style="color:var(--color-text-primary)">Step 3</strong> — 3B.8: order integration (~2–3 days, needs both 3B.7 and 3A sprint 3.3)</div>
+      <div style="margin-left:1rem; color: var(--color-border-secondary)">↓</div>
+      <div><strong style="color:var(--color-text-primary)">Step 4</strong> — 3A.4–3A.12: delivery through production hardening (~27 days)</div>
+    </div>
+  </div>
+
+  <!-- RISKS -->
+  <div id="panel-risks" class="panel">
+    <div class="section-label">Key risks & mitigations</div>
+    <div id="risks-container"></div>
+  </div>
+
+  <!-- DOD -->
+  <div id="panel-dod" class="panel">
+    <div class="section-label">Definition of done — Phase 3B</div>
+    <div id="dod-container"></div>
+  </div>
+</div>
+
+<script>
+const sprints = [
+  { id:'3B.0', name:'Foundation & prerequisites', lo:1, hi:2, color:'#888780' },
+  { id:'3B.1', name:'Sales hierarchy models',     lo:2, hi:3, color:'#534AB7' },
+  { id:'3B.2', name:'Actuals models & import',    lo:3, hi:4, color:'#0F6E56' },
+  { id:'3B.3', name:'Forecast models & versions', lo:3, hi:4, color:'#0F6E56' },
+  { id:'3B.4', name:'Statistical forecast engine',lo:5, hi:7, color:'#BA7517' },
+  { id:'3B.5', name:'Consensus override engine',  lo:4, hi:5, color:'#BA7517' },
+  { id:'3B.6', name:'Accuracy tracking',          lo:2, hi:3, color:'#993C1D' },
+  { id:'3B.7', name:'React SPA frontend',         lo:7, hi:10, color:'#185FA5' },
+  { id:'3B.8', name:'Phase 3A integration',       lo:2, hi:3, color:'#3B6D11' },
+  { id:'3B.9', name:'Production hardening',       lo:2, hi:3, color:'#888780' },
+];
+const total = { lo: 31, hi: 44 };
+
+const risks = [
+  { risk:'Nixtla library API changes between versions', mitig:'Pin statsforecast and hierarchicalforecast versions. Isolate all library calls inside utils/demand/forecast_engine.py — a library swap touches one file, not model code.' },
+  { risk:'Summing matrix S construction is wrong — reconciliation silently produces bad numbers', mitig:'Unit-test S matrix shape and column ordering independently before integrating with HierarchicalForecast. Compare reconciled top-level total against manually summed bottom-up for a known dataset.' },
+  { risk:'Forecast Celery task times out for large clients (10K SKU × 200 customer)', mitig:'Set CELERYD_TASK_SOFT_TIME_LIMIT=1800. Design task to checkpoint progress into ForecastVersion.status so it can resume. Consider chunking by product group for the largest clients.' },
+  { risk:'Actuals data quality — missing FKs, wrong item codes break imports', mitig:'Row-level error collection into ActualSaleImport.errors JSONField. Never fail the whole batch for a single bad row. Expose per-row errors in the upload UI so the planner can fix and re-upload.' },
+  { risk:'React SPA auth complexity — session vs token confusion', mitig:'Use Django session cookie (same origin). No JWT in Phase 3B. DRF SessionAuthentication on all demand endpoints. CSRF token sent in X-CSRFToken header from axios.' },
+  { risk:'DuckDB + PostgreSQL dual-engine causes write confusion', mitig:'Hard rule: DuckDB is used only inside Celery tasks for fast read aggregation. All writes go to PostgreSQL only. Document this boundary prominently in tech-stack.md.' },
+  { risk:'AG Grid Community licence missing server-side row model for large datasets', mitig:'Community is sufficient for Phase 3B. For very large grids (> 100K rows), implement pagination in the API and virtual row loading. Enterprise server-side row model deferred to Phase 4 if needed.' },
+];
+
+const dod = [
+  { text:'Client staff can upload monthly actuals (CSV/Excel) for SKU × Customer × Location', tag:'3B.2' },
+  { text:'Upload is idempotent — re-uploading the same file produces no duplicate rows', tag:'3B.2' },
+  { text:'Forecast run completes for 10K SKU × 200 customer × 36 month history in < 15 minutes', tag:'3B.4 / 3B.9' },
+  { text:'Hierarchical reconciliation: top-level total of reconciled forecast equals sum of bottom-up within float tolerance', tag:'3B.4' },
+  { text:'Consensus override at Location level disaggregates correctly to SKU leaf ForecastLines', tag:'3B.5' },
+  { text:'LOCKED ForecastVersion rejects all edit, override, and approval calls', tag:'3B.3' },
+  { text:'Accuracy report shows MAPE / Bias / WMAPE after actuals close for an approved version period', tag:'3B.6' },
+  { text:'Approved forecast version shows suggested quantity on Quotation / Order line form', tag:'3B.8' },
+  { text:'All demand API endpoints enforce ClientGroupPermission (demand_planning module)', tag:'3B.9' },
+  { text:'manage.py check clean; 0 migration errors', tag:'all' },
+  { text:'Production load tests passed: forecast run and actuals upload within stated time bounds', tag:'3B.9' },
+];
+
+// Render effort table
+const tbody = document.getElementById('effort-tbody');
+const maxDays = 10;
+sprints.forEach(s => {
+  const barW = Math.round((s.hi / maxDays) * 100);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="font-weight:500;font-size:13px">${s.id}</td>
+    <td style="font-size:13px">${s.name}</td>
+    <td>
+      <div class="effort-bar">
+        <div class="effort-fill" style="width:${barW}%;background:${s.color}"></div>
+      </div>
+    </td>
+    <td class="days-cell">${s.lo}–${s.hi} days</td>`;
+  tbody.appendChild(tr);
+});
+const totalRow = document.createElement('tr');
+totalRow.className = 'total-row';
+totalRow.innerHTML = `<td colspan="2" style="font-size:13px">Total</td><td></td><td class="days-cell">${total.lo}–${total.hi} days</td>`;
+tbody.appendChild(totalRow);
+
+// Sequence diagram (simple horizontal bars by phase)
+const seqData = [
+  { label:'3B.0–3B.3', desc:'Foundation → Forecast models', color:'#0F6E56', left:0, width:45 },
+  { label:'3B.4 + 3B.5', desc:'Engine + Override (parallel)', color:'#BA7517', left:45, width:30 },
+  { label:'3B.6', desc:'Accuracy', color:'#993C1D', left:75, width:10 },
+  { label:'3B.7 SPA', desc:'React SPA (start at 3B.3)', color:'#185FA5', left:35, width:35, parallel: true },
+  { label:'3B.8', desc:'3A Integration', color:'#3B6D11', left:80, width:10 },
+  { label:'3B.9', desc:'Hardening', color:'#888780', left:90, width:10 },
+];
+
+const seqBlock = document.getElementById('seq-block');
+seqData.forEach((s, i) => {
+  if (i > 0 && !s.parallel) {
+    const div = document.createElement('div');
+    div.className = 'seq-row-divider';
+    seqBlock.appendChild(div);
+  }
+  const row = document.createElement('div');
+  row.className = 'seq-row';
+  row.innerHTML = `
+    <div class="seq-label">${s.label}</div>
+    <div class="seq-bars">
+      <div class="seq-bar" style="left:${s.left}%;width:${s.width}%;background:${s.color}22;
+        border:1px solid ${s.color}55;color:${s.color};font-size:10px">
+        ${s.desc}
+      </div>
+    </div>`;
+  seqBlock.appendChild(row);
+});
+
+// Risks
+const rc = document.getElementById('risks-container');
+risks.forEach(r => {
+  const div = document.createElement('div');
+  div.className = 'risk-row';
+  div.innerHTML = `
+    <div>
+      <div class="risk-label"><i class="ti ti-alert-triangle risk-icon" aria-hidden="true"></i>${r.risk}</div>
+    </div>
+    <div class="mitig-text">${r.mitig}</div>`;
+  rc.appendChild(div);
+});
+
+// DoD
+const dc = document.getElementById('dod-container');
+dod.forEach(d => {
+  const div = document.createElement('div');
+  div.className = 'dod-item';
+  div.innerHTML = `
+    <div class="dod-check"></div>
+    <div class="dod-text">${d.text} <span class="dod-tag">${d.tag}</span></div>`;
+  dc.appendChild(div);
+});
+
+function show(panel, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + panel).classList.add('active');
+  el.classList.add('active');
+}
+</script>

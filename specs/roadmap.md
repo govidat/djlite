@@ -73,8 +73,8 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] `GlobalVal` / `GlobalValCat` key-value store for UI strings; `get_globalval()` utility
 - [x] `globalval` context processor delivering `gv` (resolved) and `gvt` (raw) to all templates
 - [x] `SvgtextbadgeValue.language_code` CharField as per-component translation mechanism
-- [ ] `django-modeltranslation` translation classes registered in `translation.py` for `Client`, `Page`, `Theme`, `GlobalVal` — confirm registrations are complete and migrations generated
-- [ ] Language switcher UI wired end-to-end (session-based language preference per customer per client)
+- [x] `django-modeltranslation` translation classes registered in `translation.py` for `Client`, `Page`, `Theme`, `GlobalVal` — confirm registrations are complete and migrations generated
+- [x] Language switcher UI wired end-to-end (session-based language preference per customer per client)
 
 ### Milestone 1.5 — Page Builder Models ✅ Done
 - [x] `Page`: `page_id`, `parent` (self-FK), `order`, `hidden`, translatable `name`; `unique_together (client, page_id)`
@@ -89,7 +89,7 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] `django-admin-sortable2` on `Layout.order`, `ComponentSlot.order`, `Page.order`
 - [x] `django-nested-admin` for nested inline hierarchy in Django Admin
 - [x] `no_html_tags` + `no_double_quotes` validators on all user-facing text fields
-- [ ] `GentextBlock` is present but currently unused in `build_client_payload` (commented out) — decide: keep for future use or remove
+- [x] `GentextBlock` is present but currently unused in `build_client_payload` (commented out) — decide: keep for future use or remove
 - [ ] `django-admin-sortable2` fully wired into admin classes for all sortable models
 
 ### Milestone 1.5b — Hybrid Page Authoring (Track A: Raw HTML) ✅ Done
@@ -110,7 +110,7 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] `resolve_theme()` — merges ThemePreset base tokens with Theme.overrides
 - [x] `THEME_PRESET_FIELDS` cached at import time
 - [x] `LocMemCache` configured (`translations-cache`)
-- [ ] **Cache invalidation signals** — `post_save` on `Client`, `Page`, `Layout`, `Component`, `ComponentSlot`, `Theme` must call `cache.delete(f"clientstatic:{client_id}")`. Not yet implemented. Without this, content edits don't reflect until cache expires or server restarts.
+- [x] **Cache invalidation signals** — `post_save` on `Client`, `Page`, `Layout`, `Component`, `ComponentSlot`, `Theme` must call `cache.delete(f"clientstatic:{client_id}")`. Not yet implemented. Without this, content edits don't reflect until cache expires or server restarts.
 - [ ] Switch to Redis cache in production (config is commented in settings — uncomment and wire to env var)
 - [ ] `use_cache=True` — currently hardcoded `False` in some call sites for debugging; restore before production
 
@@ -134,7 +134,7 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] Language switcher UI component
 
 ### Milestone 1.9 — Production Hardening
-- [ ] Split `settings.py` into `base` / `development` / `production`
+- [x] Split `settings.py` into `base` / `development` / `production`
 - [ ] `SECRET_KEY` moved to env var; `DEBUG=False` in production config
 - [ ] `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` set via env vars
 - [ ] `ACCOUNT_EMAIL_VERIFICATION = "mandatory"` in production
@@ -144,7 +144,7 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] Cache invalidation signals implemented
 - [ ] `manage.py check --deploy` passes with no warnings
 - [ ] Basic smoke tests: tenant resolution, page render, auth flows
-- [ ] README with local dev setup and deploy instructions
+- [x] README with local dev setup and deploy instructions
 
 ---
 
@@ -152,13 +152,13 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 
 | Decision | Status | Notes |
 |----------|--------|-------|
-| HTMX vs Datastar | Datastar dropped. HTMX not yet added. | Spike HTMX for theme/language switcher and inline editing |
-| `GentextBlock` retention | Present but unused | Decide: keep for future use or remove to reduce model complexity |
-| `models.py` split | Single file, growing large | Split into `models/` package before Phase 2 |
-| Staff admin UI | Django Admin (current) | Re-evaluate custom dashboard after Phase 1 with real client feedback |
-| Cache invalidation | Not implemented | Required before production — `post_save` signals on all content models |
-| Navbar architecture | ~~Coupled to page_tree~~ → **Resolved**: dedicated `NavItem` model,
-| decoupled from pages, supports external links and footer nav independently | Done |
+| DONE - HTMX Added in Phase 2 - HTMX vs Datastar | Datastar dropped. HTMX not yet added. | Spike HTMX for theme/language switcher and inline editing |
+| NOT Used `GentextBlock` retention | Present but unused | Decide: keep for future use or remove to reduce model complexity |
+| DONE`models.py` split | Single file, growing large | Split into `models/` package before Phase 2 |
+| WIP Staff admin UI | Django Admin (current) | Re-evaluate custom dashboard after Phase 1 with real client feedback |
+| DONE Cache invalidation | Not implemented | Required before production — `post_save` signals on all content models |
+| DONE Navbar architecture | ~~Coupled to page_tree~~ → **Resolved**: dedicated `NavItem` model,
+|    decoupled from pages, supports external links and footer nav independently | Done |
 ---
 
 ## Phase 2 — Product Catalogue
@@ -283,3 +283,476 @@ Phase 3 commerce models are Beckn schema-aligned. Full Beckn network participati
 | Elasticsearch / full-text search | Premature until catalogue size justifies it |
 | Multi-currency | Deferred until eCommerce validated |
 | Redis cache (dev) | LocMemCache sufficient for development; Redis config is already written — just needs uncommenting |
+
+## Phase 3B — Demand Planning
+*(Recommended sequencing: build Phase 3B before Phase 3A eCommerce so that
+approved forecasts can feed into Order creation as suggested quantities.)*
+ 
+**Goal:** Client staff can upload monthly actuals (SKU × Customer × Location),
+trigger statistical forecast runs, make consensus overrides at any hierarchy
+level, approve a final forecast, and track accuracy against actuals.
+ 
+Phase 3B uses the existing `Item`, `CustomerProfile`, and `ClientLocation` models
+from Phases 1 and 2 as foreign keys. It adds a new `demand/` model package and a
+React SPA frontend served under `/{client_id}/planning/`.
+ 
+---
+ 
+### Sprint 3B.0 — Foundation and Prerequisites
+- [ ] Add `statsforecast`, `hierarchicalforecast`, `polars`, `duckdb`, `prophet`, `openpyxl`, `pandas` to `requirements.txt`
+- [ ] Add `ClientFeatureControl` keys: `demand_planning`, `actuals_upload`, `forecast_run`, `consensus_override`, `forecast_approval`
+- [ ] Add `ClientLocation.parent` self-FK (nullable) + `path` CharField for materialized path
+- [ ] Add `ClientLocation.path` index (`text_pattern_ops`)
+- [ ] `python manage.py makemigrations && migrate`
+- [ ] `python manage.py check` — 0 issues
+---
+ 
+### Sprint 3B.1 — Sales Hierarchy Models
+- [ ] Create `mysite/models/demand/hierarchy.py`:
+  - `SalesNode(client, name, level_label, parent→self, location FK nullable, path CharField)`
+  - `CustomerSalesAssignment(customer, sales_node, valid_from, valid_to)`
+- [ ] `SalesNode` materialized path: `pre_save` signal computes path from parent chain
+- [ ] Add `ix_salesnode_path` index via `RunSQL` in migration
+- [ ] Admin: `SalesNodeAdmin` (tree display with indent), `CustomerSalesAssignmentInline`
+- [ ] REST endpoint: `GET /api/demand/sales-hierarchy/` → full tree JSON
+- [ ] REST endpoint: `GET /api/demand/location-hierarchy/` → ClientLocation tree JSON
+- [ ] Unit tests: path computed correctly on create/reparent; subtree query returns all descendants; CustomerSalesAssignment date effectivity
+---
+ 
+### Sprint 3B.2 — Actuals Models and Import Pipeline
+- [ ] Create `mysite/models/demand/actuals.py`:
+  - `ActualSale(client, item, variant nullable, customer, location, year, month, qty, revenue MoneyField)`
+  - Unique constraint: `(client, item, customer, location, year, month)`
+  - `ActualSaleLocation(client, location, year, month, total_qty, total_revenue MoneyField)`
+  - `ActualSaleImport(client, import_date, source_file, row_count, status, errors JSONField)`
+- [ ] Add DB indexes: `ix_actualsale_client_period`, `ix_actualsale_item_customer`
+- [ ] Django Admin: `ActualSaleImport` admin with status display
+- [ ] REST endpoint: `POST /api/demand/actuals/upload/` — multipart file, creates import job
+- [ ] REST endpoint: `GET /api/demand/actuals/upload/{id}/` — poll import status
+- [ ] REST endpoint: `GET /api/demand/actuals/` — filtered query (item, customer, location, period range)
+- [ ] Celery task `process_actuals_import(import_id)`:
+  - Parse CSV / Excel with `pandas`
+  - Validate all FKs exist; collect errors per row into `ActualSaleImport.errors`
+  - `bulk_create` with `update_conflicts=True` (idempotent re-upload)
+  - Update `ActualSaleImport.status` → `COMPLETE` / `FAILED`
+- [ ] Celery task `process_summary_actuals_import` for `ActualSaleLocation`
+- [ ] Excel template: `management/commands/generate_actuals_template.py` — produces a `.xlsx` with correct column headers for client download
+- [ ] Unit tests: duplicate upload → idempotent; invalid item FK → error row; valid upload → `ActualSale` row count correct
+---
+ 
+### Sprint 3B.3 — Forecast Models and Version Management
+- [ ] Create `mysite/models/demand/forecast.py`:
+  - `ForecastVersion(client, version_label, base_period_end, horizon_months, engine_config JSONField, status, created_by, approved_by nullable, approved_at nullable)`
+  - `ForecastLine(version, item, customer, location, year, month, statistical_qty, override_qty nullable, final_qty)` — `final_qty` = `override_qty or statistical_qty` (computed on save)
+  - `ForecastAggregate(version, agg_level, agg_key JSONField, year, month, statistical_qty, override_qty, final_qty)`
+  - `ForecastOverride(version, override_level, override_key JSONField, year, month, override_qty nullable, override_pct nullable, disagg_method, override_note, created_by)`
+  - `OverrideSplitWeight(override, child_key JSONField, weight)` — for CUSTOM disaggregation
+  - `ForecastAccuracy(version, item, customer, location, year, month, actual_qty, forecast_qty, mape, bias)`
+- [ ] Add DB indexes: `ix_forecastline_version`, `ix_forecastaggregate_version_level`
+- [ ] `ForecastVersion.status` state machine: `DRAFT → IN_REVIEW → APPROVED → LOCKED`
+- [ ] REST endpoints:
+  - `GET/POST /api/demand/forecast-versions/`
+  - `GET /api/demand/forecast-versions/{id}/`
+  - `GET /api/demand/forecast-versions/{id}/lines/` (paginated, filterable)
+  - `GET /api/demand/forecast-versions/{id}/aggregates/`
+  - `POST /api/demand/forecast-versions/{id}/approve/`
+- [ ] Admin: `ForecastVersionAdmin` with status display; read-only `ForecastLineInline` (paginated)
+- [ ] Unit tests: `final_qty` computation; status transition guard (LOCKED → no edits); version copy
+---
+ 
+### Sprint 3B.4 — Statistical Forecast Engine
+- [ ] Create `utils/demand/forecast_engine.py`:
+  - `build_actuals_dataframe(client_id, period_start, period_end)` → Polars DataFrame via DuckDB
+  - `build_summing_matrix(client_id)` → numpy array `S` + `tags` dict for three hierarchy dimensions
+  - `run_statsforecast(actuals_df, horizon_months)` → forecasts DataFrame
+  - `run_hierarchical_reconciliation(forecasts_df, actuals_df, S, tags, method)` → reconciled DataFrame
+  - `write_forecast_lines(version_id, reconciled_df)` → bulk_create ForecastLine (batched 5000)
+  - `write_forecast_aggregates(version_id)` → roll-up ForecastAggregate for all agg_levels
+- [ ] Celery task `run_forecast(version_id)`:
+  - Orchestrates the above pipeline steps
+  - Updates `ForecastVersion.status` → `READY` on success, `FAILED` on error
+  - Notifies requesting user
+- [ ] Engine config JSONField controls: model list (ETS / ARIMA / Theta / CrostonSBA), reconciliation method, intermittent threshold (series with zero rate > X% use CrostonSBA automatically)
+- [ ] REST endpoint: `POST /api/demand/forecast-versions/` with `engine_config` → triggers `run_forecast` Celery task; returns version_id for polling
+- [ ] REST endpoint: `GET /api/demand/forecast-versions/{id}/` includes `celery_task_id` for progress polling
+- [ ] Unit tests:
+  - `build_summing_matrix` produces correct `S` shape for known hierarchy
+  - Reconciled totals at top level equal sum of bottom-up actuals (within float tolerance)
+  - CrostonSBA selected for intermittent series (> 50% zero months)
+  - `write_forecast_lines` bulk_create produces correct row count
+---
+ 
+### Sprint 3B.5 — Consensus Override Engine
+- [ ] Create `utils/demand/override_engine.py`:
+  - `resolve_leaf_lines(version_id, override_key, override_level)` → list of leaf `ForecastLine` PKs in subtree
+  - `compute_proportional_shares(leaf_lines, base_year, base_month_range)` → dict of leaf_pk → share
+  - `apply_override(override_id)` → updates `ForecastLine.override_qty` for each leaf
+  - `recompute_aggregates(version_id, affected_agg_keys)` → updates `ForecastAggregate` records
+- [ ] Routing logic: subtree < 500 leaves → synchronous; ≥ 500 → Celery task `propagate_override(override_id)`
+- [ ] REST endpoints:
+  - `GET/POST /api/demand/forecast-versions/{id}/overrides/`
+  - `DELETE /api/demand/forecast-versions/{id}/overrides/{override_id}/` (reverts leaf lines to statistical)
+- [ ] Unit tests:
+  - Proportional disaggregation sums to override total (within rounding tolerance)
+  - Override revert restores statistical_qty values
+  - LOCKED version rejects override POST
+---
+ 
+### Sprint 3B.6 — Accuracy Tracking
+- [ ] Celery task `compute_forecast_accuracy(version_id, year, month)`:
+  - Joins `ForecastLine` (approved version, given period) with `ActualSale`
+  - Computes per-leaf: `mape = abs(actual - forecast) / actual`, `bias = (forecast - actual) / actual`
+  - Writes `ForecastAccuracy` records (bulk_create, update_conflicts=True)
+  - Computes `WMAPE = sum(abs(actual - forecast)) / sum(actual)` at aggregate levels
+- [ ] Scheduled: monthly Celery beat task triggers for all Clients with `demand_planning` feature enabled
+- [ ] REST endpoint: `GET /api/demand/forecast-versions/{id}/accuracy/`
+- [ ] Unit tests: MAPE formula; WMAPE aggregate; division-by-zero guard (actual = 0)
+---
+ 
+### Sprint 3B.7 — React SPA Frontend
+- [ ] Scaffold React app under `frontend/planning/` (Vite + TypeScript)
+- [ ] Served under `/{client_id}/planning/` via a Django catch-all view that returns `planning.html` shell
+- [ ] Auth: shares Django session cookie; DRF SessionAuthentication on all demand API endpoints
+- [ ] **View 1 — Actuals Dashboard:**
+  - Upload widget (drag-and-drop CSV/Excel) → polls import job status
+  - Location × Month heatmap (ECharts) showing total revenue
+  - SKU drill-down table (AG Grid): item × customer × location × month
+- [ ] **View 2 — Forecast Run:**
+  - Select base period, horizon, reconciliation method
+  - Submit → polls `ForecastVersion.status`; shows progress bar
+  - On complete: navigate to Consensus Grid
+- [ ] **View 3 — Consensus Override Grid (AG Grid):**
+  - Rows: item groups / locations / sales nodes (switchable grouping)
+  - Columns: months (horizon)
+  - Cell values: `final_qty`; editable at any aggregate level
+  - On cell edit: POST `ForecastOverride`; optimistic UI update; background propagation
+  - Colour coding: statistical (white), overridden (yellow), locked (grey)
+- [ ] **View 4 — Version Comparison:**
+  - Select two versions; ECharts line chart overlay at chosen aggregate level
+- [ ] **View 5 — Accuracy Report:**
+  - MAPE / Bias / WMAPE by product group, by location, by sales node
+  - Sortable AG Grid; ECharts bar chart for top N worst-performing SKUs
+- [ ] Unit tests (Vitest): AG Grid cell edit triggers correct API call; polling interval logic; share computation display
+---
+ 
+### Sprint 3B.8 — Phase 3A Integration
+- [ ] `OrderLine` gains `forecast_line` nullable FK → `ForecastLine`
+- [ ] When staff creates `Quotation` or `Order` for a Customer × Item combination, approved `ForecastVersion` is queried for a suggested quantity; shown as a hint on the line form
+- [ ] `ForecastAccuracy` extended: `actual_order_qty` column populated from `OrderLine` quantities (in addition to `ActualSale` uploads)
+- [ ] Unit tests: suggested quantity shown when approved version exists; `forecast_line` FK set on OrderLine on acceptance
+---
+ 
+### Sprint 3B.9 — Production Hardening
+- [ ] Deploy with Celery worker (forecasting jobs can run 5–15 min for full matrix; configure `CELERYD_TASK_SOFT_TIME_LIMIT = 1800`)
+- [ ] DuckDB installed in production container (pure Python wheel; no native install needed)
+- [ ] `EXPLAIN ANALYZE` on actuals matrix pull; verify indexes used
+- [ ] Load test: 10K SKU × 200 customer × 36 month forecast run completes < 15 minutes
+- [ ] Load test: actuals upload of 50K rows completes < 60 seconds
+- [ ] End-to-end test: upload → run → override → approve → order suggestion visible
+---
+ 
+## Phase 3B Dependency Map
+ 
+```
+3B.0 (Foundation)
+  └─▶ 3B.1 (Sales Hierarchy)
+        └─▶ 3B.2 (Actuals Import)
+              └─▶ 3B.3 (Forecast Models)
+                    ├─▶ 3B.4 (Statistical Engine)  ─┐
+                    └─▶ 3B.5 (Override Engine)      ├─▶ 3B.6 (Accuracy)
+                                                     │         │
+                    3B.4 + 3B.5 + 3B.6 ─────────────┴─▶ 3B.7 (React SPA)
+                                                               │
+                    3B.7 + Phase 3A Sprint 3.3 ───────────────▶ 3B.8 (3A Integration)
+                                                               │
+                    All ──────────────────────────────────────▶ 3B.9 (Hardening)
+```
+ 
+---
+ 
+## Phase 3B Effort Estimates
+ 
+| Sprint | Effort (solo dev) |
+|--------|------------------|
+| 3B.0 Foundation | 1–2 days |
+| 3B.1 Sales Hierarchy | 2–3 days |
+| 3B.2 Actuals Import | 3–4 days |
+| 3B.3 Forecast Models | 3–4 days |
+| 3B.4 Statistical Engine | 5–7 days |
+| 3B.5 Override Engine | 4–5 days |
+| 3B.6 Accuracy Tracking | 2–3 days |
+| 3B.7 React SPA | 7–10 days |
+| 3B.8 Phase 3A Integration | 2–3 days |
+| 3B.9 Production Hardening | 2–3 days |
+| **Total** | **31–44 days** |
+ 
+Sprints 3B.4 and 3B.5 can run in parallel once 3B.3 is complete.
+Sprint 3B.7 (React SPA) can begin in parallel with 3B.4/3B.5 once 3B.3 REST endpoints are stubbed.
+ 
+---
+ 
+## Recommended Overall Sequencing
+ 
+```
+Phase 2 (Complete)
+    ↓
+Phase 3B.0–3B.6  (Actuals + Forecast engine, no UI yet)   ← ~20 days
+    ↓  [parallel with 3B.7]
+Phase 3A.0–3A.3  (Foundation, Pricing, Inquiry, Order)    ← ~20 days
+    ↓
+Phase 3B.7–3B.8  (React SPA + Order integration)          ← ~12 days
+    ↓
+Phase 3A.4–3A.12 (Delivery through Production Hardening)  ← ~27 days
+    ↓
+Phase 4 (Beckn BPP, probabilistic forecasting, ML models)
+```
+ 
+This ordering means:
+- The forecast engine is validated against real actuals before anyone tries to use it in an order flow.
+- The Order model exists (3A.3) before the forecast-to-order integration sprint (3B.8).
+- No phase blocks another; each delivers standalone value.
+---
+ 
+## Key Risks and Mitigations (Phase 3B)
+ 
+| Risk | Mitigation |
+|------|-----------|
+| Nixtla library API changes | Pin `statsforecast` and `hierarchicalforecast` versions; isolate in `utils/demand/forecast_engine.py` so a library swap affects one file |
+| Summing matrix construction complexity | Unit-test `S` matrix shape and column ordering independently before integrating with `HierarchicalForecast` |
+| Forecast job timeout for large clients | `CELERYD_TASK_SOFT_TIME_LIMIT=1800`; design job to checkpoint progress into `ForecastVersion` so it can resume |
+| Actuals data quality (missing FKs, wrong item codes) | Row-level error collection in `ActualSaleImport.errors`; never fail the whole batch for a bad row |
+| React SPA auth complexity | Use Django session cookie (same domain); no JWT needed in Phase 3B |
+| DuckDB + PostgreSQL dual-engine confusion | DuckDB is used **only inside Celery tasks** for fast aggregation; all writes go to PostgreSQL only; document this boundary clearly |
+| AG Grid Community licence limits | Community licence is sufficient for Phase 3B; Enterprise (pivot, server-side row model) deferred to Phase 4 if needed |
+ 
+---
+ 
+## Definition of Done (Phase 3B)
+ 
+- [ ] Client staff can upload monthly actuals (CSV/Excel) for SKU × Customer × Location
+- [ ] Upload is idempotent (re-upload same file produces no duplicates)
+- [ ] Forecast run completes for 10K SKU × 200 customer × 36 month history in < 15 minutes
+- [ ] Hierarchical reconciliation: top-level total of reconciled forecast equals sum of bottom-up
+- [ ] Consensus override at Location level disaggregates correctly to SKU leaf lines
+- [ ] LOCKED version rejects all edits
+- [ ] Accuracy report shows MAPE / Bias / WMAPE after actuals close for an approved version period
+- [ ] Approved forecast version shows suggested quantity on Quotation / Order line form
+- [ ] All demand API endpoints enforce `ClientGroupPermission` (demand_planning module)
+- [ ] `manage.py check` clean; 0 migration errors
+- [ ] Production load test passed
+
+
+
+## Phase 3 — eCommerce
+
+**Goal:** Customers can initiate and track orders across the full commerce lifecycle (Inquiry → Quotation → Order → Delivery → Billing). Clients manage the end-to-end process. Pricing is rule-based, auditable, and extensible. Multi-currency is supported. Partial and split deliveries are handled.
+
+Phase 3 commerce models are Beckn v2.0 schema-aligned. Full Beckn network participation (BPP role, async callbacks, digital signatures, ONDC registry) is Phase 4.
+
+---
+
+### Sprint 3.0 — Foundation and Prerequisites
+
+- [ ] Switch production cache to Redis (`CACHES` env var; Celery broker same Redis instance)
+- [ ] Add `djangorestframework`, `django-filter`, `celery`, `djmoney`, `babel` to `requirements.txt`
+- [ ] Extend `ClientLocation` with Phase 3 boolean flags: `allow_delivery_split`, `allow_partial_shipment`, `is_dispatch_location`, `enable_picking`, `enable_packing`, `enable_transportation`, `enable_billing_consolidation`
+- [ ] Extend `Client` with: `allowed_currencies` (JSONField), `base_currency` (CharField), `allow_delivery_split`, `allow_partial_shipment`, `multi_location_dispatch`
+- [ ] Add `ClientCurrencyRule(client, client_country, customer_country, currency)` model + admin
+- [ ] Extend `CustomerAddress.address_type` to enum `BILL_TO / SHIP_TO / BOTH`; add Beckn fields: `gps`, `area_code`, `state`, `landmark`
+- [ ] Add Phase 3 feature keys to `ClientFeatureControl`: `inquiry`, `quotation`, `picking`, `packing`, `transportation`, `billing_consolidation`, `multi_currency`, `partial_shipment`
+- [ ] `python manage.py makemigrations && migrate`
+- [ ] `python manage.py check` — 0 issues
+
+---
+
+### Sprint 3.1 — Pricing Engine
+
+- [ ] Create `mysite/models/commerce/pricing.py`:
+  - `PricingConditionType` (name, calc_type: ABSOLUTE/PERCENT, category: DISCOUNT/SURCHARGE/TAX)
+  - `ConditionAccessSequence` (name, ordered access keys as JSONField)
+  - `ConditionRecord` (condition_type, key_combination JSONField, valid_from, valid_to, amount MoneyField, scale FK)
+  - `ConditionScale` (condition_record, scale_type VALUE/QTY, breaks JSONField)
+  - `PricingProcedure` (client FK, name, is_default)
+  - `PricingStep` (procedure FK, step_number, condition_type FK, access_sequence FK, apply_at LINE/HEADER, is_statistical, group_key, requirement, from_step)
+  - `PricingResultLine` (GenericFK to Order/Quotation, line_ref, step_number, condition_type, base_amount, condition_value, result_amount, is_statistical)
+- [ ] Signal: on Client create, copy system default `PricingProcedure`
+- [ ] Create `utils/pricing_engine.py`:
+  - `build_pricing_context(document)` — assembles customer, items, quantities, currency
+  - `resolve_condition_record(step, context)` — walks access sequence, returns ConditionRecord or None
+  - `evaluate_scale(condition_record, context_value)` — returns step rate/amount from ConditionScale
+  - `execute_pricing_procedure(document)` — runs all steps sequentially, writes PricingResultLine records, updates document totals
+- [ ] Cache: `pricing_procedure:{client_id}` (1hr), `condition_records:{client_id}:{type}` (15min)
+- [ ] Admin: `PricingProcedureAdmin` with inline `PricingStepInline`; `ConditionRecordAdmin` with inline `ConditionScaleInline`
+- [ ] Unit tests: % condition on derived base; slab step function; header condition apportionment; statistical condition exclusion from total; access sequence fallthrough
+
+---
+
+### Sprint 3.2 — Inquiry and Quotation
+
+- [ ] Create `mysite/models/commerce/inquiry.py`: `Inquiry`, `InquiryLine`
+  - `Inquiry` fields: `client`, `customer`, `status` (DRAFT/SUBMITTED/CONVERTED/CANCELLED), `currency`, `bill_to_address`, `ship_to_address`, `source_doc_type`, `source_doc_id`, `valid_until`, timestamps
+  - `InquiryLine` fields: `inquiry`, `item`, `variant`, `qty`, `unit_price` (MoneyField), `ship_to_address` (override, nullable)
+- [ ] Create `mysite/models/commerce/quotation.py`: `Quotation`, `QuotationLine`
+  - `Quotation` fields: same header pattern as Inquiry + `pricing_result_total` (MoneyField)
+  - `QuotationLine` fields: same as InquiryLine + `discount_amount`, `tax_amount`, `line_total` (all MoneyField)
+- [ ] Create `utils/document_promotion.py`: `promote_document(source, target_model)` service function
+  - Validates source status
+  - Deep-copies header; sets `source_doc_type` + `source_doc_id`
+  - Creates target lines from source lines
+  - If target is Quotation or Order: runs `execute_pricing_procedure()`
+  - Returns target in DRAFT status
+- [ ] Views: `inquiry_create`, `inquiry_detail`, `inquiry_to_quotation`; `quotation_create`, `quotation_detail`, `quotation_to_order`
+- [ ] Templates: `commerce/inquiry_form.html`, `commerce/quotation_form.html` (DaisyUI, HTMX inline line editing)
+- [ ] Currency dropdown on Inquiry / Quotation header (populated from `Client.allowed_currencies`)
+- [ ] Admin: `InquiryAdmin`, `QuotationAdmin` with line inlines; read-only `PricingResultLine` inline on Quotation
+- [ ] Unit tests: Inquiry → Quotation promotion copies lines; pricing applied on Quotation creation
+
+---
+
+### Sprint 3.3 — Order
+
+- [ ] Create `mysite/models/commerce/order.py`: `Order`, `OrderLine`
+  - `Order` fields: `client`, `customer`, `status` (DRAFT/CONFIRMED/PROCESSING/COMPLETED/CANCELLED), `currency`, `bill_to_address`, `ship_to_address`, `allow_delivery_split` (nullable — customer override), `source_doc_type`, `source_doc_id`, pricing total fields (MoneyField)
+  - `OrderLine` fields: `order`, `item`, `variant`, `qty`, `open_qty`, `closed_qty`, `unit_price`, `line_total` (MoneyField), `ship_to_address` (override), `bill_to_address` (override)
+- [ ] `promote_document` extended for Quotation → Order path
+- [ ] `Order` direct creation (no source doc) supported
+- [ ] Cart model: `Cart`, `CartItem` — session-based for anonymous; DB-persisted for logged-in; `Cart.promote_to_order()` method
+- [ ] Views: `cart_view`, `add_to_cart`, `update_cart`, `checkout`, `order_create`, `order_detail`, `order_list`
+- [ ] Customer-facing order history view
+- [ ] `open_qty` tracking: on DeliveryLine save, `OrderLine.open_qty` is decremented; short-close sets `open_qty=0` and `OrderLine.status=SHORT_CLOSED`
+- [ ] Admin: `OrderAdmin` with `OrderLineInline`; status transition buttons
+- [ ] Unit tests: Quotation → Order promotion; direct Order creation; open_qty tracking; short-close flag behaviour
+
+---
+
+### Sprint 3.4 — Delivery
+
+- [ ] Create `mysite/models/commerce/delivery.py`: `Delivery`, `DeliveryLine`
+  - `Delivery` fields: `order`, `dispatch_location` (FK → ClientLocation), `status` (DRAFT/CONFIRMED/DISPATCHED/DELIVERED/CANCELLED), `scheduled_date`, `actual_date`, `ship_to_address`
+  - `DeliveryLine` fields: `delivery`, `order_line`, `delivered_qty`
+- [ ] Delivery split service `utils/delivery_service.py`:
+  - `plan_deliveries(order)` — reads split rules (Customer override → ClientLocation → Client) and groups OrderLines by `ship_to_address` and dispatch location
+  - `create_delivery_from_plan(order, lines, dispatch_location)` — creates Delivery + DeliveryLines
+- [ ] Part-shipment service: `create_backorder(delivery)` — creates new Delivery for remaining `open_qty` per flag
+- [ ] Admin: `DeliveryAdmin` with `DeliveryLineInline`; dispatch location filter
+- [ ] Unit tests: split allowed → multiple Deliveries; split disallowed → error; partial shipment → backorder created; partial shipment disallowed → short-close
+
+---
+
+### Sprint 3.5 — Picking and Packing (Optional)
+
+- [ ] Create `mysite/models/commerce/picking.py`, `packing.py`
+- [ ] `Picking(delivery, warehouse_user, status, lines)`, `PickingLine(picking, delivery_line, picked_qty)`
+- [ ] `Packing(picking_or_delivery, status, lines)`, `PackingLine`
+- [ ] Feature-gated by `ClientFeatureControl('picking')` and `ClientFeatureControl('packing')` — if disabled, Delivery goes directly to Transportation / Billing
+- [ ] Admin + basic views for warehouse staff
+- [ ] Unit tests: feature disabled → Picking skipped in status flow
+
+---
+
+### Sprint 3.6 — Transportation (Optional)
+
+- [ ] Create `mysite/models/commerce/transportation.py`
+- [ ] `Transportation(client, carrier, status, vehicle_ref, dispatch_date)` + `TransportationDelivery(transportation, delivery)` M2M through table
+- [ ] Constraint: one Delivery → at most one Transportation
+- [ ] Feature-gated by `ClientFeatureControl('transportation')`
+- [ ] Admin: select multiple Deliveries → create Transportation (action)
+- [ ] Beckn: `Transportation.to_beckn()` → `BecknFulfillment`
+- [ ] Unit tests: Delivery already on Transportation → error on second assignment
+
+---
+
+### Sprint 3.7 — Billing / Invoice
+
+- [ ] Create `mysite/models/commerce/billing.py`
+- [ ] `Invoice(client, customer, status DRAFT/ISSUED/PAID/CANCELLED, currency, payment_terms, due_date)` + `InvoiceLine` + `InvoiceDelivery` (M2M through)
+- [ ] Constraint: one Delivery → at most one Invoice
+- [ ] `InvoiceDelivery` consolidation: client staff selects one or more Deliveries → Invoice auto-populated from DeliveryLines
+- [ ] Feature-gated by `ClientFeatureControl('billing_consolidation')` (when disabled: 1 Invoice per Delivery)
+- [ ] PDF generation Celery task (`generate_invoice_pdf`)
+- [ ] Beckn: `Invoice.to_beckn()` → `BecknBilling`
+- [ ] Unit tests: multi-Delivery invoice; single-Delivery fallback; PDF task queued on ISSUED
+
+---
+
+### Sprint 3.8 — Payment
+
+- [ ] Create `mysite/models/commerce/payment.py`
+- [ ] `Payment(invoice, method, status, amount MoneyField, gateway_ref, paid_at)` + `PaymentAllocation(payment, invoice, allocated_amount MoneyField)`
+- [ ] Payment gateway integration: **Razorpay** (INR primary) + **Stripe** (multi-currency fallback)
+- [ ] Webhook handlers: `razorpay_webhook`, `stripe_webhook` → update Payment status → trigger `send_order_confirmation` Celery task
+- [ ] Order confirmation email template (Celery: `send_order_confirmation`)
+- [ ] Quotation email with PDF attachment (Celery: `send_quotation_email`)
+- [ ] Unit tests: payment allocation; over-payment; partial payment
+
+---
+
+### Sprint 3.9 — Returns and Refunds
+
+- [ ] Create `mysite/models/commerce/returns.py`
+- [ ] `Return(order, delivery, status, reason, lines)` + `ReturnLine(return_doc, order_line, return_qty)`
+- [ ] `Refund(return_doc, payment, amount MoneyField, status, gateway_ref)`
+- [ ] Return → open_qty restoration or write-off depending on condition
+- [ ] Admin + customer-facing return request flow
+- [ ] Unit tests: return restores open_qty; refund allocated against original payment
+
+---
+
+### Sprint 3.10 — REST API Layer
+
+- [ ] Add DRF router under `mysite/api/`
+- [ ] ViewSets: `InquiryViewSet`, `QuotationViewSet`, `OrderViewSet`, `DeliveryViewSet`, `InvoiceViewSet`
+- [ ] Token authentication for API (DRF Token Auth; JWT deferred to Phase 4)
+- [ ] `?format=beckn` query param on detail endpoints → serialiser calls `to_beckn()`
+- [ ] OpenAPI schema generation (`drf-spectacular`)
+
+---
+
+### Sprint 3.11 — Client Dashboard and Reporting
+
+- [ ] Order management view (client staff): filter by status, date, customer, location
+- [ ] Basic revenue report: orders confirmed + paid per period
+- [ ] Delivery performance: on-time vs delayed
+- [ ] `ClientGroupPermission` modules activated: `inquiry`, `quotation`, `cart`, `order`, `delivery`, `shipment`, `billing`, `payment`
+
+---
+
+### Sprint 3.12 — Production Hardening
+
+- [ ] Deploy with PostgreSQL + Redis on Railway / Render
+- [ ] Celery worker process added to `Procfile`
+- [ ] `ACCOUNT_EMAIL_VERIFICATION = "mandatory"` in production settings
+- [ ] End-to-end test: Inquiry → Quotation → Order → Delivery → Invoice → Payment
+- [ ] End-to-end test: Order → split Delivery → consolidated Invoice
+- [ ] End-to-end test: partial shipment → back-order Delivery
+- [ ] Load test: 500 concurrent checkout sessions
+- [ ] Wire `django-guardian` permissions to all commerce views and API endpoints
+
+---
+
+## Open Decisions (Phase 3)
+
+| Decision | Options | Target Sprint |
+|----------|---------|---------------|
+| Payment gateway | Razorpay (INR) primary, Stripe fallback | 3.8 |
+| API auth | DRF Token (Phase 3) → JWT (Phase 4) | 3.10 |
+| PDF engine | `weasyprint` or `reportlab` for invoice PDF | 3.7 |
+| Full-text search | PostgreSQL FTS on Item (deferred from Phase 2) | 3.11 |
+| Currency conversion rates | Static `ClientCurrencyRule` (Phase 3) → live FX feed (Phase 4) | 3.0 |
+| Drag-and-drop order line reorder | Deferred | Phase 4 |
+
+---
+
+## CHANGE 2 — Update Deferred / Future Consideration table
+
+Replace the `Multi-currency` row with:
+
+| Feature | Rationale |
+|---------|-----------|
+| Native mobile app | REST API now exists (Phase 3); separate build pipeline still needed |
+| Subdomain / custom domain routing | Path-prefix sufficient through Phase 3 |
+| Drag-and-drop visual page editor | Deferred pending client validation |
+| Elasticsearch / full-text search | PostgreSQL FTS added in Phase 3.11; Elasticsearch if scale demands |
+| Live FX rates | Static ClientCurrencyRule in Phase 3; live feed in Phase 4 |
+| Beckn BPP network participation | ONDC registry, async callbacks, digital signatures — Phase 4 |
+| Redis cache (dev) | LocMemCache dev; Redis production — production switch in Sprint 3.0 |

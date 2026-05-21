@@ -190,7 +190,7 @@ python manage.py migrate
 5. Add the new sub model to signals.py, translation.py, admin
 """
 # ── 1. Taxonomy (Hierarchy type) ─────────────────────────────────────
- 
+  
 class Taxonomy(models.Model):
     """
     Defines the TYPE of hierarchy.
@@ -464,7 +464,7 @@ class NodeAttributeValue(models.Model):
         attslug = getattr(self.attribute_type, 'slug', '?') if self.attribute_type else '?'
         return f"{attslug} = {self.name}"
 
-
+ 
 # ═══════════════════════════════════════════════════════════════════
 # PART B: GLOBAL ITEM (Reference catalogue — superuser managed)
 #GlobalItem
@@ -1246,7 +1246,8 @@ class ItemMedia(models.Model):
         ('text',  'Structured Text'),        
     ]    
     media_type  = models.CharField(max_length=20, choices=MEDIA_CHOICES, db_index=True)    
-    media_url   = models.URLField(max_length=500)
+    media_url   = models.URLField(max_length=500, blank=True,
+                                   help_text="URL for image/audio/video/pdf")
     alt         = models.CharField(max_length=200, blank=True)
     order       = models.PositiveIntegerField(default=0)
     is_primary  = models.BooleanField(default=False)
@@ -1288,6 +1289,8 @@ class ItemVariant(models.Model):
     )
     stock        = models.IntegerField(default=0)
     is_active    = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    image_url = models.URLField(blank=True)    
 
     class Meta:
         unique_together = ('item', 'variant_id')

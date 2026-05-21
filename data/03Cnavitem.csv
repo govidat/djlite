@@ -1,0 +1,6 @@
+id,location,nav_type,url,name_en,name_hi,name_fr,order,hidden,open_in_new_tab,client_id,page_id,svg_pre,svg_suf,name_ta,parent_name_en
+1,header,page,,Home,hiHome,frHome,1,0,0,bahushira,home,,,,
+2,header,page,,About,hiAbout,frAbout,2,0,0,bahushira,about,,,,
+3,header,page,,Catalogue,hiCatalogue,frCatalogue,3,0,0,bahushira,catalogue,,,,
+4,header,page,,Terms,,,3,0,0,bahushira,terms,,,,
+5,header,page,,Privacy,,,4,0,0,bahushira,privacy,,,,

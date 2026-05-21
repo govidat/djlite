@@ -1,0 +1,3 @@
+id,theme_id,order,hidden,overrides,is_default,client_id,themepreset_id,name_en,name_fr,name_hi,name_ta,ltext
+1,light,1,0,,1,bahushira,light,Light2,frLight,hiLight,,
+2,dark,2,0,,0,bahushira,dark,Dark2,frDark,hiDark,,

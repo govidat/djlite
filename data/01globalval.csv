@@ -1,0 +1,9 @@
+globalvalcat_id,key,keyval_en,keyval_hi,keyval_fr
+account,logout,Logout,hiLogout,frLogout
+account,signIn,SignIn,hiSignIn,frSignIn
+account,signin_up,Signin/Signup,hiSignin/Signup,frSignin/Signup
+account,signup,Signup,hiSignup,frSignup
+language,en,English,hiEnglish,frEnglish
+language,hi,Hindi,hiHindi,frHindi
+language,fr,French,hiFrench,frFrench
+testcat,testkey,test_en,test_hi,test_fr

@@ -1,0 +1,4 @@
+client_id,text_key,section_order,child_order,content_order,title_en,title_hi,title_fr,title_ta,subtitle_en,subtitle_hi,subtitle_fr,subtitle_ta,content_en,content_hi,content_fr,content_ta
+bahushira,bosch-fr7dc-description,1,1,1,Product DescriptionV2,उत्पाद विवरण,,,Overview,अवलोकन,,,The Bosch FR7DC is a high-quality spark plug.,Bosch FR7DC एक उच्च गुणवत्ता वाला स्पार्क प्लग है।,,
+bahushira,bosch-fr7dc-description,1,1,2,Product Description,उत्पाद विवरण,,,Overview,अवलोकन,,,Its copper core ensures reliable ignition.,इसका कॉपर कोर विश्वसनीय इग्निशन सुनिश्चित करता है।,,
+bahushira,bosch-fr7dc-description,1,2,1,Product Description,उत्पाद विवरण,,,Technology,प्रौद्योगिकी,,,Nickel alloy electrodes improve durability.,निकेल मिश्र धातु इलेक्ट्रोड टिकाऊपन बढ़ाते हैं।,,

@@ -39,7 +39,7 @@ from .component import (
     Component,
     ComponentSlot,
     ComptextBlock,
-    GentextBlock,
+    #GentextBlock,
     TextstbItem,
     SvgtextbadgeValue,
 )
@@ -60,6 +60,7 @@ from .catalogue import (
     GlobalItem,
     GlobalItemTaxonomyNode,
     GlobalItemAttributeValue,
+    GlobalItemMedia,
 
     Taxonomy,
     TaxonomyNode,

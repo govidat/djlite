@@ -27,14 +27,11 @@ from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
 from mysite.models import (
     Client, Page, Layout, Component, ComponentSlot,
-    GentextBlock, ComptextBlock, TextstbItem, SvgtextbadgeValue
+     ComptextBlock, TextstbItem, SvgtextbadgeValue
 )
 from django.db import models as django_models
 
 def run():
-    #lv_client_id = 'bahushira'
-    #result = ClientLanguage.objects.filter(client_id="bahushira").order_by("-order").values_list('language_id', flat=True)
-    #result = ClientLanguage.objects.filter(client_id='bahushira').values_list('language_id', flat=True).order_by('order')
     #print(connection.queries)    
     #result = ClientNavbar.objects.filter(client_id=lv_client_id).values('id', 'page_id', 'parent', 'order').order_by('order')
     #print(result)
@@ -43,7 +40,38 @@ def run():
     #pprint(connection.queries)
 
     # print("Hello from runscript")
-    """ Step 1
+    """ 
+    # STEP 1
+
+    GLOBALVALCAT_DATA = [
+        {
+        "globalvalcat_id": "testcat"
+        }
+    ]
+    for row in GLOBALVALCAT_DATA:
+        GlobalValCat.objects.update_or_create(
+            globalvalcat_id=row["globalvalcat_id"]
+        )
+
+    # STEP 2
+    GLOBALVAL_DATA = [
+        {
+        "globalvalcat_id": "testcat",
+        "Key": "testkey",
+        "keyval_en": "test_en", "keyval_hi": "test_hi", "keyval_fr": "test_fr"
+        }
+
+    ]
+
+    globalvalcats = {c.globalvalcat_id: c for c in globalvalcat.objects.all()}
+    for row in GLOBALVAL_DATA:
+        globalvalcat_value = globalvalcats[row["globalvalcat_id"]]
+        GlobalVal.objects.update_or_create(
+            globalvalcat = globalvalcat_value,
+            key=row["key"],
+            keyval_en=row["keyval_en"], keyval_hi=row["keyval_hi"], keyval_fr=row["keyval_fr"],
+        )    
+
 
     THEMEPRESET_DATA = [
         {
@@ -252,22 +280,7 @@ def upload_comptextblocks(blocks_data, parent_obj):
         upload_stb_items(block_data.get("items", []), block)
 
 
-def upload_gentextblocks(blocks_data, parent_obj):
-    """Create GentextBlock + items for Client, Page or Theme"""
-    ct = get_content_type(parent_obj.__class__)
-    for block_data in blocks_data:
-        block, created = GentextBlock.objects.get_or_create(
-            content_type=ct,
-            object_id=parent_obj.id,
-            block_id=block_data["block_id"],
-            order=block_data.get("order", 1),
-            defaults={
-                "ltext":     block_data.get("ltext", ""),
-                "hidden":    block_data.get("hidden", False),
-                "css_class": block_data.get("css_class", ""),
-            }
-        )
-        upload_stb_items(block_data.get("items", []), block)
+
 
 # ── Generic field extractor ───────────────────────────────────
 
@@ -423,7 +436,7 @@ def upload_pages(pages_data, client):
         )
         page_map[page_data["page_id"]] = page
 
-        upload_gentextblocks(page_data.get("gentextblocks", []), page)
+
         upload_layouts(page_data.get("layouts", []), page)
 
     return page_map
@@ -450,8 +463,7 @@ def bulk_upload(json_data):
     print(f"Uploading data for client: {client_id}")
 
     # Client level gentextblocks
-    upload_gentextblocks(json_data.get("gentextblocks", []), client)
-
+ 
     # Pages + layouts + components
     upload_pages(json_data.get("pages", []), client)
 

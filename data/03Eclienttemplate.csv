@@ -1,0 +1,593 @@
+template_key,is_active,client_id,htmlblob_en,htmlblob_fr,htmlblob_hi,htmlblob_ta
+catalogue_item_card,1,bahushira,"{#
+load dict_filters
+
+  item_card — DB template for bahushira client
+  Context: item (serialised dict from serialize_item())
+  item keys: item_id, name, description, image_url, image_alt,
+             price, currency, sku, stock, domain, gtin,
+             attr_values (dict), domain_data (dict)
+#}
+
+<div class=""card bg-base-100 border border-base-300
+            hover:shadow-lg hover:border-primary/30
+            transition-all duration-200 group"">
+
+  {# ── Image ──────────────────────────────────────────────── #}
+  <a href=""{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}""
+     class=""block overflow-hidden rounded-t-2xl"">
+    <figure class=""aspect-square bg-base-200 overflow-hidden"">
+      {% if item.image_url %}
+      <img src=""{{ item.image_url }}""
+           alt=""{{ item.image_alt|default:item.name }}""
+           class=""w-full h-full object-cover
+                  group-hover:scale-105 transition-transform duration-300""
+           loading=""lazy"">
+      {% else %}
+      <div class=""w-full h-full flex items-center justify-center
+                  text-base-content/20"">
+        {% if item.domain == 'song' %}
+          <span class=""text-6xl"">🎵</span>
+        {% elif item.domain == 'document' %}
+          <span class=""text-6xl"">📄</span>
+        {% elif item.domain == 'service' %}
+          <span class=""text-6xl"">🔧</span>
+        {% else %}
+          <span class=""text-6xl"">📦</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </figure>
+  </a>
+
+  <div class=""card-body p-4 gap-2"">
+
+    {# ── Domain badge ────────────────────────────────────────── #}
+    {% if item.domain != 'product' and item.domain != 'generic' %}
+    <div>
+      <span class=""badge badge-outline badge-xs capitalize"">
+        {{ item.domain }}
+      </span>
+    </div>
+    {% endif %}
+
+    {# ── Name ─────────────────────────────────────────────────── #}
+    <a href=""{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}""
+       class=""font-semibold text-sm text-base-content
+              hover:text-primary line-clamp-2 leading-snug"">
+      {{ item.name }}
+    </a>
+
+    {# ── Key attribute values ──────────────────────────────────── #}
+    {# Show up to 2 attribute values as small tags #}
+    {% if item.attr_values %}
+    <div class=""flex flex-wrap gap-1"">
+      {% for slug, val in item.attr_values.items %}
+      {% if forloop.counter <= 2 %}
+      <span class=""badge badge-ghost badge-xs"">{{ val }}</span>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Domain-specific display ───────────────────────────────── #}
+    {% if item.domain == 'song' and item.domain_data.duration %}
+    <p class=""text-xs text-base-content/50"">
+      ⏱ {{ item.domain_data.duration }}
+      {% if item.domain_data.genre %}
+      · {{ item.domain_data.genre }}
+      {% endif %}
+    </p>
+    {% endif %}
+
+    {% if item.domain == 'document' %}
+    <p class=""text-xs text-base-content/50"">
+      {% if item.domain_data.format %}{{ item.domain_data.format }}{% endif %}
+      {% if item.domain_data.is_free %}
+      · <span class=""text-success font-medium"">Free</span>
+      {% endif %}
+    </p>
+    {% endif %}
+
+    {# ── SKU ──────────────────────────────────────────────────── #}
+    {% if item.sku %}
+    <p class=""text-xs text-base-content/40 font-mono"">{{ item.sku }}</p>
+    {% endif %}
+
+    {# ── Price and stock ──────────────────────────────────────── #}
+    <div class=""flex items-center justify-between mt-1"">
+      {% if item.price %}
+      <p class=""text-lg font-bold text-primary"">
+        {{ item.currency }} {{ item.price }}
+      </p>
+      {% else %}
+      <span></span>
+      {% endif %}
+
+      {% if item.stock is not None %}
+        {% if item.stock == 0 %}
+        <span class=""badge badge-error badge-xs"">Out of stock</span>
+        {% elif item.stock <= 5 %}
+        <span class=""badge badge-warning badge-xs"">{{ item.stock }} left</span>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    {# ── Actions ──────────────────────────────────────────────── #}
+    <div class=""card-actions mt-2"">
+      <a href=""{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}""
+         class=""btn btn-primary btn-sm w-full"">
+        V2View Details
+      </a>
+    </div>
+
+  </div>
+</div>",,,
+catalogue_item_detail,1,bahushira,"{# load my_tags
+  item_detail — DB template for bahushira client
+  Context variables (all pre-resolved in view):
+    name, description, care_instructions
+    image_url, image_alt
+    images, audios, videos, pdfs, texts  — lists of ItemMedia instances
+    price, compare_price, currency, sku, stock
+    gtin, gpc_brick_code, barcode, country_of_origin
+    attr_values   — dict {attr_type_name: resolved_value}
+    attributes    — dict JSONB overflow
+    dimensions    — dict {label: value}
+    taxonomy_chains — list of {taxonomy_name, nodes, chain}
+    variants      — list of ItemVariant instances
+    domain_obj    — typed sub-model (ProductItem etc.)
+    item          — Item model instance
+    client        — from context processor
+#}
+
+<div class=""max-w-5xl mx-auto px-4 py-8"">
+
+  {# ── Breadcrumb ──────────────────────────────────────────── #}
+  <div class=""text-sm breadcrumbs text-base-content/60 mb-6"">
+    <ul>
+      <li><a href=""/{{ client.client_id }}/"">Home</a></li>
+      <li>
+        <a href=""{% url 'catalogue_page' client_id=client.client_id %}"">
+          Catalogue
+        </a>
+      </li>
+      <li class=""text-base-content font-medium"">{{ name }}</li>
+    </ul>
+  </div>
+
+  {# ── Main 2-column layout ──────────────────────────────── #}
+  <div class=""flex flex-col md:flex-row gap-8"">
+
+    {# ══════════════════════════════════════════════════════
+       LEFT COLUMN — Media
+    ══════════════════════════════════════════════════════ #}
+    <div class=""md:w-1/2"">
+
+      {% if images or audios or videos or pdfs or texts %}
+
+      <div class=""tabs tabs-bordered mb-4"">
+
+        {# Images tab #}
+        {% if images %}
+        <label class=""tab gap-1"">
+          <input type=""radio"" name=""media_tabs"" checked />
+          🖼 Images
+          {% if images|length > 1 %}
+          <span class=""badge badge-sm badge-ghost"">{{ images|length }}</span>
+          {% endif %}
+        </label>
+        <div class=""tab-content border-base-300 pt-4"">
+          <figure class=""aspect-square bg-base-200 rounded-2xl
+                         overflow-hidden mb-3"">
+            <img src=""{{ images.0.media_url }}""
+                 alt=""{{ images.0.alt|default:name }}""
+                 class=""w-full h-full object-cover""
+                 id=""main-image"">
+          </figure>
+          {% if images|length > 1 %}
+          <div class=""flex gap-2 overflow-x-auto pb-2"">
+            {% for img in images %}
+            <button type=""button""
+                    onclick=""
+                      document.getElementById('main-image').src='{{ img.media_url }}';
+                      document.querySelectorAll('.thumb-btn').forEach(
+                        b => b.classList.remove('border-primary')
+                      );
+                      this.classList.add('border-primary');
+                    ""
+                    class=""thumb-btn shrink-0 w-16 h-16 rounded-lg
+                           overflow-hidden border-2
+                           {% if forloop.first %}border-primary
+                           {% else %}border-transparent{% endif %}
+                           hover:border-primary transition-colors"">
+              <img src=""{{ img.media_url }}""
+                   alt=""{{ img.alt|default:name }}""
+                   class=""w-full h-full object-cover""
+                   loading=""lazy"">
+            </button>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# Audio tab #}
+        {% if audios %}
+        <label class=""tab gap-1"">
+          <input type=""radio"" name=""media_tabs""
+                 {% if not images %}checked{% endif %} />
+          🎵 Audio
+        </label>
+        <div class=""tab-content border-base-300 pt-4"">
+          {% if image_url %}
+          <div class=""aspect-video bg-base-200 rounded-2xl overflow-hidden
+                      mb-4 relative"">
+            <img src=""{{ image_url }}"" alt=""{{ image_alt }}""
+                 class=""w-full h-full object-cover opacity-25"">
+            <div class=""absolute inset-0 flex items-center
+                         justify-center text-6xl"">🎵</div>
+          </div>
+          {% endif %}
+          <div class=""space-y-3"">
+            {% for audio in audios %}
+            <div class=""card bg-base-200"">
+              <div class=""card-body p-4 gap-2"">
+                {% if audio.alt %}
+                <p class=""text-sm font-medium"">{{ audio.alt }}</p>
+                {% endif %}
+                <audio controls class=""w-full"" preload=""metadata"">
+                  <source src=""{{ audio.media_url }}"">
+                </audio>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {# Video tab #}
+        {% if videos %}
+        <label class=""tab gap-1"">
+          <input type=""radio"" name=""media_tabs""
+                 {% if not images and not audios %}checked{% endif %} />
+          🎬 Video
+        </label>
+        <div class=""tab-content border-base-300 pt-4"">
+          <div class=""space-y-4"">
+            {% for video in videos %}
+            <div class=""rounded-2xl overflow-hidden bg-base-200"">
+              {% if video.alt %}
+              <p class=""text-sm font-medium px-4 pt-3"">{{ video.alt }}</p>
+              {% endif %}
+              <video controls class=""w-full"" preload=""metadata""
+                     poster=""{{ image_url }}"">
+                <source src=""{{ video.media_url }}"">
+              </video>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {# PDF tab #}
+        {% if pdfs %}
+        <label class=""tab gap-1"">
+          <input type=""radio"" name=""media_tabs""
+                 {% if not images and not audios and not videos %}checked{% endif %} />
+          📄 Docs
+        </label>
+        <div class=""tab-content border-base-300 pt-4"">
+          <div class=""space-y-4"">
+            {% for pdf in pdfs %}
+            <div class=""card bg-base-200"">
+              <div class=""card-body p-4"">
+                <div class=""flex items-center justify-between gap-3 mb-3"">
+                  <div class=""flex items-center gap-3"">
+                    <span class=""text-3xl"">📄</span>
+                    <p class=""font-medium text-sm"">
+                      {{ pdf.alt|default:""Document"" }}
+                    </p>
+                  </div>
+                  <div class=""flex gap-2"">
+                    <a href=""{{ pdf.media_url }}"" target=""_blank""
+                       rel=""noopener"" class=""btn btn-sm btn-outline"">
+                      Open ↗
+                    </a>
+                    <a href=""{{ pdf.media_url }}"" download
+                       class=""btn btn-sm btn-primary"">
+                      ↓ Download
+                    </a>
+                  </div>
+                </div>
+                <iframe src=""{{ pdf.media_url }}""
+                        class=""w-full rounded-lg border border-base-300""
+                        style=""height:480px;""
+                        loading=""lazy""
+                        title=""{{ pdf.alt|default:'Document' }}"">
+                </iframe>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {# Text tab #}
+        {% if texts %}
+        <label class=""tab gap-1"">
+          <input type=""radio"" name=""media_tabs""
+                 {% if not images and not audios and not videos and not pdfs %}
+                 checked{% endif %} />
+          📝 Content
+        </label>
+        <div class=""tab-content border-base-300 pt-4"">
+          {% for text_media in texts %}
+          <div class=""prose prose-sm max-w-none text-base-content/90"">
+            {% for section in text_media.text_content %}
+            <section class=""mb-8"">
+              {% if section.title %}
+              <h2 class=""text-xl font-bold text-base-content mb-4
+                          border-b border-base-300 pb-2"">
+                {{ section.title }}
+              </h2>
+              {% endif %}
+              {% for child in section.children %}
+              <div class=""mb-4"">
+                {% if child.subtitle %}
+                <h3 class=""text-base font-semibold text-base-content mb-2"">
+                  {{ child.subtitle }}
+                </h3>
+                {% endif %}
+                {% for para in child.content %}
+                <p class=""text-base-content/80 mb-2 leading-relaxed"">
+                  {{ para }}
+                </p>
+                {% endfor %}
+              </div>
+              {% endfor %}
+            </section>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      </div>
+
+      {% elif image_url %}
+      <figure class=""aspect-square bg-base-200 rounded-2xl overflow-hidden"">
+        <img src=""{{ image_url }}"" alt=""{{ image_alt }}""
+             class=""w-full h-full object-cover"">
+      </figure>
+      {% else %}
+      <figure class=""aspect-square bg-base-200 rounded-2xl overflow-hidden
+                     flex items-center justify-center"">
+        <span class=""text-7xl text-base-content/20"">📦</span>
+      </figure>
+      {% endif %}
+
+    </div>
+
+    {# ══════════════════════════════════════════════════════
+       RIGHT COLUMN — Details
+    ══════════════════════════════════════════════════════ #}
+    <div class=""md:w-1/2 space-y-5"">
+
+      {# Name #}
+      <h1 class=""text-3xl font-bold text-base-content leading-tight"">
+        v2{{ name }}
+      </h1>
+
+      {# Identifiers #}
+      {% if sku or gtin or barcode %}
+      <div class=""flex flex-wrap gap-2"">
+        {% if sku %}
+        <span class=""badge badge-ghost badge-sm font-mono"">SKU: {{ sku }}</span>
+        {% endif %}
+        {% if gtin %}
+        <span class=""badge badge-ghost badge-sm font-mono"">GTIN: {{ gtin }}</span>
+        {% endif %}
+        {% if barcode %}
+        <span class=""badge badge-ghost badge-sm font-mono"">
+          Barcode: {{ barcode }}
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Price #}
+      {% if price %}
+      <div class=""flex items-baseline gap-3 flex-wrap"">
+        <p class=""text-3xl font-bold text-primary"">
+          {{ currency }} {{ price }}
+        </p>
+        {% if compare_price and compare_price > price %}
+        <p class=""text-lg text-base-content/40 line-through"">
+          {{ currency }} {{ compare_price }}
+        </p>
+        <span class=""badge badge-error badge-sm"">Sale</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Stock #}
+      {% if stock is not None %}
+      <div>
+        {% if stock > 10 %}
+        <span class=""badge badge-success gap-1"">✓ In Stock</span>
+        {% elif stock > 0 %}
+        <span class=""badge badge-warning gap-1"">Only {{ stock }} left</span>
+        {% else %}
+        <span class=""badge badge-error gap-1"">Out of Stock</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# Description #}
+      {% if description %}
+      <div class=""prose prose-sm text-base-content/80 max-w-none"">
+        <p>{{ description }}</p>
+      </div>
+      {% endif %}
+
+      {# Variants #}
+      {% if variants %}
+      <div class=""space-y-2"">
+        <p class=""font-semibold text-sm"">Options:</p>
+        <div class=""flex flex-wrap gap-2"">
+          {% for variant in variants %}
+          <label class=""cursor-pointer"">
+            <input type=""radio"" name=""variant""
+                   value=""{{ variant.variant_id }}""
+                   class=""sr-only peer""
+                   {% if forloop.first %}checked{% endif %}>
+            <span class=""btn btn-sm btn-outline peer-checked:btn-primary
+                         transition-colors"">
+              {{ variant.name }}
+              {% if variant.price %}
+              <span class=""text-xs opacity-70 ml-1"">
+                {{ currency }} {{ variant.price }}
+              </span>
+              {% endif %}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Add to Cart — Phase 3 #}
+      <div class=""pt-1"">
+        <button class=""btn btn-primary w-full"" disabled>
+          Add to Cart
+          <span class=""badge badge-sm badge-outline ml-2"">Coming Soon</span>
+        </button>
+      </div>
+
+      {% if attr_values or attributes or dimensions %}
+      <div class=""divider my-1""></div>
+      {% endif %}
+
+      {# Structured attribute values #}
+      {% if attr_values %}
+      <div class=""collapse collapse-arrow border border-base-300 rounded-lg"">
+        <input type=""checkbox"" checked />
+        <div class=""collapse-title font-semibold text-sm"">Specifications</div>
+        <div class=""collapse-content"">
+          <table class=""table table-sm w-full mt-2"">
+            <tbody>
+              {% for attr_name, attr_value in attr_values.items %}
+              <tr class=""hover"">
+                <td class=""text-base-content/60 font-medium w-2/5"">
+                  {{ attr_name }}
+                </td>
+                <td class=""font-semibold text-base-content"">{{ attr_value }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Physical dimensions #}
+      {% if dimensions %}
+      <div class=""collapse collapse-arrow border border-base-300 rounded-lg"">
+        <input type=""checkbox"" />
+        <div class=""collapse-title font-semibold text-sm"">Physical Details</div>
+        <div class=""collapse-content"">
+          <table class=""table table-sm w-full mt-2"">
+            <tbody>
+              {% for label, value in dimensions.items %}
+              <tr class=""hover"">
+                <td class=""text-base-content/60 font-medium w-2/5"">{{ label }}</td>
+                <td class=""font-medium"">{{ value }}</td>
+              </tr>
+              {% endfor %}
+              {% if country_of_origin %}
+              <tr class=""hover"">
+                <td class=""text-base-content/60 font-medium w-2/5"">
+                  Country of Origin
+                </td>
+                <td class=""font-medium"">{{ country_of_origin }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {# JSONB overflow #}
+      {% if attributes %}
+      <div class=""collapse collapse-arrow border border-base-300 rounded-lg"">
+        <input type=""checkbox"" />
+        <div class=""collapse-title font-semibold text-sm"">
+          Additional Details
+        </div>
+        <div class=""collapse-content"">
+          <table class=""table table-sm w-full mt-2"">
+            <tbody>
+              {% for key, value in attributes.items %}
+              <tr class=""hover"">
+                <td class=""text-base-content/60 capitalize w-2/5"">
+                  {{ key|cut:""_"" }}
+                </td>
+                <td class=""font-medium"">{{ value }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Care instructions #}
+      {% if care_instructions %}
+      <div class=""collapse collapse-arrow border border-base-300 rounded-lg"">
+        <input type=""checkbox"" />
+        <div class=""collapse-title font-semibold text-sm"">
+          Care Instructions
+        </div>
+        <div class=""collapse-content prose prose-sm text-base-content/80"">
+          <p>{{ care_instructions }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  {# ── Taxonomy classification ──────────────────────────── #}
+  {% if taxonomy_chains %}
+  <div class=""mt-8 pt-6 border-t border-base-300"">
+    <p class=""text-xs text-base-content/40 uppercase tracking-widest mb-3"">
+      Classification
+    </p>
+    <div class=""space-y-2"">
+      {% for chain in taxonomy_chains %}
+      <div class=""flex items-start gap-3"">
+        <span class=""badge badge-outline badge-sm shrink-0 mt-0.5 min-w-24
+                     text-base-content/50"">
+          {{ chain.taxonomy_name }}
+        </span>
+        <div class=""flex flex-wrap items-center gap-1"">
+          {% for node in chain.nodes %}
+          {% if not forloop.first %}
+          <span class=""text-base-content/30 text-xs"">›</span>
+          {% endif %}
+          <span class=""badge badge-sm
+                       {% if forloop.last %}badge-primary
+                       {% else %}badge-ghost text-base-content/50{% endif %}"">
+            {{ node.name }}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>",,,
