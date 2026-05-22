@@ -1,0 +1,4 @@
+client_id,item_id,price,currency,duration_minutes,is_location_based,service_area,fulfillment_type,attributes
+acme,svc001,499.00,INR,60,1,Bangalore,in-person,"{""language"": ""english"", ""includes_material"": true}"
+acme,svc002,1200.00,INR,90,0,,remote,"{""platform"": ""zoom""}"
+demo,svc003,2500.00,USD,120,1,New York,hybrid,"{""technician_level"": ""senior""}"

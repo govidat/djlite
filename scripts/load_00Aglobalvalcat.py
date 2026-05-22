@@ -1,27 +1,32 @@
 import csv
 from pathlib import Path
 
+from django.conf import settings
 from django.db import transaction
 
-from mysite.models import ThemePreset
+from mysite.models import (
+    GlobalValCat,
+)
 
 from scripts.helpers import clean
 
+
+LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 
 # ═══════════════════════════════════════════════════════
-# Load ThemePreset
+# Load GlobalValCat
 # ═══════════════════════════════════════════════════════
 
-def load_val01(
+def load_globalvalcats(
     dry_run=False,
     verbose=False,
 ):
 
-    file_path = DATA_DIR / "02themepreset.csv"
+    file_path = DATA_DIR / "00globalvalcat.csv"
 
     with open(
         file_path,
@@ -39,84 +44,45 @@ def load_val01(
 
     for row in rows:
 
-        themepreset_id = clean(
-            row.get("themepreset_id"),
+        globalvalcat_id = clean(
+            row.get("globalvalcat_id"),
             lower=True,
         )
 
-        if not themepreset_id:
+        if not globalvalcat_id:
 
             print(
-                "Skipping empty themepreset_id"
+                "Skipping empty globalvalcat_id"
             )
 
             skipped_count += 1
             continue
 
-        if themepreset_id in seen:
+        if globalvalcat_id in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{themepreset_id}"
+                f"{globalvalcat_id}"
             )
 
             skipped_count += 1
             continue
 
-        seen.add(themepreset_id)
-
-        defaults = {
-
-            "ltext": clean(row.get("ltext")),
-
-            "primary": clean(row.get("primary")),
-            "primary_content": clean(row.get("primary_content")),
-
-            "secondary": clean(row.get("secondary")),
-            "secondary_content": clean(row.get("secondary_content")),
-
-            "accent": clean(row.get("accent")),
-            "accent_content": clean(row.get("accent_content")),
-
-            "neutral": clean(row.get("neutral")),
-            "neutral_content": clean(row.get("neutral_content")),
-
-            "base_100": clean(row.get("base_100")),
-            "base_200": clean(row.get("base_200")),
-            "base_300": clean(row.get("base_300")),
-            "base_content": clean(row.get("base_content")),
-
-            "success": clean(row.get("success")),
-            "success_content": clean(row.get("success_content")),
-
-            "warning": clean(row.get("warning")),
-            "warning_content": clean(row.get("warning_content")),
-
-            "error": clean(row.get("error")),
-            "error_content": clean(row.get("error_content")),
-
-            "info": clean(row.get("info")),
-            "info_content": clean(row.get("info_content")),
-        }
+        seen.add(globalvalcat_id)
 
         if dry_run:
 
             print(
                 f"[DRY RUN] "
-                f"{themepreset_id}"
+                f"{globalvalcat_id}"
             )
-
-            if verbose:
-                print(defaults)
 
         else:
 
             obj, created = (
-                ThemePreset.objects.update_or_create(
+                GlobalValCat.objects.update_or_create(
 
-                    themepreset_id=themepreset_id,
-
-                    defaults=defaults,
+                    globalvalcat_id=globalvalcat_id,
                 )
             )
 
@@ -129,8 +95,8 @@ def load_val01(
 
                 print(
                     f"{'Created' if created else 'Updated'} "
-                    f"ThemePreset: "
-                    f"{themepreset_id}"
+                    f"GlobalValCat: "
+                    f"{globalvalcat_id}"
                 )
 
     print()
@@ -144,7 +110,6 @@ def load_val01(
         f"updated={updated_count}, "
         f"skipped={skipped_count})"
     )
-
 
 # ═══════════════════════════════════════════════════════
 # RUN
@@ -161,7 +126,7 @@ def run(*args):
     print(f"DRY_RUN = {DRY_RUN}")
     print(f"VERBOSE = {VERBOSE}")
 
-    load_val01(
+    load_globalvalcats(
         dry_run=DRY_RUN,
         verbose=VERBOSE,
     )
@@ -181,13 +146,13 @@ def run(*args):
 """
 Normal Run
 -----------
-python manage.py runscript load_02themepreset
+python manage.py runscript load_00Aglobalvalcat
 
 Dry Run
 --------
-python manage.py runscript load_02themepreset --script-args dryrun
+python manage.py runscript load_00Aglobalvalcat --script-args dryrun
 
 Dry Run + Verbose
 -----------------
-python manage.py runscript load_02themepreset --script-args dryrun verbose
+python manage.py runscript load_00Aglobalvalcat --script-args dryrun verbose
 """

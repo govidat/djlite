@@ -1,27 +1,33 @@
 import csv
 from pathlib import Path
 
+from django.conf import settings
 from django.db import transaction
 
-from mysite.models import ThemePreset
+from mysite.models import (
+    GlobalValCat,
+    GlobalVal,
+)
 
 from scripts.helpers import clean
 
+
+LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 
 # ═══════════════════════════════════════════════════════
-# Load ThemePreset
+# Load GlobalVal
 # ═══════════════════════════════════════════════════════
 
-def load_val01(
+def load_globalvals(
     dry_run=False,
     verbose=False,
 ):
 
-    file_path = DATA_DIR / "02themepreset.csv"
+    file_path = DATA_DIR / "01globalval.csv"
 
     with open(
         file_path,
@@ -31,6 +37,27 @@ def load_val01(
 
         rows = list(csv.DictReader(f))
 
+    # ── preload GlobalValCat ─────────────────────────
+
+    globalvalcat_ids = {
+
+        clean(
+            r.get("globalvalcat_id"),
+            lower=True,
+        )
+
+        for r in rows
+    }
+
+    globalvalcats = {
+
+        c.globalvalcat_id: c
+
+        for c in GlobalValCat.objects.filter(
+            globalvalcat_id__in=globalvalcat_ids
+        )
+    }
+
     created_count = 0
     updated_count = 0
     skipped_count = 0
@@ -39,71 +66,71 @@ def load_val01(
 
     for row in rows:
 
-        themepreset_id = clean(
-            row.get("themepreset_id"),
+        globalvalcat_id = clean(
+            row.get("globalvalcat_id"),
             lower=True,
         )
 
-        if not themepreset_id:
+        key = clean(
+            row.get("key"),
+            lower=True,
+        )
+
+        if not globalvalcat_id or not key:
 
             print(
-                "Skipping empty themepreset_id"
+                "Skipping row with empty "
+                "globalvalcat_id/key"
             )
 
             skipped_count += 1
             continue
 
-        if themepreset_id in seen:
+        duplicate_key = (
+            globalvalcat_id,
+            key,
+        )
+
+        if duplicate_key in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{themepreset_id}"
+                f"{duplicate_key}"
             )
 
             skipped_count += 1
             continue
 
-        seen.add(themepreset_id)
+        seen.add(duplicate_key)
 
-        defaults = {
+        globalvalcat = globalvalcats.get(
+            globalvalcat_id
+        )
 
-            "ltext": clean(row.get("ltext")),
+        if not globalvalcat:
 
-            "primary": clean(row.get("primary")),
-            "primary_content": clean(row.get("primary_content")),
+            print(
+                f"Missing GlobalValCat: "
+                f"{globalvalcat_id}"
+            )
 
-            "secondary": clean(row.get("secondary")),
-            "secondary_content": clean(row.get("secondary_content")),
+            skipped_count += 1
+            continue
 
-            "accent": clean(row.get("accent")),
-            "accent_content": clean(row.get("accent_content")),
+        defaults = {}
 
-            "neutral": clean(row.get("neutral")),
-            "neutral_content": clean(row.get("neutral_content")),
+        for lang in LANGS:
 
-            "base_100": clean(row.get("base_100")),
-            "base_200": clean(row.get("base_200")),
-            "base_300": clean(row.get("base_300")),
-            "base_content": clean(row.get("base_content")),
-
-            "success": clean(row.get("success")),
-            "success_content": clean(row.get("success_content")),
-
-            "warning": clean(row.get("warning")),
-            "warning_content": clean(row.get("warning_content")),
-
-            "error": clean(row.get("error")),
-            "error_content": clean(row.get("error_content")),
-
-            "info": clean(row.get("info")),
-            "info_content": clean(row.get("info_content")),
-        }
+            defaults[f"keyval_{lang}"] = clean(
+                row.get(f"keyval_{lang}")
+            )
 
         if dry_run:
 
             print(
                 f"[DRY RUN] "
-                f"{themepreset_id}"
+                f"{globalvalcat_id} / "
+                f"{key}"
             )
 
             if verbose:
@@ -112,9 +139,10 @@ def load_val01(
         else:
 
             obj, created = (
-                ThemePreset.objects.update_or_create(
+                GlobalVal.objects.update_or_create(
 
-                    themepreset_id=themepreset_id,
+                    globalvalcat=globalvalcat,
+                    key=key,
 
                     defaults=defaults,
                 )
@@ -129,8 +157,8 @@ def load_val01(
 
                 print(
                     f"{'Created' if created else 'Updated'} "
-                    f"ThemePreset: "
-                    f"{themepreset_id}"
+                    f"GlobalVal: "
+                    f"{globalvalcat_id} / {key}"
                 )
 
     print()
@@ -161,7 +189,7 @@ def run(*args):
     print(f"DRY_RUN = {DRY_RUN}")
     print(f"VERBOSE = {VERBOSE}")
 
-    load_val01(
+    load_globalvals(
         dry_run=DRY_RUN,
         verbose=VERBOSE,
     )
@@ -181,13 +209,13 @@ def run(*args):
 """
 Normal Run
 -----------
-python manage.py runscript load_02themepreset
+python manage.py runscript load_00Bglobalval
 
 Dry Run
 --------
-python manage.py runscript load_02themepreset --script-args dryrun
+python manage.py runscript load_00Bglobalval --script-args dryrun
 
 Dry Run + Verbose
 -----------------
-python manage.py runscript load_02themepreset --script-args dryrun verbose
+python manage.py runscript load_00Bglobalval --script-args dryrun verbose
 """

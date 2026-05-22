@@ -1,146 +1,393 @@
 import csv
 from pathlib import Path
 
-from mysite.models import Client, Page, NavItem
-#id,location,nav_type,url,name,name_en,name_hi,name_fr,order,hidden,open_in_new_tab,client_id,page_id,svg_pre,svg_suf,name_ta,parent_name_en
+from django.conf import settings
+from django.db import transaction
+
+from mysite.models import (
+    Client,
+    Page,
+    NavItem,
+)
+
+from scripts.helpers import (
+    clean,
+    to_bool,
+    to_int,
+)
+
+
+LANGS = [lang[0] for lang in settings.LANGUAGES]
+
+
+# id,location,nav_type,url,name,name_en,name_hi,name_fr,
+# order,hidden,open_in_new_tab,client_id,page_id,
+# svg_pre,svg_suf,name_ta,parent_name_en
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 
+# ═══════════════════════════════════════════════════════
+# Load NavItem
+# ═══════════════════════════════════════════════════════
 
-def load_val01():
+def load_val01(
+    dry_run=False,
+    verbose=False,
+):
 
     file_path = DATA_DIR / "03Cnavitem.csv"
 
-    # ── First pass: collect client_ids from CSV ─────────────
+    # ── Read CSV once ───────────────────────────────────
 
-    with open(file_path, newline="", encoding="utf-8-sig") as f:
+    with open(
+        file_path,
+        newline="",
+        encoding="utf-8-sig"
+    ) as f:
 
-        reader = csv.DictReader(f)
-        
-        rows = list(reader)   # if multiple passes are required, then this construct is required
-        
+        rows = list(csv.DictReader(f))
 
-        client_ids = {
-            (row.get("client_id") or "").strip().lower()
-            for row in rows
-            if (row.get("client_id") or "").strip()
-        }
+    # ── Collect keys ────────────────────────────────────
 
-        #print(f"client_ids: {client_ids}")
+    client_ids = {
 
-        page_ids = {
-            (row.get("page_id") or "").strip().lower()
-            for row in rows
-            if (row.get("page_id") or "").strip()
-        }
+        clean(
+            r.get("client_id"),
+            lower=True,
+        )
 
-        #print(f"page_ids: {page_ids}")
+        for r in rows
 
-    # ── Fetch only required clients and pages ─────────────────────────
+        if clean(r.get("client_id"))
+    }
+
+    page_ids = {
+
+        clean(
+            r.get("page_id"),
+            lower=True,
+        )
+
+        for r in rows
+
+        if clean(r.get("page_id"))
+    }
+
+    # ── Preload Clients ─────────────────────────────────
 
     clients = {
+
         c.client_id: c
+
         for c in Client.objects.filter(
             client_id__in=client_ids
         )
     }
 
+    # ── Preload Pages ──────────────────────────────────
+
     pages = {
-        (p.client.client_id, p.page_id): p
+
+        (
+            p.client.client_id,
+            p.page_id,
+        ): p
+
         for p in Page.objects.filter(
             client__client_id__in=client_ids,
             page_id__in=page_ids,
         ).select_related("client")
     }
 
+    # ── Preload Existing Parents ───────────────────────
+
     parents = {
-        (n.client.client_id, n.name_en): n
+
+        (
+            n.client.client_id,
+            clean(n.name_en, lower=True),
+        ): n
+
         for n in NavItem.objects.filter(
             client__client_id__in=client_ids
         ).select_related("client")
     }
 
+    # ── Counters ────────────────────────────────────────
 
-    # ── Second pass: load navs ─────────────────────────────
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
 
-    #with open(file_path, newline="", encoding="utf-8") as f:
+    seen = set()
 
-    #    reader = csv.DictReader(f)
+    # ── Load NavItems ───────────────────────────────────
 
     for row in rows:
 
-        client_id = row["client_id"]
-        client = clients.get(client_id)
-        if not client:
-            print(f"Missing client: {client_id}")
+        client_id = clean(
+            row.get("client_id"),
+            lower=True,
+        )
+
+        name_en = clean(
+            row.get("name_en"),
+            lower=True,
+        )
+
+        # ── validation ────────────────────────────────
+
+        if not client_id or not name_en:
+
+            print(
+                "Skipping row with empty "
+                "client_id/name_en"
+            )
+
+            skipped_count += 1
             continue
 
-        # ── page ───────────────────────────────────────
+        key = (
+            client_id,
+            name_en,
+        )
+
+        if key in seen:
+
+            print(
+                f"Duplicate CSV row: {key}"
+            )
+
+            skipped_count += 1
+            continue
+
+        seen.add(key)
+
+        # ── resolve client ────────────────────────────
+
+        client = clients.get(client_id)
+
+        if not client:
+
+            print(
+                f"Missing client: "
+                f"{client_id}"
+            )
+
+            skipped_count += 1
+            continue
+
+        # ── resolve page ──────────────────────────────
 
         page = None
-        page_id = row.get("page_id").strip().lower()
+
+        page_id = clean(
+            row.get("page_id"),
+            lower=True,
+        )
+
         if page_id:
-            page = pages.get((client_id, page_id))
+
+            page = pages.get(
+                (client_id, page_id)
+            )
+
             if not page:
-                print(f"Missing page: {client_id} / {page_id}")
+
+                print(
+                    f"Missing page: "
+                    f"{client_id} / {page_id}"
+                )
+
+                skipped_count += 1
                 continue
-        #print("LOOKUP:")
-        #print((client_id, page_id))
-        # ── parent ─────────────────────────────────────
+
+        # ── resolve parent ────────────────────────────
 
         parent = None
-        parent_name_en = row.get("parent_name_en").strip().lower()
+
+        parent_name_en = clean(
+            row.get("parent_name_en"),
+            lower=True,
+        )
+
         if parent_name_en:
-            parent = parents.get((client_id, parent_name_en))
+
+            parent = parents.get(
+                (
+                    client_id,
+                    parent_name_en,
+                )
+            )
+
             if not parent:
+
                 print(
                     f"Missing parent: "
-                    f"{client_id} / {parent_name_en}"
+                    f"{client_id} / "
+                    f"{parent_name_en}"
                 )
+
+                skipped_count += 1
                 continue
 
-        obj, created = NavItem.objects.update_or_create(
+        # ── defaults ──────────────────────────────────
 
-            client=client,
-            name_en=row.get("name_en", "").strip().lower(),
+        defaults = {
 
-            defaults={
+            "parent":
+                parent,
 
-                "parent": parent,
-                "page": page,
+            "page":
+                page,
 
-                "location": row.get("location", "header"),
-                "nav_type": row.get("nav_type", "page"),
-                "url": row.get("url", ""),
+            "location":
+                clean(
+                    row.get("location")
+                ) or "header",
 
-                "name_hi": row.get("name_hi", ""),
-                "name_fr": row.get("name_fr", ""),
-                "name_ta": row.get("name_ta", ""),
+            "nav_type":
+                clean(
+                    row.get("nav_type")
+                ) or "page",
 
-                "order": int(row.get("order", 0)),
+            "url":
+                clean(row.get("url")),
 
-                "hidden": row.get("hidden", "0") == "1",
+            "order":
+                to_int(row.get("order")) or 0,
 
-                "open_in_new_tab": row.get("open_in_new_tab", "0") == "1",
+            "hidden":
+                to_bool(row.get("hidden")),
 
-                "svg_pre": row.get("svg_pre", ""),
-                "svg_suf": row.get("svg_suf", ""),
-            }
-        )
+            "open_in_new_tab":
+                to_bool(
+                    row.get("open_in_new_tab")
+                ),
+
+            "svg_pre":
+                clean(row.get("svg_pre")),
+
+            "svg_suf":
+                clean(row.get("svg_suf")),
+        }
+
+        # ── multilingual fields ───────────────────────
+
+        for lang in LANGS:
+
+            defaults[f"name_{lang}"] = clean(
+                row.get(f"name_{lang}")
+            )
+
+        # ── DRY RUN ───────────────────────────────────
+
+        if dry_run:
+
+            print(
+                f"[DRY RUN] "
+                f"{client_id} / {name_en}"
+            )
+
+            if verbose:
+                print(defaults)
+
+        # ── SAVE ──────────────────────────────────────
+
+        else:
+
+            obj, created = (
+                NavItem.objects.update_or_create(
+
+                    client=client,
+                    name_en=name_en,
+
+                    defaults=defaults,
+                )
+            )
+
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+
+            # ── update parents cache ────────────────
+
+            parents[
+                (
+                    client_id,
+                    name_en,
+                )
+            ] = obj
+
+            if verbose:
+
+                print(
+                    f"{'Created' if created else 'Updated'} "
+                    f"NavItem: "
+                    f"{client_id} / {name_en}"
+                )
+
+    # ── Summary ────────────────────────────────────────
+
+    print()
+
+    print(
+        f"{'Dry-Run Completed -> Rollback' if dry_run else 'Loading Completed'}"
+    )
+
+    print(
+        f"(created={created_count}, "
+        f"updated={updated_count}, "
+        f"skipped={skipped_count})"
+    )
 
 
+# ═══════════════════════════════════════════════════════
+# RUN
+# ═══════════════════════════════════════════════════════
+
+@transaction.atomic
+def run(*args):
+
+    args = [a.lower() for a in args]
+
+    DRY_RUN = "dryrun" in args
+    VERBOSE = "verbose" in args
+
+    print(f"DRY_RUN = {DRY_RUN}")
+    print(f"VERBOSE = {VERBOSE}")
+
+    load_val01(
+        dry_run=DRY_RUN,
+        verbose=VERBOSE,
+    )
+
+    if DRY_RUN:
+
+        print()
         print(
-            f"{'Created' if created else 'Updated'} "
-            f"Page: {client_id} / {obj.name_en}"
+            "DRY RUN COMPLETE → rollback"
         )
 
-    print("Loaded NavItem")
-
-
-def run():
-
-    load_val01()
+        transaction.set_rollback(True)
 
     print("Done")
+
+
+"""
+Normal Run
+-----------
+python manage.py runscript load_03cnavitem
+
+Dry Run
+--------
+python manage.py runscript load_03cnavitem --script-args dryrun
+
+Dry Run + Verbose
+-----------------
+python manage.py runscript load_03cnavitem --script-args dryrun verbose
+"""

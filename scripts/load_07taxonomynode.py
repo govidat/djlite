@@ -1,4 +1,446 @@
 import csv
+from pathlib import Path
+
+from django.conf import settings
+from django.db import transaction
+
+from mysite.models import (
+    Client,
+    Taxonomy,
+    TaxonomyNode,
+)
+
+from scripts.helpers import (
+    clean,
+    to_int,
+    to_bool,
+    to_json,
+)
+
+LANGS = [lang[0] for lang in settings.LANGUAGES]
+
+# slug,order,is_active,metadata,taxonomy_slug,
+# name_en,name_fr,name_hi,name_ta,
+# client_id,gpc_code,parent_slug,global_node_id
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+
+
+def load_val01(
+    dry_run=False,
+    verbose=False,
+):
+
+    file_path = DATA_DIR / "07taxonomynode.csv"
+
+    # =========================================================
+    # READ CSV
+    # =========================================================
+
+    with open(
+        file_path,
+        newline="",
+        encoding="utf-8-sig",
+    ) as f:
+
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    # =========================================================
+    # COLLECT IDS
+    # =========================================================
+
+    client_ids = {
+        clean(row.get("client_id"), lower=True)
+        for row in rows
+        if clean(row.get("client_id"))
+    }
+
+    taxonomy_slugs = {
+        clean(row.get("taxonomy_slug"), lower=True)
+        for row in rows
+        if clean(row.get("taxonomy_slug"))
+    }
+
+    # =========================================================
+    # PREFETCH CLIENTS
+    # =========================================================
+
+    clients = {
+        c.client_id: c
+        for c in Client.objects.filter(
+            client_id__in=client_ids
+        )
+    }
+
+    # =========================================================
+    # PREFETCH TAXONOMIES
+    # key = (client_id_or_none, taxonomy_slug)
+    # =========================================================
+
+    taxonomies = {}
+
+    for t in (
+        Taxonomy.objects
+        .filter(slug__in=taxonomy_slugs)
+        .select_related("client")
+    ):
+
+        key = (
+            t.client.client_id if t.client else None,
+            t.slug,
+        )
+
+        taxonomies[key] = t
+
+    # =========================================================
+    # PREFETCH EXISTING NODES
+    # key = (client_id_or_none, taxonomy_slug, slug)
+    # =========================================================
+
+    node_cache = {}
+
+    existing_nodes = (
+        TaxonomyNode.objects
+        .filter(
+            taxonomy__slug__in=taxonomy_slugs
+        )
+        .select_related(
+            "client",
+            "taxonomy",
+        )
+    )
+
+    for n in existing_nodes:
+
+        key = (
+            n.client.client_id if n.client else None,
+            n.taxonomy.slug,
+            n.slug,
+        )
+
+        node_cache[key] = n
+
+    # =========================================================
+    # PROCESS
+    # =========================================================
+
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+
+    pending_rows = rows.copy()
+
+    pass_num = 1
+
+    while pending_rows:
+
+        print(f"\n--- PASS {pass_num} ---")
+
+        next_pending = []
+
+        progress_made = False
+
+        for row in pending_rows:
+
+            # =================================================
+            # BASIC VALUES
+            # =================================================
+
+            client_id = clean(
+                row.get("client_id"),
+                lower=True,
+            )
+
+            taxonomy_slug = clean(
+                row.get("taxonomy_slug"),
+                lower=True,
+            )
+
+            slug = clean(
+                row.get("slug"),
+                lower=True,
+            )
+
+            parent_slug = clean(
+                row.get("parent_slug"),
+                lower=True,
+            )
+
+            if not taxonomy_slug or not slug:
+
+                print(
+                    "Skipping row with missing "
+                    "taxonomy_slug or slug"
+                )
+
+                skipped_count += 1
+                continue
+
+            client = (
+                clients.get(client_id)
+                if client_id else None
+            )
+
+            # =================================================
+            # TAXONOMY
+            # =================================================
+
+            taxonomy = taxonomies.get(
+                (
+                    client_id if client_id else None,
+                    taxonomy_slug,
+                )
+            )
+
+            # fallback to global taxonomy
+            if not taxonomy:
+
+                taxonomy = taxonomies.get(
+                    (
+                        None,
+                        taxonomy_slug,
+                    )
+                )
+
+            if not taxonomy:
+
+                print(
+                    f"Missing taxonomy: "
+                    f"{client_id or 'GLOBAL'} / "
+                    f"{taxonomy_slug}"
+                )
+
+                skipped_count += 1
+                continue
+
+            # =================================================
+            # PARENT
+            # =================================================
+
+            parent = None
+
+            if parent_slug:
+
+                parent = node_cache.get(
+                    (
+                        client_id if client_id else None,
+                        taxonomy_slug,
+                        parent_slug,
+                    )
+                )
+
+                # fallback to global parent
+
+                if not parent:
+
+                    parent = node_cache.get(
+                        (
+                            None,
+                            taxonomy_slug,
+                            parent_slug,
+                        )
+                    )
+
+                # unresolved parent
+
+                if not parent:
+
+                    next_pending.append(row)
+                    continue
+
+            # =================================================
+            # GLOBAL NODE
+            # =================================================
+
+            global_node = None
+
+            global_node_id = clean(
+                row.get("global_node_id")
+            )
+
+            if global_node_id:
+
+                global_node = (
+                    TaxonomyNode.objects
+                    .filter(id=global_node_id)
+                    .first()
+                )
+
+            # =================================================
+            # DEFAULTS
+            # =================================================
+
+            defaults = {
+
+                "parent": parent,
+
+                "order":
+                    to_int(row.get("order")) or 0,
+
+                "is_active":
+                    to_bool(row.get("is_active")),
+
+                "metadata":
+                    to_json(row.get("metadata")),
+
+                "gpc_code":
+                    clean(row.get("gpc_code")),
+
+                "global_node":
+                    global_node,
+            }
+
+            for lang in LANGS:
+
+                defaults[f"name_{lang}"] = clean(
+                    row.get(f"name_{lang}")
+                )
+
+            # =================================================
+            # DRY RUN
+            # =================================================
+
+            if dry_run:
+
+                print(
+                    f"[DRY RUN] "
+                    f"{client_id or 'GLOBAL'} / "
+                    f"{taxonomy_slug} / "
+                    f"{slug}"
+                )
+
+                if verbose:
+                    print(defaults)
+
+                progress_made = True
+                continue
+
+            # =================================================
+            # UPSERT
+            # =================================================
+
+            obj, created = (
+                TaxonomyNode.objects
+                .update_or_create(
+
+                    taxonomy=taxonomy,
+                    client=client,
+                    slug=slug,
+
+                    defaults=defaults,
+                )
+            )
+
+            # =================================================
+            # CACHE UPDATE
+            # =================================================
+
+            cache_key = (
+                client_id if client_id else None,
+                taxonomy_slug,
+                slug,
+            )
+
+            node_cache[cache_key] = obj
+
+            progress_made = True
+
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+
+            if verbose:
+
+                print(
+                    f"{'Created' if created else 'Updated'} "
+                    f"TaxonomyNode: "
+                    f"{client_id or 'GLOBAL'} / "
+                    f"{taxonomy_slug} / "
+                    f"{slug}"
+                )
+
+        # =====================================================
+        # NO PROGRESS
+        # =====================================================
+
+        if not progress_made:
+
+            print("\nUNRESOLVED ROWS:")
+
+            for row in next_pending:
+
+                print(
+                    f"Could not resolve parent "
+                    f"[taxonomy="
+                    f"{row.get('taxonomy_slug')} "
+                    f"slug={row.get('slug')} "
+                    f"parent={row.get('parent_slug')}]"
+                )
+
+            skipped_count += len(next_pending)
+            break
+
+        pending_rows = next_pending
+
+        pass_num += 1
+
+    # =========================================================
+    # SUMMARY
+    # =========================================================
+
+    print()
+
+    if dry_run:
+
+        print("Dry-Run Completed -> Rollback")
+        transaction.set_rollback(True)
+
+    else:
+
+        print("Loading Completed")
+
+        print(
+            f"(created={created_count}, "
+            f"updated={updated_count}, "
+            f"skipped={skipped_count})"
+        )
+
+
+@transaction.atomic
+def run(*args):
+
+    args = [a.lower() for a in args]
+
+    DRY_RUN = "dryrun" in args
+    VERBOSE = "verbose" in args
+
+    print(f"DRY_RUN = {DRY_RUN}")
+    print(f"VERBOSE = {VERBOSE}")
+
+    load_val01(
+        dry_run=DRY_RUN,
+        verbose=VERBOSE,
+    )
+
+    print("Done")
+
+
+"""
+Normal Run:
+python manage.py runscript load_07taxonomynode
+
+Dry Run:
+python manage.py runscript load_07taxonomynode --script-args dryrun
+
+Dry Run + Verbose:
+python manage.py runscript load_07taxonomynode --script-args dryrun verbose
+"""
+"""
+
+import csv
 import json
 from pathlib import Path
 
@@ -321,3 +763,4 @@ def run():
     load_val01()
 
     print("Done")
+"""

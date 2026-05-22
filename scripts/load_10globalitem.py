@@ -6,6 +6,10 @@ from django.contrib.auth import get_user_model
 
 from mysite.models import GlobalItem
 from django.conf import settings
+import sys  # for DRY_RUN
+from django.db import transaction # for DRY_RUN
+from scripts.helpers import clean, to_int, to_bool, to_json, to_decimal
+
 
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
@@ -25,34 +29,7 @@ DATA_DIR = BASE_DIR / "data"
 User = get_user_model()
 
 
-def to_int(value):
-
-    value = (value or "").strip()
-
-    if not value:
-        return None
-
-    try:
-        return int(value)
-    except ValueError:
-        return None
-
-
-def to_json(value):
-
-    value = (value or "").strip()
-
-    if not value:
-        return {}
-
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError:
-        print(f"Invalid JSON: {value}")
-        return {}
-
-
-def load_val01():
+def load_val01(dry_run=False, verbose=False,):
 
     file_path = DATA_DIR / "10globalitem.csv"
 
@@ -64,30 +41,41 @@ def load_val01():
         rows = list(reader)
 
     # ── Load GlobalItem ─────────────────────────────────────
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+    seen = set()
 
     for row in rows:
 
-        global_item_id = (
-            row.get("global_item_id") or ""
-        ).strip().lower()
+        global_item_id = clean(row.get("global_item_id"),lower=True)
 
         if not global_item_id:
 
             print("Skipping row with empty global_item_id")
+            skipped_count += 1            
             continue
+
+        key = global_item_id
+        if key in seen:
+            print(
+                f"Duplicate CSV row: {key}"
+            )
+            skipped_count += 1
+            continue        
 
         defaults = {
 
-            "gtin": row.get("gtin", "").strip(),
-            "gpc_brick_code": row.get("gpc_brick_code", "").strip(),
-            "domain": row.get("domain", "generic").strip(),
-            "status": row.get("status", "draft").strip(),
+            "gtin": clean(row.get("gtin")),
+            "gpc_brick_code": clean(row.get("gpc_brick_code")),
+            "domain": clean(row.get("domain", "generic")),
+            "status": clean(row.get("status", "draft")),
             # ── media / identity ───────────────
 
-            "country_of_origin": row.get("country_of_origin", "").strip(),
-            "image_url": row.get("image_url", "").strip(),
-            "image_alt": row.get("image_alt", "").strip(),
-            "barcode": row.get("barcode", "").strip(),
+            "country_of_origin": clean(row.get("country_of_origin")),
+            "image_url": clean(row.get("image_url")),
+            "image_alt": clean(row.get("image_alt")),
+            "barcode": clean(row.get("barcode")),
 
             # ── dimensions ─────────────────────
 
@@ -96,44 +84,85 @@ def load_val01():
             "width_mm": to_int(row.get("width_mm")),
             "height_mm": to_int(row.get("height_mm")),
             # ── JSON attributes ────────────────
-
-            "attributes": json.loads(row.get("attributes", "{}")),
+            "attributes": to_json(row.get("attributes")),
+            
         }
 
         for lang in LANGS:
 
-            defaults[f"name_{lang}"] = \
-                row.get(f"name_{lang}", "")
+            defaults[f"name_{lang}"] = clean(row.get(f"name_{lang}"))
+            defaults[f"description_{lang}"] = clean(row.get(f"description_{lang}"))
+            defaults[f"care_instructions_{lang}"] = clean(row.get(f"care_instructions_{lang}"))
 
-            defaults[f"description_{lang}"] = \
-                row.get(f"description_{lang}", "")
+        if dry_run:
 
-            defaults[
-                f"care_instructions_{lang}"
-            ] = row.get(
-                f"care_instructions_{lang}",
-                ""
+            print(
+                
+                f"[DRY RUN] "
+                f"{global_item_id} "
             )
 
+            if verbose:
+                print(defaults)
 
-        obj, created = (
-            GlobalItem.objects.update_or_create(
+        else:
 
-                global_item_id=global_item_id,
-                defaults=defaults
+            obj, created = (
+                GlobalItem.objects.update_or_create(
+
+                    global_item_id=global_item_id,
+                    defaults=defaults
+                )
             )
-        )
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
 
+            if verbose:
+                print(
+                    f"{'Created' if created else 'Updated'} "
+                    f"GlobalItem: {global_item_id}"
+                )                
+
+    print()
+    if dry_run:
+        print(f"Dry-Run Completed -> Rollback")
+        transaction.set_rollback(True)
+        
+    else: 
+        print(f"Loading Completed")
         print(
-            f"{'Created' if created else 'Updated'} "
-            f"GlobalItem: {global_item_id}"
+            f"(created={created_count}, "
+            f"updated={updated_count}, "
+            f"skipped={skipped_count})"
         )
 
-    print("Loaded GlobalItem")
+        
 
+@transaction.atomic
+def run(*args):
+    args = [a.lower() for a in args] # for DRY_RUN
 
-def run():
+    DRY_RUN = "dryrun" in args # for DRY_RUN
+    VERBOSE = "verbose" in args # for DRY_RUN
 
-    load_val01()
+    print(f"DRY_RUN = {DRY_RUN}")
+    print(f"VERBOSE = {VERBOSE}")
+
+    load_val01(
+        dry_run=DRY_RUN,
+        verbose=VERBOSE,
+    )
+
+        #if DRY_RUN:
+
+    #    print("DRY RUN COMPLETE → rollback")
+    #    raise Exception("Rollback requested")
 
     print("Done")
+
+"""
+Normal Run - python manage.py runscript ....
+Dry Run + Verbose - python manage.py runscript ... --script-args dryrun verbose
+"""

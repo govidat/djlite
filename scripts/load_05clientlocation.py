@@ -1,32 +1,44 @@
 import csv
 from pathlib import Path
 
+from django.db import transaction
+
 from mysite.models import Client, ClientLocation
-#location_id,name,location_type,is_active,client_id
+
+from scripts.helpers import (
+    clean,
+    to_bool,
+)
+
+# location_id,name,location_type,is_active,client_id
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 
-
-def load_val01():
+def load_val01(
+    dry_run=False,
+    verbose=False,
+):
 
     file_path = DATA_DIR / "05clientlocation.csv"
 
-    # ── First pass: collect client_ids from CSV ─────────────
+    # ── Read CSV once ─────────────────────────────────────
 
-    with open(file_path, newline="", encoding="utf-8") as f:
+    with open(file_path, newline="", encoding="utf-8-sig") as f:
 
         reader = csv.DictReader(f)
-        rows = list(reader)   # if multiple passes are required, then this construct is required
+        rows = list(reader)
 
-        client_ids = {
-            (row.get("client_id") or "").strip().lower()
-            for row in rows
-            if (row.get("client_id") or "").strip()
-        }
+    # ── Collect keys ──────────────────────────────────────
 
+    client_ids = {
+        clean(row.get("client_id"), lower=True)
+        for row in rows
+        if clean(row.get("client_id"))
+    }
 
-    # ── Fetch only required clients  ─────────────────────────
+    # ── Preload clients ───────────────────────────────────
 
     clients = {
         c.client_id: c
@@ -35,49 +47,168 @@ def load_val01():
         )
     }
 
+    # ── Load ClientLocation ───────────────────────────────
 
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
 
-    # ── Second pass: load navs ─────────────────────────────
-
-    #with open(file_path, newline="", encoding="utf-8") as f:
-
-    #    reader = csv.DictReader(f)
+    seen = set()
 
     for row in rows:
 
-        client_id = row["client_id"]
-        client = clients.get(client_id)
-        if not client:
-            print(f"Missing client: {client_id}")
-            continue
-        
-        location_id= row.get("location_id", "")
-
-        obj, created = ClientLocation.objects.update_or_create(
-
-            client=client,
-            location_id= location_id,
-
-            defaults={
-                
-                "is_active": row.get("is_active", "0") == "1",
-
-                "name": row.get("name", ""),
-                "location_type": row.get("location_type", ""),                  
-            }
+        client_id = clean(
+            row.get("client_id"),
+            lower=True
         )
 
+        location_id = clean(
+            row.get("location_id"),
+            lower=True
+        )
+
+        if not client_id or not location_id:
+
+            print(
+                "Skipping row with empty "
+                "client_id/location_id"
+            )
+
+            skipped_count += 1
+            continue
+
+        key = (client_id, location_id)
+
+        if key in seen:
+
+            print(
+                f"Duplicate CSV row: "
+                f"{client_id} / {location_id}"
+            )
+
+            skipped_count += 1
+            continue
+
+        seen.add(key)
+
+        # ── Client lookup ───────────────────────────────
+
+        client = clients.get(client_id)
+
+        if not client:
+
+            print(
+                f"Missing client: "
+                f"{client_id}"
+            )
+
+            skipped_count += 1
+            continue
+
+        defaults = {
+
+            "is_active": to_bool(
+                row.get("is_active"),
+                default=False
+            ),
+
+            "name": clean(
+                row.get("name")
+            ),
+
+            "location_type": clean(
+                row.get("location_type")
+            ),
+        }
+
+        # ── Dry Run ─────────────────────────────────────
+
+        if dry_run:
+
+            print(
+                f"[DRY RUN] "
+                f"{client_id} / {location_id}"
+            )
+
+            if verbose:
+                print(defaults)
+
+            continue
+
+        # ── Save ────────────────────────────────────────
+
+        obj, created = (
+            ClientLocation.objects.update_or_create(
+
+                client=client,
+                location_id=location_id,
+
+                defaults=defaults
+            )
+        )
+
+        if created:
+            created_count += 1
+        else:
+            updated_count += 1
+
+        if verbose:
+
+            print(
+                f"{'Created' if created else 'Updated'} "
+                f"ClientLocation: "
+                f"{client_id} / {location_id}"
+            )
+
+    # ── Summary ──────────────────────────────────────────
+
+    print()
+
+    if dry_run:
 
         print(
-            f"{'Created' if created else 'Updated'} "
-            f"ClientLocation: {client_id} / {location_id}"
+            "Dry-Run Completed -> Rollback"
         )
 
-    print("Loaded ClientLocation")
+        transaction.set_rollback(True)
+
+    else:
+
+        print("Loading Completed")
+
+        print(
+            f"(created={created_count}, "
+            f"updated={updated_count}, "
+            f"skipped={skipped_count})"
+        )
 
 
-def run():
+@transaction.atomic
+def run(*args):
 
-    load_val01()
+    args = [a.lower() for a in args]
+
+    DRY_RUN = "dryrun" in args
+    VERBOSE = "verbose" in args
+
+    print(f"DRY_RUN = {DRY_RUN}")
+    print(f"VERBOSE = {VERBOSE}")
+
+    load_val01(
+        dry_run=DRY_RUN,
+        verbose=VERBOSE,
+    )
 
     print("Done")
+
+
+"""
+Normal Run:
+python manage.py runscript load_05clientlocation
+
+Dry Run:
+python manage.py runscript load_05clientlocation --script-args dryrun
+
+Dry Run + Verbose:
+python manage.py runscript load_05clientlocation --script-args dryrun verbose
+"""
