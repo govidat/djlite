@@ -391,7 +391,7 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
         return [ClientGroupPermissionInline, ClientUserMembershipInline]
 
 class ClientLocationAdmin(ClientScopedMixin, admin.ModelAdmin):
-    list_display  = ('location_id', 'name', 'client', 'location_type', 'is_active')
+    list_display  = ('location_id', 'name', 'client', 'location_type', 'is_active', 'parent')
     list_filter   = ('location_type', 'is_active')
     search_fields = ('location_id', 'name', 'client__client_id')
 
@@ -407,5 +407,27 @@ class ClientLocationAdmin(ClientScopedMixin, admin.ModelAdmin):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'client':
             kwargs['queryset'] = self._permitted_clients(request)
+
+        if db_field.name == 'parent':
+            # On change form: object_id is in the URL resolver
+            object_id = request.resolver_match.kwargs.get('object_id')
+            if object_id:
+                try:
+                    obj = ClientLocation.objects.select_related('client').get(pk=object_id)
+                    kwargs['queryset'] = ClientLocation.objects.filter(
+                        client=obj.client
+                    ).exclude(pk=object_id)   # can't be its own parent
+                except ClientLocation.DoesNotExist:
+                    kwargs['queryset'] = ClientLocation.objects.none()
+            else:
+                # Add form — try to infer client from POST data
+                client_id = request.POST.get('client')
+                if client_id:
+                    kwargs['queryset'] = ClientLocation.objects.filter(client_id=client_id)
+                else:
+                    # Nothing selected yet — show nothing; JS will populate via client selection
+                    kwargs['queryset'] = ClientLocation.objects.none()
+
+
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
   

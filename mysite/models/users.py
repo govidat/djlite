@@ -122,6 +122,39 @@ class ClientLocation(models.Model):
     location_type = models.CharField(max_length=20, choices=LOCATION_TYPE_CHOICES, default='store')
     is_active     = models.BooleanField(default=True)
 
+    parent = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='children',
+        db_index=True,
+        help_text='Parent location in the Region → Branch → Location tree. Null = root node.',
+    )
+    path = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        db_index=False,   # index added manually via RunSQL below (text_pattern_ops)
+        help_text='Materialized path: dot-separated PKs from root to this node. e.g. "1.4.17"',
+    )
+
+    def compute_path(self):
+        """Walk up the parent chain and build dot-separated PK path."""
+        ancestors = []
+        node = self
+        while node is not None:
+            ancestors.append(str(node.pk))
+            node = node.parent
+        return '.'.join(reversed(ancestors))
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)   # PK assigned on first save
+        computed = self.compute_path()
+        if self.path != computed:
+            ClientLocation.objects.filter(pk=self.pk).update(path=computed)
+            self.path = computed
+            
     class Meta:
         unique_together = ('client', 'location_id')
         ordering        = ['client', 'location_id']

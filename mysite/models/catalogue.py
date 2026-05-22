@@ -84,7 +84,7 @@ def add_postgres_indexes(apps, schema_editor):
     if schema_editor.connection.vendor != 'postgresql':
         return
     indexes = [
-        # Item base table
+        # Item base table - REPLACE # in the beginning and # at the end of each line with ". So the line should read 3doubequote-Create - 3doublequote
         #""CREATE INDEX IF NOT EXISTS item_attributes_gin_idx ON mysite_item USING GIN (attributes jsonb_path_ops)#"",
         #""CREATE INDEX IF NOT EXISTS item_domain_idx ON mysite_item (client_id, domain, status)#"",
 
@@ -122,7 +122,8 @@ def add_postgres_indexes(apps, schema_editor):
         # ItemAttributeValue — critical for faceted filter queries
         #""CREATE INDEX IF NOT EXISTS itemattributevalue_lookup_idx ON mysite_itemattributevalue (attribute_type_id, predefined_value_id)#""',
         #""CREATE INDEX IF NOT EXISTS globalitemattributevalue_lookup_idx ON mysite_globalitemattributevalue (attribute_type_id, predefined_value_id)#"",
-         
+        ## ClientLocation
+        #""CREATE INDEX IF NOT EXISTS clientlocation_path_idx ON mysite_clientlocation (path text_pattern_ops)#"",
 
     ]
     for sql in indexes:
@@ -157,7 +158,9 @@ def remove_postgres_indexes(apps, schema_editor):
         'DROP INDEX IF EXISTS serviceitem_attributes_gin_idx',
         'DROP INDEX IF EXISTS serviceitem_fulfillment_type_idx',  
         'DROP INDEX IF EXISTS itemattributevalue_lookup_idx',
-        'DROP INDEX IF EXISTS globalitemattributevalue_lookup_idx',                             
+        'DROP INDEX IF EXISTS globalitemattributevalue_lookup_idx',
+        'DROP INDEX IF EXISTS clientlocation_path_idx',   
+
         # ... rest of drops
     ]
     for sql in drops:

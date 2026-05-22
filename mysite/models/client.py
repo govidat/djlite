@@ -207,6 +207,12 @@ class ClientFeatureControl(models.Model):
     FEATURE_CHOICES = [
         ('catalogue', 'Catalogue'),
         ('ecommerce', 'E-Commerce'),
+        # Phase 3B Demand Planning
+        ('demand_planning',      'Demand Planning Module'),
+        ('actuals_upload',       'Actuals Upload'),
+        ('forecast_run',         'Run Statistical Forecast'),
+        ('consensus_override',   'Consensus Override'),
+        ('forecast_approval',    'Forecast Approval Workflow'),        
     ]
 
     client = models.ForeignKey(

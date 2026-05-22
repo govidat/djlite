@@ -4,7 +4,7 @@ from django.conf import settings
 
 from django.contrib.auth.models import User
 from allauth.account.forms import SignupForm
-from .models import CustomerProfile, ClientUserProfile, Client, CustomerAddress
+from .models import CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation
 
 
 class ClientForm(forms.ModelForm):
@@ -207,3 +207,35 @@ class CustomerAddressForm(forms.ModelForm):
                 'placeholder': 'e.g. IN, US, FR'
             }),
         }
+
+class ClientLocationAdminForm(forms.ModelForm):
+    class Meta:
+        model  = ClientLocation
+        fields = '__all__'
+
+    def clean(self):
+        cleaned = super().clean()
+        client  = cleaned.get('client')
+        parent  = cleaned.get('parent')
+
+        if parent and client:
+            if parent.client_id != client.pk:
+                raise forms.ValidationError(
+                    f'Parent location "{parent}" belongs to client '
+                    f'"{parent.client}" — must be the same client as this location.'
+                )
+
+        if parent and parent == self.instance:
+            raise forms.ValidationError('A location cannot be its own parent.')
+
+        # Optional: guard against cycles (A→B→C→A)
+        if parent and self.instance.pk:
+            ancestor = parent
+            while ancestor is not None:
+                if ancestor.pk == self.instance.pk:
+                    raise forms.ValidationError(
+                        f'Assigning "{parent}" as parent would create a circular reference.'
+                    )
+                ancestor = ancestor.parent
+
+        return cleaned
