@@ -63,7 +63,8 @@ def load_val01(dry_run=False, verbose=False,):
             )
             skipped_count += 1
             continue        
-
+        seen.add(key)
+        
         defaults = {
 
             "gtin": clean(row.get("gtin")),

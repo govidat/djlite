@@ -14,6 +14,8 @@ from mysite.admin.users import (
 )
 from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, TaxonomyNodeAdmin, NodeAttributeTypeAdmin, NodeAttributeValueAdmin
 
+from mysite.admin.demand import PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, CustomerSalesAssignmentAdmin, ActualSaleAdmin
+
 from mysite.models import (
     ThemePreset, GlobalValCat, GlobalVal,
     Client, ClientBlock, ClientFeatureControl, 
@@ -24,9 +26,11 @@ from mysite.models import (
     Layout, Component,
     ClientUserProfile, CustomerProfile, ClientUserMembership,
     GlobalItem, Taxonomy, Item,
-    TaxonomyNode, NodeAttributeType, NodeAttributeValue
-
+    TaxonomyNode, NodeAttributeType, NodeAttributeValue,
+    # Demand Planning
+    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
 )
+
 
 
 # All registrations in one place — easy to see what's registered
@@ -52,3 +56,10 @@ admin.site.register(Item,                 ItemAdmin)
 admin.site.register(TaxonomyNode,         TaxonomyNodeAdmin)
 admin.site.register(NodeAttributeType,    NodeAttributeTypeAdmin)
 admin.site.register( NodeAttributeValue,  NodeAttributeValueAdmin)
+
+# Demand Planning PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, CustomerSalesAssignmentAdmin, ActualSaleAdmin
+admin.site.register( PlanningLocation,  PlanningLocationAdmin)
+admin.site.register( PlanningCustomer,  PlanningCustomerAdmin)
+admin.site.register( SalesNode,  SalesNodeAdmin)
+admin.site.register( CustomerSalesAssignment,  CustomerSalesAssignmentAdmin)
+admin.site.register( ActualSale,  ActualSaleAdmin)

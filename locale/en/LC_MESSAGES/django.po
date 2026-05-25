@@ -1,0 +1,195 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-23 21:46+0530\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: mydj/settings/base.py:269
+msgid "English"
+msgstr ""
+
+#: mydj/settings/base.py:270
+msgid "Hindi"
+msgstr ""
+
+#: mydj/settings/base.py:271
+msgid "French"
+msgstr ""
+
+#: mydj/settings/base.py:272
+msgid "Tamil"
+msgstr ""
+
+#: templates/account/login.html:9 templates/account/login.html:43
+#: templates/account/password_reset.html:49 templates/account/signup.html:49
+#: templates/cotton/customer_menu.html:162
+msgid "Sign In"
+msgstr ""
+
+#: templates/account/login.html:38
+msgid "Forgot password?"
+msgstr ""
+
+#: templates/account/login.html:48 templates/account/password_reset.html:46
+#: templates/account/signup.html:46
+msgid "or"
+msgstr ""
+
+#: templates/account/login.html:51 templates/account/password_reset.html:8
+#: templates/account/signup.html:8
+msgid "Create Account"
+msgstr ""
+
+#: templates/account/logout.html:9 templates/account/logout.html:18
+#: templates/cotton/customer_menu.html:105
+msgid "Sign Out"
+msgstr ""
+
+#: templates/account/logout.html:12
+msgid "Are you sure you want to sign out?"
+msgstr ""
+
+#: templates/account/logout.html:23
+msgid "Cancel"
+msgstr ""
+
+#: templates/account/password_change.html:8
+#: templates/account/password_change.html:38
+#: templates/cotton/customer_menu.html:126
+msgid "Change Password"
+msgstr ""
+
+#: templates/account/password_reset.html:41 templates/account/signup.html:41
+#: templates/cotton/customer_menu.html:167
+msgid "Sign Up"
+msgstr ""
+
+#: templates/account/password_reset_done.html:9
+msgid "Check Your Email"
+msgstr ""
+
+#: templates/account/password_reset_done.html:12
+msgid "We have sent a password reset link to your email address."
+msgstr ""
+
+#: templates/cotton/customer_menu.html:51
+msgid "My Profile"
+msgstr ""
+
+#: templates/cotton/customer_menu.html:67 templates/customer/addresses.html:11
+#: templates/customer/profile.html:73
+msgid "My Addresses"
+msgstr ""
+
+#: templates/cotton/customer_menu.html:84
+msgid "Admin"
+msgstr ""
+
+#: templates/cotton/customer_menu.html:144
+msgid "Sign In / Sign Up"
+msgstr ""
+
+#: templates/customer/addresses.html:34 templates/customer/profile.html:87
+msgid "Default"
+msgstr ""
+
+#: templates/customer/addresses.html:51
+msgid "Set Default"
+msgstr ""
+
+#: templates/customer/addresses.html:59
+msgid "Delete this address?"
+msgstr ""
+
+#: templates/customer/addresses.html:62
+msgid "Delete"
+msgstr ""
+
+#: templates/customer/addresses.html:72
+msgid "No addresses yet. Add one below."
+msgstr ""
+
+#: templates/customer/addresses.html:79 templates/customer/addresses.html:125
+msgid "Add Address"
+msgstr ""
+
+#: templates/customer/addresses.html:87 templates/customer/onboarding.html:49
+msgid "Street"
+msgstr ""
+
+#: templates/customer/addresses.html:100 templates/customer/onboarding.html:62
+msgid "City"
+msgstr ""
+
+#: templates/customer/addresses.html:111 templates/customer/onboarding.html:73
+msgid "ZIP / PIN"
+msgstr ""
+
+#: templates/customer/addresses.html:119 templates/customer/onboarding.html:81
+msgid "Country Code"
+msgstr ""
+
+#: templates/customer/onboarding.html:9
+msgid "Complete Your Profile"
+msgstr ""
+
+#: templates/customer/onboarding.html:11
+msgid "A few details to personalise your experience."
+msgstr ""
+
+#: templates/customer/onboarding.html:17
+msgid "Preferences"
+msgstr ""
+
+#: templates/customer/onboarding.html:21 templates/customer/profile.html:42
+msgid "Mobile"
+msgstr ""
+
+#: templates/customer/onboarding.html:33 templates/customer/profile.html:49
+msgid "Preferred Language"
+msgstr ""
+
+#: templates/customer/onboarding.html:40 templates/customer/profile.html:56
+msgid "Preferred Theme"
+msgstr ""
+
+#: templates/customer/onboarding.html:45
+msgid "Your Address"
+msgstr ""
+
+#: templates/customer/onboarding.html:87
+msgid "Get Started"
+msgstr ""
+
+#: templates/customer/profile.html:35
+msgid "My Details"
+msgstr ""
+
+#: templates/customer/profile.html:62
+msgid "Save Changes"
+msgstr ""
+
+#: templates/customer/profile.html:76
+msgid "Manage"
+msgstr ""
+
+#: templates/customer/profile.html:98
+msgid "No addresses yet."
+msgstr ""
+
+#: templates/customer/profile.html:101
+msgid "Add one"
+msgstr ""

@@ -299,12 +299,12 @@ React SPA frontend served under `/{client_id}/planning/`.
 ---
  
 ### Sprint 3B.0 — Foundation and Prerequisites
-- [ ] Add `statsforecast`, `hierarchicalforecast`, `polars`, `duckdb`, `prophet`, `openpyxl`, `pandas` to `requirements.txt`
-- [ ] Add `ClientFeatureControl` keys: `demand_planning`, `actuals_upload`, `forecast_run`, `consensus_override`, `forecast_approval`
-- [ ] Add `ClientLocation.parent` self-FK (nullable) + `path` CharField for materialized path
-- [ ] Add `ClientLocation.path` index (`text_pattern_ops`)
-- [ ] `python manage.py makemigrations && migrate`
-- [ ] `python manage.py check` — 0 issues
+- [x] Add `statsforecast`, `hierarchicalforecast`, `polars`, `duckdb`, `prophet`, `openpyxl`, `pandas` to `requirements.txt`
+- [x] Add `ClientFeatureControl` keys: `demand_planning`, `actuals_upload`, `forecast_run`, `consensus_override`, `forecast_approval`
+- [x] Add `ClientLocation.parent` self-FK (nullable) + `path` CharField for materialized path
+- [x] Add `ClientLocation.path` index (`text_pattern_ops`)
+- [x] `python manage.py makemigrations && migrate`
+- [x] `python manage.py check` — 0 issues
 ---
  
 ### Sprint 3B.1 — Sales Hierarchy Models

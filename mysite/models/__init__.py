@@ -75,3 +75,12 @@ from .catalogue import (
     ItemMedia,
     ItemVariant
 )
+
+from .demand import (
+    PlanningLocation,
+    PlanningCustomer,
+    SalesNode,
+    CustomerSalesAssignment,
+    ActualSaleImport,
+    ActualSale,
+)

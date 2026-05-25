@@ -60,14 +60,14 @@ into Order creation as suggested quantities.
 **Deliverable:** Full sales org tree is configurable in Admin. Hierarchy APIs return correct nested JSON for both the sales tree and the location tree.
 
 **Tasks:**
-- Create `mysite/models/demand/hierarchy.py`:
-  - `SalesNode(client, name, level_label, parent→self FK nullable, location→ClientLocation FK nullable, path CharField)`
-  - `CustomerSalesAssignment(customer, sales_node, valid_from, valid_to)`
-- `pre_save` signal on `SalesNode` computes materialized `path` from parent chain
-- Add `ix_salesnode_path` index (`text_pattern_ops`) via `RunSQL` in migration
-- Admin: `SalesNodeAdmin` with tree indent display; `CustomerSalesAssignmentInline`
-- REST endpoint: `GET /api/demand/sales-hierarchy/` → full `SalesNode` tree JSON
-- REST endpoint: `GET /api/demand/location-hierarchy/` → `ClientLocation` tree JSON
+- CLOSED - Create `mysite/models/demand/hierarchy.py`:
+  - CLOSED -  `SalesNode(client, name, level_label, parent→self FK nullable, location→ClientLocation FK nullable, path CharField)`
+  - CLOSED - `CustomerSalesAssignment(customer, sales_node, valid_from, valid_to)`
+- CLOSED - `pre_save` signal on `SalesNode` computes materialized `path` from parent chain
+- CLOSED - Add `ix_salesnode_path` index (`text_pattern_ops`) via `RunSQL` in migration
+- CLOSED - Admin: `SalesNodeAdmin` with tree indent display; `CustomerSalesAssignmentInline`
+- OPEN - REST endpoint: `GET /api/demand/sales-hierarchy/` → full `SalesNode` tree JSON
+-  OPEN - REST endpoint: `GET /api/demand/location-hierarchy/` → `ClientLocation` tree JSON
 - Unit tests:
   - `path` computed correctly on create and on reparent
   - Subtree query via `path__startswith` returns all descendants
@@ -83,27 +83,27 @@ into Order creation as suggested quantities.
 **Deliverable:** Client staff can upload monthly SKU × Customer × Location actuals via CSV or Excel. Import is idempotent; per-row errors are reported without failing the entire batch.
 
 **Tasks:**
-- Create `mysite/models/demand/actuals.py`:
+- CLOSED - Create `mysite/models/demand/actuals.py`:
   - `ActualSale(client, item, variant nullable, customer, location, year, month, qty, revenue MoneyField)`
   - Unique constraint: `(client, item, customer, location, year, month)`
   - `ActualSaleLocation(client, location, year, month, total_qty, total_revenue MoneyField)`
   - `ActualSaleImport(client, import_date, source_file, row_count, status, errors JSONField)`
-- Add DB indexes via `RunSQL`:
+- CLOSED - Add DB indexes via `RunSQL`:
   - `ix_actualsale_client_period` on `(client_id, year, month)`
   - `ix_actualsale_item_customer` on `(item_id, customer_id, location_id)`
-- Django Admin: `ActualSaleImport` with status display; `ActualSaleLocationAdmin`
-- REST endpoints:
+- CLOSED - Django Admin: `ActualSaleImport` with status display; `ActualSaleLocationAdmin`
+-  OPEN - REST endpoints:
   - `POST /api/demand/actuals/upload/` — multipart file upload; creates `ActualSaleImport` job
   - `GET /api/demand/actuals/upload/{id}/` — poll import job status
   - `GET /api/demand/actuals/` — filtered query (item, customer, location, period range)
-- Celery task `process_actuals_import(import_id)`:
+-  OPEN - Celery task `process_actuals_import(import_id)`:
   - Parse CSV / Excel with `pandas`
   - Validate all FKs exist; collect errors per row into `ActualSaleImport.errors`
   - `bulk_create` with `update_conflicts=True` (idempotent re-upload)
   - Update `ActualSaleImport.status` → `COMPLETE` / `FAILED`
-- Celery task `process_summary_actuals_import(import_id)` for `ActualSaleLocation`
-- Management command `generate_actuals_template` → produces `.xlsx` with correct column headers for client download
-- Unit tests:
+-  OPEN - Celery task `process_summary_actuals_import(import_id)` for `ActualSaleLocation`
+-  OPEN - Management command `generate_actuals_template` → produces `.xlsx` with correct column headers for client download
+-  OPEN - Unit tests:
   - Duplicate upload → idempotent; row count unchanged on second upload
   - Invalid item FK → error collected in `errors` JSONField; other rows still imported
   - Valid upload → `ActualSale` row count matches file row count

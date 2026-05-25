@@ -112,7 +112,10 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
     #list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
     inlines      = [ThemeInline, PageInline, NavItemInline]
     admin_role_only = True
-
+    search_fields = [
+        'client_id',
+        'name',
+    ]
     def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(

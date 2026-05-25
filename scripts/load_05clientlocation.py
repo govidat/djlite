@@ -3,164 +3,313 @@ from pathlib import Path
 
 from django.db import transaction
 
-from mysite.models import Client, ClientLocation
+from mysite.models import (
+    Client,
+    ClientLocation,
+)
 
 from scripts.helpers import (
     clean,
     to_bool,
 )
 
-# location_id,name,location_type,is_active,client_id
+# =========================================================
+# CSV FORMAT
+# =========================================================
+# location_id,name,location_type,is_active,
+# client_id,parent_location_id
+#
+# Example:
+#
+# location_id,name,location_type,is_active,client_id,parent_location_id
+# india,India,office,1,bahushira,
+# south,South Region,branch,1,bahushira,india
+# blr,Bangalore Branch,branch,1,bahushira,south
+# wh1,Warehouse 1,warehouse,1,bahushira,blr
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
+
+# =========================================================
+# Loader
+# =========================================================
 
 def load_val01(
     dry_run=False,
     verbose=False,
 ):
 
-    file_path = DATA_DIR / "05clientlocation.csv"
+    file_path = (
+        DATA_DIR /
+        "05clientlocation.csv"
+    )
 
-    # ── Read CSV once ─────────────────────────────────────
+    # =====================================================
+    # READ CSV
+    # =====================================================
 
-    with open(file_path, newline="", encoding="utf-8-sig") as f:
+    with open(
+        file_path,
+        newline="",
+        encoding="utf-8-sig",
+    ) as f:
 
         reader = csv.DictReader(f)
         rows = list(reader)
 
-    # ── Collect keys ──────────────────────────────────────
+    # =====================================================
+    # COLLECT CLIENT IDS
+    # =====================================================
 
     client_ids = {
-        clean(row.get("client_id"), lower=True)
+
+        clean(
+            row.get("client_id"),
+            lower=True,
+        )
+
         for row in rows
+
         if clean(row.get("client_id"))
     }
 
-    # ── Preload clients ───────────────────────────────────
+    # =====================================================
+    # PREFETCH CLIENTS
+    # =====================================================
 
     clients = {
+
         c.client_id: c
+
         for c in Client.objects.filter(
             client_id__in=client_ids
         )
     }
 
-    # ── Load ClientLocation ───────────────────────────────
+    # =====================================================
+    # PREFETCH EXISTING LOCATIONS
+    # key = (client_id, location_id)
+    # =====================================================
+
+    location_cache = {}
+
+    existing_locations = (
+        ClientLocation.objects
+        .filter(
+            client__client_id__in=client_ids
+        )
+        .select_related("client")
+    )
+
+    for loc in existing_locations:
+
+        key = (
+            loc.client.client_id,
+            loc.location_id,
+        )
+
+        location_cache[key] = loc
+
+    # =====================================================
+    # PROCESS
+    # =====================================================
 
     created_count = 0
     updated_count = 0
     skipped_count = 0
 
-    seen = set()
+    pending_rows = rows.copy()
 
-    for row in rows:
+    pass_num = 1
 
-        client_id = clean(
-            row.get("client_id"),
-            lower=True
-        )
+    while pending_rows:
 
-        location_id = clean(
-            row.get("location_id"),
-            lower=True
-        )
+        print(f"\n--- PASS {pass_num} ---")
 
-        if not client_id or not location_id:
+        next_pending = []
 
-            print(
-                "Skipping row with empty "
-                "client_id/location_id"
+        progress_made = False
+
+        for row in pending_rows:
+
+            # =================================================
+            # BASIC VALUES
+            # =================================================
+
+            client_id = clean(
+                row.get("client_id"),
+                lower=True,
             )
 
-            skipped_count += 1
-            continue
-
-        key = (client_id, location_id)
-
-        if key in seen:
-
-            print(
-                f"Duplicate CSV row: "
-                f"{client_id} / {location_id}"
+            location_id = clean(
+                row.get("location_id"),
+                lower=True,
             )
 
-            skipped_count += 1
-            continue
-
-        seen.add(key)
-
-        # ── Client lookup ───────────────────────────────
-
-        client = clients.get(client_id)
-
-        if not client:
-
-            print(
-                f"Missing client: "
-                f"{client_id}"
+            parent_location_id = clean(
+                row.get("parent_location_id"),
+                lower=True,
             )
 
-            skipped_count += 1
-            continue
+            if not client_id or not location_id:
 
-        defaults = {
+                print(
+                    "Skipping row with missing "
+                    "client_id or location_id"
+                )
 
-            "is_active": to_bool(
-                row.get("is_active"),
-                default=False
-            ),
+                skipped_count += 1
+                continue
 
-            "name": clean(
-                row.get("name")
-            ),
+            # =================================================
+            # CLIENT
+            # =================================================
 
-            "location_type": clean(
-                row.get("location_type")
-            ),
-        }
+            client = clients.get(client_id)
 
-        # ── Dry Run ─────────────────────────────────────
+            if not client:
 
-        if dry_run:
+                print(
+                    f"Missing client: "
+                    f"{client_id}"
+                )
 
-            print(
-                f"[DRY RUN] "
-                f"{client_id} / {location_id}"
+                skipped_count += 1
+                continue
+
+            # =================================================
+            # PARENT LOCATION
+            # =================================================
+
+            parent = None
+
+            if parent_location_id:
+
+                parent = location_cache.get(
+                    (
+                        client_id,
+                        parent_location_id,
+                    )
+                )
+
+                # unresolved parent
+                if not parent:
+
+                    next_pending.append(row)
+                    continue
+
+            # =================================================
+            # DEFAULTS
+            # =================================================
+
+            defaults = {
+
+                "name": clean(
+                    row.get("name")
+                ),
+
+                "location_type": clean(
+                    row.get("location_type")
+                ),
+
+                "is_active": to_bool(
+                    row.get("is_active")
+                ),
+
+                "parent": parent,
+            }
+
+            # =================================================
+            # DRY RUN
+            # =================================================
+
+            if dry_run:
+
+                print(
+                    f"[DRY RUN] "
+                    f"{client_id} / "
+                    f"{location_id}"
+                )
+
+                if verbose:
+                    print(defaults)
+
+                progress_made = True
+                continue
+
+            # =================================================
+            # UPSERT
+            # =================================================
+
+            obj, created = (
+                ClientLocation.objects
+                .update_or_create(
+
+                    client=client,
+                    location_id=location_id,
+
+                    defaults=defaults,
+                )
             )
+
+            # =================================================
+            # CACHE UPDATE
+            # =================================================
+
+            cache_key = (
+                client_id,
+                location_id,
+            )
+
+            location_cache[cache_key] = obj
+
+            progress_made = True
+
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
 
             if verbose:
-                print(defaults)
 
-            continue
+                print(
+                    f"{'Created' if created else 'Updated'} "
+                    f"ClientLocation: "
+                    f"{client_id} / "
+                    f"{location_id}"
+                )
 
-        # ── Save ────────────────────────────────────────
+        # =====================================================
+        # NO PROGRESS
+        # =====================================================
 
-        obj, created = (
-            ClientLocation.objects.update_or_create(
+        if not progress_made:
 
-                client=client,
-                location_id=location_id,
+            print("\nUNRESOLVED ROWS:")
 
-                defaults=defaults
-            )
-        )
+            for row in next_pending:
 
-        if created:
-            created_count += 1
-        else:
-            updated_count += 1
+                print(
+                    f"Could not resolve parent "
+                    f"[client="
+                    f"{row.get('client_id')} "
+                    f"location="
+                    f"{row.get('location_id')} "
+                    f"parent="
+                    f"{row.get('parent_location_id')}]"
+                )
 
-        if verbose:
+            skipped_count += len(next_pending)
+            break
 
-            print(
-                f"{'Created' if created else 'Updated'} "
-                f"ClientLocation: "
-                f"{client_id} / {location_id}"
-            )
+        pending_rows = next_pending
 
-    # ── Summary ──────────────────────────────────────────
+        pass_num += 1
+
+    # =========================================================
+    # SUMMARY
+    # =========================================================
 
     print()
 
@@ -183,6 +332,10 @@ def load_val01(
         )
 
 
+# =========================================================
+# RUNNER
+# =========================================================
+
 @transaction.atomic
 def run(*args):
 
@@ -203,12 +356,102 @@ def run(*args):
 
 
 """
-Normal Run:
+Normal Run
+----------
 python manage.py runscript load_05clientlocation
 
-Dry Run:
+Dry Run
+--------
 python manage.py runscript load_05clientlocation --script-args dryrun
 
-Dry Run + Verbose:
+Dry Run + Verbose
+-----------------
 python manage.py runscript load_05clientlocation --script-args dryrun verbose
+"""
+"""
+
+import csv
+from pathlib import Path
+
+from mysite.models import Client, ClientLocation
+#location_id,name,location_type,is_active,client_id
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+
+
+
+def load_val01():
+
+    file_path = DATA_DIR / "05clientlocation.csv"
+
+    # ── First pass: collect client_ids from CSV ─────────────
+
+    with open(file_path, newline="", encoding="utf-8") as f:
+
+        reader = csv.DictReader(f)
+        rows = list(reader)   # if multiple passes are required, then this construct is required
+
+        client_ids = {
+            (row.get("client_id") or "").strip().lower()
+            for row in rows
+            if (row.get("client_id") or "").strip()
+        }
+
+
+    # ── Fetch only required clients  ─────────────────────────
+
+    clients = {
+        c.client_id: c
+        for c in Client.objects.filter(
+            client_id__in=client_ids
+        )
+    }
+
+
+
+    # ── Second pass: load navs ─────────────────────────────
+
+    #with open(file_path, newline="", encoding="utf-8") as f:
+
+    #    reader = csv.DictReader(f)
+
+    for row in rows:
+
+        client_id = row["client_id"]
+        client = clients.get(client_id)
+        if not client:
+            print(f"Missing client: {client_id}")
+            continue
+        
+        location_id= row.get("location_id", "")
+
+        obj, created = ClientLocation.objects.update_or_create(
+
+            client=client,
+            location_id= location_id,
+
+            defaults={
+                
+                "is_active": row.get("is_active", "0") == "1",
+
+                "name": row.get("name", ""),
+                "location_type": row.get("location_type", ""),                  
+            }
+        )
+
+
+        print(
+            f"{'Created' if created else 'Updated'} "
+            f"ClientLocation: {client_id} / {location_id}"
+        )
+
+    print("Loaded ClientLocation")
+
+
+def run():
+
+    load_val01()
+
+    print("Done")
+
 """

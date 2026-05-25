@@ -1,0 +1,3 @@
+code,is_active,client_id,parent_code,planning_location_code,level_label_en,level_label_fr,level_label_hi,level_label_ta,name_en,name_fr,name_hi,name_ta
+aism,1,bahushira,,ho,National Manager,,,,All India Sales Manager,,,
+rmchennai,1,bahushira,aism,chennaibranch,Area Manager,,,,Regional Manager Chennai,,,

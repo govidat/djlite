@@ -1,0 +1,317 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-23 21:46+0530\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: mysite/models/demand/actuals.py:102
+msgid "Second"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:103
+msgid "Minute"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:104
+msgid "Hour"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:105
+msgid "Day"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:106
+msgid "Week"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:107
+msgid "Month"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:108
+msgid "Bi-Monthly (2 months)"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:109
+msgid "Quarter"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:110
+msgid "Half-Year"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:111
+msgid "Year"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:200
+msgid "Pending"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:201
+msgid "Processing"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:202
+msgid "Done"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:203
+msgid "Failed"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:220 mysite/models/demand/actuals.py:292
+msgid "period type"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:224
+msgid "Bucket granularity of the data in this upload."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:233
+msgid "actual sale import"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:234
+msgid "actual sale imports"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:266 mysite/models/demand/hierarchy.py:200
+#: mysite/models/demand/hierarchy.py:337
+msgid "planning location"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:273
+msgid "item"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:275
+msgid "Must be a leaf node of the Taxonomy with slug='product_planning'."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:285 mysite/models/demand/hierarchy.py:283
+#: mysite/models/demand/hierarchy.py:387
+msgid "planning customer"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:287
+msgid "Null means demand is not attributed to any specific customer or group."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:297
+msgid ""
+"Granularity of this period bucket. All rows in one forecast run must share "
+"the same period_type."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:302
+msgid "period start"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:304
+msgid ""
+"First day of the period bucket (e.g. 2024-01-01 for a January month bucket, "
+"2024-01-01 for Q1 2024, 2024-01-01 for ISO week starting Mon 1 Jan 2024)."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:309
+msgid "period end"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:312
+msgid ""
+"Last day of the period bucket (inclusive). Auto-computed from period_type + "
+"period_start. Stored for fast range queries."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:318
+msgid "quantity"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:321
+msgid "Sales quantity in base UoM."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:324
+msgid "revenue"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:329
+msgid "Revenue in client's base currency. Optional."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:350
+msgid "actual sale"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:351
+msgid "actual sales"
+msgstr ""
+
+#: mysite/models/demand/actuals.py:392 mysite/models/demand/hierarchy.py:365
+msgid "Planning location must belong to the same client."
+msgstr ""
+
+#: mysite/models/demand/actuals.py:395
+msgid "Planning customer must belong to the same client."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:100
+msgid "materialized path"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:169 mysite/models/demand/hierarchy.py:244
+#: mysite/models/demand/hierarchy.py:320
+msgid "client"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:177
+msgid "parent location"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:179 mysite/models/demand/hierarchy.py:254
+#: mysite/models/demand/hierarchy.py:340
+msgid "code"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:180 mysite/models/demand/hierarchy.py:255
+#: mysite/models/demand/hierarchy.py:341
+msgid "name"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:182 mysite/models/demand/hierarchy.py:263
+#: mysite/models/demand/hierarchy.py:343
+msgid "level label"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:185
+msgid "Human label for this level, e.g. 'Region', 'Branch', 'DC'."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:188
+msgid "is leaf"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:190
+msgid ""
+"True if this node represents an actual stocking/planning point. Actuals and "
+"forecasts are stored only at leaf nodes."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:193 mysite/models/demand/hierarchy.py:276
+#: mysite/models/demand/hierarchy.py:348
+msgid "active"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:194 mysite/models/demand/hierarchy.py:277
+msgid "notes"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:201
+msgid "planning locations"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:212
+msgid "Parent location must belong to the same client."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:236
+msgid "Real customer"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:237
+msgid "Planning group"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:252
+msgid "parent"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:257
+msgid "customer type"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:266
+msgid "E.g. 'Channel', 'Key Account', 'Customer'."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:270
+msgid "external ID"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:274
+msgid "ERP / CRM identifier. Used during data import to match rows."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:284
+msgid "planning customers"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:298
+msgid "Parent customer must belong to the same client."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:328
+msgid "parent node"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:338
+msgid "The location this sales node primarily covers. Informational only."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:346
+msgid "E.g. 'National Manager', 'Area Manager', 'Sales Rep'."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:354 mysite/models/demand/hierarchy.py:393
+msgid "sales node"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:355
+msgid "sales nodes"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:363
+msgid "Parent sales node must belong to the same client."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:395
+msgid "valid from"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:397
+msgid "valid to"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:400
+msgid "Leave blank for the currently active assignment."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:405
+msgid "customer sales assignment"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:406
+msgid "customer sales assignments"
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:425
+msgid "valid_to must be on or after valid_from."
+msgstr ""
+
+#: mysite/models/demand/hierarchy.py:428
+msgid "Planning customer and sales node must belong to the same client."
+msgstr ""

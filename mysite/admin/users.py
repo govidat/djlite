@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from mysite.models import (Client, ClientUserProfile, ClientGroupPermission, ClientLocation, ClientUserMembership)
 from .base import _user_has_admin_role, BaseAdminInlinecss
 from .base import ClientScopedMixin
+from mysite.forms import ClientLocationAdminForm
 
 from django.contrib.auth.admin import UserAdmin
 APP_LABEL = Client._meta.app_label   # → 'mysite'
@@ -391,6 +392,7 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
         return [ClientGroupPermissionInline, ClientUserMembershipInline]
 
 class ClientLocationAdmin(ClientScopedMixin, admin.ModelAdmin):
+    form = ClientLocationAdminForm
     list_display  = ('location_id', 'name', 'client', 'location_type', 'is_active', 'parent')
     list_filter   = ('location_type', 'is_active')
     search_fields = ('location_id', 'name', 'client__client_id')

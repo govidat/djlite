@@ -1,0 +1,2 @@
+id,period_type,period_start,qty,revenue,client_id,import_batch_id,planning_customer_code,planning_location_code,item_code
+1,month,2026-04-01,100,1000,bahushira,,tvsmountroad,chennaibranch,Bosch-fr7dc

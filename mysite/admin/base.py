@@ -19,6 +19,7 @@ def _user_has_admin_role(user):
         is_active=True,
     ).exists()
 """
+"""
 def _user_has_admin_role(user):
     #User has admin role in ANY active client group.
 
@@ -34,6 +35,25 @@ def _user_has_admin_role(user):
         role='admin',
         is_active=True,
     ).exists()
+"""
+def _user_has_admin_role(user, client=None):
+
+    if not user or not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    qs = ClientGroup.objects.filter(
+        memberships__user=user,
+        role='admin',
+        is_active=True,
+    )
+
+    if client:
+        qs = qs.filter(client=client)
+
+    return qs.exists()
 
 class ClientScopedMixin:
     """
@@ -166,10 +186,17 @@ class ClientScopedMixin:
     def has_view_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-
+        
+        if getattr(self, 'admin_role_only', False):
+            client = self._client_from_obj(obj) if obj else None
+            return _user_has_admin_role(
+                request.user,
+                client=client,
+            )
+        """
         if getattr(self, 'admin_role_only', False):
             return _user_has_admin_role(request.user)
-
+        """
         return self._has_guardian_perm(request, 'view_client_data', obj)
 
     """ chatgpt
@@ -188,7 +215,14 @@ class ClientScopedMixin:
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-
+        
+        if getattr(self, 'admin_role_only', False):
+            client = self._client_from_obj(obj) if obj else None
+            return _user_has_admin_role(
+                request.user,
+                client=client,
+            )        
+        """
         if getattr(self, 'admin_role_only', False):
             if obj:
                 client = self._client_from_obj(obj)
@@ -199,7 +233,7 @@ class ClientScopedMixin:
                     is_active=True,
                 ).exists()
             return _user_has_admin_role(request.user)
-
+        """
         return self._has_guardian_perm(request, 'edit_client_data', obj)
 
     def has_add_permission(self, request, obj=None):
@@ -210,7 +244,14 @@ class ClientScopedMixin:
         if request.user.is_superuser:
             return True
         if getattr(self, 'admin_role_only', False):
-            return _user_has_admin_role(request.user)
+            client = self._client_from_obj(obj) if obj else None
+            return _user_has_admin_role(
+                request.user,
+                client=client,
+            )        
+
+        #if getattr(self, 'admin_role_only', False):
+        #    return _user_has_admin_role(request.user)
         if obj is not None:
             return self._has_guardian_perm(request, 'create_client_data', obj)
         #return bool(self._permitted_client_ids(request))
@@ -221,7 +262,14 @@ class ClientScopedMixin:
         if request.user.is_superuser:
             return True
         if getattr(self, 'admin_role_only', False):
-            return _user_has_admin_role(request.user)
+            client = self._client_from_obj(obj) if obj else None
+            return _user_has_admin_role(
+                request.user,
+                client=client,
+            )        
+
+        #if getattr(self, 'admin_role_only', False):
+        #    return _user_has_admin_role(request.user)
         return self._has_guardian_perm(request, 'admin_client_data', obj)
 
     # ── Module-level permission check (for commerce models) ───────────

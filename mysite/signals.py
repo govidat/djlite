@@ -11,7 +11,7 @@ from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProf
 from django.contrib.auth.models import User
 
 from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
-
+from .models import PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
 """
 @receiver(post_save, sender=GlobalVal)
 @receiver(post_delete, sender=GlobalVal)
@@ -52,7 +52,10 @@ ADMIN_ONLY_MODELS = [
     TaxonomyNode,
     NodeAttributeType,
     NodeAttributeValue,
-    Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
+    Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant,
+
+    # Demand Planning
+    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
 ]
 
 # ADMIN Add only for Admin — needed for user creation
@@ -376,23 +379,23 @@ def get_client_id_from_instance(instance):
     Walk up the ownership chain to find the client_id.
     Returns None if the chain cannot be resolved (e.g. orphaned record).
     """
-
+    # PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
     try:
         # Direct
         if isinstance(instance, Client):
             return instance.client_id
 
         # One hop via client FK
-        if isinstance(instance, (Theme, Page, NavItem, ClientTemplate)):
+        if isinstance(instance, (Theme, Page, NavItem, ClientTemplate, PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale)):
             return instance.client.client_id
 
         # Two hops: PageContent → page → client
-        if isinstance(instance, PageContent):
+        if isinstance(instance, (PageContent, Layout)):
             return instance.page.client.client_id
 
         # Two hops: Layout → page → client
-        if isinstance(instance, Layout):
-            return instance.page.client.client_id
+        #if isinstance(instance, Layout):
+        #    return instance.page.client.client_id
 
         # Three hops: Component → layout → page → client
         if isinstance(instance, Component):

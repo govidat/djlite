@@ -163,6 +163,24 @@ class ClientLocation(models.Model):
         client_id = getattr(self.client, 'client_id', '?')       
         return f"{client_id} / {self.location_id} ({self.location_type})"
 
+    def clean(self):
+        
+        if self.parent_id:
+            # Avoid an extra query if parent is already loaded
+            parent_client_id = (
+                self.parent.client_id
+                if hasattr(self, '_parent_cache') or self.parent_id
+                else None
+            )
+            parent = ClientLocation.objects.select_related('client').get(pk=self.parent_id)
+            if parent.client_id != self.client_id:
+                raise ValidationError(
+                    {'parent': f'Parent must belong to the same client as this location.'}
+                )
+            if self.parent_id == self.pk:
+                raise ValidationError({'parent': 'A location cannot be its own parent.'})    
+
+
 # ── Client Group ──────────────────────────────────────────────────────
 
 class ClientGroup(models.Model):

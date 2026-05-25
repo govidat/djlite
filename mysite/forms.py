@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from allauth.account.forms import SignupForm
 from .models import CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation
-
+from django.utils.translation import gettext_lazy as _
 
 class ClientForm(forms.ModelForm):
 
@@ -239,3 +239,14 @@ class ClientLocationAdminForm(forms.ModelForm):
                 ancestor = ancestor.parent
 
         return cleaned
+"""  
+class ActualSaleImportForm(forms.Form):
+    period_type = forms.ChoiceField(
+        label=_("Period Type"),
+        choices=PERIOD_TYPE_CHOICES,
+    )
+    file = forms.FileField(
+        label=_("Upload file"),
+        help_text=_("Accepted formats: .csv, .xlsx"),
+    )
+"""

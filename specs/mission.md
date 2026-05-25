@@ -149,6 +149,12 @@ A dedicated Taxonomy slug `product_planning` carries the 3–5 level product gro
 **Sales Hierarchy** — new model tree.
 `SalesNode(client, name, level_label, parent→self, location→ClientLocation nullable)` represents the org chart of the sales force. `CustomerSalesAssignment(customer, sales_node, valid_from, valid_to)` assigns each Customer to a leaf SalesNode with date effectivity.
  
+Demand Planning to be a stand alone module and hence Customer data to be independent of CustomerProfile which is eCommerce dependent. Let a standalone Client level Customer Hierarchy be maintained for Demand Planning. This can be an arbitrary planning level Customer Hierarchy and data to be pushed directly and does not have any linkage to eCommerce sales. 
+Item hierarchy to flow from catalog module that is already in place. 
+Sales team hierarchy to be made separately for this module. 
+Separate Client Location hierarchy to be made for this stand alone Demand Planning module. This also need not have any direct link with ClientLocation model which has operational siginificance for eCommerce. 
+At the lowest level, demand data will be maintained at  Planning Location, Item, Customer level (can included specific Customers or a planning Customer to represent a group of unspecified Customers). As a result of Demand Planning forecast data is expected at Location / Item level at the minimum and if required at Location / Customer / Item level.
+ 
 #### Data Ingestion Models
  
 | Model | Key Fields | Notes |

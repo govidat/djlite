@@ -13,7 +13,8 @@ from mysite.models.catalogue import (
     GlobalItem, GlobalItemMedia, Item, ItemMedia, ProductItem, SongItem, ItemVariant
 )
 from mysite.models.component import SvgtextbadgeValue
- 
+from mysite.models.demand import PlanningLocation, PlanningCustomer, SalesNode
+
 class GlobalValTranslationOptions(TranslationOptions):
     fields = ('keyval',)
     required_languages = ('en',)
@@ -89,6 +90,14 @@ class ItemVariantTranslationOptions(TranslationOptions):
 class SvgtextbadgeValueTranslationOptions(TranslationOptions):
     fields = ('text',)
 
+class PlanningLocationTranslationOptions(TranslationOptions):
+    fields = ('name', 'level_label',)    
+
+class PlanningCustomerTranslationOptions(TranslationOptions):
+    fields = ('name', 'level_label',)  
+
+class SalesNodeTranslationOptions(TranslationOptions):
+    fields = ('name', 'level_label',)  
 """
 # Register using get_model — avoids circular import during startup
 # modeltranslation calls translation.py before models are fully loaded
@@ -124,6 +133,12 @@ translator.register(ItemMedia,          ItemMediaTranslationOptions)
 translator.register(SongItem,      SongItemTranslationOptions)
 translator.register(ItemVariant,      ItemVariantTranslationOptions)
 translator.register(SvgtextbadgeValue,      SvgtextbadgeValueTranslationOptions)
+
+translator.register(PlanningLocation,      PlanningLocationTranslationOptions)
+translator.register(PlanningCustomer,      PlanningCustomerTranslationOptions)
+translator.register(SalesNode,      SalesNodeTranslationOptions)
+
+
 """
 
 
