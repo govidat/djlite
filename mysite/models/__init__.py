@@ -83,4 +83,5 @@ from .demand import (
     CustomerSalesAssignment,
     ActualSaleImport,
     ActualSale,
+    ActualSaleLocation,
 )

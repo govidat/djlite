@@ -3,6 +3,30 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
+def add_postgres_indexes(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    indexes = [
+        # Item base table - REMOVE #"" in the beginning and #"" at the end of each line
+        """CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_with_customer ON mysite_actualsale (client_id, planning_location_id, item_id, planning_customer_id, period_type, period_start) WHERE planning_customer_id IS NOT NULL""",
+        """CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_no_customer ON mysite_actualsale (client_id, planning_location_id, item_id, period_type, period_start) WHERE planning_customer_id IS NULL""",     
+ 
+    ]
+    for sql in indexes:
+        schema_editor.execute(sql)
+
+
+def remove_postgres_indexes(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    drops = [
+        'DROP INDEX IF EXISTS uq_actualsale_with_customer',
+        'DROP INDEX IF EXISTS uq_actualsale_no_customer',        
+
+        # ... rest of drops
+    ]
+    for sql in drops:
+        schema_editor.execute(sql)
 
 class Migration(migrations.Migration):
 
@@ -16,4 +40,9 @@ class Migration(migrations.Migration):
             name='item',
             field=models.ForeignKey(help_text="Active item belonging to this client. Item must have status='active'.", on_delete=django.db.models.deletion.PROTECT, related_name='actual_sales', to='mysite.item', verbose_name='item'),
         ),
+
+        migrations.RunPython(
+            add_postgres_indexes,      # ← runs on: python manage.py migrate (forward)
+            remove_postgres_indexes,   # ← runs on: python manage.py migrate <app> <prev> (reverse)
+        ),                
     ]

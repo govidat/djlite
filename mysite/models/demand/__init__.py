@@ -7,7 +7,7 @@ Add more imports here as actuals.py and forecast.py are created in later sprints
 from .hierarchy import PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment
 from mysite.models.demand.actuals import (
     ActualSaleImport,
-    ActualSale,
+    ActualSale, ActualSaleLocation
 )
 
 __all__ = [
@@ -17,4 +17,5 @@ __all__ = [
     'CustomerSalesAssignment',
     'ActualSaleImport',
     'ActualSale',
+    'ActualSaleLocation',
 ]

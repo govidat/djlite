@@ -1,5 +1,5 @@
 """
-THIS IS NOT REQUIRED FOR THIS SET PF MODELS
+THIS IS REQUIRED FOR THIS SET PF MODELS - UPDATED AS PER SPRINT3.2
 3. Add to the indexing pattern kept in migration
 # 1. Generate the migration normally
 python manage.py makemigrations
@@ -14,7 +14,9 @@ def add_postgres_indexes(apps, schema_editor):
         return
     indexes = [
         # Item base table - REPLACE # in the beginning and # at the end of each line with ". So the line should read 3doubequote-Create - 3doublequote
-        #""CREATE INDEX IF NOT EXISTS xxx ON  (path text_pattern_ops)#"",
+        # Unique index for rows WITH a customer (standard behaviour)
+        #""CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_with_customer ON mysite_actualsale (client_id, planning_location_id, item_id, planning_customer_id, period_type, period_start) WHERE planning_customer_id IS NOT NULL#"",
+        #""CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_no_customer ON mysite_actualsale (client_id, planning_location_id, item_id, period_type, period_start) WHERE planning_customer_id IS NULL#"",     
     ]
     for sql in indexes:
         schema_editor.execute(sql)
@@ -24,8 +26,8 @@ def remove_postgres_indexes(apps, schema_editor):
     if schema_editor.connection.vendor != 'postgresql':
         return
     drops = [
-        'DROP INDEX IF EXISTS xxx',   
-
+        'DROP INDEX IF EXISTS uq_actualsale_with_customer'
+        'DROP INDEX IF EXISTS uq_actualsale_no_customer'
         # ... rest of drops
     ]
     for sql in drops:
@@ -356,7 +358,7 @@ class ActualSale(models.Model):
             (
                 "client", "planning_location", "item",
                 "planning_customer", "period_type", "period_start",
-            ),
+            ), # this can be removed in pg as there is another index to take care
         ]
         ordering = ["period_type", "period_start", "planning_location", "item"]
         verbose_name = _("02-05 Actual Sale")
@@ -417,3 +419,86 @@ class ActualSale(models.Model):
                 validate_period_start(self.period_start, self.period_type)
             except ValueError as exc:
                 raise ValidationError({"period_start": str(exc)})
+"""            
+Celery Task: `process_summary_actuals_import`
+
+This task handles location-level summary uploads (no customer, no item
+breakdown — just total qty and revenue per location per period). It writes
+to a separate `ActualSaleLocation` summary table rather than `ActualSale`.
+
+### 5.1 `ActualSaleLocation` model
+
+Add this to `mysite/models/demand/actuals.py` below `ActualSale`:
+
+5.2 Summary import file columns
+
+```
+period_start    YYYY-MM-DD   required
+location_code   string       required
+total_qty       decimal      required
+total_revenue   decimal      optional
+
+"""
+class ActualSaleLocation(models.Model):
+    """
+    Location-level summary actuals. One row per (client, location, period).
+
+    Populated either:
+      a) By direct upload via process_summary_actuals_import, or
+      b) By aggregating ActualSale rows (via a Celery rollup task in 3B.3).
+
+    Used as a consistency check: if the sum of ActualSale.qty for a
+    location × period does not match ActualSaleLocation.total_qty,
+    the data has gaps.
+    """
+    client            = models.ForeignKey(
+        "mysite.Client", on_delete=models.CASCADE,
+        related_name="actual_sale_locations",
+    )
+    planning_location = models.ForeignKey(
+        PlanningLocation, on_delete=models.PROTECT,
+        related_name="actual_sale_locations",
+        verbose_name=_("planning location"),
+    )
+    period_type  = models.CharField(
+        _("period type"), max_length=16, choices=PERIOD_TYPE_CHOICES,
+    )
+    period_start = models.DateField(_("period start"))
+    period_end   = models.DateField(_("period end"), editable=False)
+    total_qty    = models.DecimalField(
+        _("total quantity"), max_digits=16, decimal_places=3,
+    )
+    total_revenue = models.DecimalField(
+        _("total revenue"), max_digits=18, decimal_places=2,
+        null=True, blank=True,
+    )
+    import_batch  = models.ForeignKey(
+        ActualSaleImport, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="summary_actuals",
+    )
+
+    class Meta:
+        app_label     = "mysite"
+        unique_together = [
+            ("client", "planning_location", "period_type", "period_start"),
+        ]
+        ordering      = ["period_type", "period_start", "planning_location"]
+        verbose_name  = _("02-06 Actual Sale Location")
+        verbose_name_plural = _("02-06 Actual Sale Locations")
+        indexes = [
+            models.Index(
+                fields=["client", "planning_location", "period_type", "period_start"],
+                name="ix_actualsaleloc_period",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.period_type and self.period_start:
+            self.period_end = compute_period_end(self.period_start, self.period_type)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return (
+            f"{self.period_type}:{self.period_start} | "
+            f"{self.planning_location} | qty={self.total_qty}"
+        )

@@ -1,5 +1,4 @@
-from django.urls import path
-
+from django.urls import path, include
 from . import views
 from django.http import HttpResponse
 
@@ -39,6 +38,9 @@ urlpatterns = [
     path('<str:client_id>/catalogue/', views.catalogue_page, name='catalogue_page'),
     path('<str:client_id>/catalogue/filter/', views.catalogue_filter, name='catalogue_filter'),
     path('<str:client_id>/catalogue/<str:item_id>/', views.item_detail, name='item_detail'),
+
+    # --Demand Planning ------------------------------------------------
+    path('api/demand/',  include('mysite.api.demand.urls')),
     #Add BEFORE <str:client_id>/<str:page>/ catch-all:
 
     path("<str:client_id>/<str:page>/", views.ClientPageView.as_view(), name="client_page"),

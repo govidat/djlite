@@ -26,7 +26,7 @@
 ```bash
 pip show djangorestframework
 ```
-
+ 
 If missing:
 
 ```bash

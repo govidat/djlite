@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "slippers", # allauth ui
     "guardian", # client level authorization
     "django_htmx",
+    "django_celery_results",   # optional but recommended — stores task results in DB
 ]
 TAILWIND_APP_NAME = 'theme'  # tailwind
 
@@ -344,3 +345,12 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 
 ACCOUNT_ADAPTER      = 'mysite.adapters.ClientAwareAccountAdapter'
 #ACCOUNT_SIGNUP_FORM_CLASS = 'mysite.forms.CustomerSignupForm'
+
+# ── Celery ────────────────────────────────────────────────────────────────────
+CELERY_BROKER_URL        = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND    = 'redis://localhost:6379/1'   # or 'django-db' if using django_celery_results
+CELERY_ACCEPT_CONTENT    = ['json']
+CELERY_TASK_SERIALIZER   = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE          = TIME_ZONE   # reuse your existing Django TIME_ZONE
+CELERY_RESULT_BACKEND = 'django-db'
