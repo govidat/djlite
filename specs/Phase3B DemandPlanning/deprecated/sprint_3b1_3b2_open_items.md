@@ -6,6 +6,25 @@
 
 ---
 
+## Summary
+
+Section-by-section summary
+### Section 2 — Hierarchy REST endpoints
+The tree serializer uses SerializerMethodField + a _children list pre-attached by the view rather than a recursive nested serializer with a many=True on a queryset. This avoids the classic N+1 problem: the view fetches all nodes in one query, runs build_tree() in Python (O(n)), and the serializer just reads obj._children which is already populated. For the sales hierarchy, all CustomerSalesAssignment rows are fetched in a second single query and grouped into a dict by sales_node_id before the loop — again O(1) queries regardless of tree depth.
+### Section 3 — Actuals upload endpoints
+The upload endpoint returns 202 Accepted immediately with a poll_url — it never waits for the Celery task. The period_type is a POST parameter, not a column in the file, because it applies uniformly to all rows in a batch. File type is validated by extension before the file is saved to storage.
+### Section 4 — process_actuals_import
+Three decisions worth noting: (1) All FK lookups (items, locations, customers) are done in three queries at the start, building Python dicts — not one query per row. (2) Row-level errors are collected but never abort the batch — this matches the sprint spec for "per-row errors reported without failing the entire batch". (3) The update_conflicts=True upsert updates qty, revenue, and import_batch on conflict — so re-uploading a corrected file fixes values rather than silently doing nothing.
+### Section 4.3 — Partial unique indexes
+This is the most important correctness issue in the whole sprint. PostgreSQL's standard UNIQUE constraint treats NULL != NULL, so without the partial indexes, two rows with planning_customer=NULL for the same location-item-period would both insert, making the idempotency guarantee incorrect for unattributed demand rows. The two partial indexes (one WHERE planning_customer_id IS NOT NULL, one WHERE IS NULL) cover both cases correctly and bulk_create(update_conflicts=True) on PostgreSQL will pick the right one per row.
+### Section 6 — Management command
+The template generates three sheets: the data entry sheet with example rows, an Instructions sheet with period-type-specific anchor rules (e.g. for quarter it shows Jan/Apr/Jul/Oct examples), and a Reference Values sheet listing all valid item IDs, location codes, and customer codes for that client — so planners don't need to look anything up separately.
+### Section 8 — Tests
+The most important test is test_duplicate_upload_is_idempotent — it calls _run_import() twice with the same content and asserts the row count stays at 1. The _run_import() function is deliberately separated from the Celery task wrapper so it can be called directly in tests without needing a running Celery worker. The overlap test for CustomerSalesAssignment includes the clean() method code you need to add — it's in a comment block so you can copy it directly.
+
+
+
+
 ## Table of Contents
 
 1. [Prerequisites and Package Setup](#1-prerequisites)

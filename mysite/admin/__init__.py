@@ -16,6 +16,11 @@ from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, Ta
 
 from mysite.admin.demand import PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, CustomerSalesAssignmentAdmin, ActualSaleAdmin
 
+from mysite.admin.demand_forecast import ( 
+    ForecastVersionAdmin, ForecastLineAdmin, ForecastAccuracyAdmin, 
+    AbcClassDefinitionAdmin, ForecastingConfigAdmin, SeriesLevelEvaluationAdmin, SeriesProfileAdmin
+)
+
 from mysite.models import (
     ThemePreset, GlobalValCat, GlobalVal,
     Client, ClientBlock, ClientFeatureControl, 
@@ -28,7 +33,9 @@ from mysite.models import (
     GlobalItem, Taxonomy, Item,
     TaxonomyNode, NodeAttributeType, NodeAttributeValue,
     # Demand Planning
-    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
+    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, 
+    ForecastVersion, ForecastLine, ForecastAccuracy, 
+    AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
 )
 
 
@@ -63,3 +70,15 @@ admin.site.register( PlanningCustomer,  PlanningCustomerAdmin)
 admin.site.register( SalesNode,  SalesNodeAdmin)
 admin.site.register( CustomerSalesAssignment,  CustomerSalesAssignmentAdmin)
 admin.site.register( ActualSale,  ActualSaleAdmin)
+
+# Forecasting
+admin.site.register( ForecastVersion,  ForecastVersionAdmin)
+admin.site.register( ForecastLine,  ForecastLineAdmin)
+admin.site.register( ForecastAccuracy,  ForecastAccuracyAdmin)
+
+
+admin.site.register( AbcClassDefinition,  AbcClassDefinitionAdmin)
+admin.site.register( ForecastingConfig,  ForecastingConfigAdmin)
+admin.site.register( SeriesLevelEvaluation,  SeriesLevelEvaluationAdmin)
+admin.site.register( SeriesProfile,  SeriesProfileAdmin)
+

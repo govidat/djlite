@@ -84,4 +84,6 @@ from .demand import (
     ActualSaleImport,
     ActualSale,
     ActualSaleLocation,
+    ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, 
+    AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
 )

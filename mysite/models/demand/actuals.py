@@ -94,7 +94,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
-
+from calendar import monthrange
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Period helpers
@@ -106,6 +106,7 @@ PERIOD_TYPE_CHOICES = [
     ("hour",     _("Hour")),
     ("day",      _("Day")),
     ("week",     _("Week")),
+    ("fortnight",     _("Fortnight (2 weeks)")),
     ("month",    _("Month")),
     ("bimonth",  _("Bi-Monthly (2 months)")),
     ("quarter",  _("Quarter")),
@@ -121,6 +122,7 @@ PERIOD_FREQ_MAP: dict[str, str] = {
     "hour":     "h",
     "day":      "D",
     "week":     "W-MON",
+    "fortnight": "2W-MON",
     "month":    "MS",
     "bimonth":  "2MS",
     "quarter":  "QS",
@@ -128,6 +130,19 @@ PERIOD_FREQ_MAP: dict[str, str] = {
     "year":     "YS",
 }
 
+PERIOD_HIGHER_HORIZONS: dict[str, list[str]] = {
+    'second':   ['minute', 'hour', 'day'],
+    'minute':   ['hour', 'day', 'week'],
+    'hour':     ['day', 'week', 'month'],
+    'day':      ['week', 'fortnight', 'month'],
+    'week':     ['month', 'quarter'],
+    'fortnight':['month', 'quarter'],
+    'month':    ['quarter', 'halfyear'],
+    'bimonth':  ['halfyear', 'year'],
+    'quarter':  ['halfyear', 'year'],
+    'halfyear': ['year'],
+    'year':     [],
+}
 
 def compute_period_end(period_start: datetime.date, period_type: str) -> datetime.date:
     """
@@ -150,6 +165,16 @@ def compute_period_end(period_start: datetime.date, period_type: str) -> datetim
         return d
     elif period_type == "week":
         return d + datetime.timedelta(days=6)
+    elif period_type == "fortnight":
+        if d.day == 1:
+            return d.replace(day=14)
+        elif d.day == 15:
+            last_day = monthrange(d.year, d.month)[1]
+            return d.replace(day=last_day)
+        else:
+            raise ValueError(
+                f"Fortnight period_start must be the 1st or 15th day of the month, got {d}"
+            )    
     elif period_type == "month":
         return d + relativedelta(months=1) - datetime.timedelta(days=1)
     elif period_type == "bimonth":
@@ -181,6 +206,8 @@ def validate_period_start(period_start: datetime.date, period_type: str) -> None
         raise ValueError(f"period_start for week must be a Monday, got {d} ({d.strftime('%A')}).")
     if period_type in ("month", "bimonth", "quarter", "halfyear", "year") and d.day != 1:
         raise ValueError(f"period_start for {period_type} must be the 1st of the month, got {d}.")
+    if period_type == "fortnight" and d.day not in (1, 15):
+        raise ValueError(f"period_start for fortnight must be the 1st or 15th of the month, got {d}.")
     if period_type == "bimonth" and d.month % 2 != 1:
         raise ValueError(f"period_start for bimonth must be an odd month (Jan/Mar/…), got month {d.month}.")
     if period_type == "quarter" and d.month not in (1, 4, 7, 10):
@@ -190,6 +217,17 @@ def validate_period_start(period_start: datetime.date, period_type: str) -> None
     if period_type == "year" and d.month != 1:
         raise ValueError(f"period_start for year must be January, got month {d.month}.")
 
+def get_higher_period_types(base_period_type: str, steps: int) -> list[str]:
+    """
+    Return the list of higher period types to try, up to `steps` levels.
+
+    Examples:
+        get_higher_period_types('month', 2)  → ['quarter', 'halfyear']
+        get_higher_period_types('day', 3)    → ['week', 'fortnight', 'month']
+        get_higher_period_types('year', 2)   → []
+    """
+    horizons = PERIOD_HIGHER_HORIZONS.get(base_period_type, [])
+    return horizons[:steps]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ActualSaleImport — upload audit log

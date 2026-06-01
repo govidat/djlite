@@ -9,6 +9,10 @@ from mysite.models.demand.actuals import (
     ActualSaleImport,
     ActualSale, ActualSaleLocation
 )
+from mysite.models.demand.forecast import (
+  ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, 
+  AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
+)
 
 __all__ = [
     'PlanningLocation',
@@ -18,4 +22,6 @@ __all__ = [
     'ActualSaleImport',
     'ActualSale',
     'ActualSaleLocation',
+    'ForecastVersion', 'ForecastLine', 'ForecastAggregate', 'ForecastOverride', 'OverrideSplitWeight', 'ForecastAccuracy', 
+    'AbcClassDefinition', 'ForecastingConfig', 'SeriesLevelEvaluation', 'SeriesProfile'
 ]
