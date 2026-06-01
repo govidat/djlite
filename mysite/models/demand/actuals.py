@@ -270,8 +270,8 @@ class ActualSaleImport(models.Model):
     class Meta:
         app_label = "mysite"
         ordering = ["-uploaded_at"]
-        verbose_name = _("actual sale import")
-        verbose_name_plural = _("actual sale imports")
+        verbose_name = _("02-07 actual sale import")
+        verbose_name_plural = _("02-07 actual sale imports")
 
     def __str__(self):
         return f"{self.file_name} [{self.period_type}] ({self.status}) — {self.uploaded_at:%Y-%m-%d}"

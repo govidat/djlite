@@ -307,8 +307,8 @@ class ForecastVersion(models.Model):
     class Meta:
         app_label           = 'mysite'
         ordering            = ['-created_at']
-        verbose_name        = _('03-01 Forecast Version')
-        verbose_name_plural = _('03-01 Forecast Versions')
+        verbose_name        = _('02-15 Forecast Version')
+        verbose_name_plural = _('02-15 Forecast Versions')
         indexes = [
             models.Index(
                 fields=['client', 'status'],
@@ -519,6 +519,47 @@ class ForecastLine(models.Model):
         ),
     )
 
+    price_used = models.DecimalField(
+        _('price used'),
+        max_digits=14,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text=_(
+            'The ItemPlanningProfile.effective_price at the time the forecast '
+            'was computed. Stored for audit — price may change after the run.'
+        ),
+    )
+    statistical_value = models.DecimalField(
+        _('statistical value'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('statistical_qty × price_used. Computed by the forecast engine.'),
+    )
+    override_value = models.DecimalField(
+        _('override value'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('override_qty × price_used. Null when no override is set.'),
+    )
+    final_value = models.DecimalField(
+        _('final value'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            'final_qty × price_used. Auto-computed in save(). '
+            'Used for value-based disaggregation at product hierarchy levels '
+            'and for aggregate rollups shown to planners.'
+        ),
+    )
+
     class Meta:
         app_label = 'mysite'
         unique_together = [
@@ -528,20 +569,37 @@ class ForecastLine(models.Model):
             ),
         ]
         ordering    = ['period_start', 'planning_location', 'item']
-        verbose_name        = _('03-02 Forecast Line')
-        verbose_name_plural = _('03-02 Forecast Lines')
+        verbose_name        = _('02-16 Forecast Line')
+        verbose_name_plural = _('02-16 Forecast Lines')
 
     def save(self, *args, **kwargs):
         # Compute period_end
         if self.period_type and self.period_start:
             self.period_end = compute_period_end(self.period_start, self.period_type)
-        # Compute final_qty
+
+        # Compute final_qty: override wins over statistical
         self.final_qty = (
             self.override_qty
             if self.override_qty is not None
             else self.statistical_qty
         )
+
+        # Compute value fields when price is available
+        if self.price_used is not None:
+            two_dp = Decimal('0.01')
+            self.statistical_value = (
+                self.statistical_qty * self.price_used
+            ).quantize(two_dp)
+            self.override_value = (
+                (self.override_qty * self.price_used).quantize(two_dp)
+                if self.override_qty is not None else None
+            )
+            self.final_value = (
+                self.final_qty * self.price_used
+            ).quantize(two_dp)
+
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         cust = self.planning_customer or 'unattributed'
@@ -632,11 +690,67 @@ class ForecastAggregate(models.Model):
         editable=False,
     )
 
+    total_statistical_value = models.DecimalField(
+        _('total statistical value'),
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Sum of ForecastLine.statistical_value across all constituent lines. '
+            'This is the value the statistical engine produced before any overrides.'
+        ),
+    )
+    total_override_value = models.DecimalField(
+        _('total override value'),
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Sum of ForecastLine.override_value for lines that have an override. '
+            'Null when no overrides exist in this aggregate node.'
+        ),
+    )
+    total_final_value = models.DecimalField(
+        _('total final value'),
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Sum of ForecastLine.final_value across all constituent lines. '
+            'This is the primary value figure shown to planners at aggregate level. '
+            'Used as the basis for value-based override disaggregation: '
+            'a planner sets a target ₹ value here; the engine converts it to '
+            'qty deltas per item using each item\'s price_used.'
+        ),
+    )
+
+    # Used to convert a value-based planner override back to a qty delta
+    # when the override is entered at aggregate level.
+    weighted_avg_price = models.DecimalField(
+        _('weighted average price'),
+        max_digits=14,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text=_(
+            'sum(final_value) / sum(final_qty) across constituent lines. '
+            'Computed by the rollup task. '
+            'When a planner overrides total_final_value at this level, the '
+            'engine computes: implied_qty = override_value / weighted_avg_price, '
+            'then disaggregates the qty delta proportionally.'
+        ),
+    )
+
     class Meta:
         app_label = 'mysite'
         ordering  = ['agg_level', 'period_start']
-        verbose_name        = _('03-03 Forecast Aggregate')
-        verbose_name_plural = _('03-03 Forecast Aggregates')
+        verbose_name        = _('02-17 Forecast Aggregate')
+        verbose_name_plural = _('02-17 Forecast Aggregates')
+
+
 
     def save(self, *args, **kwargs):
         if self.period_type and self.period_start:
@@ -647,6 +761,13 @@ class ForecastAggregate(models.Model):
             else self.statistical_qty
         )
         super().save(*args, **kwargs)
+
+    # Note: total_statistical_value, total_override_value, total_final_value,
+    # and weighted_avg_price are NOT computed in save() — they are set by the
+    # Celery rollup task (write_forecast_aggregates in forecast_engine.py)
+    # which aggregates ForecastLine rows in bulk using DuckDB.
+    # Computing them in save() would require loading all constituent lines
+    # on every aggregate save, which is prohibitively expensive.
 
     def __str__(self):
         return (
@@ -736,6 +857,23 @@ class ForecastOverride(models.Model):
             'Mutually exclusive with override_qty.'
         ),
     )
+
+    override_value = models.DecimalField(
+        _('override value (₹)'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Value-based override at aggregate levels. '
+            'Mutually exclusive with override_qty and override_pct. '
+            'Used when a planner sets a ₹ target for a product group or region. '
+            'The engine converts this to a qty delta using '
+            'ForecastAggregate.weighted_avg_price, then disaggregates '
+            'the qty delta to constituent ForecastLine rows.'
+        ),
+    )
+
     disagg_method = models.CharField(
         _('disaggregation method'),
         max_length=16,
@@ -771,8 +909,8 @@ class ForecastOverride(models.Model):
     class Meta:
         app_label = 'mysite'
         ordering  = ['-created_at']
-        verbose_name        = _('03-04 Forecast Override')
-        verbose_name_plural = _('03-04 Forecast Overrides')
+        verbose_name        = _('02-18 Forecast Override')
+        verbose_name_plural = _('02-18 Forecast Overrides')
         indexes = [
             models.Index(
                 fields=['version', 'override_level', 'period_start'],
@@ -805,19 +943,38 @@ class ForecastOverride(models.Model):
             except ForecastVersion.DoesNotExist:
                 pass
 
-        # Exactly one of override_qty / override_pct must be set
-        has_qty = self.override_qty is not None
-        has_pct = self.override_pct is not None
-        if has_qty and has_pct:
+        # Exactly one of override_qty / override_pct / override_value must be set
+        has_qty   = self.override_qty   is not None
+        has_pct   = self.override_pct   is not None
+        has_value = self.override_value is not None
+
+        set_count = sum([has_qty, has_pct, has_value])
+
+        if set_count > 1:
             raise ValidationError(
-                _('Set either override_qty or override_pct, not both.')
+                _(
+                    'Set exactly one of override_qty, override_pct, or '
+                    'override_value — not multiple.'
+                )
             )
-        if not has_qty and not has_pct:
+        if set_count == 0:
             raise ValidationError(
-                _('One of override_qty or override_pct must be set.')
+                _(
+                    'One of override_qty, override_pct, or override_value '
+                    'must be set.'
+                )
             )
 
-        # CUSTOM disagg requires OverrideSplitWeight rows (validated post-save)
+        # override_value is only valid at aggregate levels — not SKU level
+        if has_value and self.override_level == 'sku':
+            raise ValidationError(
+                _(
+                    'override_value cannot be used at SKU level. '
+                    'Use override_qty to set an absolute quantity, or '
+                    'override_pct to adjust by percentage.'
+                )
+            )
+
         # Period anchor validation
         if self.period_start and self.period_type:
             try:
@@ -865,8 +1022,8 @@ class OverrideSplitWeight(models.Model):
 
     class Meta:
         app_label = 'mysite'
-        verbose_name        = _('03-05 Override Split Weight')
-        verbose_name_plural = _('03-05 Override Split Weights')
+        verbose_name        = _('02-19 Override Split Weight')
+        verbose_name_plural = _('02-19 Override Split Weights')
 
     def __str__(self):
         return f'{self.override} | child={self.child_key} | weight={self.weight}'
@@ -961,8 +1118,8 @@ class ForecastAccuracy(models.Model):
             ),
         ]
         ordering    = ['period_start', 'item']
-        verbose_name        = _('03-06 Forecast Accuracy')
-        verbose_name_plural = _('03-06 Forecast Accuracy Records')
+        verbose_name        = _('02-20 Forecast Accuracy')
+        verbose_name_plural = _('02-20 Forecast Accuracy Records')
         indexes = [
             models.Index(
                 fields=['version', 'period_start'],
@@ -1048,8 +1205,8 @@ class AbcClassDefinition(models.Model):
         app_label   = 'mysite'
         unique_together = [('client', 'rank'), ('client', 'label')]
         ordering    = ['client', 'rank']
-        verbose_name        = _('03-00A ABC Class Definition')
-        verbose_name_plural = _('03-00A ABC Class Definitions')
+        verbose_name        = _('02-11 ABC Class Definition')
+        verbose_name_plural = _('02-11 ABC Class Definitions')
 
     def __str__(self):
         return f'{self.client} | rank={self.rank} label={self.label} ≤{self.cumulative_upper_pct}%'
@@ -1212,8 +1369,8 @@ class ForecastingConfig(models.Model):
 
     class Meta:
         app_label           = 'mysite'
-        verbose_name        = _('03-00 Forecasting Config')
-        verbose_name_plural = _('03-00 Forecasting Configs')
+        verbose_name        = _('02-12 Forecasting Config')
+        verbose_name_plural = _('02-12 Forecasting Configs')
 
     def __str__(self):
         return (
@@ -1373,8 +1530,8 @@ class SeriesLevelEvaluation(models.Model):
     class Meta:
         app_label = 'mysite'
         ordering  = ['item__item_id', 'grain']
-        verbose_name        = _('03-06 Series Level Evaluation')
-        verbose_name_plural = _('03-06 Series Level Evaluations')
+        verbose_name        = _('02-13 Series Level Evaluation')
+        verbose_name_plural = _('02-13 Series Level Evaluations')
         indexes = [
             models.Index(
                 fields=['client', 'grain', 'demand_class'],
@@ -1505,8 +1662,8 @@ class SeriesProfile(models.Model):
              'planning_location', 'period_type'),
         ]
         ordering = ['item__item_id', 'planning_location__code']
-        verbose_name        = _('03-07 Series Profile')
-        verbose_name_plural = _('03-07 Series Profiles')
+        verbose_name        = _('02-14 Series Profile')
+        verbose_name_plural = _('02-14 Series Profiles')
         indexes = [
             models.Index(fields=['client', 'chosen_grain'],      name='ix_seriespro_grain'),
             models.Index(fields=['client', 'demand_class_atomic'], name='ix_seriespro_cls'),

@@ -458,6 +458,47 @@ class ForecastLine(models.Model):
         ),
     )
 
+    price_used = models.DecimalField(
+        _('price used'),
+        max_digits=14,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text=_(
+            'The ItemPlanningProfile.effective_price at the time the forecast '
+            'was computed. Stored for audit — price may change after the run.'
+        ),
+    )
+    statistical_value = models.DecimalField(
+        _('statistical value'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('statistical_qty × price_used. Computed by the forecast engine.'),
+    )
+    override_value = models.DecimalField(
+        _('override value'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('override_qty × price_used. Null when no override is set.'),
+    )
+    final_value = models.DecimalField(
+        _('final value'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            'final_qty × price_used. Auto-computed in save(). '
+            'Used for value-based disaggregation at product hierarchy levels '
+            'and for aggregate rollups shown to planners.'
+        ),
+    )
+
     class Meta:
         app_label = 'mysite'
         unique_together = [
@@ -467,20 +508,37 @@ class ForecastLine(models.Model):
             ),
         ]
         ordering    = ['period_start', 'planning_location', 'item']
-        verbose_name        = _('03-02 Forecast Line')
-        verbose_name_plural = _('03-02 Forecast Lines')
+        verbose_name        = _('02-16 Forecast Line')
+        verbose_name_plural = _('02-16 Forecast Lines')
 
     def save(self, *args, **kwargs):
         # Compute period_end
         if self.period_type and self.period_start:
             self.period_end = compute_period_end(self.period_start, self.period_type)
-        # Compute final_qty
+
+        # Compute final_qty: override wins over statistical
         self.final_qty = (
             self.override_qty
             if self.override_qty is not None
             else self.statistical_qty
         )
+
+        # Compute value fields when price is available
+        if self.price_used is not None:
+            two_dp = Decimal('0.01')
+            self.statistical_value = (
+                self.statistical_qty * self.price_used
+            ).quantize(two_dp)
+            self.override_value = (
+                (self.override_qty * self.price_used).quantize(two_dp)
+                if self.override_qty is not None else None
+            )
+            self.final_value = (
+                self.final_qty * self.price_used
+            ).quantize(two_dp)
+
         super().save(*args, **kwargs)
+
 
     def __str__(self):
         cust = self.planning_customer or 'unattributed'
@@ -571,11 +629,67 @@ class ForecastAggregate(models.Model):
         editable=False,
     )
 
+    total_statistical_value = models.DecimalField(
+        _('total statistical value'),
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Sum of ForecastLine.statistical_value across all constituent lines. '
+            'This is the value the statistical engine produced before any overrides.'
+        ),
+    )
+    total_override_value = models.DecimalField(
+        _('total override value'),
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Sum of ForecastLine.override_value for lines that have an override. '
+            'Null when no overrides exist in this aggregate node.'
+        ),
+    )
+    total_final_value = models.DecimalField(
+        _('total final value'),
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Sum of ForecastLine.final_value across all constituent lines. '
+            'This is the primary value figure shown to planners at aggregate level. '
+            'Used as the basis for value-based override disaggregation: '
+            'a planner sets a target ₹ value here; the engine converts it to '
+            'qty deltas per item using each item\'s price_used.'
+        ),
+    )
+
+    # Used to convert a value-based planner override back to a qty delta
+    # when the override is entered at aggregate level.
+    weighted_avg_price = models.DecimalField(
+        _('weighted average price'),
+        max_digits=14,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text=_(
+            'sum(final_value) / sum(final_qty) across constituent lines. '
+            'Computed by the rollup task. '
+            'When a planner overrides total_final_value at this level, the '
+            'engine computes: implied_qty = override_value / weighted_avg_price, '
+            'then disaggregates the qty delta proportionally.'
+        ),
+    )
+
     class Meta:
         app_label = 'mysite'
         ordering  = ['agg_level', 'period_start']
-        verbose_name        = _('03-03 Forecast Aggregate')
-        verbose_name_plural = _('03-03 Forecast Aggregates')
+        verbose_name        = _('02-17 Forecast Aggregate')
+        verbose_name_plural = _('02-17 Forecast Aggregates')
+
+
 
     def save(self, *args, **kwargs):
         if self.period_type and self.period_start:
@@ -586,6 +700,13 @@ class ForecastAggregate(models.Model):
             else self.statistical_qty
         )
         super().save(*args, **kwargs)
+
+    # Note: total_statistical_value, total_override_value, total_final_value,
+    # and weighted_avg_price are NOT computed in save() — they are set by the
+    # Celery rollup task (write_forecast_aggregates in forecast_engine.py)
+    # which aggregates ForecastLine rows in bulk using DuckDB.
+    # Computing them in save() would require loading all constituent lines
+    # on every aggregate save, which is prohibitively expensive.
 
     def __str__(self):
         return (
@@ -675,6 +796,23 @@ class ForecastOverride(models.Model):
             'Mutually exclusive with override_qty.'
         ),
     )
+
+    override_value = models.DecimalField(
+        _('override value (₹)'),
+        max_digits=18,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_(
+            'Value-based override at aggregate levels. '
+            'Mutually exclusive with override_qty and override_pct. '
+            'Used when a planner sets a ₹ target for a product group or region. '
+            'The engine converts this to a qty delta using '
+            'ForecastAggregate.weighted_avg_price, then disaggregates '
+            'the qty delta to constituent ForecastLine rows.'
+        ),
+    )
+
     disagg_method = models.CharField(
         _('disaggregation method'),
         max_length=16,
@@ -710,16 +848,16 @@ class ForecastOverride(models.Model):
     class Meta:
         app_label = 'mysite'
         ordering  = ['-created_at']
-        verbose_name        = _('03-04 Forecast Override')
-        verbose_name_plural = _('03-04 Forecast Overrides')
+        verbose_name        = _('02-18 Forecast Override')
+        verbose_name_plural = _('02-18 Forecast Overrides')
         indexes = [
             models.Index(
                 fields=['version', 'override_level', 'period_start'],
-                name='ix_fcastoverride_ver_level',
+                name='ix_fcstovr_ver_level',
             ),
             models.Index(
                 fields=['version', 'is_applied'],
-                name='ix_fcastoverride_ver_applied',
+                name='ix_fcstovr_ver_applied',
             ),
         ]
 
@@ -744,19 +882,38 @@ class ForecastOverride(models.Model):
             except ForecastVersion.DoesNotExist:
                 pass
 
-        # Exactly one of override_qty / override_pct must be set
-        has_qty = self.override_qty is not None
-        has_pct = self.override_pct is not None
-        if has_qty and has_pct:
+        # Exactly one of override_qty / override_pct / override_value must be set
+        has_qty   = self.override_qty   is not None
+        has_pct   = self.override_pct   is not None
+        has_value = self.override_value is not None
+
+        set_count = sum([has_qty, has_pct, has_value])
+
+        if set_count > 1:
             raise ValidationError(
-                _('Set either override_qty or override_pct, not both.')
+                _(
+                    'Set exactly one of override_qty, override_pct, or '
+                    'override_value — not multiple.'
+                )
             )
-        if not has_qty and not has_pct:
+        if set_count == 0:
             raise ValidationError(
-                _('One of override_qty or override_pct must be set.')
+                _(
+                    'One of override_qty, override_pct, or override_value '
+                    'must be set.'
+                )
             )
 
-        # CUSTOM disagg requires OverrideSplitWeight rows (validated post-save)
+        # override_value is only valid at aggregate levels — not SKU level
+        if has_value and self.override_level == 'sku':
+            raise ValidationError(
+                _(
+                    'override_value cannot be used at SKU level. '
+                    'Use override_qty to set an absolute quantity, or '
+                    'override_pct to adjust by percentage.'
+                )
+            )
+
         # Period anchor validation
         if self.period_start and self.period_type:
             try:
@@ -1559,6 +1716,7 @@ class ForecastVersionCreateSerializer(serializers.ModelSerializer):
         return value
 
 
+
 class ForecastLineSerializer(serializers.ModelSerializer):
     item_id       = serializers.CharField(source='item.item_id',         read_only=True)
     item_name     = serializers.CharField(source='item.name',            read_only=True)
@@ -1576,9 +1734,10 @@ class ForecastLineSerializer(serializers.ModelSerializer):
             'item_id', 'item_name',
             'location_code', 'customer_code',
             'period_type', 'period_start', 'period_end',
-            'statistical_qty', 'override_qty', 'final_qty',
+            'statistical_qty', 'override_qty', 'final_qty', 'forecast_level', 'model_used', 
+            'price_used', 'statistical_value', 'override_value', 'final_value',
         ]
-        read_only_fields = ['period_end', 'final_qty', 'statistical_qty']
+        read_only_fields = ['period_end', 'final_qty', 'statistical_qty', 'forecast_level', 'model_used', 'price_used', 'statistical_value', 'override_value', 'final_value']
 
 
 class ForecastAggregateSerializer(serializers.ModelSerializer):
@@ -1588,6 +1747,7 @@ class ForecastAggregateSerializer(serializers.ModelSerializer):
             'id', 'agg_level', 'agg_key',
             'period_type', 'period_start', 'period_end',
             'statistical_qty', 'override_qty', 'final_qty',
+            'total_statistical_value', 'total_override_value', 'total_final_value','weighted_avg_price'
         ]
         read_only_fields = fields
 
@@ -1601,7 +1761,7 @@ class ForecastOverrideSerializer(serializers.ModelSerializer):
             'id', 'override_level', 'override_key',
             'period_type', 'period_start',
             'override_qty', 'override_pct',
-            'disagg_method', 'override_note',
+            'disagg_method', 'override_note', 'override_value',
             'is_applied', 'created_by_name', 'created_at',
         ]
         read_only_fields = ['is_applied', 'created_at', 'created_by_name']
@@ -1610,6 +1770,7 @@ class ForecastOverrideSerializer(serializers.ModelSerializer):
         if obj.created_by:
             return obj.created_by.get_full_name() or obj.created_by.username
         return None
+   
 ```
 
 ---
@@ -6290,7 +6451,66 @@ else:
     # use_upper: product-group disaggregation overwrites everything
     pass
 ```
+# In apply_overrides Celery task — dispatch by override type
+```python
+if override.override_qty is not None:
+    # ── Absolute qty override ──────────────────────────────────────────
+    # Planner said "I want exactly N units at this level."
+    # Disaggregate N units to constituent lines by historical qty share.
+    _disaggregate_qty(override, lines, method=override.disagg_method)
 
+elif override.override_pct is not None:
+    # ── Percentage override ────────────────────────────────────────────
+    # Planner said "+10% on this category."
+    # Multiply each constituent line's statistical_qty by (1 + pct/100).
+    multiplier = 1 + float(override.override_pct) / 100
+    for line in lines:
+        line.override_qty = (line.statistical_qty * Decimal(str(multiplier))
+                            ).quantize(Decimal('0.001'))
+        line.save(update_fields=['override_qty', 'final_qty',
+                                 'override_value', 'final_value'])
+
+elif override.override_value is not None:
+    # ── Value override (₹) ────────────────────────────────────────────
+    # Planner said "I want ₹45,00,000 for this category/region."
+    # Step 1: Get the weighted_avg_price for this aggregate node.
+    # Step 2: Convert ₹ target → implied total qty.
+    # Step 3: Disaggregate implied qty to lines by value share.
+
+    agg = ForecastAggregate.objects.filter(
+        version=override.version,
+        agg_level=override.override_level,
+        period_start=override.period_start,
+    ).filter_by_key(override.override_key).first()
+
+    if agg and agg.weighted_avg_price:
+        implied_qty = (
+            override.override_value / agg.weighted_avg_price
+        ).quantize(Decimal('0.001'))
+        _disaggregate_qty_by_value_share(override, lines, implied_qty)
+    else:
+        # No weighted_avg_price available — fall back to qty-share disaggregation
+        # using statistical_qty proportions
+        total_stat = sum(l.statistical_qty for l in lines) or Decimal('1')
+        for line in lines:
+            share = line.statistical_qty / total_stat
+            # Reverse-compute implied qty for this line from its value share
+            if line.price_used:
+                line_value_target = (
+                    override.override_value *
+                    (line.final_value / agg.total_final_value
+                     if agg and agg.total_final_value else share)
+                )
+                line.override_qty = (
+                    line_value_target / line.price_used
+                ).quantize(Decimal('0.001'))
+            else:
+                line.override_qty = (
+                    implied_qty * share
+                ).quantize(Decimal('0.001'))
+            line.save(update_fields=['override_qty', 'final_qty',
+                                     'override_value', 'final_value'])
+```
 ---
 
 ## 6. Migration

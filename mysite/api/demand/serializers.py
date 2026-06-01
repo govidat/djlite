@@ -210,9 +210,10 @@ class ForecastLineSerializer(serializers.ModelSerializer):
             'item_id', 'item_name',
             'location_code', 'customer_code',
             'period_type', 'period_start', 'period_end',
-            'statistical_qty', 'override_qty', 'final_qty', 'forecast_level', 'model_used'
+            'statistical_qty', 'override_qty', 'final_qty', 'forecast_level', 'model_used', 
+            'price_used', 'statistical_value', 'override_value', 'final_value',
         ]
-        read_only_fields = ['period_end', 'final_qty', 'statistical_qty', 'forecast_level', 'model_used']
+        read_only_fields = ['period_end', 'final_qty', 'statistical_qty', 'forecast_level', 'model_used', 'price_used', 'statistical_value', 'override_value', 'final_value']
 
 
 class ForecastAggregateSerializer(serializers.ModelSerializer):
@@ -222,6 +223,7 @@ class ForecastAggregateSerializer(serializers.ModelSerializer):
             'id', 'agg_level', 'agg_key',
             'period_type', 'period_start', 'period_end',
             'statistical_qty', 'override_qty', 'final_qty',
+            'total_statistical_value', 'total_override_value', 'total_final_value','weighted_avg_price'
         ]
         read_only_fields = fields
 
@@ -235,7 +237,7 @@ class ForecastOverrideSerializer(serializers.ModelSerializer):
             'id', 'override_level', 'override_key',
             'period_type', 'period_start',
             'override_qty', 'override_pct',
-            'disagg_method', 'override_note',
+            'disagg_method', 'override_note', 'override_value',
             'is_applied', 'created_by_name', 'created_at',
         ]
         read_only_fields = ['is_applied', 'created_at', 'created_by_name']

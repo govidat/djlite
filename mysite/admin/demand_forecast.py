@@ -28,6 +28,7 @@ class ForecastLineInline(admin.TabularInline):
         'period_type', 'period_start', 'item',
         'planning_location', 'planning_customer',
         'statistical_qty', 'override_qty', 'final_qty',
+        'price_used', 'statistical_value', 'override_value', 'final_value'
     ]
     readonly_fields = fields
 
@@ -48,7 +49,7 @@ class ForecastOverrideInline(admin.TabularInline):
     can_delete  = False
     fields      = [
         'override_level', 'override_key', 'period_start',
-        'override_qty', 'override_pct', 'disagg_method',
+        'override_qty', 'override_pct', 'disagg_method', 'override_value',
         'is_applied', 'created_by', 'created_at',
     ]
     readonly_fields = ['is_applied', 'created_by', 'created_at']
@@ -141,7 +142,8 @@ class ForecastLineAdmin(admin.ModelAdmin):
     list_display   = [
         'version', 'period_type', 'period_start',
         'item', 'planning_location', 'planning_customer',
-        'statistical_qty', 'override_qty', 'final_qty', 'forecast_level', 'model_used'
+        'statistical_qty', 'override_qty', 'final_qty', 'forecast_level', 'model_used',
+        'price_used', 'statistical_value', 'override_value', 'final_value'
     ]
     list_filter    = ['version__client', 'period_type', 'version__status']
     search_fields  = [
@@ -150,7 +152,7 @@ class ForecastLineAdmin(admin.ModelAdmin):
         'version__version_label',
     ]
     date_hierarchy = 'period_start'
-    readonly_fields = ['period_end', 'final_qty', 'forecast_level', 'model_used']
+    readonly_fields = ['period_end', 'final_qty', 'forecast_level', 'model_used', 'price_used', 'statistical_value', 'override_value', 'final_value']
 
     def get_queryset(self, request):
         return (
