@@ -540,3 +540,67 @@ class ActualSaleLocation(models.Model):
             f"{self.period_type}:{self.period_start} | "
             f"{self.planning_location} | qty={self.total_qty}"
         )
+    
+class ItemPlanningProfile(models.Model):
+    """
+    Demand-planning attributes for an item, kept separate from the
+    catalog Item model.
+
+    standard_price:
+        Used to convert qty forecasts to value (₹) at every aggregate level.
+        Set by demand planners, not catalog managers.
+        Represents the expected selling / transfer price for planning purposes.
+
+    weighted_avg_price:
+        Computed by the forecast engine from recent actuals:
+            sum(ActualSale.revenue) / sum(ActualSale.qty)
+        over the last N periods. Stored here so aggregate-level value
+        overrides can convert a ₹ target back to a qty delta without
+        re-querying actuals each time.
+    """
+
+    client = models.ForeignKey(
+        'mysite.Client', on_delete=models.CASCADE,
+        related_name='item_planning_profiles',
+    )
+    item = models.ForeignKey(
+        'mysite.Item', on_delete=models.PROTECT,
+        related_name='planning_profile',
+    )
+    standard_price = models.DecimalField(
+        _('standard price'),
+        max_digits=14, decimal_places=4,
+        help_text=_(
+            'Expected selling/transfer price used for value forecasts. '
+            'Set by demand planners.'
+        ),
+    )
+    weighted_avg_price = models.DecimalField(
+        _('weighted average price'),
+        max_digits=14, decimal_places=4,
+        null=True, blank=True,
+        help_text=_(
+            'Computed from recent actuals: sum(revenue)/sum(qty). '
+            'Auto-updated by the forecast engine before each run.'
+        ),
+    )
+    price_updated_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = 'mysite'
+        unique_together = [('client', 'item')]
+        verbose_name = _('02-07 Item Planning Profile')
+        verbose_name_plural = _('02-07 Item Planning Profiles')
+
+    def __str__(self):
+        return f'{self.item.item_id} | std_price={self.standard_price}'
+
+    @property
+    def effective_price(self) -> 'Decimal':
+        """
+        Price to use for value calculations.
+        Falls back to standard_price if no weighted_avg_price computed yet.
+        """
+        return self.weighted_avg_price or self.standard_price

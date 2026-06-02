@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
+
 
 from modeltranslation.admin import TranslationBaseModelAdmin
 from .base import _user_has_admin_role, ClientLanguageMixinV2, BaseAdminInlinecss, ClientScopedMixin
@@ -245,3 +248,180 @@ class ActualSaleAdmin(admin.ModelAdmin):
     date_hierarchy = "period_start"
     admin_role_only = True
 """
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 1. ItemPlanningProfile
+# ═════════════════════════════════════════════════════════════════════════════
+
+#@admin.register(ItemPlanningProfile)
+class ItemPlanningProfileAdmin(admin.ModelAdmin):
+    """
+    Planners maintain standard_price here for every active item.
+    weighted_avg_price and price_updated_at are read-only — set by the
+    compute_series_profiles Celery task from ActualSale revenue data.
+
+    Price resolution used by the forecast engine:
+        1. weighted_avg_price  (preferred — actuals-derived)
+        2. standard_price      (fallback — planner-set)
+
+    Planners should review items where:
+        - standard_price is set but weighted_avg_price is null
+          (item has no revenue history — price is a pure estimate)
+        - weighted_avg_price diverges significantly from standard_price
+          (price has shifted — consider updating standard_price)
+    """
+
+    list_display = [
+        'item_code',
+        'client',
+        'standard_price',
+        'weighted_avg_price',
+        'effective_price_display',
+        'price_divergence_flag',
+        'price_updated_at',
+        'updated_at',
+    ]
+    list_filter  = ['client']
+    search_fields = [
+        'item__item_id',
+        'item__name',
+        'client__client_id',
+    ]
+    ordering = ['client', 'item__item_id']
+
+    # ── Field layout ──────────────────────────────────────────────────────────
+    readonly_fields = [
+        'client',                   # set at creation, never changed
+        'item',                     # set at creation, never changed
+        'weighted_avg_price',       # Celery-managed — never hand-edit
+        'price_updated_at',         # Celery-managed
+        'updated_at',               # auto
+        'effective_price_display',
+        'price_divergence_flag',
+        'actuals_revenue_note',
+    ]
+
+    fieldsets = [
+        (_('Item'), {
+            'fields': [('client', 'item')],
+        }),
+        (_('Planning Price'), {
+            'fields': [
+                'standard_price',
+                'notes',
+            ],
+            'description': _(
+                'Set the standard_price for every item before running a forecast. '
+                'This is the transfer/selling price used to convert qty forecasts '
+                'to value (₹) at all aggregate levels.'
+            ),
+        }),
+        (_('Actuals-Derived Price (read-only)'), {
+            'fields': [
+                'weighted_avg_price',
+                'price_updated_at',
+                'effective_price_display',
+                'price_divergence_flag',
+                'actuals_revenue_note',
+            ],
+            'description': _(
+                'weighted_avg_price is computed automatically by the '
+                'compute_series_profiles task from sum(revenue)/sum(qty) '
+                'over recent actuals. Do not edit manually.'
+            ),
+            'classes': ['collapse'],
+        }),
+        (_('Audit'), {
+            'fields': ['updated_at'],
+            'classes': ['collapse'],
+        }),
+    ]
+
+    # ── Custom columns ────────────────────────────────────────────────────────
+
+    @admin.display(description='Item ID', ordering='item__item_id')
+    def item_code(self, obj):
+        return obj.item.item_id
+
+    @admin.display(description='Effective Price')
+    def effective_price_display(self, obj):
+        ep = obj.effective_price
+        source = (
+            'actuals-derived'
+            if obj.weighted_avg_price
+            else 'standard (no actuals revenue)'
+        )
+        return format_html(
+            '<strong>₹{}</strong> <span style="color:#6c757d;font-size:11px">({})</span>',
+            ep, source,
+        )
+
+    @admin.display(description='Price Check')
+    def price_divergence_flag(self, obj):
+        """
+        Warn when weighted_avg_price diverges > 20% from standard_price.
+        Helps planners spot stale standard prices.
+        """
+        if not obj.weighted_avg_price or not obj.standard_price:
+            return '—'
+
+        wap = float(obj.weighted_avg_price)
+        sp  = float(obj.standard_price)
+        if sp == 0:
+            return '—'
+
+        divergence_pct = abs(wap - sp) / sp * 100
+
+        if divergence_pct > 30:
+            return format_html(
+                '<span style="color:#dc3545;font-weight:bold">'
+                '⚠ {:.1f}% divergence — review standard_price'
+                '</span>',
+                divergence_pct,
+            )
+        if divergence_pct > 15:
+            return format_html(
+                '<span style="color:#fd7e14">'
+                '△ {:.1f}% divergence'
+                '</span>',
+                divergence_pct,
+            )
+        return format_html(
+            '<span style="color:#198754">✓ {:.1f}%</span>',
+            divergence_pct,
+        )
+
+    @admin.display(description='Actuals Note')
+    def actuals_revenue_note(self, obj):
+        """
+        Show how many ActualSale rows with revenue exist for this item,
+        so planners know whether weighted_avg_price is well-supported.
+        """
+        from mysite.models.demand.actuals import ActualSale
+        count = ActualSale.objects.filter(
+            client=obj.client,
+            item=obj.item,
+            revenue__isnull=False,
+        ).count()
+        if count == 0:
+            return format_html(
+                '<span style="color:#dc3545">'
+                'No actuals revenue rows — standard_price is the only source.'
+                '</span>'
+            )
+        return format_html(
+            '<span style="color:#198754">'
+            '{} actuals rows with revenue data.'
+            '</span>',
+            count,
+        )
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request)
+            .select_related('client', 'item')
+        )
+
+    admin_role_only = True
+
+

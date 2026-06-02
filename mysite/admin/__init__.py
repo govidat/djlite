@@ -14,11 +14,12 @@ from mysite.admin.users import (
 )
 from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, TaxonomyNodeAdmin, NodeAttributeTypeAdmin, NodeAttributeValueAdmin
 
-from mysite.admin.demand import PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, CustomerSalesAssignmentAdmin, ActualSaleAdmin
+from mysite.admin.demand import PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, CustomerSalesAssignmentAdmin, ActualSaleAdmin, ItemPlanningProfileAdmin
 
 from mysite.admin.demand_forecast import ( 
     ForecastVersionAdmin, ForecastLineAdmin, ForecastAccuracyAdmin, 
-    AbcClassDefinitionAdmin, ForecastingConfigAdmin, SeriesLevelEvaluationAdmin, SeriesProfileAdmin
+    AbcClassDefinitionAdmin, ForecastingConfigAdmin, SeriesLevelEvaluationAdmin, SeriesProfileAdmin, 
+    ForecastAggregateAdmin, ForecastOverrideAdmin
 )
 
 from mysite.models import (
@@ -33,9 +34,10 @@ from mysite.models import (
     GlobalItem, Taxonomy, Item,
     TaxonomyNode, NodeAttributeType, NodeAttributeValue,
     # Demand Planning
-    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, 
+    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, ItemPlanningProfile,
     ForecastVersion, ForecastLine, ForecastAccuracy, 
-    AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
+    AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile,
+    ForecastAggregate, ForecastOverride
 )
 
 
@@ -70,7 +72,7 @@ admin.site.register( PlanningCustomer,  PlanningCustomerAdmin)
 admin.site.register( SalesNode,  SalesNodeAdmin)
 admin.site.register( CustomerSalesAssignment,  CustomerSalesAssignmentAdmin)
 admin.site.register( ActualSale,  ActualSaleAdmin)
-
+admin.site.register( ItemPlanningProfile,  ItemPlanningProfileAdmin)
 # Forecasting
 admin.site.register( ForecastVersion,  ForecastVersionAdmin)
 admin.site.register( ForecastLine,  ForecastLineAdmin)
@@ -81,4 +83,5 @@ admin.site.register( AbcClassDefinition,  AbcClassDefinitionAdmin)
 admin.site.register( ForecastingConfig,  ForecastingConfigAdmin)
 admin.site.register( SeriesLevelEvaluation,  SeriesLevelEvaluationAdmin)
 admin.site.register( SeriesProfile,  SeriesProfileAdmin)
-
+admin.site.register( ForecastAggregate,  ForecastAggregateAdmin)
+admin.site.register( ForecastOverride,  ForecastOverrideAdmin)

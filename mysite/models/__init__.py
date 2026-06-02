@@ -83,7 +83,7 @@ from .demand import (
     CustomerSalesAssignment,
     ActualSaleImport,
     ActualSale,
-    ActualSaleLocation,
+    ActualSaleLocation, ItemPlanningProfile,
     ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, 
     AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
 )
