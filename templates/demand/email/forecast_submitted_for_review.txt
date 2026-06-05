@@ -1,0 +1,14 @@
+{{ version.version_label }} — Submitted for Review
+
+{{ actor.get_full_name|default:actor.username }} has submitted this forecast version for review.
+
+Version: {{ version.version_label }}
+Client:  {{ version.client }}
+Period:  {{ version.period_type }} ending {{ version.base_period_end }}
+Submitted at: {{ timestamp|date:"d M Y H:i" }}
+
+Please log in to review and approve or reject:
+{{ site_url }}/demand/forecast-versions/{{ version.pk }}/
+
+---
+This is an automated notification from the Demand Planning system.

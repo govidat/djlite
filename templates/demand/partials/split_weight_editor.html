@@ -1,0 +1,95 @@
+{# demand/partials/split_weight_editor.html #}
+{# Context: override, weights (list of OverrideSplitWeight) #}
+
+<div class="split-weight-editor" id="split-weight-editor">
+  <h4>Edit custom weights for override {{ override.pk }}</h4>
+  <p class="hint">
+    Changing weights will reset is_applied and re-queue disaggregation.
+  </p>
+
+  <form
+    hx-put="/api/demand/forecast-versions/{{ override.version_id }}/overrides/{{ override.pk }}/split-weights/"
+    hx-target="#split-weight-editor"
+    hx-swap="outerHTML"
+    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+    hx-encoding="application/json"
+    id="split-weight-edit-form"
+  >
+    <table class="split-weight-table">
+      <thead>
+        <tr>
+          <th>Child key (JSON)</th>
+          <th>Weight</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="edit-weight-rows">
+        {% for sw in weights %}
+        <tr>
+          <td><input class="sw-key"    type="text"   value="{{ sw.child_key }}" required></td>
+          <td><input class="sw-weight" type="number"  step="0.001" min="0" max="1"
+                     value="{{ sw.weight }}" required></td>
+          <td><button type="button" class="sw-remove">✕</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="split-weight-form__total">
+      Total: <strong id="edit-weight-total">—</strong>
+      <span id="edit-weight-warning" style="color:red;display:none">⚠ Must sum to 1.0</span>
+    </div>
+
+    <button type="button" id="add-edit-row" class="btn btn-secondary btn-sm">+ Add child</button>
+    <button type="submit" class="btn btn-primary">Save weights</button>
+    <button type="button" class="btn btn-link"
+            onclick="document.getElementById('split-weight-editor').innerHTML=''">
+      Cancel
+    </button>
+  </form>
+</div>
+
+<script>
+(function() {
+  /* Same totalUpdate / serialise logic as above — could be extracted to a shared JS file */
+  function updateTotal() {
+    const ws = [...document.querySelectorAll('#edit-weight-rows .sw-weight')]
+      .map(el => parseFloat(el.value)||0);
+    const total = ws.reduce((a,b)=>a+b,0);
+    document.getElementById('edit-weight-total').textContent = total.toFixed(3);
+    document.getElementById('edit-weight-warning').style.display =
+      Math.abs(total-1.0)>0.001?'inline':'none';
+  }
+
+  document.querySelectorAll('#edit-weight-rows .sw-remove').forEach(btn => {
+    btn.addEventListener('click', () => { btn.closest('tr').remove(); updateTotal(); });
+  });
+  document.querySelectorAll('#edit-weight-rows .sw-weight').forEach(el => {
+    el.addEventListener('input', updateTotal);
+  });
+  document.getElementById('add-edit-row').addEventListener('click', () => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="sw-key"    type="text"   required></td>
+      <td><input class="sw-weight" type="number"  step="0.001" min="0" max="1" required></td>
+      <td><button type="button" class="sw-remove">✕</button></td>`;
+    tr.querySelector('.sw-remove').addEventListener('click', () => { tr.remove(); updateTotal(); });
+    tr.querySelector('.sw-weight').addEventListener('input', updateTotal);
+    document.getElementById('edit-weight-rows').appendChild(tr);
+    updateTotal();
+  });
+
+  // Serialise to JSON for the PUT request
+  document.getElementById('split-weight-edit-form').addEventListener('htmx:configRequest', e => {
+    const rows = [...document.querySelectorAll('#edit-weight-rows tr')];
+    e.detail.parameters = {
+      weights: rows.map(tr => ({
+        child_key: tr.querySelector('.sw-key').value,
+        weight: parseFloat(tr.querySelector('.sw-weight').value)||0,
+      }))
+    };
+  });
+
+  updateTotal();
+})();
+</script>

@@ -1,0 +1,131 @@
+{# demand/partials/override_list_row.html #}
+{# Context: override (ForecastOverride), version (ForecastVersion) #}
+
+<tr class="override-list-row
+           {% if override.is_applied %}override-list-row--applied
+           {% else %}override-list-row--pending{% endif %}"
+    id="override-row-{{ override.pk }}"
+    data-override-id="{{ override.pk }}">
+
+  {# ── Level + Key ──────────────────────────────────────────────────────── #}
+  <td class="override-list-row__level">
+    <span class="level-badge level-badge--{{ override.override_level }}">
+      {{ override.get_override_level_display }}
+    </span>
+  </td>
+  <td class="override-list-row__key">
+    {% with key=override.override_key %}
+      {% if override.override_level == 'sku' %}
+        {{ key.item_id|default:"—" }}
+      {% elif override.override_level == 'location' %}
+        {{ key.location_code|default:"—" }}
+      {% elif override.override_level == 'customer' %}
+        {{ key.customer_code|default:"—" }}
+      {% elif override.override_level == 'category' %}
+        {{ key.category|default:key.taxon_id|default:"—" }}
+      {% elif override.override_level == 'region' %}
+        {{ key.region_code|default:"—" }}
+      {% elif override.override_level == 'channel' %}
+        {{ key.channel_code|default:"—" }}
+      {% else %}
+        Grand Total
+      {% endif %}
+    {% endwith %}
+  </td>
+
+  {# ── Period ───────────────────────────────────────────────────────────── #}
+  <td class="override-list-row__period">
+    {{ override.period_start|date:"M Y" }}
+  </td>
+
+  {# ── Override value — show whichever of the three is set ─────────────── #}
+  <td class="override-list-row__value">
+    {% if override.override_qty is not None %}
+      <span class="override-type-tag override-type-tag--qty">Qty</span>
+      <strong>{{ override.override_qty|floatformat:0 }}</strong>
+    {% elif override.override_pct is not None %}
+      <span class="override-type-tag override-type-tag--pct">%</span>
+      <strong>
+        {% if override.override_pct >= 0 %}+{% endif %}{{ override.override_pct }}%
+      </strong>
+    {% elif override.override_value is not None %}
+      <span class="override-type-tag override-type-tag--value">₹</span>
+      <strong>₹{{ override.override_value|floatformat:0 }}</strong>
+    {% else %}
+      —
+    {% endif %}
+  </td>
+
+  {# ── Disagg method ────────────────────────────────────────────────────── #}
+  <td class="override-list-row__disagg">
+    {{ override.get_disagg_method_display }}
+    {% if override.disagg_method == 'CUSTOM' %}
+      <a class="link-sm"
+         hx-get="/api/demand/forecast-versions/{{ version.pk }}/overrides/{{ override.pk }}/split-weights/"
+         hx-target="#split-weight-editor-container"
+         hx-swap="innerHTML"
+         title="Edit custom weights">
+        ✏️
+      </a>
+    {% endif %}
+  </td>
+
+  {# ── Status badge ─────────────────────────────────────────────────────── #}
+  <td class="override-list-row__status">
+    {% if override.is_applied %}
+      <span class="badge badge--applied" title="Override disaggregated to line level">
+        ✓ Applied
+      </span>
+    {% else %}
+      <span class="badge badge--pending" title="Waiting for apply_overrides task">
+        ⏳ Pending
+      </span>
+    {% endif %}
+  </td>
+
+  {# ── Created by / when ────────────────────────────────────────────────── #}
+  <td class="override-list-row__meta">
+    <span class="meta-user">
+      {{ override.created_by.get_full_name|default:override.created_by.username }}
+    </span>
+    <span class="meta-time">{{ override.created_at|date:"d M H:i" }}</span>
+  </td>
+
+  {# ── Note (collapsed, shown on hover / expand) ─────────────────────────── #}
+  <td class="override-list-row__note">
+    {% if override.override_note %}
+      <span class="note-preview" title="{{ override.override_note }}">
+        {{ override.override_note|truncatechars:40 }}
+      </span>
+    {% else %}
+      <span class="note-empty">—</span>
+    {% endif %}
+  </td>
+
+  {# ── Actions ──────────────────────────────────────────────────────────── #}
+  <td class="override-list-row__actions">
+
+    {# Propagation view — which lines were touched? #}
+    <button class="btn-icon"
+            title="View affected lines"
+            hx-get="/demand/partials/override-propagation/{{ override.pk }}/"
+            hx-target="#propagation-panel"
+            hx-swap="innerHTML">
+      🔍
+    </button>
+
+    {# Delete — with confirmation; only shown on DRAFT versions #}
+    {% if version.is_editable %}
+    <button class="btn-icon btn-icon--danger"
+            title="{% if override.is_applied %}Revert and delete{% else %}Delete{% endif %}"
+            hx-delete="/api/demand/forecast-versions/{{ version.pk }}/overrides/{{ override.pk }}/"
+            hx-confirm="{% if override.is_applied %}This override has been applied to forecast lines. Deleting it will revert those lines to their statistical forecast. Continue?{% else %}Delete this pending override?{% endif %}"
+            hx-target="#override-row-{{ override.pk }}"
+            hx-swap="outerHTML swap:300ms"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      🗑
+    </button>
+    {% endif %}
+
+  </td>
+</tr>

@@ -1,0 +1,222 @@
+{# demand/forecast_grid.html #}
+{# Context: version (ForecastVersion), lines (Page), periods (list[date]),
+            overrides (QuerySet[ForecastOverride]),
+            period_labels (list[str]) #}
+
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Forecast Grid — {{ version.version_label }}{% endblock %}
+
+{% block content %}
+<div class="forecast-grid-page" data-version-id="{{ version.pk }}">
+
+  {# ════════════════════════════════════════════════════════════════════════ #}
+  {# Header: version meta + approval panel                                   #}
+  {# ════════════════════════════════════════════════════════════════════════ #}
+  <div class="forecast-grid-page__header">
+    <div class="version-meta">
+      <h1 class="version-meta__title">{{ version.version_label }}</h1>
+      <dl class="version-meta__details">
+        <dt>Period</dt>
+        <dd>{{ version.period_type|capfirst }} · {{ version.horizon_periods }} periods</dd>
+        <dt>Base end</dt>
+        <dd>{{ version.base_period_end|date:"d M Y" }}</dd>
+        <dt>Lines</dt>
+        <dd>{{ version.lines.count|intcomma }}</dd>
+      </dl>
+    </div>
+
+    {# Approval panel — HTMX-refreshed after every status transition #}
+    <div id="approval-panel-{{ version.pk }}">
+      {% include "demand/partials/approval_panel.html" with version=version %}
+    </div>
+  </div>
+
+  {# ════════════════════════════════════════════════════════════════════════ #}
+  {# Two-column layout: grid (left) + side panels (right)                    #}
+  {# ════════════════════════════════════════════════════════════════════════ #}
+  <div class="forecast-grid-page__body">
+
+    {# ── LEFT: forecast grid table ──────────────────────────────────────── #}
+    <div class="forecast-grid-page__grid">
+
+      {# Filter bar #}
+      <div class="grid-filter-bar">
+        <input type="text" id="grid-search" placeholder="Filter by item or location…"
+               hx-get="/demand/partials/forecast-grid-rows/?version={{ version.pk }}"
+               hx-trigger="keyup changed delay:400ms"
+               hx-target="#forecast-grid-tbody"
+               hx-swap="innerHTML"
+               hx-include="#grid-filter-bar"
+               name="q"
+               class="grid-filter-bar__search">
+
+        <select name="location_code"
+                hx-get="/demand/partials/forecast-grid-rows/?version={{ version.pk }}"
+                hx-trigger="change"
+                hx-target="#forecast-grid-tbody"
+                hx-swap="innerHTML"
+                hx-include="#grid-filter-bar"
+                class="grid-filter-bar__select">
+          <option value="">All locations</option>
+          {% for loc in locations %}
+            <option value="{{ loc.code }}">{{ loc.code }} — {{ loc.name }}</option>
+          {% endfor %}
+        </select>
+
+        <a href="/api/demand/forecast-versions/{{ version.pk }}/export/"
+           class="btn btn-secondary btn-sm"
+           download>
+          📥 Export .xlsx
+        </a>
+      </div>
+      <div id="grid-filter-bar" style="display:none">
+        {# Hidden container used by hx-include to pick up filter values #}
+      </div>
+
+      {# Forecast grid table — scrollable horizontally #}
+      <div class="grid-scroll-wrapper">
+        <table class="forecast-grid-table" id="forecast-grid-table">
+
+          <thead class="forecast-grid-table__head">
+            <tr>
+              <th class="col-location">Location</th>
+              <th class="col-item-id">Item ID</th>
+              <th class="col-item-name">Item</th>
+              <th class="col-customer">Customer</th>
+              {# One <th> per forecast period #}
+              {% for label in period_labels %}
+                <th class="col-period">{{ label }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+
+          <tbody id="forecast-grid-tbody">
+            {#
+              Each <tr> groups all periods for one (location, item, customer).
+              Each period <td> is either:
+                • a plain qty cell  →  click to open override_form.html inline
+                • an overridden cell → shows override_badge.html
+            #}
+            {% for row in grid_rows %}
+            <tr class="forecast-row" id="forecast-row-{{ row.key }}">
+
+              <td class="col-location">{{ row.location_code }}</td>
+              <td class="col-item-id">{{ row.item_id }}</td>
+              <td class="col-item-name">{{ row.item_name }}</td>
+              <td class="col-customer">{{ row.customer_code|default:"—" }}</td>
+
+              {% for cell in row.cells %}
+              <td class="forecast-cell
+                         {% if cell.line.override_qty is not None %}forecast-cell--overridden{% endif %}"
+                  id="cell-{{ cell.line.pk }}"
+                  data-line-id="{{ cell.line.pk }}"
+                  data-period="{{ cell.period_label }}">
+
+                {% if cell.line.override_qty is not None %}
+                  {# Cell has an applied or pending override → show badge #}
+                  {% include "demand/partials/override_badge.html"
+                     with line=cell.line override=cell.override version=version %}
+                {% else %}
+                  {# Plain statistical cell → click opens the inline form #}
+                  <span class="forecast-cell__value"
+                        hx-get="/demand/partials/override-form/?line={{ cell.line.pk }}&version={{ version.pk }}"
+                        hx-target="#cell-{{ cell.line.pk }}"
+                        hx-swap="innerHTML"
+                        title="Click to add override">
+                    {{ cell.line.final_qty|floatformat:0 }}
+                  </span>
+                {% endif %}
+
+              </td>
+              {% endfor %}
+
+            </tr>
+            {% empty %}
+              <tr>
+                <td colspan="{{ periods|length|add:4 }}" class="grid-empty">
+                  No forecast lines found.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+
+        </table>
+      </div>{# /grid-scroll-wrapper #}
+
+      {# Pagination #}
+      <div class="grid-pagination">
+        {% if lines.has_previous %}
+          <a href="?page={{ lines.previous_page_number }}"
+             class="btn btn-sm btn-secondary">← Previous</a>
+        {% endif %}
+        <span>Page {{ lines.number }} of {{ lines.paginator.num_pages }}</span>
+        {% if lines.has_next %}
+          <a href="?page={{ lines.next_page_number }}"
+             class="btn btn-sm btn-secondary">Next →</a>
+        {% endif %}
+      </div>
+
+    </div>{# /forecast-grid-page__grid #}
+
+    {# ── RIGHT: side panels ─────────────────────────────────────────────── #}
+    <div class="forecast-grid-page__sidebar">
+
+      {# Override history table #}
+      <section class="sidebar-section" id="override-history-section">
+        <h2 class="sidebar-section__title">
+          Overrides
+          <span class="badge">{{ overrides.count }}</span>
+        </h2>
+
+        <div class="override-list-wrapper">
+          <table class="override-list-table">
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>Key</th>
+                <th>Period</th>
+                <th>Value</th>
+                <th>Split</th>
+                <th>Status</th>
+                <th>By</th>
+                <th>Note</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="override-list-{{ version.pk }}">
+              {% for override in overrides %}
+                {% include "demand/partials/override_list_row.html"
+                   with override=override version=version %}
+              {% empty %}
+                <tr>
+                  <td colspan="9" class="override-list--empty">
+                    No overrides yet. Click a forecast cell to add one.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {# CUSTOM weight editor — loaded here when ✏️ is clicked #}
+        <div id="split-weight-editor-container"></div>
+      </section>
+
+      {# Propagation panel — loaded when 🔍 is clicked on any override row #}
+      <section class="sidebar-section" id="propagation-panel">
+        <p class="propagation-panel--placeholder">
+          Click 🔍 on an override to see which lines were affected.
+        </p>
+      </section>
+
+    </div>{# /forecast-grid-page__sidebar #}
+
+  </div>{# /forecast-grid-page__body #}
+
+</div>{# /forecast-grid-page #}
+
+{# ── Global: approval modal container (for reject / copy modals) ─────────── #}
+<div id="approval-modal-container"></div>
+{% endblock %}

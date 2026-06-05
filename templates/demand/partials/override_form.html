@@ -1,0 +1,110 @@
+{# demand/partials/override_form.html #}
+{# Context vars: version, line (ForecastLine), period_label #}
+
+<form
+  hx-post="/api/demand/forecast-versions/{{ version.pk }}/overrides/"
+  hx-target="#override-list-{{ version.pk }}"
+  hx-swap="outerHTML"
+  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+  class="override-form"
+  id="override-form-{{ line.pk }}"
+>
+  {# Hidden fields: period and target identification #}
+  <input type="hidden" name="period_type"  value="{{ version.period_type }}">
+  <input type="hidden" name="period_start" value="{{ line.period_start|date:'Y-m-d' }}">
+
+  {# Override level and key — determine what gets overridden #}
+  <div class="override-form__level">
+    <label for="override_level">Level</label>
+    <select name="override_level" id="override_level" required
+            hx-trigger="change"
+            hx-get="/demand/partials/override-key-field/"
+            hx-target="#override-key-container"
+            hx-include="[name='override_level']">
+      <option value="sku"         {% if default_level == 'sku' %}selected{% endif %}>SKU</option>
+      <option value="location">Location</option>
+      <option value="region">Region</option>
+      <option value="category">Category</option>
+      <option value="customer">Customer</option>
+      <option value="total">Grand Total</option>
+    </select>
+  </div>
+
+  {# override_key is rendered dynamically based on level selection #}
+  <div id="override-key-container">
+    {# Default: SKU — pre-populate from the clicked line #}
+    <input type="hidden" name="override_key"
+           value='{"item_id": "{{ line.item.item_id }}"}'>
+  </div>
+
+  {# Override value — exactly one must be filled in #}
+  <fieldset class="override-form__value">
+    <legend>Override value</legend>
+
+    <div class="override-form__mode" id="override-mode-tabs">
+      <label class="tab {% if True %}active{% endif %}">
+        <input type="radio" name="_mode" value="qty" checked
+               hx-trigger="change" hx-target="#override-value-inputs"
+               hx-get="/demand/partials/override-value-inputs/?mode=qty">
+        Absolute Qty
+      </label>
+      <label class="tab">
+        <input type="radio" name="_mode" value="pct"
+               hx-trigger="change" hx-target="#override-value-inputs"
+               hx-get="/demand/partials/override-value-inputs/?mode=pct">
+        % Adjustment
+      </label>
+      <label class="tab {% if default_level == 'sku' %}disabled{% endif %}">
+        <input type="radio" name="_mode" value="value"
+               {% if default_level == 'sku' %}disabled{% endif %}
+               hx-trigger="change" hx-target="#override-value-inputs"
+               hx-get="/demand/partials/override-value-inputs/?mode=value">
+        ₹ Target
+      </label>
+    </div>
+
+    <div id="override-value-inputs">
+      {# Default: qty input #}
+      <label>
+        Quantity
+        <input type="number" name="override_qty" min="0" step="0.001"
+               value="{{ line.final_qty }}" required>
+      </label>
+      <small class="hint">
+        Statistical: {{ line.statistical_qty }} | Current: {{ line.final_qty }}
+      </small>
+    </div>
+  </fieldset>
+
+  {# Disaggregation method (shown for non-SKU levels) #}
+  <div class="override-form__disagg"
+       {% if default_level == 'sku' %}style="display:none"{% endif %}>
+    <label for="disagg_method">Split method</label>
+    <select name="disagg_method" id="disagg_method">
+      <option value="PROPORTIONAL" selected>Proportional (historical share)</option>
+      <option value="EQUAL">Equal split</option>
+      <option value="CUSTOM"
+              hx-trigger="change"
+              hx-get="/demand/partials/split-weight-form/?version={{ version.pk }}&override_level={{ default_level|default:'sku' }}&period_start={{ line.period_start|date:'Y-m-d' }}"
+              hx-target="#split-weight-container">
+        Custom weights
+      </option>
+    </select>
+    <div id="split-weight-container"></div>
+  </div>
+
+  {# Note #}
+  <div class="override-form__note">
+    <label for="override_note">Note (optional)</label>
+    <textarea name="override_note" id="override_note" rows="2"
+              placeholder="Reason for override…"></textarea>
+  </div>
+
+  <div class="override-form__actions">
+    <button type="submit" class="btn btn-primary">Apply Override</button>
+    <button type="button" class="btn btn-secondary"
+            onclick="document.getElementById('override-form-{{ line.pk }}').remove()">
+      Cancel
+    </button>
+  </div>
+</form>

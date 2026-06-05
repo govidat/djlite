@@ -2,6 +2,8 @@
 
 from django.urls import path
 from mysite.api.demand import views
+#from mysite.api.demand.views import forecast_grid
+#, override_key_field, override_value_inputs, encode_override_key, override_propagation
 
 urlpatterns = [
     
@@ -65,7 +67,16 @@ urlpatterns = [
         views.ForecastVersionApproveView.as_view(),
         name='demand-forecast-version-approve',
     ),
-
+    path(
+        'forecast-versions/<int:pk>/run/',
+        views.ForecastVersionRunView.as_view(),
+        name='demand-forecast-version-run',
+    ),
+    path(
+        'forecast-versions/<int:pk>/run-status/',
+        views.ForecastVersionRunStatusView.as_view(),
+        name='demand-forecast-version-run-status',
+    ),
     # ── Series Profiles  (NEW — SeriesProfile additions) ───────────────────
     path(
         'series-profiles/',
@@ -89,5 +100,29 @@ urlpatterns = [
         views.ForecastingConfigView.as_view(),
         name='demand-forecasting-config',
     ),     
+    # Override list + create
+    path(
+        'forecast-versions/<int:pk>/overrides/',
+        views.ForecastOverrideListCreateView.as_view(),
+        name='demand-forecast-overrides',
+    ),
+    # Override detail + delete
+    path(
+        'forecast-versions/<int:pk>/overrides/<int:override_id>/',
+        views.ForecastOverrideDetailView.as_view(),
+        name='demand-forecast-override-detail',
+    ),
+    # Propagation view — which lines did this override touch?
+    path(
+        'forecast-versions/<int:pk>/overrides/<int:override_id>/affected-lines/',
+        views.ForecastOverrideAffectedLinesView.as_view(),
+        name='demand-forecast-override-affected-lines',
+    ),
+    # Custom split-weight management
+    path(
+        'forecast-versions/<int:pk>/overrides/<int:override_id>/split-weights/',
+        views.ForecastOverrideSplitWeightView.as_view(),
+        name='demand-forecast-override-split-weights',
+    ),
 
 ]

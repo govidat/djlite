@@ -1,0 +1,33 @@
+{# demand/partials/approval_copy_form.html #}
+{# Context: version #}
+
+<div class="modal-overlay" id="approval-copy-modal">
+  <div class="modal">
+    <h3>Copy to new Draft</h3>
+    <p>Creates a new DRAFT version with all forecast lines copied.
+       Override history is not carried over.</p>
+
+    <form
+      hx-post="/api/demand/forecast-versions/{{ version.pk }}/approve/"
+      hx-target="body"
+      hx-swap="none"
+      hx-on::after-request="window.location.href='/demand/forecast-versions/'"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+    >
+      <input type="hidden" name="action" value="copy">
+      <div class="form-group">
+        <label for="copy-label">New version label</label>
+        <input type="text" id="copy-label" name="note"
+               value="{{ version.version_label }} (copy)"
+               class="form-control" required>
+      </div>
+      <div class="modal__actions">
+        <button type="submit" class="btn btn-primary">Create Copy</button>
+        <button type="button" class="btn btn-link"
+                onclick="document.getElementById('approval-modal-container').innerHTML=''">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

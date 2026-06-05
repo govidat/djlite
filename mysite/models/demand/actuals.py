@@ -1,3 +1,4 @@
+# mysite/models/demand/actuals.py
 """
 THIS IS REQUIRED FOR THIS SET PF MODELS - UPDATED AS PER SPRINT3.2
 3. Add to the indexing pattern kept in migration
@@ -89,7 +90,7 @@ Use update_or_create on this key to make uploads idempotent.
 
 import datetime
 from dateutil.relativedelta import relativedelta
-
+from decimal import Decimal
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 

@@ -1,0 +1,34 @@
+{# demand/partials/approval_rejected_note.html #}
+{# Loaded into #approval-modal-container when "Reject" is clicked #}
+{# Context: version #}
+
+<div class="modal-overlay" id="approval-reject-modal">
+  <div class="modal">
+    <h3>Send back for revision</h3>
+    <p>Rejecting will return this version to <strong>DRAFT</strong> status.
+       Planners will be notified by email.</p>
+
+    <form
+      hx-post="/api/demand/forecast-versions/{{ version.pk }}/approve/"
+      hx-target="#approval-panel-{{ version.pk }}"
+      hx-swap="outerHTML"
+      hx-on::after-request="document.getElementById('approval-modal-container').innerHTML=''"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+    >
+      <input type="hidden" name="action" value="reject">
+      <div class="form-group">
+        <label for="reject-note">Reason for rejection <span class="hint">(shown in email)</span></label>
+        <textarea id="reject-note" name="note" rows="4"
+                  placeholder="e.g. Category totals for North region need revision…"
+                  class="form-control" required></textarea>
+      </div>
+      <div class="modal__actions">
+        <button type="submit" class="btn btn-warning">Confirm Rejection</button>
+        <button type="button" class="btn btn-link"
+                onclick="document.getElementById('approval-modal-container').innerHTML=''">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

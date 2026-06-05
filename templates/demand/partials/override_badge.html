@@ -1,0 +1,47 @@
+{# demand/partials/override_badge.html #}
+{# Context: line (ForecastLine), override (ForecastOverride) #}
+
+<td class="forecast-cell forecast-cell--overridden"
+    data-line-id="{{ line.pk }}"
+    data-override-id="{{ override.pk }}">
+
+  {# Main value #}
+  <span class="forecast-value">
+    {% if override.is_applied %}
+      {{ line.final_qty|floatformat:0 }}
+    {% else %}
+      {{ line.statistical_qty|floatformat:0 }}
+      <span class="badge badge--pending" title="Override pending disaggregation">⏳</span>
+    {% endif %}
+  </span>
+
+  {# Override chip — shows the override type and value #}
+  <span class="override-chip">
+    {% if override.override_qty is not None %}
+      <span class="override-chip__label">Qty</span>
+      <span class="override-chip__value">{{ override.override_qty|floatformat:0 }}</span>
+    {% elif override.override_pct is not None %}
+      <span class="override-chip__label">
+        {% if override.override_pct >= 0 %}+{% endif %}{{ override.override_pct }}%
+      </span>
+    {% elif override.override_value is not None %}
+      <span class="override-chip__label">₹{{ override.override_value|floatformat:0 }}</span>
+    {% endif %}
+
+    {# Links: propagation view and delete #}
+    <a class="override-chip__link"
+       hx-get="/demand/partials/override-propagation/{{ override.pk }}/"
+       hx-target="#propagation-panel"
+       hx-swap="innerHTML"
+       title="View affected lines">🔍</a>
+
+    <button class="override-chip__delete"
+            hx-delete="/api/demand/forecast-versions/{{ version.pk }}/overrides/{{ override.pk }}/"
+            hx-confirm="Revert this override? The line will return to its statistical forecast."
+            hx-target="#override-list-{{ version.pk }}"
+            hx-swap="outerHTML"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+      ✕
+    </button>
+  </span>
+</td>

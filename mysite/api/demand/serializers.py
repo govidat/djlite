@@ -6,7 +6,7 @@ from mysite.models.demand.hierarchy import (
 )
 from mysite.models.demand.forecast import (
     ForecastVersion, ForecastLine,
-    ForecastAggregate, ForecastOverride
+    ForecastAggregate, ForecastOverride, OverrideSplitWeight
 )
 
 from mysite.models.demand.forecast import (
@@ -151,11 +151,11 @@ class ForecastVersionSerializer(serializers.ModelSerializer):
             'created_by_name', 'approved_by_name',
             'approved_at', 'locked_at', 'copied_from',
             'notes', 'created_at', 'updated_at',
-            'line_count',
+            'line_count', 'run_status', 'celery_task_id', 'run_error'
         ]
         read_only_fields = [
             'status', 'approved_by_name', 'approved_at',
-            'locked_at', 'created_at', 'updated_at', 'is_editable',
+            'locked_at', 'created_at', 'updated_at', 'is_editable', 'run_status', 'celery_task_id', 'run_error'
         ]
 
     def get_created_by_name(self, obj):
@@ -546,6 +546,156 @@ class SeriesProfileListSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sprint 3B.5 serializer additions
+# ─────────────────────────────────────────────────────────────────────────────
+
+#from mysite.models.demand.forecast import ForecastOverride, OverrideSplitWeight
+
+
+class OverrideSplitWeightSerializer(serializers.ModelSerializer):
+    """
+    Serializer for a single child weight in a CUSTOM override.
+    Used nested inside ForecastOverrideDetailSerializer and standalone
+    in the PUT /split-weights/ endpoint.
+    """
+
+    class Meta:
+        model  = OverrideSplitWeight
+        fields = ['id', 'child_key', 'weight']
+
+    def validate_weight(self, value):
+        if value < 0 or value > 1:
+            raise serializers.ValidationError(
+                'Weight must be between 0 and 1.'
+            )
+        return value
+
+
+class ForecastOverrideSerializer(serializers.ModelSerializer):
+    """
+    List serializer — used for GET /overrides/ (list view).
+    Lightweight: no nested split_weights to keep the list fast.
+    is_applied is read-only — owned by the Celery task.
+    """
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = ForecastOverride
+        fields = [
+            'id',
+            'override_level', 'override_key',
+            'period_type', 'period_start', 'period_end',
+            'override_qty', 'override_pct', 'override_value',
+            'disagg_method', 'override_note',
+            'is_applied', 'created_by_name', 'created_at',
+        ]
+        read_only_fields = ['id', 'is_applied', 'created_at', 'created_by_name', 'period_end']
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username
+        return None
+
+
+class ForecastOverrideDetailSerializer(ForecastOverrideSerializer):
+    """
+    Detail serializer — used for GET /overrides/{id}/ and POST response.
+    Includes nested split_weights for CUSTOM overrides.
+    """
+    split_weights = OverrideSplitWeightSerializer(many=True, read_only=True)
+
+    class Meta(ForecastOverrideSerializer.Meta):
+        fields = ForecastOverrideSerializer.Meta.fields + ['split_weights']
+
+
+class ForecastOverrideCreateSerializer(serializers.ModelSerializer):
+    """
+    Write serializer — used for POST /overrides/.
+    Enforces the mutual exclusivity of override_qty / override_pct / override_value
+    and validates that override_value is not used at SKU level.
+    The version and created_by are injected in the view's perform_create().
+    """
+
+    class Meta:
+        model  = ForecastOverride
+        fields = [
+            'override_level', 'override_key',
+            'period_type', 'period_start',
+            'override_qty', 'override_pct', 'override_value',
+            'disagg_method', 'override_note',
+        ]
+
+    def validate(self, data):
+        has_qty   = data.get('override_qty')   is not None
+        has_pct   = data.get('override_pct')   is not None
+        has_value = data.get('override_value') is not None
+        set_count = sum([has_qty, has_pct, has_value])
+
+        if set_count == 0:
+            raise serializers.ValidationError(
+                'Provide exactly one of: override_qty, override_pct, or override_value.'
+            )
+        if set_count > 1:
+            raise serializers.ValidationError(
+                'Only one of override_qty, override_pct, or override_value may be set.'
+            )
+        if has_value and data.get('override_level') == 'sku':
+            raise serializers.ValidationError(
+                'override_value cannot be used at SKU level. '
+                'Use override_qty for an absolute quantity or override_pct for a % adjustment.'
+            )
+        return data
+
+
+class OverrideSplitWeightBulkSerializer(serializers.Serializer):
+    """
+    Bulk payload for PUT /overrides/{id}/split-weights/.
+    Accepts a list of {child_key, weight} pairs.
+    Validates that weights sum to 1.0 (within floating-point tolerance).
+    """
+    weights = OverrideSplitWeightSerializer(many=True)
+
+    def validate_weights(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                'Provide at least one split weight.'
+            )
+        total = sum(float(w['weight']) for w in value)
+        if abs(total - 1.0) > 0.001:
+            raise serializers.ValidationError(
+                f'Weights must sum to 1.0. Current sum: {total:.4f}.'
+            )
+        return value
+
+
+class AffectedLineSerializer(serializers.ModelSerializer):
+    """
+    Lightweight read-only serializer for the affected-lines view.
+    Shows before/after quantities so planners can see the override impact.
+    """
+    item_id       = serializers.CharField(source='item.item_id',          read_only=True)
+    item_name     = serializers.CharField(source='item.name',             read_only=True)
+    location_code = serializers.CharField(source='planning_location.code', read_only=True)
+    customer_code = serializers.CharField(
+        source='planning_customer.code', read_only=True, default=None
+    )
+
+    class Meta:
+        model  = ForecastLine
+        fields = [
+            'id',
+            'item_id', 'item_name',
+            'location_code', 'customer_code',
+            'period_start',
+            'statistical_qty',   # original statistical forecast
+            'override_qty',      # what the override set it to
+            'final_qty',         # = override_qty if set, else statistical_qty
+            'price_used',
+            'final_value',
+        ]
+        read_only_fields = fields
     item_id           = serializers.CharField(source='item.item_id',         read_only=True)
     item_name         = serializers.CharField(source='item.name',            read_only=True)
     location_code     = serializers.CharField(

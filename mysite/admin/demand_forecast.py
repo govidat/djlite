@@ -75,7 +75,7 @@ class ForecastVersionAdmin(admin.ModelAdmin):
     list_filter  = ['client', 'status', 'period_type']
     search_fields = ['version_label', 'client__client_id']
     readonly_fields = [
-        'status', 'approved_by', 'approved_at', 'locked_at',
+        'status', 'approved_by', 'approved_at', 'locked_at', 'run_status', 'run_error', 'celery_task_id',
         'copied_from', 'created_at', 'updated_at',
     ]
     fieldsets = [
@@ -95,7 +95,7 @@ class ForecastVersionAdmin(admin.ModelAdmin):
         }),
         (_('Workflow'), {
             'fields': [
-                'status', 'created_by',
+                'status', 'run_status', 'run_error', 'celery_task_id', 'created_by',
                 'approved_by', 'approved_at', 'locked_at',
             ],
         }),

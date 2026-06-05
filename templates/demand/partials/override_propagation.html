@@ -1,0 +1,78 @@
+{# demand/partials/override_propagation.html #}
+{# Context: override, page (Page object), count #}
+
+<div class="propagation-panel" id="propagation-panel">
+
+  <div class="propagation-panel__header">
+    <h3>Lines affected by override</h3>
+    <dl class="override-meta">
+      <dt>Level</dt>  <dd>{{ override.get_override_level_display }}</dd>
+      <dt>Key</dt>    <dd>{{ override.override_key }}</dd>
+      <dt>Period</dt> <dd>{{ override.period_start }}</dd>
+      <dt>Status</dt>
+      <dd>
+        {% if override.is_applied %}
+          <span class="badge badge--applied">✓ Applied</span>
+        {% else %}
+          <span class="badge badge--pending">⏳ Pending</span>
+        {% endif %}
+      </dd>
+    </dl>
+  </div>
+
+  <table class="propagation-table">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Location</th>
+        <th>Customer</th>
+        <th>Statistical Qty</th>
+        <th>Override Qty</th>
+        <th>Final Qty</th>
+        <th>₹ Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in page.object_list %}
+      <tr class="{% if line.override_qty %}propagation-table__row--overridden{% endif %}">
+        <td>{{ line.item.item_id }} — {{ line.item.name }}</td>
+        <td>{{ line.planning_location.code }}</td>
+        <td>{{ line.planning_customer.code|default:"—" }}</td>
+        <td class="num">{{ line.statistical_qty|floatformat:0 }}</td>
+        <td class="num {% if line.override_qty %}overridden{% endif %}">
+          {{ line.override_qty|floatformat:0|default:"—" }}
+        </td>
+        <td class="num">{{ line.final_qty|floatformat:0 }}</td>
+        <td class="num">
+          {% if line.final_value %}₹{{ line.final_value|floatformat:0 }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+        <tr><td colspan="7" class="empty">No lines matched this override.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {# Pagination #}
+  {% if page.has_previous or page.has_next %}
+  <div class="propagation-panel__pagination">
+    {% if page.has_previous %}
+    <button hx-get="/demand/partials/override-propagation/{{ override.pk }}/?page={{ page.previous_page_number }}"
+            hx-target="#propagation-panel" hx-swap="outerHTML">
+      ← Previous
+    </button>
+    {% endif %}
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }} — {{ count }} total lines</span>
+    {% if page.has_next %}
+    <button hx-get="/demand/partials/override-propagation/{{ override.pk }}/?page={{ page.next_page_number }}"
+            hx-target="#propagation-panel" hx-swap="outerHTML">
+      Next →
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <button class="btn btn-link" onclick="document.getElementById('propagation-panel').innerHTML = ''">
+    Close
+  </button>
+</div>

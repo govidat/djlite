@@ -1,0 +1,9 @@
+{{ version.version_label }} — Approved
+
+{{ actor.get_full_name|default:actor.username }} has approved this forecast version.
+It is now ready to be locked for PO export.
+
+Version: {{ version.version_label }}
+Approved at: {{ timestamp|date:"d M Y H:i" }}
+
+View: {{ site_url }}/demand/forecast-versions/{{ version.pk }}/

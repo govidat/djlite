@@ -1,0 +1,10 @@
+{# demand/partials/override_key_sku.html #}
+<label>Item ID
+  <input type="text" name="override_key_item_id" required
+         placeholder="e.g. ITEM-001"
+         hx-trigger="blur"
+         hx-post="/demand/partials/encode-override-key/"
+         hx-target="#override-key-hidden"
+         hx-include="[name^='override_key_']">
+</label>
+<input type="hidden" id="override-key-hidden" name="override_key" value="{}">

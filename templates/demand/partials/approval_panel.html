@@ -1,0 +1,111 @@
+{# demand/partials/approval_panel.html #}
+{# Context: version (ForecastVersion), request.user #}
+
+<div class="approval-panel" id="approval-panel-{{ version.pk }}">
+
+  {# ── Status badge ─────────────────────────────────────────────────────── #}
+  <div class="approval-panel__status">
+    {% with s=version.status %}
+    <span class="status-badge status-badge--{{ s|lower }}">
+      {% if s == 'DRAFT' %}📝 Draft
+      {% elif s == 'IN_REVIEW' %}🔍 In Review
+      {% elif s == 'APPROVED' %}✅ Approved
+      {% elif s == 'LOCKED' %}🔒 Locked
+      {% endif %}
+    </span>
+    {% endwith %}
+
+    <span class="approval-panel__meta">
+      Created by {{ version.created_by.get_full_name|default:version.created_by.username }}
+      on {{ version.created_at|date:"d M Y" }}
+      {% if version.approved_by %}
+        · Approved by {{ version.approved_by.get_full_name|default:version.approved_by.username }}
+        on {{ version.approved_at|date:"d M Y" }}
+      {% endif %}
+      {% if version.locked_at %}
+        · Locked {{ version.locked_at|date:"d M Y" }}
+      {% endif %}
+    </span>
+  </div>
+
+  {# ── Action buttons — vary by current status ───────────────────────────── #}
+  <div class="approval-panel__actions">
+
+    {% if version.status == 'DRAFT' %}
+      {# Planners submit for review #}
+      <button class="btn btn-primary"
+              hx-post="/api/demand/forecast-versions/{{ version.pk }}/approve/"
+              hx-vals='{"action": "submit"}'
+              hx-confirm="Submit this version for review? Overrides will be frozen."
+              hx-target="#approval-panel-{{ version.pk }}"
+              hx-swap="outerHTML"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}",
+                            "Content-Type": "application/json"}'>
+        Submit for Review
+      </button>
+      <button class="btn btn-secondary"
+              hx-get="/demand/partials/approval-copy-form/{{ version.pk }}/"
+              hx-target="#approval-modal-container"
+              hx-swap="innerHTML">
+        Copy Version
+      </button>
+
+    {% elif version.status == 'IN_REVIEW' %}
+      {# Approvers can approve or reject (reject sends back to DRAFT) #}
+      <button class="btn btn-success"
+              hx-post="/api/demand/forecast-versions/{{ version.pk }}/approve/"
+              hx-vals='{"action": "approve"}'
+              hx-confirm="Approve this forecast version?"
+              hx-target="#approval-panel-{{ version.pk }}"
+              hx-swap="outerHTML"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}",
+                            "Content-Type": "application/json"}'>
+        Approve
+      </button>
+      <button class="btn btn-warning"
+              hx-get="/demand/partials/approval-reject-form/{{ version.pk }}/"
+              hx-target="#approval-modal-container"
+              hx-swap="innerHTML">
+        Reject (send back)
+      </button>
+
+    {% elif version.status == 'APPROVED' %}
+      {# Only lock action remains — this is terminal except for copy #}
+      <button class="btn btn-danger"
+              hx-post="/api/demand/forecast-versions/{{ version.pk }}/approve/"
+              hx-vals='{"action": "lock"}'
+              hx-confirm="Lock this version? It will be immutable and used as the PO baseline."
+              hx-target="#approval-panel-{{ version.pk }}"
+              hx-swap="outerHTML"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}",
+                            "Content-Type": "application/json"}'>
+        Lock for PO Export
+      </button>
+      <button class="btn btn-secondary"
+              hx-get="/demand/partials/approval-copy-form/{{ version.pk }}/"
+              hx-target="#approval-modal-container"
+              hx-swap="innerHTML">
+        Copy Version
+      </button>
+
+    {% elif version.status == 'LOCKED' %}
+      {# No mutations — only copy and export #}
+      <a class="btn btn-primary"
+         href="/api/demand/forecast-versions/{{ version.pk }}/export/"
+         download="forecast_{{ version.version_label|slugify }}.xlsx">
+        📥 Download PO Export (.xlsx)
+      </a>
+      <button class="btn btn-secondary"
+              hx-get="/demand/partials/approval-copy-form/{{ version.pk }}/"
+              hx-target="#approval-modal-container"
+              hx-swap="innerHTML">
+        Copy to New Draft
+      </button>
+    {% endif %}
+
+  </div>
+
+  {# ── Modal container — populated by HTMX for reject / copy forms ────────── #}
+  <div id="approval-modal-container"></div>
+
+</div>

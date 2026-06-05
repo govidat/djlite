@@ -301,8 +301,39 @@ class ForecastVersion(models.Model):
         verbose_name=_('copied from'),
     )
     notes = models.TextField(_('notes'), blank=True)
+    celery_task_id = models.CharField(
+        _('celery task ID'),
+        max_length=255,
+        blank=True,
+        help_text=_('ID of the Celery task chain currently running for this version.'),
+    )
+    run_status = models.CharField(
+        _('run status'),
+        max_length=16,
+        blank=True,
+        choices=[
+            ('',             _('Not started')),
+            ('QUEUED',       _('Queued')),
+            ('PROFILING',    _('Profiling series')),
+            ('RUNNING',      _('Running forecast')),
+            ('RECONCILING',  _('Reconciling')),
+            ('AGGREGATING',  _('Building aggregates')),
+            ('COMPLETE',     _('Complete')),
+            ('FAILED',       _('Failed')),
+        ],
+        help_text=_(
+            'Granular progress state of the forecast run task. '
+            'Separate from the version status workflow (DRAFT/IN_REVIEW/etc.).'
+        ),
+    )
+    run_error = models.TextField(
+        _('run error'),
+        blank=True,
+        help_text=_('Traceback if run_status=FAILED.'),
+    )    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
 
     class Meta:
         app_label           = 'mysite'

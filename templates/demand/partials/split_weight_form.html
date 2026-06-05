@@ -1,0 +1,101 @@
+{# demand/partials/split_weight_form.html #}
+{# Context: version, override_level, period_start #}
+{# Shown during override creation — weights entered before the override is saved. #}
+{# The form JS collects these into a JSON array and includes them in the POST body. #}
+
+<div class="split-weight-form" id="split-weight-form">
+  <h4>Custom split weights</h4>
+  <p class="hint">
+    Weights must sum to 1.0. Add one row per child node.
+    Example: 0.5 = 50% of the override goes to this child.
+  </p>
+
+  <table class="split-weight-table" id="split-weight-table">
+    <thead>
+      <tr>
+        <th>Child key (JSON)</th>
+        <th>Weight</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="split-weight-rows">
+      {# Rows are added by JS below #}
+    </tbody>
+  </table>
+
+  <div class="split-weight-form__total">
+    Total: <strong id="split-weight-total">0.000</strong>
+    <span id="split-weight-warning" style="color:red;display:none">
+      ⚠ Must sum to 1.0
+    </span>
+  </div>
+
+  <button type="button" class="btn btn-secondary btn-sm" id="add-weight-row">
+    + Add child
+  </button>
+
+  {#
+    On form submit, the JS below serialises the split_weights table to a hidden
+    field called "split_weights_json" which the view decodes.
+    The POST endpoint for create (Section 4A) should accept an optional
+    "split_weights_json" field and create OverrideSplitWeight rows atomically
+    with the ForecastOverride. See Section 9c for the view update.
+  #}
+</div>
+
+<script>
+(function () {
+  const tbody   = document.getElementById('split-weight-rows');
+  const totalEl = document.getElementById('split-weight-total');
+  const warnEl  = document.getElementById('split-weight-warning');
+
+  function addRow(key = '', weight = '') {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="sw-key"    type="text"   placeholder='{"item_id": "SKU-001"}' value="${key}" required></td>
+      <td><input class="sw-weight" type="number"  step="0.001" min="0" max="1"         value="${weight}" required></td>
+      <td><button type="button" class="sw-remove">✕</button></td>
+    `;
+    tr.querySelector('.sw-remove').addEventListener('click', () => {
+      tr.remove(); updateTotal();
+    });
+    tr.querySelector('.sw-weight').addEventListener('input', updateTotal);
+    tbody.appendChild(tr);
+    updateTotal();
+  }
+
+  function updateTotal() {
+    const weights = [...document.querySelectorAll('.sw-weight')]
+      .map(el => parseFloat(el.value) || 0);
+    const total = weights.reduce((a, b) => a + b, 0);
+    totalEl.textContent = total.toFixed(3);
+    warnEl.style.display = Math.abs(total - 1.0) > 0.001 ? 'inline' : 'none';
+    serialise();
+  }
+
+  function serialise() {
+    const rows = [...tbody.querySelectorAll('tr')];
+    const data = rows.map(tr => ({
+      child_key: tr.querySelector('.sw-key').value,
+      weight:    parseFloat(tr.querySelector('.sw-weight').value) || 0,
+    }));
+    const hidden = document.getElementById('split-weights-json-field');
+    if (hidden) hidden.value = JSON.stringify(data);
+  }
+
+  document.getElementById('add-weight-row').addEventListener('click', () => addRow());
+
+  // Inject a hidden field into the parent form for serialisation
+  const form = document.querySelector('.override-form');
+  if (form && !document.getElementById('split-weights-json-field')) {
+    const hidden = document.createElement('input');
+    hidden.type  = 'hidden';
+    hidden.name  = 'split_weights_json';
+    hidden.id    = 'split-weights-json-field';
+    form.appendChild(hidden);
+  }
+
+  // Seed one empty row
+  addRow();
+})();
+</script>
