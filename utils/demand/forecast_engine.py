@@ -392,7 +392,7 @@ def load_series_decisions(
             'item_id':     profile.item_id,
             'location_id': profile.planning_location_id,
             'customer_id': profile.planning_customer_id,
-            'is_manual':   profile.is_manual,
+            'is_manual':   (profile.effective_strategy == 'MANUAL'),
         }
 
     # Unclassified series — default to atomic grain

@@ -114,8 +114,19 @@ class MaterializedPathMixin(models.Model):
     def build_path(self) -> str:
         if self.parent_id is None:
             return f"{self.pk}/"
-        return f"{self.parent.path}{self.pk}/"
-
+        #return f"{self.parent.path}{self.pk}/"
+        parent = type(self).objects.get(pk=self.parent_id)
+        return f"{parent.path}{self.pk}/"
+    """
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        new_path = self.build_path()
+        if self.path != new_path:
+            self.path = new_path
+            super().save(update_fields=["path"])
+            self._update_descendant_paths()   
+    """
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         new_path = self.build_path()
@@ -125,6 +136,16 @@ class MaterializedPathMixin(models.Model):
             type(self).objects.filter(pk=self.pk).update(path=new_path)
             # Cascade path update to all descendants
             self._update_descendant_paths()
+    """
+    def _update_descendant_paths(self):
+        for child in self.children.all():
+            new_path = child.build_path()
+            if child.path != new_path:
+                child.path = new_path
+                child.save(update_fields=["path"])
+
+            child._update_descendant_paths()
+    """
 
     def _update_descendant_paths(self):
         for child in self.children.all():
@@ -426,7 +447,19 @@ class CustomerSalesAssignment(models.Model):
         return f"{self.planning_customer} → {self.sales_node} ({self.valid_from}–{to})"
 
     def clean(self):
+
         from django.core.exceptions import ValidationError
+        #if not self.client_id:
+        #    self.client = self.planning_customer.client        
+        overlapping = CustomerSalesAssignment.objects.filter(
+            planning_customer=self.planning_customer,
+            valid_to__isnull=True,
+        ).exclude(pk=self.pk)
+
+        if overlapping.exists():
+            raise ValidationError(
+                _("Customer already has an open assignment.")
+            )
         if self.valid_to and self.valid_to < self.valid_from:
             raise ValidationError(_("valid_to must be on or after valid_from."))
         if self.planning_customer.client_id != self.sales_node.client_id:

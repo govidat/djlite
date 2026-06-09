@@ -1,0 +1,3 @@
+period_start,item_id,location_code,customer_code,qty,revenue
+2024-01-01,item-001,LEAF-01,,100,
+2024-01-01,NONEXISTENT,LEAF-01,,50,

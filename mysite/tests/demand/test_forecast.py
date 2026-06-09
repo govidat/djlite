@@ -17,17 +17,23 @@ from mysite.models.demand.forecast import (
 
 @pytest.fixture
 def staff_user(db, django_user_model):
-    return django_user_model.objects.create_user(
-        username='planner', password='pw',
-        first_name='Test', last_name='Planner',
+    user, _ = django_user_model.objects.get_or_create(
+        username='planner',
+        defaults={
+            'first_name': 'Test',
+            'last_name': 'Planner',
+        },
     )
+    return user
 
 
 @pytest.fixture
 def approver_user(db, django_user_model):
-    return django_user_model.objects.create_user(
-        username='approver', password='pw',
+    user, _ = django_user_model.objects.get_or_create(
+        username='approver',
+        defaults={},
     )
+    return user
 
 
 @pytest.fixture
@@ -53,6 +59,7 @@ def forecast_line(db, draft_version, active_item, leaf_location, planning_custom
         period_type       = 'month',
         period_start      = datetime.date(2025, 1, 1),
         statistical_qty   = Decimal('480.000'),
+        final_qty         = Decimal('480.000'),   # ← add this
     )
 
 
@@ -191,22 +198,19 @@ class TestLockedVersionRejectsEdits:
             draft_version.assert_editable()
 
     def test_api_returns_403_on_locked_version(
-        self, draft_version, staff_user, approver_user, client_obj,
-        django_user_model
+        self, api_client, draft_version, staff_user, approver_user
     ):
-        """POST to approve/ on a LOCKED version returns 403."""
-        from rest_framework.test import APIClient
         from django.urls import reverse
+        test_client, _ = api_client
 
-        self._lock_version(draft_version, staff_user, approver_user)
+        # Lock the version
+        draft_version.transition_to(ForecastVersion.Status.IN_REVIEW, staff_user)
+        draft_version.transition_to(ForecastVersion.Status.APPROVED, approver_user)
+        draft_version.transition_to(ForecastVersion.Status.LOCKED, approver_user)
 
-        api = APIClient()
-        api.force_authenticate(user=staff_user)
-
+        test_client.force_authenticate(user=staff_user)
         url = reverse('demand-forecast-version-approve', kwargs={'pk': draft_version.pk})
-        response = api.post(url, {'action': 'submit'}, format='json')
-
-        # submit from LOCKED is an invalid transition → 403
+        response = test_client.post(url, {'action': 'submit'}, format='json')
         assert response.status_code == 403
 
     def test_override_on_locked_version_raises(
@@ -269,6 +273,7 @@ class TestForecastVersionCopy:
             period_type       = 'month',
             period_start      = datetime.date(2025, 2, 1),
             statistical_qty   = Decimal('320.000'),
+            final_qty         = Decimal('320.000'),   # ← add this
         )
         original_count = draft_version.lines.count()
 
@@ -525,10 +530,11 @@ class TestComputeSyntetosBoylan:
     def test_lumpy_series(self):
         """Sparse, high-variance series → LUMPY."""
         from mysite.models.demand.forecast import SeriesProfile
-        # ADI = 36/6 = 6.0 ≥ 1.32; CV² of [100,50,200,150,80,120] is high
+        # ADI = 36/6 = 6.0 ≥ 1.32; CV² needs to be ≥ 0.49
+        # Use very high variance: [1, 500, 2, 480, 3, 520] → CV² ≈ 1.4
         qty = [Decimal('0')] * 30 + [
-            Decimal('100'), Decimal('50'), Decimal('200'),
-            Decimal('150'), Decimal('80'), Decimal('120'),
+            Decimal('1'), Decimal('500'), Decimal('2'),
+            Decimal('480'), Decimal('3'), Decimal('520'),
         ]
         result = SeriesProfile.compute_syntetos_boylan(qty, self.ADI, self.CV2, self.MNZ)
         assert result['demand_class'] == 'LUMPY'
@@ -703,20 +709,15 @@ class TestSeriesProfileProperties:
 @pytest.mark.django_db
 class TestSeriesProfileAPI:
 
-    def setup_method(self):
-        from rest_framework.test import APIClient
-        self.api = APIClient()
-
     def test_patch_override_grain_valid(
-        self, series_profile, staff_user, client_obj,
+        self, api_client, series_profile, staff_user, client_obj,
         active_item, leaf_location
     ):
-        """Valid override_grain from an evaluated level is accepted."""
+        test_client, _ = api_client
         from mysite.models.demand.forecast import SeriesLevelEvaluation
         from django.urls import reverse
         import datetime
 
-        # Create an evaluation row so validate_override_grain passes
         SeriesLevelEvaluation.objects.create(
             client=client_obj, item=active_item, planning_customer=None,
             period_type='month',
@@ -734,49 +735,48 @@ class TestSeriesProfileAPI:
             recommended_strategy='CROSTON',
         )
 
-        self.api.force_authenticate(user=staff_user)
+        test_client.force_authenticate(user=staff_user)
         url = reverse('demand-series-profile-detail', kwargs={'pk': series_profile.pk})
-        response = self.api.patch(
+        response = test_client.patch(
             url,
             {'override_grain': 'item_loc_depth_1', 'override_note': 'Manual review'},
             format='json',
         )
         assert response.status_code == 200
         data = response.json()
-        assert data['override_grain']   == 'item_loc_depth_1'
-        assert data['is_overridden']    is True
-        assert data['effective_grain']  == 'item_loc_depth_1'
+        assert data['override_grain']  == 'item_loc_depth_1'
+        assert data['is_overridden']   is True
+        assert data['effective_grain'] == 'item_loc_depth_1'
 
     def test_patch_disallowed_field_rejected(
-        self, series_profile, staff_user
+        self, api_client, series_profile, staff_user
     ):
-        """Attempting to patch a read-only field returns 400."""
+        test_client, _ = api_client
         from django.urls import reverse
-        self.api.force_authenticate(user=staff_user)
+        test_client.force_authenticate(user=staff_user)
         url = reverse('demand-series-profile-detail', kwargs={'pk': series_profile.pk})
-        response = self.api.patch(
+        response = test_client.patch(
             url,
-            {'chosen_grain': 'item_client'},  # read-only field
+            {'chosen_grain': 'item_client'},
             format='json',
         )
         assert response.status_code == 400
         assert 'not writable' in response.json()['detail']
 
     def test_patch_invalid_grain_rejected(
-        self, series_profile, staff_user
+        self, api_client, series_profile, staff_user
     ):
-        """Grain string not matching any evaluated level is rejected."""
+        test_client, _ = api_client
         from django.urls import reverse
-        self.api.force_authenticate(user=staff_user)
+        test_client.force_authenticate(user=staff_user)
         url = reverse('demand-series-profile-detail', kwargs={'pk': series_profile.pk})
-        response = self.api.patch(
+        response = test_client.patch(
             url,
-            {'override_grain': 'item_loc_depth_99'},  # no evaluation at this level
+            {'override_grain': 'item_loc_depth_99'},
             format='json',
         )
         assert response.status_code == 400
         assert 'valid grain' in response.json()['override_grain'][0]
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: ForecastingConfigView API
@@ -785,18 +785,14 @@ class TestSeriesProfileAPI:
 @pytest.mark.django_db
 class TestForecastingConfigAPI:
 
-    def setup_method(self):
-        from rest_framework.test import APIClient
-        self.api = APIClient()
-
     def test_get_returns_config_with_abc_tiers(
-        self, client_obj, staff_user, forecasting_config, abc_definitions
+        self, api_client, client_obj, staff_user, forecasting_config, abc_definitions
     ):
-        """GET returns the config including ABC tier definitions."""
+        test_client, _ = api_client
         from django.urls import reverse
-        self.api.force_authenticate(user=staff_user)
+        test_client.force_authenticate(user=staff_user)
         url = reverse('demand-forecasting-config')
-        response = self.api.get(url)
+        response = test_client.get(url)
         assert response.status_code == 200
         data = response.json()
         assert 'adi_threshold'         in data
@@ -805,42 +801,42 @@ class TestForecastingConfigAPI:
         assert data['abc_class_definitions'][0]['label'] == 'A'
 
     def test_get_includes_derived_time_horizons_for_period(
-        self, client_obj, staff_user, forecasting_config, abc_definitions
+        self, api_client, client_obj, staff_user, forecasting_config, abc_definitions
     ):
-        """derived_time_horizons respects the period_type query param."""
+        test_client, _ = api_client
         from django.urls import reverse
-        self.api.force_authenticate(user=staff_user)
+        test_client.force_authenticate(user=staff_user)
         url = reverse('demand-forecasting-config')
-        response = self.api.get(url, {'period_type': 'month'})
+        response = test_client.get(url, {'period_type': 'month'})
         data = response.json()
-        # Default steps=2: month → [quarter, halfyear]
         assert data['derived_time_horizons'] == ['quarter', 'halfyear']
 
     def test_patch_by_non_staff_returns_403(
-        self, client_obj, forecasting_config, abc_definitions, django_user_model
+        self, api_client, client_obj, forecasting_config, abc_definitions,
+        django_user_model
     ):
-        """Non-staff user cannot PATCH forecasting config."""
+        test_client, _ = api_client
         from django.urls import reverse
         regular_user = django_user_model.objects.create_user(
             'regular', password='pw', is_staff=False
         )
-        self.api.force_authenticate(user=regular_user)
+        test_client.force_authenticate(user=regular_user)
         url = reverse('demand-forecasting-config')
-        response = self.api.patch(url, {'time_horizon_steps': 3}, format='json')
+        response = test_client.patch(url, {'time_horizon_steps': 3}, format='json')
         assert response.status_code == 403
 
     def test_patch_by_staff_updates_threshold(
-        self, client_obj, staff_user, forecasting_config, abc_definitions,
+        self, api_client, client_obj, staff_user, forecasting_config, abc_definitions,
         django_user_model
     ):
-        """Staff user can update ADI threshold."""
+        test_client, _ = api_client
         from django.urls import reverse
         staff = django_user_model.objects.create_user(
             'adminstaff', password='pw', is_staff=True
         )
-        self.api.force_authenticate(user=staff)
+        test_client.force_authenticate(user=staff)
         url = reverse('demand-forecasting-config')
-        response = self.api.patch(url, {'adi_threshold': '1.5000'}, format='json')
+        response = test_client.patch(url, {'adi_threshold': '1.5000'}, format='json')
         assert response.status_code == 200
         assert response.json()['adi_threshold'] == '1.5000'
         forecasting_config.refresh_from_db()

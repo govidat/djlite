@@ -815,44 +815,6 @@ class ForecastVersionApproveView(DemandFeatureMixin, APIView):
 
         version.refresh_from_db()
         return Response(ForecastVersionSerializer(version).data)
-    """ 
-    def post(self, request, pk):
-        result = is_demand_feature_disabled(request.client, 'forecast_approval')
-        if result['disabled']:
-            return Response({'detail': result['message']},
-                            status=status.HTTP_403_FORBIDDEN)
-
-        version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
-        action  = request.data.get('action', '').strip().lower()
-        note    = request.data.get('note', '').strip()
-
-        if action == 'copy':
-            new_label   = note or f'{version.version_label} (copy)'
-            new_version = version.copy(user=request.user, new_label=new_label)
-            return Response(ForecastVersionSerializer(new_version).data,
-                            status=status.HTTP_201_CREATED)
-
-        if action not in self.ACTION_TRANSITIONS:
-            return Response(
-                {'detail': (
-                    f'Unknown action "{action}". '
-                    f'Valid: submit, approve, reject, lock, copy.'
-                )},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            version.transition_to(self.ACTION_TRANSITIONS[action], user=request.user)
-        except DjangoValidationError as exc:
-            return Response({'detail': exc.message}, status=status.HTTP_403_FORBIDDEN)
-
-        if note:
-            version.notes = (version.notes + f'\n[{action}] {note}').strip()
-            version.save(update_fields=['notes'])
-
-        version.refresh_from_db()
-        return Response(ForecastVersionSerializer(version).data)
-    """
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SeriesProfile views   (NEW — from SeriesProfile additions)
@@ -1554,202 +1516,571 @@ class ForecastOverrideSplitWeightView(DemandFeatureMixin, APIView):
             status=status.HTTP_202_ACCEPTED,
         )
 
-"""   
-# mysite/views/demand/forecast_grid.py
-
-#from django.contrib.auth.decorators import login_required
-#from django.core.paginator import Paginator, EmptyPage
-from django.shortcuts import get_object_or_404, render
-
-from mysite.models.demand.forecast import ForecastVersion, ForecastLine, ForecastOverride
 
 
-@login_required
-def forecast_grid(request, pk):
+# ─────────────────────────────────────────────────────────────────────────────
+# Sprint 3B.6 imports — add to existing import block
+# ─────────────────────────────────────────────────────────────────────────────
+import io
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
-    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
 
-    # All periods for this version, in order
-    periods = sorted(
-        ForecastLine.objects
-        .filter(version=version)
-        .values_list('period_start', flat=True)
-        .distinct()
+# ─────────────────────────────────────────────────────────────────────────────
+# 5C. Export view
+# GET /api/demand/forecast-versions/{id}/export/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ForecastVersionExportView(DemandFeatureMixin, APIView):
+    """
+    GET /api/demand/forecast-versions/{id}/export/
+
+    Streams a formatted .xlsx workbook of ForecastLine.final_qty values.
+
+    Query params:
+        forecast_level — filter to one grain level (default: all lines)
+        location_code  — export one location only
+        period_start   — ISO date, include periods >= value
+        period_end     — ISO date, include periods <= value
+
+    Works on any version status. LOCKED versions are the canonical source
+    for purchase order input.
+
+    Response headers:
+        Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        Content-Disposition: attachment; filename="forecast_{version_label}.xlsx"
+    """
+    permission_classes = [IsAuthenticated]
+
+    # Openpyxl style constants — defined once, reused across rows
+    _HEADER_FONT     = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+    _HEADER_FILL     = PatternFill('solid', start_color='1F4E79')   # dark navy
+    _PERIOD_FONT     = Font(name='Arial', bold=True, color='FFFFFF', size=10)
+    _PERIOD_FILL     = PatternFill('solid', start_color='2E75B6')   # mid-blue
+    _SUBHEADER_FONT  = Font(name='Arial', bold=True, size=10)
+    _BODY_FONT       = Font(name='Arial', size=10)
+    _OVR_FILL        = PatternFill('solid', start_color='FFF2CC')   # pale yellow
+    _THIN_BORDER     = Border(
+        bottom=Side(style='thin', color='DEE2E6'),
+        right =Side(style='thin', color='DEE2E6'),
     )
-    period_labels = [p.strftime('%b-%y') for p in periods]
+    _NUM_FMT         = '#,##0.000'   # 3 d.p. for quantities
+    _VAL_FMT         = '₹#,##0.00'  # 2 d.p. for values
 
-    # Active overrides keyed by (item_id, location_code, period_start)
-    # Used to attach the override object to each cell
-    applied_overrides = {
-        (o.override_key.get('item_id'), o.period_start): o
-        for o in ForecastOverride.objects.filter(
-            version=version,
-            override_level='sku',
-        ).select_related('created_by')
-    }
+    def get(self, request, pk):
+        version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
 
-    # Paginated lines — page by unique (location, item, customer) key
-    # Build a list of unique row keys first, then fetch lines for that page
-    row_keys = list(
-        ForecastLine.objects
-        .filter(version=version)
-        .order_by('planning_location__code', 'item__item_id')
-        .values_list(
-            'planning_location__code',
-            'item__item_id',
-            'planning_customer__code',
-        )
-        .distinct()
-    )
-
-    page_size = int(request.GET.get('page_size', 50))
-    page_num  = int(request.GET.get('page', 1))
-    paginator = Paginator(row_keys, page_size)
-    try:
-        page = paginator.page(page_num)
-    except EmptyPage:
-        page = paginator.page(paginator.num_pages)
-
-    page_keys = list(page.object_list)
-
-    # Fetch all lines for the current page keys in one query
-    from django.db.models import Q
-    key_filter = Q()
-    for loc_code, item_id, cust_code in page_keys:
-        key_filter |= Q(
-            planning_location__code=loc_code,
-            item__item_id=item_id,
-            planning_customer__code=cust_code,
+        # ── Build ForecastLine queryset ───────────────────────────────────────
+        qs = (
+            ForecastLine.objects
+            .filter(version=version)
+            .select_related('item', 'planning_location', 'planning_customer')
+            .order_by(
+                'planning_location__code',
+                'item__item_id',
+                'planning_customer__code',
+                'period_start',
+            )
         )
 
-    page_lines = (
-        ForecastLine.objects
-        .filter(version=version)
-        .filter(key_filter)
-        .select_related('item', 'planning_location', 'planning_customer')
-        .order_by('planning_location__code', 'item__item_id', 'period_start')
-    )
+        p = request.query_params
+        if p.get('forecast_level'):
+            qs = qs.filter(forecast_level=p['forecast_level'])
+        if p.get('location_code'):
+            qs = qs.filter(planning_location__code=p['location_code'])
+        if p.get('period_start'):
+            try:
+                import datetime
+                qs = qs.filter(
+                    period_start__gte=datetime.date.fromisoformat(p['period_start'])
+                )
+            except ValueError:
+                pass
+        if p.get('period_end'):
+            try:
+                import datetime
+                qs = qs.filter(
+                    period_end__lte=datetime.date.fromisoformat(p['period_end'])
+                )
+            except ValueError:
+                pass
 
-    # Pivot into grid_rows
-    line_index: dict[tuple, dict] = {}
-    for line in page_lines:
-        row_key = (
-            line.planning_location.code,
-            line.item.item_id,
-            line.planning_customer.code if line.planning_customer else '',
+        lines = list(qs)
+
+        if not lines:
+            return Response(
+                {'detail': 'No forecast lines found for the specified filters.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ── Build workbook ────────────────────────────────────────────────────
+        wb = Workbook()
+        self._build_forecast_sheet(wb, version, lines)
+        self._build_summary_sheet(wb, version)
+
+        # ── Stream response ───────────────────────────────────────────────────
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        safe_label = version.version_label.replace(' ', '_').replace('/', '-')
+        filename   = f'forecast_{safe_label}.xlsx'
+
+        response = HttpResponse(
+            buf.read(),
+            content_type=(
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ),
         )
-        if row_key not in line_index:
-            line_index[row_key] = {
-                'key':           '-'.join(row_key),
-                'location_code': line.planning_location.code,
-                'item_id':       line.item.item_id,
-                'item_name':     line.item.name,
-                'customer_code': line.planning_customer.code
-                                 if line.planning_customer else '',
-                'cells':         [],
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    # ── Sheet builders ────────────────────────────────────────────────────────
+
+    def _build_forecast_sheet(self, wb, version, lines):
+        """
+        Sheet 1: Location × Item × Period matrix.
+
+        Structure:
+          Row 1  — workbook title (merged)
+          Row 2  — version meta (merged)
+          Row 3  — blank
+          Row 4  — column headers (Location, Item ID, Item Name, Customer,
+                                   UOM, Price, <period_1>, <period_2>, …)
+          Row 5+ — one row per unique (location, item, customer) with
+                   final_qty in each period column.
+        """
+        ws = wb.active
+        ws.title = 'Forecast'
+
+        # ── Collect distinct periods in order ─────────────────────────────────
+        periods = sorted({line.period_start for line in lines})
+        period_labels = [
+            p.strftime('%b-%y') for p in periods   # e.g. Jan-25
+        ]
+
+        # ── Fixed columns ─────────────────────────────────────────────────────
+        fixed_cols = [
+            'Location', 'Item ID', 'Item Name', 'Customer', 'UOM', 'Price (₹)'
+        ]
+        n_fixed   = len(fixed_cols)
+        n_periods = len(periods)
+        total_cols = n_fixed + n_periods
+
+        # ── Row 1: workbook title ─────────────────────────────────────────────
+        ws.merge_cells(start_row=1, start_column=1,
+                       end_row=1,   end_column=total_cols)
+        title_cell = ws.cell(row=1, column=1,
+                             value=f'Demand Forecast — {version.version_label}')
+        title_cell.font      = Font(name='Arial', bold=True, size=13, color='1F4E79')
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[1].height = 24
+
+        # ── Row 2: version meta ───────────────────────────────────────────────
+        ws.merge_cells(start_row=2, start_column=1,
+                       end_row=2,   end_column=total_cols)
+        meta_cell = ws.cell(
+            row=2, column=1,
+            value=(
+                f'Status: {version.status}  |  '
+                f'Period: {version.period_type}  |  '
+                f'Base end: {version.base_period_end}  |  '
+                f'Horizon: {version.horizon_periods} periods  |  '
+                f'Exported: {__import__("datetime").date.today()}'
+            )
+        )
+        meta_cell.font      = Font(name='Arial', size=9, italic=True, color='6C757D')
+        meta_cell.alignment = Alignment(horizontal='left')
+        ws.row_dimensions[2].height = 16
+
+        # ── Row 3: blank spacer ───────────────────────────────────────────────
+        ws.row_dimensions[3].height = 6
+
+        # ── Row 4: column headers ─────────────────────────────────────────────
+        header_row = 4
+        for col_idx, label in enumerate(fixed_cols, start=1):
+            cell = ws.cell(row=header_row, column=col_idx, value=label)
+            cell.font      = self._HEADER_FONT
+            cell.fill      = self._HEADER_FILL
+            cell.alignment = Alignment(horizontal='center', vertical='center',
+                                       wrap_text=True)
+            cell.border    = self._THIN_BORDER
+
+        for p_idx, label in enumerate(period_labels, start=n_fixed + 1):
+            cell = ws.cell(row=header_row, column=p_idx, value=label)
+            cell.font      = self._PERIOD_FONT
+            cell.fill      = self._PERIOD_FILL
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border    = self._THIN_BORDER
+
+        ws.row_dimensions[header_row].height = 28
+
+        # ── Pivot: (location, item, customer) → {period_start: final_qty} ────
+        pivot: dict[tuple, dict] = {}
+        meta:  dict[tuple, dict] = {}   # static metadata per row key
+
+        for line in lines:
+            key = (
+                line.planning_location.code,
+                line.item.item_id,
+                line.planning_customer.code if line.planning_customer else '',
+            )
+            if key not in pivot:
+                pivot[key] = {}
+                meta[key]  = {
+                    'location_name': line.planning_location.name
+                                     if hasattr(line.planning_location, 'name')
+                                     else line.planning_location.code,
+                    'item_name':     line.item.name,
+                    'uom':           getattr(line.item, 'uom', 'EA'),
+                    'price':         float(line.price_used) if line.price_used else '',
+                    'has_override':  False,
+                }
+            pivot[key][line.period_start] = float(line.final_qty)
+            if line.override_qty is not None:
+                meta[key]['has_override'] = True
+
+        # ── Data rows ─────────────────────────────────────────────────────────
+        data_start_row = header_row + 1
+        for row_idx, (key, period_qtys) in enumerate(
+            sorted(pivot.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][2])),
+            start=data_start_row,
+        ):
+        #for row_idx, (key, period_qtys) in enumerate(
+        #    sorted(pivot.keys(), key=lambda k: (k[0], k[1], k[2])),
+        #    start=data_start_row,
+        #):
+            loc_code, item_id, cust_code = key
+            m = meta[key]
+            fill = self._OVR_FILL if m['has_override'] else None
+
+            fixed_values = [
+                loc_code,
+                item_id,
+                m['item_name'],
+                cust_code or '—',
+                m['uom'],
+                m['price'],
+            ]
+            for col_idx, val in enumerate(fixed_values, start=1):
+                cell         = ws.cell(row=row_idx, column=col_idx, value=val)
+                cell.font    = self._BODY_FONT
+                cell.border  = self._THIN_BORDER
+                if fill:
+                    cell.fill = fill
+                if col_idx == n_fixed:   # Price column — right-align, number format
+                    cell.alignment  = Alignment(horizontal='right')
+                    cell.number_format = '#,##0.00'
+
+            for p_idx, period_start in enumerate(periods, start=n_fixed + 1):
+                qty  = period_qtys.get(period_start, '')
+                cell = ws.cell(row=row_idx, column=p_idx, value=qty)
+                cell.font   = self._BODY_FONT
+                cell.border = self._THIN_BORDER
+                if qty != '':
+                    cell.number_format = self._NUM_FMT
+                    cell.alignment     = Alignment(horizontal='right')
+                if fill:
+                    cell.fill = fill
+
+        # ── Column widths ─────────────────────────────────────────────────────
+        col_widths = [14, 12, 28, 16, 6, 12] + [10] * n_periods
+        for col_idx, width in enumerate(col_widths, start=1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+        # ── Freeze panes: freeze fixed columns + header rows ──────────────────
+        ws.freeze_panes = ws.cell(
+            row=data_start_row, column=n_fixed + 1
+        )
+
+        # ── Legend row below data ─────────────────────────────────────────────
+        legend_row = data_start_row + len(pivot) + 1
+        ws.merge_cells(start_row=legend_row, start_column=1,
+                       end_row=legend_row, end_column=4)
+        legend_cell = ws.cell(
+            row=legend_row, column=1,
+            value='⬛ Highlighted rows have planner overrides applied.'
+        )
+        legend_cell.fill = self._OVR_FILL
+        legend_cell.font = Font(name='Arial', size=9, italic=True)
+
+    def _build_summary_sheet(self, wb, version):
+        """
+        Sheet 2: Period-level summary from ForecastAggregate (agg_level='total').
+        Falls back to aggregating ForecastLine if no aggregate rows exist.
+        """
+        ws = wb.create_sheet(title='Summary')
+
+        from mysite.models.demand.forecast import ForecastAggregate
+        from django.db.models import Sum, Count, Q
+
+        # Try ForecastAggregate first (populated by 3B.4 write_forecast_aggregates)
+        agg_rows = (
+            ForecastAggregate.objects
+            .filter(version=version, agg_level='total')
+            .order_by('period_start')
+        )
+
+        # ── Header ────────────────────────────────────────────────────────────
+        headers = [
+            'Period', 'Period Start', 'Total Final Qty',
+            'Total Final Value (₹)', 'Override Count',
+        ]
+        for col_idx, label in enumerate(headers, start=1):
+            cell       = ws.cell(row=1, column=col_idx, value=label)
+            cell.font  = self._HEADER_FONT
+            cell.fill  = self._HEADER_FILL
+            cell.border= self._THIN_BORDER
+            cell.alignment = Alignment(horizontal='center')
+        ws.row_dimensions[1].height = 22
+
+        # ── Data ──────────────────────────────────────────────────────────────
+        if agg_rows.exists():
+            for row_idx, agg in enumerate(agg_rows, start=2):
+                override_count = (
+                    ForecastLine.objects
+                    .filter(
+                        version      = version,
+                        period_start = agg.period_start,
+                        override_qty__isnull=False,
+                    )
+                    .count()
+                )
+                row_data = [
+                    agg.period_start.strftime('%b-%y'),
+                    agg.period_start,
+                    float(agg.final_qty),
+                    float(agg.total_final_value) if agg.total_final_value else '',
+                    override_count,
+                ]
+                for col_idx, val in enumerate(row_data, start=1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                    cell.font   = self._BODY_FONT
+                    cell.border = self._THIN_BORDER
+                    if col_idx == 3:
+                        cell.number_format = self._NUM_FMT
+                        cell.alignment     = Alignment(horizontal='right')
+                    if col_idx == 4 and val != '':
+                        cell.number_format = '#,##0.00'
+                        cell.alignment     = Alignment(horizontal='right')
+
+        else:
+            # Fallback: aggregate directly from ForecastLine
+            summary = (
+                ForecastLine.objects
+                .filter(version=version)
+                .values('period_start')
+                .annotate(
+                    total_qty   = Sum('final_qty'),
+                    total_value = Sum('final_value'),
+                    ovr_count   = Count('pk', filter=Q(override_qty__isnull=False)),
+                )
+                .order_by('period_start')
+            )
+            for row_idx, row in enumerate(summary, start=2):
+                ps = row['period_start']
+                row_data = [
+                    ps.strftime('%b-%y'),
+                    ps,
+                    float(row['total_qty']  or 0),
+                    float(row['total_value'] or 0),
+                    row['ovr_count'],
+                ]
+                for col_idx, val in enumerate(row_data, start=1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                    cell.font   = self._BODY_FONT
+                    cell.border = self._THIN_BORDER
+                    if col_idx == 3:
+                        cell.number_format = self._NUM_FMT
+                        cell.alignment     = Alignment(horizontal='right')
+                    if col_idx == 4:
+                        cell.number_format = '#,##0.00'
+                        cell.alignment     = Alignment(horizontal='right')
+
+        # ── Add totals row using Excel SUM formulas ───────────────────────────
+        last_data_row = ws.max_row
+        totals_row    = last_data_row + 1
+        ws.cell(row=totals_row, column=1, value='TOTAL').font = self._SUBHEADER_FONT
+        for col_idx in (3, 4):
+            col_letter = get_column_letter(col_idx)
+            total_cell = ws.cell(
+                row=totals_row, column=col_idx,
+                value=f'=SUM({col_letter}2:{col_letter}{last_data_row})',
+            )
+            total_cell.font   = self._SUBHEADER_FONT
+            total_cell.border = self._THIN_BORDER
+            total_cell.number_format = (
+                self._NUM_FMT if col_idx == 3 else '#,##0.00'
+            )
+            total_cell.alignment = Alignment(horizontal='right')
+
+        # ── Column widths ─────────────────────────────────────────────────────
+        for col_idx, width in enumerate([10, 14, 18, 22, 16], start=1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
+    """
+    GET /api/demand/forecast-versions/{id}/accuracy/
+
+    Returns ForecastAccuracy records grouped and averaged by the requested
+    dimension. Uses DuckDB for fast in-memory aggregation over potentially
+    large accuracy result sets.
+
+    group_by options:
+        'category'  — grouped by Item.category (or Item.subcategory)
+        'location'  — grouped by PlanningLocation.code
+        'period'    — grouped by period_start (time series of accuracy)
+        'item'      — per-item MAPE/Bias (for detailed drilldown)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        import datetime
+        import duckdb
+        import pandas as pd
+        from mysite.models.demand.forecast import ForecastAccuracy
+
+        version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+
+        group_by = request.query_params.get('group_by', 'category').lower()
+        if group_by not in ('category', 'location', 'period', 'item'):
+            return Response(
+                {'detail': 'group_by must be one of: category, location, period, item.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Build queryset ────────────────────────────────────────────────────
+        qs_base = ForecastAccuracy.objects.filter(version=version)
+
+        if not qs_base.exists():
+            return Response({
+                'version_id':    version.pk,
+                'version_label': version.version_label,
+                'group_by':      group_by,
+                'count':         0,
+                'overall':       None,
+                'results':       [],
+                'detail': (
+                    'No accuracy records found. Run the compute_accuracy task '
+                    'after actuals have landed for the forecast period.'
+                ),
+            })
+
+        qs = (
+            qs_base
+            .select_related('item', 'planning_location')
+            .values(
+                'item__item_id',
+                'item__name',
+                'planning_location__code',
+                'planning_location__name',
+                'period_start',
+                'actual_qty',
+                'forecast_qty',
+                'mape',
+                'bias',
+            )
+        )
+        p = request.query_params
+        if p.get('period_start'):
+            try:
+                qs = qs.filter(
+                    period_start__gte=datetime.date.fromisoformat(p['period_start'])
+                )
+            except ValueError:
+                pass
+        if p.get('period_end'):
+            try:
+                qs = qs.filter(
+                    period_start__lte=datetime.date.fromisoformat(p['period_end'])
+                )
+            except ValueError:
+                pass
+
+        df = pd.DataFrame(list(qs))
+        # Rename columns for DuckDB readability
+        df.columns = [c.replace('__', '_') for c in df.columns]
+        # Ensure numeric types
+        for col in ('mape', 'bias', 'actual_qty', 'forecast_qty'):
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        con = duckdb.connect()
+        con.register('acc', df)
+
+        # ── Group-by SQL ──────────────────────────────────────────────────────
+        group_col_map = {
+            'category': 'item_item_id, item_name',     # group by both# no category field — group by item instead
+            'location': 'planning_location_code',
+            'period':   'period_start',
+            'item':     'item_item_id, item_name',     # group by both
+        }
+        group_col = group_col_map[group_by]
+
+        group_label_map = {
+            'category': "item_item_id || ' — ' || item_name AS group_key",
+            'location': 'planning_location_code AS group_key',
+            'period':   "CAST(period_start AS VARCHAR) AS group_key",
+            'item':     "item_item_id || ' — ' || item_name AS group_key",
+        }
+        group_label = group_label_map[group_by]
+
+        grouped = con.execute(f"""
+            SELECT
+                {group_label},
+                AVG(mape)              AS mean_mape,
+                AVG(bias)              AS mean_bias,
+                MIN(mape)              AS min_mape,
+                MAX(mape)              AS max_mape,
+                COUNT(*)               AS record_count,
+                -- % of periods that are over-forecast (bias > 0)
+                100.0 * SUM(CASE WHEN bias > 0 THEN 1 ELSE 0 END)
+                    / NULLIF(COUNT(*), 0) AS over_forecast_pct
+            FROM acc
+            WHERE mape IS NOT NULL
+            GROUP BY {group_col}
+            ORDER BY mean_mape ASC NULLS LAST
+        """).df()
+
+        overall = con.execute("""
+            SELECT
+                AVG(mape)  AS mean_mape,
+                AVG(bias)  AS mean_bias,
+                COUNT(*)   AS record_count
+            FROM acc
+            WHERE mape IS NOT NULL
+        """).fetchone()
+
+        con.close()
+
+        def _fmt(val):
+            if val is None or pd.isna(val):
+                return None
+            return f'{float(val):.2f}'
+
+        results = [
+            {
+                'group_key':         row['group_key'],
+                'mean_mape':         _fmt(row['mean_mape']),
+                'mean_bias':         _fmt(row['mean_bias']),
+                'min_mape':          _fmt(row['min_mape']),
+                'max_mape':          _fmt(row['max_mape']),
+                'record_count':      int(row['record_count']),
+                'over_forecast_pct': _fmt(row['over_forecast_pct']),
             }
-        ovr = applied_overrides.get((line.item.item_id, line.period_start))
-        line_index[row_key]['cells'].append({
-            'line':         line,
-            'period_label': line.period_start.strftime('%b-%y'),
-            'override':     ovr,
+            for _, row in grouped.iterrows()
+        ]
+
+        return Response({
+            'version_id':    version.pk,
+            'version_label': version.version_label,
+            'group_by':      group_by,
+            'count':         len(results),
+            'overall': {
+                'mean_mape':    _fmt(overall[0]) if overall else None,
+                'mean_bias':    _fmt(overall[1]) if overall else None,
+                'record_count': int(overall[2])  if overall else 0,
+            },
+            'results': results,
         })
-
-    grid_rows = [line_index[k] for k in page_keys if k in line_index]
-
-    from mysite.models import PlanningLocation
-    locations = (
-        PlanningLocation.objects
-        .filter(client=request.client)
-        .order_by('code')
-    )
-
-    overrides = (
-        ForecastOverride.objects
-        .filter(version=version)
-        .select_related('created_by')
-        .order_by('-created_at')
-    )
-
-    return render(request, 'demand/forecast_grid.html', {
-        'version':       version,
-        'lines':         page,           # Page object for pagination controls
-        'periods':       periods,
-        'period_labels': period_labels,
-        'grid_rows':     grid_rows,
-        'overrides':     overrides,
-        'locations':     locations,
-    })
-
-from django.shortcuts import render
-#from django.contrib.auth.decorators import login_required
-
-
-@login_required
-def override_key_field(request):
-
-    level = request.GET.get('override_level', 'sku')
-    return render(request, f'demand/partials/override_key_{level}.html', {
-        'level': level,
-    })
-
-
-@login_required
-def override_value_inputs(request):
-
-    mode = request.GET.get('mode', 'qty')
-    return render(request, f'demand/partials/override_value_{mode}.html', {
-        'mode': mode,
-    })
-
-@login_required
-def encode_override_key(request):
-
-    import json
-    from django.http import HttpResponse
-
-    key = {}
-    for k, v in request.POST.items():
-        if k.startswith('override_key_') and v:
-            field = k[len('override_key_'):]
-            key[field] = v
-
-    encoded = json.dumps(key)
-    return HttpResponse(
-        f'<input type="hidden" id="override-key-hidden" '
-        f'name="override_key" value=\'{encoded}\'>',
-        content_type='text/html',
-    )
-
-#from django.core.paginator import Paginator, EmptyPage
-#from mysite.models.demand.forecast import ForecastOverride, ForecastVersion
-#from mysite.api.demand.views import _build_affected_lines_qs   # reuse the helper
-
-
-@login_required
-def override_propagation(request, override_id):
-
-    override = get_object_or_404(
-        ForecastOverride,
-        pk=override_id,
-        version__client=request.client,
-    )
-    version = override.version
-
-    qs      = _build_affected_lines_qs(override, version)
-    page_size = 50
-    page_num  = int(request.GET.get('page', 1))
-    paginator = Paginator(qs, page_size)
-    try:
-        page = paginator.page(page_num)
-    except EmptyPage:
-        page = paginator.page(paginator.num_pages)
-
-    return render(request, 'demand/partials/override_propagation.html', {
-        'override': override,
-        'version':  version,
-        'page':     page,
-        'count':    paginator.count,
-    })
-
-"""

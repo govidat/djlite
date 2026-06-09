@@ -446,7 +446,9 @@ class ForecastVersion(models.Model):
                 period_end        = line.period_end,
                 statistical_qty   = line.statistical_qty,
                 override_qty      = line.override_qty,
-                # final_qty is recomputed in save() — don't copy it directly
+                # bulk_create bypasses save(), so compute final_qty explicitly here
+                final_qty         = line.override_qty if line.override_qty is not None
+                                    else line.statistical_qty,
             )
             for line in original_lines
         ]
@@ -1724,6 +1726,9 @@ class SeriesProfile(models.Model):
     def is_overridden(self) -> bool:
         return bool(self.override_grain or self.override_strategy)
 
+    @property
+    def is_manual(self) -> bool:
+        return self.effective_strategy == 'MANUAL'
     # ── Classification pure functions ─────────────────────────────────────────
 
     @classmethod

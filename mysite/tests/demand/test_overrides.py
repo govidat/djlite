@@ -16,64 +16,6 @@ from mysite.models.demand.forecast import (
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Shared fixtures
-# ─────────────────────────────────────────────────────────────────────────────
-
-@pytest.fixture
-def api_client(db, django_user_model):
-    user = django_user_model.objects.create_user(username='planner', password='pass')
-    client = APIClient()
-    client.force_authenticate(user=user)
-    return client, user
-
-
-@pytest.fixture
-def draft_version_with_lines(db, draft_version, active_item, leaf_location):
-    """
-    A DRAFT version with two ForecastLine rows for January 2025.
-    line_a: ITEM-001 | NULL | LEAF-01 | statistical_qty=100
-    line_b: ITEM-002 | NULL | LEAF-01 | statistical_qty=200
-    """
-    from mysite.models.demand.forecast import ForecastLine
-    import datetime
-
-    line_a = ForecastLine.objects.create(
-        version              = draft_version,
-        item                 = active_item,
-        planning_location    = leaf_location,
-        planning_customer    = None,
-        period_type          = 'month',
-        period_start         = datetime.date(2025, 1, 1),
-        period_end           = datetime.date(2025, 1, 31),
-        statistical_qty      = Decimal('100.000'),
-        final_qty            = Decimal('100.000'),
-        price_used           = Decimal('150.00'),
-        statistical_value    = Decimal('15000.00'),
-        final_value          = Decimal('15000.00'),
-        model_used           = 'AutoETS',
-        forecast_level       = 'item_cust_location',
-    )
-    # Second item (assume you have a second active_item fixture; adapt as needed)
-    line_b = ForecastLine.objects.create(
-        version              = draft_version,
-        item                 = active_item,   # same item — different location in real test
-        planning_location    = leaf_location,
-        planning_customer    = None,
-        period_type          = 'month',
-        period_start         = datetime.date(2025, 2, 1),
-        period_end           = datetime.date(2025, 2, 28),
-        statistical_qty      = Decimal('200.000'),
-        final_qty            = Decimal('200.000'),
-        price_used           = Decimal('150.00'),
-        statistical_value    = Decimal('30000.00'),
-        final_value          = Decimal('30000.00'),
-        model_used           = 'AutoETS',
-        forecast_level       = 'item_cust_location',
-    )
-    return draft_version, line_a, line_b
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Test class: POST /overrides/ — create
 # ─────────────────────────────────────────────────────────────────────────────
 

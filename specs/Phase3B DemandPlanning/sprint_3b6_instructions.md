@@ -288,7 +288,7 @@ mysite/
   </div>
 </div>
 ```
-
+ 
 ### 3e. HTMX views to serve approval partials
 
 Add to `mysite/views/demand/forecast_htmx.py` (alongside the Sprint 3B.5 HTMX views):

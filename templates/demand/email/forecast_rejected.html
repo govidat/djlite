@@ -2,8 +2,13 @@
 <html>
 <body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto">
   <div style="background:#0d6efd;padding:16px;border-radius:4px 4px 0 0">
-    <h2 style="color:#198754;margin:0">✅ Forecast Approved</h2>
+    <h2 style="color:#fd7e14;margin:0">⚠️ Forecast Sent Back for Revision</h2>
   </div>
+  {% if note %}
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:12px;margin:16px 0">
+      <strong>Reason:</strong> {{ note }}
+    </div>
+  {% endif %}
   <div style="padding:24px;border:1px solid #dee2e6;border-top:none;border-radius:0 0 4px 4px">
 
     <table style="width:100%;border-collapse:collapse;margin:16px 0">

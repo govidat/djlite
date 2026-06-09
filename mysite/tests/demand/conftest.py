@@ -21,19 +21,16 @@ The fix is to use get_or_create in the planner_user fixture instead of create_us
 # mysite/tests/demand/conftest.py
 # mysite/tests/demand/conftest.py
 
-# mysite/tests/demand/conftest.py
-
-# mysite/tests/demand/conftest.py
-
 import datetime
 import pytest
 from decimal import Decimal
 
+
 @pytest.fixture(autouse=True)
 def celery_eager(settings):
-    """Force all Celery tasks to run synchronously during tests."""
     settings.CELERY_TASK_ALWAYS_EAGER = True
     settings.CELERY_TASK_EAGER_PROPAGATES = True
+
 
 @pytest.fixture
 def client_obj(db):
@@ -49,12 +46,38 @@ def active_item(db, client_obj):
     from mysite.models import Item
     return Item.objects.create(
         client=client_obj,
-        item_id='ITEM-001',
+        item_id='item-001',
         name='Brake Pad',
         status='active',
     )
 
 
+@pytest.fixture
+def root_location(db, client_obj):
+    from mysite.models.demand.hierarchy import PlanningLocation
+    return PlanningLocation.objects.create(
+        client=client_obj,
+        code='ROOT',
+        name='Root',
+        is_leaf=False,
+    )
+
+@pytest.fixture
+def leaf_location(db, client_obj, root_location):
+    from mysite.models.demand.hierarchy import PlanningLocation
+
+    leaf = PlanningLocation.objects.create(
+        client=client_obj,
+        parent=root_location,
+        code='LEAF-01',
+        name='Mumbai Warehouse',
+        is_leaf=True,
+    )
+
+    leaf.refresh_from_db()
+
+    return leaf
+"""
 @pytest.fixture
 def leaf_location(db, client_obj):
     from mysite.models.demand.hierarchy import PlanningLocation
@@ -63,7 +86,7 @@ def leaf_location(db, client_obj):
         code='LEAF-01',
         name='Mumbai Warehouse',
     )
-
+"""
 
 @pytest.fixture
 def planning_customer(db, client_obj):
@@ -83,44 +106,52 @@ def planner_user(db, django_user_model):
     )
     return user
 
-
 @pytest.fixture
-def api_client(db, planner_user, client_obj):
-    """
-    Authenticated APIClient with request.client injected via
-    monkeypatching _get_draft_version — the function all override
-    views use to resolve the version from request.client.
-    """
+def api_client(db, planner_user, client_obj, settings):
     from rest_framework.test import APIClient
-
-    test_client = APIClient()
-    test_client.force_authenticate(user=planner_user)
-    return test_client, planner_user
-
-
-@pytest.fixture(autouse=True)
-def inject_request_client(monkeypatch, client_obj):
-    """
-    Patches _get_draft_version in the views module so that
-    request.client is always set to client_obj during tests.
-    This avoids the middleware entirely.
-    """
     import mysite.api.demand.views as demand_views
-    from django.shortcuts import get_object_or_404
-    from mysite.models.demand.forecast import ForecastVersion
+    from django.shortcuts import get_object_or_404 as _real_404
+    from mysite.models.demand.forecast import ForecastVersion as _FV
+
+    # Swap middleware
+    settings.MIDDLEWARE = [
+        'mysite.tests.demand.test_utils.TestClientMiddleware'
+        if 'CustomerProfileMiddleware' in m else m
+        for m in settings.MIDDLEWARE
+    ]
 
     _client_obj = client_obj
 
-    def patched_get_draft_version(request, pk):
-        # Inject client onto the request object directly
-        request.client = _client_obj
-        return get_object_or_404(ForecastVersion, pk=pk, client=_client_obj)
+    # Patch get_object_or_404 at module level (covers direct calls in views)
+    def _patched_404(klass, *args, **kwargs):
+        if 'client' in kwargs and kwargs['client'] is None:
+            kwargs['client'] = _client_obj
+        return _real_404(klass, *args, **kwargs)
 
-    monkeypatch.setattr(
-        demand_views,
-        '_get_draft_version',
-        patched_get_draft_version,
-    )
+    demand_views.get_object_or_404 = _patched_404
+
+    # Patch _get_draft_version directly (covers override views)
+    _original_get_draft = demand_views._get_draft_version
+
+    def _patched_get_draft(request, pk):
+        return _real_404(_FV, pk=pk, client=_client_obj)
+
+    demand_views._get_draft_version = _patched_get_draft
+
+    # InjectingAPIClient injects _TEST_CLIENT_OBJ into META
+    class InjectingAPIClient(APIClient):
+        def request(self, **kwargs):
+            kwargs['_TEST_CLIENT_OBJ'] = _client_obj
+            return super().request(**kwargs)
+
+    test_client = InjectingAPIClient()
+    test_client.force_authenticate(user=planner_user)
+
+    yield test_client, planner_user
+
+    # Restore originals
+    demand_views._get_draft_version = _original_get_draft
+    demand_views.get_object_or_404 = _real_404
 
 @pytest.fixture
 def draft_version(db, client_obj, planner_user):
@@ -164,3 +195,26 @@ def draft_version_with_lines(db, draft_version, active_item, leaf_location):
         )
         lines.append(line)
     return draft_version, lines[0], lines[1]
+
+@pytest.fixture
+def series_profile(db, client_obj, active_item, leaf_location, planning_customer):
+    from mysite.models.demand.forecast import SeriesProfile
+    import datetime
+    return SeriesProfile.objects.create(
+        client            = client_obj,
+        item              = active_item,
+        planning_location = leaf_location,
+        planning_customer = planning_customer,
+        period_type       = 'month',
+        analysis_from     = datetime.date(2023, 1, 1),
+        analysis_to       = datetime.date(2024, 12, 31),
+        total_periods     = 24,
+        nonzero_periods   = 20,
+        total_qty         = Decimal('2400.000'),
+        zero_rate         = Decimal('0.1667'),
+        demand_class_atomic = 'SMOOTH',
+        abc_class_atomic    = 'A',
+        chosen_grain      = 'item_cust_location',
+        chosen_strategy   = 'AUTOETS',
+        chosen_eval_period = 'month',
+    )

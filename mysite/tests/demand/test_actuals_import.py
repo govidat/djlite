@@ -5,8 +5,8 @@
 pytest mysite/tests/demand/ -v
 
 # Run only import tests
-pytest mysite/tests/demand/test_actuals_import.py -v
-
+pytest mysite/tests/demand/test_actuals_import.py -v --tb=short
+pytest mysite/tests/demand/test_export_approval.py -v --tb=short
 # Run with coverage
 pytest mysite/tests/demand/ --cov=mysite.models.demand --cov=mysite.tasks.demand --cov-report=term-missing
 """
@@ -57,17 +57,17 @@ class TestActualsImport:
         rows = [
             {
                 'period_start': '2024-01-01',
-                'item_id': 'ITEM-001',
+                'item_id': 'item-001',
                 'location_code': 'LEAF-01',
-                'customer_code': 'CUST-001',
+                'customer_code': 'CUST-01',
                 'qty': '100',
                 'revenue': '15000.00',
             },
             {
                 'period_start': '2024-02-01',
-                'item_id': 'ITEM-001',
+                'item_id': 'item-001',
                 'location_code': 'LEAF-01',
-                'customer_code': 'CUST-001',
+                'customer_code': 'CUST-01',
                 'qty': '120',
                 'revenue': '18000.00',
             },
@@ -86,8 +86,8 @@ class TestActualsImport:
     ):
         """Uploading the same file twice: row count stays the same."""
         rows = [{
-            'period_start': '2024-01-01', 'item_id': 'ITEM-001',
-            'location_code': 'LEAF-01', 'customer_code': 'CUST-001',
+            'period_start': '2024-01-01', 'item_id': 'item-001',
+            'location_code': 'LEAF-01', 'customer_code': 'CUST-01',
             'qty': '100', 'revenue': '',
         }]
         csv_content = make_csv(rows)
@@ -112,7 +112,7 @@ class TestActualsImport:
         """Row with unknown item_id → error in error_log; other rows imported."""
         rows = [
             {
-                'period_start': '2024-01-01', 'item_id': 'ITEM-001',
+                'period_start': '2024-01-01', 'item_id': 'item-001',
                 'location_code': 'LEAF-01', 'customer_code': '',
                 'qty': '100', 'revenue': '',
             },
@@ -151,7 +151,7 @@ class TestActualsImport:
         """period_start=2024-01-15 for month bucket → row error, not crash."""
         rows = [{
             'period_start': '2024-01-15',    # wrong anchor — not 1st of month
-            'item_id': 'ITEM-001', 'location_code': 'LEAF-01',
+            'item_id': 'item-001', 'location_code': 'LEAF-01',
             'customer_code': '', 'qty': '100', 'revenue': '',
         }]
         job = make_import_job(client_obj, period_type='month',
@@ -167,7 +167,7 @@ class TestActualsImport:
     ):
         """Blank customer_code → ActualSale.planning_customer is NULL."""
         rows = [{
-            'period_start': '2024-01-01', 'item_id': 'ITEM-001',
+            'period_start': '2024-01-01', 'item_id': 'item-001',
             'location_code': 'LEAF-01', 'customer_code': '',
             'qty': '75', 'revenue': '',
         }]

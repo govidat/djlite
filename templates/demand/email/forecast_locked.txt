@@ -1,0 +1,10 @@
+{{ version.version_label }} — Locked for PO Export
+
+{{ actor.get_full_name|default:actor.username }} has locked this forecast version.
+It is now immutable and available for purchase order export.
+
+Version: {{ version.version_label }}
+Locked at: {{ timestamp|date:"d M Y H:i" }}
+
+Download PO export:
+{{ site_url }}/api/demand/forecast-versions/{{ version.pk }}/export/

@@ -124,5 +124,17 @@ urlpatterns = [
         views.ForecastOverrideSplitWeightView.as_view(),
         name='demand-forecast-override-split-weights',
     ),
+    # Export as .xlsx
+    path(
+        'forecast-versions/<int:pk>/export/',
+        views.ForecastVersionExportView.as_view(),
+        name='demand-forecast-version-export',
+    ),
+    # Accuracy dashboard
+    path(
+        'forecast-versions/<int:pk>/accuracy/',
+        views.ForecastVersionAccuracyView.as_view(),
+        name='demand-forecast-version-accuracy',
+    ),
 
 ]

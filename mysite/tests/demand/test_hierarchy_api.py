@@ -21,17 +21,26 @@ import datetime
 @pytest.mark.django_db
 class TestPlanningLocationHierarchyAPI:
 
-    def setup_method(self):
-        self.api = APIClient()
-
-    def test_returns_nested_tree(self, client_obj, root_location, leaf_location, django_user_model):
-        user = django_user_model.objects.create_user('testuser', password='pw')
-        self.api.force_authenticate(user=user)
+    #def setup_method(self):
+    #    self.api = APIClient()
+    def test_returns_nested_tree(
+        self,
+        api_client,
+        root_location,
+        leaf_location,
+    ):
+        client, user = api_client
+        url = reverse("demand-location-hierarchy")
+        response = client.get(url)
+    #def test_returns_nested_tree(self, client_obj, root_location, leaf_location, django_user_model):
+        
+        #user = django_user_model.objects.create_user('testuser', password='pw')
+        #self.api.force_authenticate(user=user)
         # Attach client to request (simulate your middleware)
-        self.api.credentials(HTTP_X_CLIENT_ID=client_obj.client_id)
+        #self.api.credentials(HTTP_X_CLIENT_ID=client_obj.client_id)
 
-        url = reverse('demand-location-hierarchy')
-        response = self.api.get(url)
+        #url = reverse('demand-location-hierarchy')
+        #response = self.api.get(url)
 
         assert response.status_code == 200
         data = response.json()
@@ -48,13 +57,26 @@ class TestPlanningLocationHierarchyAPI:
         assert child['depth'] == 1
 
     def test_leaves_only_param_returns_flat_list(
-        self, client_obj, root_location, leaf_location, django_user_model
+        self,
+        api_client,
+        root_location,
+        leaf_location,
     ):
-        user = django_user_model.objects.create_user('user2', password='pw')
-        self.api.force_authenticate(user=user)
+        client, user = api_client
+        url = reverse("demand-location-hierarchy")
+        response = client.get(
+            url,
+            {"leaves_only": "true"}
+        )
 
-        url = reverse('demand-location-hierarchy')
-        response = self.api.get(url, {'leaves_only': 'true'})
+    #def test_leaves_only_param_returns_flat_list(
+    #    self, client_obj, root_location, leaf_location, django_user_model
+    #):
+        #user = django_user_model.objects.create_user('user2', password='pw')
+        #self.api.force_authenticate(user=user)
+
+        #url = reverse('demand-location-hierarchy')
+        #response = self.api.get(url, {'leaves_only': 'true'})
 
         assert response.status_code == 200
         data = response.json()
@@ -141,6 +163,8 @@ class TestCustomerSalesAssignment:
 
         # First assignment — open-ended
         a1 = CustomerSalesAssignment(
+            client=client_obj,
+            #a1 = CustomerSalesAssignment(
             planning_customer=planning_customer,
             sales_node=sales_leaf,
             valid_from=datetime.date(2024, 1, 1),
@@ -151,6 +175,7 @@ class TestCustomerSalesAssignment:
 
         # Second overlapping assignment — should be rejected
         a2 = CustomerSalesAssignment(
+            client=client_obj,
             planning_customer=planning_customer,
             sales_node=sales_leaf,
             valid_from=datetime.date(2024, 6, 1),

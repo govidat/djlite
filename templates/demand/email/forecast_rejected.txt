@@ -1,0 +1,11 @@
+{{ version.version_label }} — Sent Back for Revision
+
+{{ actor.get_full_name|default:actor.username }} has sent this forecast version back to DRAFT.
+
+Reason: {{ note|default:"No reason provided." }}
+
+Version: {{ version.version_label }}
+Rejected at: {{ timestamp|date:"d M Y H:i" }}
+
+Please revise and resubmit:
+{{ site_url }}/demand/forecast-versions/{{ version.pk }}/
