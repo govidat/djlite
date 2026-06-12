@@ -4,7 +4,7 @@ from django.contrib import admin
 from modeltranslation.admin import TranslationBaseModelAdmin
 
 from .base import ClientScopedMixin, _user_has_admin_role, ClientLanguageMixinV2, BaseAdminInlinecss
-from mysite.models import (Theme, ClientTemplate)
+from mysite.models import (Client, Theme, ClientTemplate)
 from mysite.forms import ClientForm
 
 from mysite.admin.page import PageInline, PageplusLayoutInline, PageplusPageContentInline, NavItemInline
@@ -17,9 +17,31 @@ class ThemeInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInline, C
     extra = 0
     classes = ['collapse']
 
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['name'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default'),
+                'classes': ('collapse',),
+            }),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        # Only add Other Languages section if client has more than one language
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
 
-    #TRANSLATED_FIELDS = ('name',)
-    #non_translated_fields = ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default')   # adjust to your actual fields
+    """
     def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
@@ -41,72 +63,7 @@ class ThemeInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInline, C
                 'classes': ('collapse',),
             }),
         )
-"""
-class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
-    form         = ClientForm
-    #list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
-    inlines      = [ThemeInline, PageInline, NavItemInline, ClientUserProfileInline, ClientTemplateInline]
-    #TRANSLATED_FIELDS = ('name', 'nb_title')
-    admin_role_only = True
-
-    def get_fieldsets(self, request, obj=None):
-
-        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-            request,
-            ['name', 'nb_title'],
-            obj
-        )
-        return (
-            ('General', {
-                'fields': ('client_id', 'parent', 'language_choices', 'default_language', 'nb_title_svg_pre', 'nb_title_svg_suf'),
-                'classes': ('collapse',),
-            }),
-            ('Main Language', {
-                'fields': main_ln_fields,
-                'classes': ('collapse',),
-            }),
-            ('Other Languages', {
-                'fields': other_ln_fields,
-                'classes': ('collapse',),
-            }),
-        )
-
-    def has_add_permission(self, request):
-        return request.user.is_superuser
-
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser
-
-    def has_change_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-        return _user_has_admin_role(request.user)
-
-    def has_module_perms(self, request):        # chatgpt
-        return request.user.is_superuser or _user_has_admin_role(request.user)
-    
-    #def has_view_permission(self, request, obj=None):
-    #    # Explicitly call mixin method — bypass TranslationBaseModelAdmin
-    #    return ClientScopedMixin.has_view_permission(self, request, obj)
-
-    #def has_change_permission(self, request, obj=None):
-    #    # Explicitly call mixin method — bypass TranslationBaseModelAdmin
-    #    return ClientScopedMixin.has_change_permission(self, request, obj)
-    
-    def get_queryset(self, request):
-        # Call NestedModelAdmin's get_queryset directly — skip TranslationBaseModelAdmin
-        qs = nested_admin.NestedModelAdmin.get_queryset(self, request)
-        if request.user.is_superuser:
-            return qs
-        # Explicitly use ClientScopedMixin method
-        return qs.filter(
-            client_id__in=ClientScopedMixin._permitted_client_ids(self, request)
-        )
-
-    class Media:
-        js = ("admin/js/layout_admin.js", "admin/js/component_admin.js",)
-
-"""
+    """
 class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
     form         = ClientForm
     #list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
@@ -116,6 +73,48 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
         'client_id',
         'name',
     ]
+    """ REDUNDANT AS IT IS IN ClientScope Mixin
+    def get_queryset(self, request):
+        # Bypass TranslationBaseModelAdmin.get_queryset — call NestedModelAdmin directly
+        qs = nested_admin.NestedModelAdmin.get_queryset(self, request)
+
+        if request.user.is_superuser:
+            return qs
+
+        permitted_ids = list(
+            Client.objects.filter(
+                groups__memberships__user=request.user,
+                groups__is_active=True,
+            ).distinct().values_list('client_id', flat=True)
+        )
+
+        return qs.filter(client_id__in=permitted_ids)
+    """
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['name', 'nb_title'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('client_id', 'parent', 'language_choices', 'default_language', 'nb_title_svg_pre', 'nb_title_svg_suf'),
+                'classes': ('collapse',),
+            }),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        # Only add Other Languages section if client has more than one language
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
+
+    """
     def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
@@ -137,7 +136,7 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
                 'classes': ('collapse',),
             }),
         )
-
+    """
     def get_inline_instances(self, request, obj=None):
         if obj is None:
             return []
@@ -148,6 +147,23 @@ class ClientContentStructuredAdmin(ClientScopedMixin, nested_admin.NestedModelAd
     fields = ('client_id',)
     inlines      = [PageplusLayoutInline]
     admin_role_only = True
+
+    def get_queryset(self, request):
+        # Bypass TranslationBaseModelAdmin.get_queryset — call NestedModelAdmin directly
+        qs = nested_admin.NestedModelAdmin.get_queryset(self, request)
+
+        if request.user.is_superuser:
+            return qs
+
+        permitted_ids = list(
+            Client.objects.filter(
+                groups__memberships__user=request.user,
+                groups__is_active=True,
+            ).distinct().values_list('client_id', flat=True)
+        )
+
+        return qs.filter(client_id__in=permitted_ids)
+        
     def has_add_permission(self, request):
         return False
     def get_inline_instances(self, request, obj=None):
@@ -160,6 +176,22 @@ class ClientContentHtmlAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, B
     fields = ('client_id',)
     inlines      = [PageplusPageContentInline]
     admin_role_only = True
+    def get_queryset(self, request):
+        # Bypass TranslationBaseModelAdmin.get_queryset — call NestedModelAdmin directly
+        qs = nested_admin.NestedModelAdmin.get_queryset(self, request)
+
+        if request.user.is_superuser:
+            return qs
+
+        permitted_ids = list(
+            Client.objects.filter(
+                groups__memberships__user=request.user,
+                groups__is_active=True,
+            ).distinct().values_list('client_id', flat=True)
+        )
+
+        return qs.filter(client_id__in=permitted_ids)
+
     def has_add_permission(self, request):
         return False
     def get_inline_instances(self, request, obj=None):
@@ -184,7 +216,31 @@ class ClientTemplateInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, nes
     classes = ['collapse']
     extra   = 0
     #fields  = ['language_code', 'html']
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['htmlblob'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('template_key', 'is_active'),
+                'classes': ('collapse',),
+            }),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        # Only add Other Languages section if client has more than one language
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
 
+    """
     def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
@@ -206,7 +262,7 @@ class ClientTemplateInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, nes
                 'classes': ('collapse',),
             })            
         )    
-
+    """
    
 class ClientTemplatewrapperAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, BaseAdminInlinecss):
     readonly_fields = ('client_id',)

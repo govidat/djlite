@@ -45,7 +45,7 @@ class TextstbItem(models.Model):
 
 class SvgtextbadgeValue(models.Model):
     textstbitem = models.OneToOneField(TextstbItem, on_delete=models.CASCADE, related_name='value')
-    text = models.TextField(blank=True, validators=text_field_validators)
+    text = models.TextField(blank=True, validators=text_field_validators) # modeltranslation blank=True to be present
 
     def __str__(self):
         return self.text[:50]

@@ -307,6 +307,17 @@ class ClientScopedMixin:
 
         permitted_clients = self._permitted_clients(request)
 
+        # Client model itself and Proxies of Client
+        #if self.model == Client:
+        #    return qs.filter(
+        #        pk__in=permitted_clients.values("pk")
+        #    )
+        
+        if issubclass(self.model, Client):
+            return qs.filter(
+                pk__in=permitted_clients.values("pk")
+            )
+
         model_fields = [f.name for f in self.model._meta.fields]
 
         # Direct client FK
@@ -468,54 +479,73 @@ class ClientLanguageMixinV2:
             }),    ....
     """    
     TRANSLATED_FIELDS = ()
-    """
-    def _all_lang_codes(self):
-        return [code for code, _ in settings.LANGUAGES]
 
-    def _get_client_languages(self, request, obj=None):
-        if request.user.is_superuser:
-            return self._all_lang_codes()
-
-        if obj and hasattr(obj, "client") and obj.client:
-            return obj.client.language_list or self._all_lang_codes()
-
-        request_client = getattr(request, "client", None)
-        if request_client and request_client.language_list:
-            return request_client.language_list
-
-        client_id = request.resolver_match.kwargs.get('object_id')
-        if client_id:
-            try:
-                client = Client.objects.get(pk=client_id)
-                return client.language_list or self._all_lang_codes()
-            except Client.DoesNotExist:
-                pass
-
-        return self._all_lang_codes()
-
-    def get_translated_field_groups(self, request, fields, obj=None):
-        
-        #Returns:
-        #    (main_fields, other_fields)
-        
-        lang_codes = self._get_client_languages(request, obj)
-        default_lang = settings.LANGUAGE_CODE
-
-        main_fields = []
-        other_fields = []
-
-        for field in fields:
-            for code in lang_codes:
-                f = f"{field}_{code}"
-                if code == default_lang:
-                    main_fields.append(f)
-                else:
-                    other_fields.append(f)
-
-        return main_fields, other_fields
-    """
     def _get_client_language_config(self, request, obj=None):
-        
+        """
+        Returns (default_language, allowed_languages).
+
+        Priority:
+        1. Superuser → full settings.LANGUAGES
+        2. obj is a Client → use obj directly
+        3. obj has a .client FK → use obj.client
+        4. URL object_id → look up Client by PK
+        5. request.client (middleware) → use if set
+        6. Fallback → full settings.LANGUAGES
+        """
+
+        # 1. Superuser gets all languages
+        if request.user.is_superuser:
+            default = settings.LANGUAGE_CODE
+            allowed = [code for code, _ in settings.LANGUAGES]
+            return default, allowed
+
+        # 2. obj is itself a Client instance (ClientAdmin change page)
+        if obj is not None and isinstance(obj, Client):
+            default = obj.default_language or settings.LANGUAGE_CODE
+            allowed = obj.language_list or [default]
+            return default, allowed
+
+        # 3. obj has a direct client FK (inline editing a related model)
+        if obj is not None and hasattr(obj, 'client') and obj.client is not None:
+            client = obj.client
+            default = client.default_language or settings.LANGUAGE_CODE
+            allowed = client.language_list or [default]
+            return default, allowed
+
+        # 4. Resolve from URL object_id (admin change page, obj not yet loaded)
+        #    This handles the case where get_fieldsets is called before obj is set
+        object_id = request.resolver_match.kwargs.get('object_id')
+        if object_id:
+            # Cache on request to avoid repeated DB hits across multiple inlines
+            if not hasattr(request, '_admin_client_lang_config'):
+                try:
+                    # object_id may be the Client PK (ClientAdmin)
+                    # or a related model PK (inline) — try Client first
+                    client = Client.objects.get(pk=object_id)
+                    request._admin_client_lang_config = (
+                        client.default_language or settings.LANGUAGE_CODE,
+                        client.language_list or [settings.LANGUAGE_CODE]
+                    )
+                except (Client.DoesNotExist, ValueError):
+                    # object_id is not a Client PK — walk up via obj
+                    request._admin_client_lang_config = None
+
+            if request._admin_client_lang_config is not None:
+                return request._admin_client_lang_config
+
+        # 5. request.client from middleware (works for non-admin URLs)
+        client = getattr(request, 'client', None)
+        if client is not None:
+            default = client.default_language or settings.LANGUAGE_CODE
+            allowed = client.language_list or [default]
+            return default, allowed
+
+        # 6. Fallback — should rarely reach here
+        default = settings.LANGUAGE_CODE
+        allowed = [code for code, _ in settings.LANGUAGES]
+        return default, allowed
+
+        """
         #Returns:
         #(default_language, allowed_languages)
         
@@ -537,9 +567,10 @@ class ClientLanguageMixinV2:
         default = settings.LANGUAGE_CODE
         allowed = [code for code, _ in settings.LANGUAGES]
         return default, allowed    
-    
-    def get_translated_field_groups(self, request, fields, obj=None):
-        
+        """
+
+
+    def get_translated_field_groups(self, request, fields, obj=None):  
         #Returns:
         #    (main_fields, other_fields)
                 
@@ -557,7 +588,8 @@ class ClientLanguageMixinV2:
                     other_fields.append(f)
 
         return main_fields, other_fields    
- 
+
+
 class BaseAdminInlinecss:
     class Media:
         css = {'all': ('admin/css/custom_inline.css',)}

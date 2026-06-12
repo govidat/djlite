@@ -385,7 +385,37 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
         if db_field.name == 'client':
             kwargs['queryset'] = self._permitted_clients(request)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
+    
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == 'locations':
+            # Scope locations to the client being edited
+            # obj_id is available from the URL when editing
+            obj_id = request.resolver_match.kwargs.get('object_id')
+            if obj_id:
+                try:
+                    from mysite.models.users import ClientGroup
+                    group  = ClientGroup.objects.select_related(
+                        'client'
+                    ).get(pk=obj_id)
+                    from mysite.models.users import ClientLocation
+                    kwargs['queryset'] = ClientLocation.objects.filter(
+                        client=group.client,
+                        is_active=True,
+                    ).order_by('location_id')
+                except ClientGroup.DoesNotExist:
+                    from mysite.models.users import ClientLocation
+                    kwargs['queryset'] = ClientLocation.objects.none()
+            else:
+                # Adding new group — no client yet, show nothing
+                # (user must save client FK first or use JS to dynamically filter)
+                from mysite.models.users import ClientLocation
+                if not request.user.is_superuser:
+                    kwargs['queryset'] = ClientLocation.objects.filter(
+                        client__in=self._permitted_clients(request),
+                        is_active=True,
+                    ).order_by('client__client_id', 'location_id')
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
+    
     def get_inlines(self, request, obj=None):
         if obj is None:
             return [ClientGroupPermissionInline]

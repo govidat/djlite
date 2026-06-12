@@ -12,7 +12,31 @@ class SvgtextbadgeValueInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, 
     classes = ['collapse']
     extra   = 0
     #fields  = ['language_code', 'html']
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['text'], obj
+        )
+        fieldsets = [
+            #('General', {
+            #    'fields': ('language_code', 'stext', 'ltext'),
+            #    'classes': ('collapse',),
+            #}),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        # Only add Other Languages section if client has more than one language
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
 
+    """
     def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
@@ -34,6 +58,7 @@ class SvgtextbadgeValueInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, 
                 'classes': ('collapse',),
             })            
         )  
+    """
 """
 class SvgtextbadgeValueInline(nested_admin.NestedTabularInline):
     model  = SvgtextbadgeValue

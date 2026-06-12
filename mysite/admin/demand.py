@@ -25,6 +25,30 @@ class PlanningLocationAdmin(ClientScopedMixin, ClientLanguageMixinV2, BaseAdminI
         'parent',
     )
     def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['name', 'level_label'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('client', 'parent', 'code', 'is_leaf', 'is_active', 'notes', 'path', 'depth'),
+                'classes': ('collapse',),
+            }),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        # Only add Other Languages section if client has more than one language
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
+    """
+    def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request,
@@ -47,6 +71,7 @@ class PlanningLocationAdmin(ClientScopedMixin, ClientLanguageMixinV2, BaseAdminI
             }),
     
         )
+    """
     """
     def has_add_permission(self, request):
         return _user_has_admin_role(request.user)
@@ -78,6 +103,30 @@ class PlanningCustomerAdmin(ClientScopedMixin, ClientLanguageMixinV2, BaseAdminI
     )
 
     def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['name', 'level_label'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('client', 'parent', 'code', 'customer_type', 'external_id', 'is_active', 'notes', 'path', 'depth' ),
+                'classes': ('collapse',),
+            }),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        # Only add Other Languages section if client has more than one language
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
+    """
+    def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request,
@@ -100,6 +149,7 @@ class PlanningCustomerAdmin(ClientScopedMixin, ClientLanguageMixinV2, BaseAdminI
             }),
     
         )
+    """
     """
     def has_add_permission(self, request):
         return _user_has_admin_role(request.user)
@@ -130,6 +180,30 @@ class SalesNodeAdmin(ClientScopedMixin, ClientLanguageMixinV2, BaseAdminInlinecs
     )
 
     def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['name', 'level_label'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('client', 'parent', 'code', 'planning_location', 'is_active'),
+                'classes': ('collapse',),
+            }),            
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        # Only add Other Languages section if client has more than one language
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
+    """
+    def get_fieldsets(self, request, obj=None):
 
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request,
@@ -152,6 +226,7 @@ class SalesNodeAdmin(ClientScopedMixin, ClientLanguageMixinV2, BaseAdminInlinecs
             }),
     
         )
+    """
     """
     def has_add_permission(self, request):
         return _user_has_admin_role(request.user)
