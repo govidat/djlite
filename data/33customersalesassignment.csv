@@ -1,2 +1,7 @@
 valid_from,valid_to,planning_customer_code,sales_node_code,client_id
 2026-05-24,2027-05-31,tvsmountroad,rmchennai,bahushira
+2000-01-01,2099-12-31,cust-chn-001,rm-ntn,autocomp
+2000-01-01,2099-12-31,cust-chn-002,rm-ntn,autocomp
+2000-01-01,2099-12-31,cust-cbe-001,rm-wtn,autocomp
+2000-01-01,2099-12-31,cust-mdu-001,rm-stn,autocomp
+2000-01-01,2099-12-31,cust-try-001,rm-ctn,autocomp

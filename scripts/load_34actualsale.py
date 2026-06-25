@@ -17,6 +17,7 @@ from mysite.models import (
 from scripts.helpers import (
     clean,
     to_decimal,
+    to_date
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -210,10 +211,22 @@ def load_val01(
             row.get("period_type"),
             lower=True,
         )
-
-        period_start = clean(
+        period_start = to_date(
             row.get("period_start")
         )
+        if not period_start:
+
+            msg = (
+                f"Invalid period_start: "
+                f"{row.get('period_start')}"
+            )
+
+            print(msg)
+
+            error_logs.append(msg)
+
+            skipped_count += 1
+            continue        
 
         # =====================================================================
         # REQUIRED

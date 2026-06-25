@@ -42,10 +42,14 @@
   </div>
   <div class="navbar-end flex xl:gap-1">
     <c-customer-menu />
+    {% if client.show_theme_selector %}
+        <c-select_theme></c-select_theme>
+    {% endif %}  
+  
     
-    <c-select_theme></c-select_theme>
-    
-    <c-select_language :languages="client.languages"></c-select_language>      
+    {% if client.show_language_selector %}
+        <c-select_language :languages="client.languages"></c-select_language>
+    {% endif %}      
     
   </div>
 </div>

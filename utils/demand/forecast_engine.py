@@ -302,7 +302,7 @@ def build_actuals_dataframe(
             'planning_customer_id', 'customer_code',
             'planning_location_id', 'planning_location__code',
             'region_code', 'period_start',
-        ])
+        ], dropna=False)  # ← add this
         .agg({'qty': 'sum', 'revenue': 'sum'})
         .reset_index()
     )
@@ -655,7 +655,7 @@ def run_statsforecast_by_grain(
     horizon: int,
     freq: str,
     season_length: int = 12,
-    n_jobs: int = -1,
+    n_jobs: int = 1,  # required inside Celery daemonic workers
 ) -> pd.DataFrame:
     """
     Group series by (grain, strategy, eval_period) and run one StatsForecast
@@ -714,6 +714,55 @@ def run_statsforecast_by_grain(
             model_col = 'MOVING_AVG'
         elif strategy in MODEL_MAP:
             model_fn = MODEL_MAP[strategy]
+            # ---
+            # Determine if series has enough data for conformal intervals
+            # Need at least (n_windows + 1) * horizon extra points beyond min training
+            min_for_conformal = run_horizon * 4  # 3 windows + 1 × horizon
+            series_lengths = subset.groupby('unique_id')['y'].count()
+            use_conformal = bool((series_lengths >= min_for_conformal).all())
+            
+            sf = StatsForecast(
+                models=[model_fn(season_length)],
+                freq=run_freq,
+                n_jobs=1,  # required inside Celery daemonic workers
+            )
+            
+            if use_conformal:
+                fcast = sf.forecast(
+                    df=subset,
+                    h=run_horizon,
+                    prediction_intervals=ConformalIntervals(
+                        h=run_horizon, n_windows=2
+                    ),
+                    level=[80, 95],
+                )
+            else:
+                # No prediction intervals — avoids conformal holdout requirement
+                # for short series. AutoETS/AutoARIMA trigger internal conformal
+                # scoring when level= is passed, even without explicit
+                # prediction_intervals=, causing "tiny datasets" on short series.
+                fcast = sf.forecast(
+                    df=subset,
+                    h=run_horizon,
+                )
+                """
+                # Fall back to analytical intervals (built into ETS, ARIMA etc.)
+                # or no intervals for models that don't support them
+                try:
+                    fcast = sf.forecast(
+                        df=subset,
+                        h=run_horizon,
+                        level=[80, 95],  # analytical intervals, no holdout needed
+                    )
+                except Exception:
+                    # Some models (CrostonSBA) don't support intervals at all
+                    fcast = sf.forecast(
+                        df=subset,
+                        h=run_horizon,
+                    )
+                """
+            # ---------
+            """ replaced above
             sf = StatsForecast(
                 models=[model_fn(season_length)],
                 freq=run_freq, n_jobs=n_jobs,
@@ -725,6 +774,7 @@ def run_statsforecast_by_grain(
                 ),
                 level=[80, 95],
             )
+            """
             # Rename model column to strategy for consistency
             model_cols = [
                 c for c in fcast.columns

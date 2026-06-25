@@ -1,0 +1,88 @@
+#POST http://127.0.0.1:8000/api/autocomp/demand/forecast-versions/
+#Content-Type: application/json
+#Authorization: Basic autocomp_ad welcome99
+
+#{
+#  "version_label": "Jan-Jun 2025 Baseline",
+#  "period_type": "month",
+#  "base_period_start": "2024-01-01",
+#  "base_period_end": "2024-12-31",
+#  "horizon_start": "2025-01-01",
+#  "horizon_end": "2025-06-30",
+#  "notes": "Initial baseline run — auto parts TN"
+#}
+
+@baseUrl = http://127.0.0.1:8000
+@client = autocomp
+@auth = Basic autocomp_ad welcome99
+
+### 1. Create a forecast version
+# @name createVersion
+POST {{baseUrl}}/api/{{client}}/demand/forecast-versions/
+Content-Type: application/json
+Authorization: {{auth}}
+
+{
+  "version_label": "Jan-Jun 2025 Baseline",
+  "period_type": "month",
+  "base_period_start": "2023-07-01",
+  "base_period_end": "2024-12-31",
+  "horizon_start": "2025-01-01",
+  "horizon_end": "2025-06-30",
+  "notes": "Initial baseline run — auto parts TN"
+}
+
+### 2. List all forecast versions for this client
+GET {{baseUrl}}/api/{{client}}/demand/forecast-versions/
+Authorization: {{auth}}
+
+### 3. Get this version's detail
+GET {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/
+Authorization: {{auth}}
+
+### 4. Trigger the forecast run
+# @name runVersion
+POST {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/run/
+Content-Type: application/json
+Authorization: {{auth}}
+
+{}
+
+### 5. Poll run status (re-send manually until status is COMPLETE/FAILED)
+GET {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/run-status/
+Authorization: {{auth}}
+
+### 6. Fetch forecast lines once complete
+GET {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/lines/
+Authorization: {{auth}}
+
+### 7. Fetch aggregates
+GET {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/aggregates/
+Authorization: {{auth}}
+
+### 8a. Submit for approval first
+POST {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/approve/
+Content-Type: application/json
+Authorization: {{auth}}
+
+{
+  "action": "submit"
+}
+
+### 8b. Then approve
+POST {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/approve/
+Content-Type: application/json
+Authorization: {{auth}}
+
+{
+  "action": "approve"
+}
+
+### 9. Export as xlsx
+GET {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/export/
+Authorization: {{auth}}
+
+
+### 10. Accuracy dashboard
+GET {{baseUrl}}/api/{{client}}/demand/forecast-versions/{{createVersion.response.body.$.id}}/accuracy/
+Authorization: {{auth}}

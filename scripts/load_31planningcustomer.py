@@ -196,14 +196,10 @@ def load_val01(
                 "parent": parent,
 
                 "customer_type":
-                    clean(
-                        row.get("customer_type")
-                    ) or "real",
+                    clean(row.get("customer_type"), default="real") ,
 
                 "external_id":
-                    clean(
-                        row.get("external_id")
-                    ),
+                    clean(row.get("external_id"), default=""),
 
                 "is_active":
                     to_bool(
@@ -211,9 +207,7 @@ def load_val01(
                     ),
 
                 "notes":
-                    clean(
-                        row.get("notes")
-                    ),
+                    clean(row.get("notes"), default=""),
             }
 
             # =================================================

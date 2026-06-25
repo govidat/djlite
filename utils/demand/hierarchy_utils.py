@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
-
+from django.db.models import Q
 
 def get_location_levels(client_id: int) -> list[dict]:
     """
@@ -100,7 +100,7 @@ def get_location_ancestor_map(client_id: int) -> dict[int, list[int]]:
 
 def get_product_hierarchy_levels(client_id: int) -> list[dict]:
     """
-    Return the product taxonomy levels for the 'product_planning' taxonomy,
+    Return the product taxonomy levels for the 'gpc' taxonomy,
     ordered from leaf (SKU) to root (highest category).
 
     Returns list of dicts ordered from FINEST to COARSEST:
@@ -117,8 +117,12 @@ def get_product_hierarchy_levels(client_id: int) -> list[dict]:
     from mysite.models import TaxonomyNode, Taxonomy
 
     try:
-        taxonomy = Taxonomy.objects.get(
-            client_id=client_id, slug='product_planning'
+        # Client-specific first, fall back to global
+        taxonomy = (
+            Taxonomy.objects
+            .filter(Q(client_id=client_id) | Q(client=None), slug='gpc')
+            .order_by('-client_id')  # client-specific wins over global
+            .first()
         )
     except Taxonomy.DoesNotExist:
         return []

@@ -191,7 +191,7 @@ def load_val01(
                     to_bool(row.get("is_active")),
 
                 "notes":
-                    clean(row.get("notes")),
+                    clean(row.get("notes"), default=""),
             }
 
             # =================================================

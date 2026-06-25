@@ -150,9 +150,12 @@ def compute_series_profiles(self, client_id: int, period_type: str):
 
     # Level 0: Item × Client (virtual — all locations)
     df_item_client = con.execute(_agg_sql(['item_id'])).df()
+    df_item_client['period_start'] = pd.to_datetime(df_item_client['period_start']).dt.date
 
     # Levels 1..n: Item × Location ancestor at each depth
     df_by_depth: dict[int, pd.DataFrame] = {}
+    for d in df_by_depth:
+        df_by_depth[d]['period_start'] = pd.to_datetime(df_by_depth[d]['period_start']).dt.date        
     for level in loc_levels[1:]:
         d = level['depth']
         anc_col = f'anc_depth_{d}'
@@ -166,13 +169,15 @@ def compute_series_profiles(self, client_id: int, period_type: str):
         _agg_sql(['item_id', 'planning_location_id',
                   'planning_location__code'])
     ).df()
+    df_item_loc['period_start'] = pd.to_datetime(df_item_loc['period_start']).dt.date
 
     # Atomic: Item × Customer × Leaf Location
     df_atomic = con.execute(
         _agg_sql(['item_id', 'cust_code', 'planning_customer_id',
                   'planning_location_id', 'planning_location__code'])
     ).df()
-
+    df_atomic['period_start'] = pd.to_datetime(df_atomic['period_start']).dt.date
+    
     # Quarterly aggregations for Part C time horizons
     df_time_agg: dict[str, pd.DataFrame] = {}
     for h_period in time_horizons:
@@ -250,7 +255,7 @@ def compute_series_profiles(self, client_id: int, period_type: str):
     # Get unique atomic series
     atomic_groups = df_atomic.groupby(
         ['item_id', 'cust_code', 'planning_customer_id',
-         'planning_location_id', 'planning_location__code']
+         'planning_location_id', 'planning_location__code'], dropna=False
     )
 
     for keys, _ in atomic_groups:

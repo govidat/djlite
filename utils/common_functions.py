@@ -608,6 +608,8 @@ def build_client_payload(client):
 
         'header_nav': header_nav,
         'footer_nav': footer_nav,
+        'show_language_selector' : len(client.language_list) > 1,
+        'show_theme_selector' : len(lv_themes) > 1,
     }
 
 """

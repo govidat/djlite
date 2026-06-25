@@ -10,6 +10,7 @@ from django.db import transaction
 
 logger = logging.getLogger(__name__)
 import pandas as pd
+import warnings
 
 @shared_task(bind=True, max_retries=1, default_retry_delay=120)
 def run_forecast(self, version_id: int):
@@ -84,7 +85,8 @@ def run_forecast(self, version_id: int):
 
         # ── Read engine_config ─────────────────────────────────────────────
         cfg = version.engine_config
-        reconciliation       = cfg.get('reconciliation', 'MinTrace_ols')
+        #reconciliation       = cfg.get('reconciliation', 'MinTrace_ols')
+        reconciliation       = cfg.get('reconciliation', None)  # disabled until hierarchy fix
         disagg_conflict      = cfg.get('disagg_conflict_resolution', 'retain_lower')
         store_all_levels     = cfg.get('store_all_level_forecasts', True)
         force_grain          = cfg.get('force_grain')
@@ -124,6 +126,14 @@ def run_forecast(self, version_id: int):
         )
 
         # ── Step 7: Run StatsForecast ──────────────────────────────────────
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=RuntimeWarning, module='statsforecast')
+            combined_df = run_statsforecast_by_grain(aggregated_actuals=agg_actuals,
+            decisions=decisions,
+            horizon=horizon,
+            freq=freq,
+            season_length=season_length,)
+        """
         combined_df = run_statsforecast_by_grain(
             aggregated_actuals=agg_actuals,
             decisions=decisions,
@@ -131,6 +141,7 @@ def run_forecast(self, version_id: int):
             freq=freq,
             season_length=season_length,
         )
+        """
 
         # ── Step 8: Disaggregate to atomic ─────────────────────────────────
         atomic_df = disaggregate_to_atomic(
@@ -150,60 +161,106 @@ def run_forecast(self, version_id: int):
         )
         """
 
-        # ── Step 9: Reconciliation (on atomic forecasts only) ──────────────
+        # ── Step 9: Reconciliation ─────────────────────────────────────────
         _set_status('RECONCILING')
-        try:
-            # Build summing matrix from atomic forecasts
-            from hierarchicalforecast.utils import aggregate as hf_agg
-            actuals_for_rec = actuals_pl.to_pandas()[
-                ['unique_id', 'ds', 'y']
-            ].copy()
-            actuals_for_rec['y']  = actuals_for_rec['y'].astype(float)
-            actuals_for_rec['ds'] = pd.to_datetime(actuals_for_rec['ds'])
+        if reconciliation:
+            try:
+                from hierarchicalforecast.utils import aggregate as hf_agg
 
-            # Build location_group for the summing matrix
-            actuals_pd = actuals_pl.to_pandas()
-            actuals_pd['location_group'] = actuals_pd['region_code']
-            hier_raw = actuals_pd[['ds', 'location_group', 'unique_id', 'y']].copy()
-            hier_raw['y']  = hier_raw['y'].astype(float)
-            hier_raw['ds'] = pd.to_datetime(hier_raw['ds'])
+                actuals_pd = actuals_pl.to_pandas()
+                actuals_pd['location_group'] = actuals_pd['region_code']
+                hier_raw = actuals_pd[['ds', 'location_group', 'unique_id', 'y']].copy()
+                hier_raw = hier_raw.rename(columns={'unique_id': 'series'})
+                hier_raw['y']  = hier_raw['y'].astype(float)
+                hier_raw['ds'] = pd.to_datetime(hier_raw['ds'])
 
-            Y_df, S_df, tags = hf_agg(
-                hier_raw,
-                [['location_group'], ['location_group', 'unique_id']],
-            )
-
-            hf_input = atomic_df[['unique_id', 'ds', 'statistical_qty']].copy()
-            hf_input = hf_input.rename(columns={'statistical_qty': 'COMBINED'})
-
-            reconciled = run_hierarchical_reconciliation(
-                forecasts_df=hf_input,
-                Y_df=Y_df, S_df=S_df, tags=tags,
-                method=reconciliation,
-            )
-
-            rec_col = [
-                c for c in reconciled.columns
-                if 'COMBINED' in c and c != 'COMBINED'
-            ]
-            if rec_col:
-                reconciled = reconciled.rename(
-                    columns={rec_col[0]: 'statistical_qty'}
+                Y_df, S_df, tags = hf_agg(
+                    hier_raw,
+                    [['location_group'], ['location_group', 'series']],
                 )
-                # Merge reconciled values back
-                rec_lookup = reconciled.set_index(['unique_id', 'ds'])['statistical_qty'].to_dict()
-                atomic_df['statistical_qty'] = atomic_df.apply(
-                    lambda row: rec_lookup.get(
-                        (row['unique_id'], row['ds']),
-                        row['statistical_qty']
-                    ),
-                    axis=1,
+
+                # Build uid → region lookup for prefixing
+                uid_to_region = (
+                    actuals_pd[['unique_id', 'region_code']]
+                    .drop_duplicates('unique_id')
+                    .set_index('unique_id')['region_code']
+                    .to_dict()
                 )
-        except Exception as exc:
-            logger.warning(
-                f'run_forecast: reconciliation failed ({exc}) — '
-                f'using unreconciled forecasts'
-            )
+
+                # Bottom-level forecast rows with prefixed unique_id
+                hf_bottom = atomic_df[['unique_id', 'ds', 'statistical_qty']].copy()
+                hf_bottom['ds'] = pd.to_datetime(hf_bottom['ds'])
+                hf_bottom = (
+                    hf_bottom.groupby(['unique_id', 'ds'])['statistical_qty']
+                    .sum().reset_index()
+                )
+                hf_bottom['unique_id'] = hf_bottom['unique_id'].map(
+                    lambda uid: f"{uid_to_region.get(uid, '__NO_REGION__')}/{uid}"
+                )
+                hf_bottom = hf_bottom.rename(columns={'statistical_qty': 'COMBINED'})
+
+                # Top-level aggregate per region (one row per region per ds)
+                # Handles multi-region clients correctly
+                region_totals = (
+                    hf_bottom.copy()
+                )
+                # Extract region from prefixed unique_id ("region/uid" → "region")
+                region_totals['region'] = region_totals['unique_id'].map(
+                    lambda uid: uid.split('/', 1)[0]
+                )
+                top_level = (
+                    region_totals.groupby(['region', 'ds'])['COMBINED']
+                    .sum()
+                    .reset_index()
+                    .rename(columns={'region': 'unique_id'})
+                )[['unique_id', 'ds', 'COMBINED']]
+
+                hf_input_full = pd.concat([top_level, hf_bottom], ignore_index=True)
+                """
+                # Top-level aggregate (required by reconcile())
+                top_level = hf_bottom.groupby('ds')['COMBINED'].sum().reset_index()
+                top_level['unique_id'] = actuals_pd['region_code'].iloc[0]  # 'tn'
+                top_level = top_level[['unique_id', 'ds', 'COMBINED']]
+
+                hf_input_full = pd.concat([top_level, hf_bottom], ignore_index=True)
+                """
+                reconciled = run_hierarchical_reconciliation(
+                    forecasts_df=hf_input_full,
+                    Y_df=Y_df, S_df=S_df, tags=tags,
+                    method=reconciliation,
+                )
+
+                rec_col = [
+                    c for c in reconciled.columns
+                    if 'COMBINED' in c and c != 'COMBINED'
+                ]
+                if rec_col:
+                    reconciled = reconciled.rename(
+                        columns={rec_col[0]: 'statistical_qty'}
+                    )
+                    # Strip region prefix from unique_id for lookup
+                    rec_lookup = {
+                        (
+                            row['unique_id'].split('/', 1)[1]
+                            if '/' in str(row['unique_id']) else row['unique_id'],
+                            pd.Timestamp(row['ds'])
+                        ): row['statistical_qty']
+                        for _, row in reconciled.iterrows()
+                    }
+                    atomic_df['statistical_qty'] = atomic_df.apply(
+                        lambda row: rec_lookup.get(
+                            (row['unique_id'], pd.Timestamp(row['ds'])),
+                            row['statistical_qty']
+                        ),
+                        axis=1,
+                    )
+
+            except Exception as exc:
+                import traceback
+                logger.warning(
+                    f'run_forecast: reconciliation failed ({exc}) — '
+                    f'using unreconciled forecasts\n{traceback.format_exc()}'
+                )
 
         # ── Step 10: Write ForecastLine rows ──────────────────────────────
         _set_status('AGGREGATING')

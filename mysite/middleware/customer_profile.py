@@ -49,9 +49,15 @@ class CustomerProfileMiddleware:
         RESERVED = {
             'admin', 'accounts', '__debug__', 'i18n',
             'static', 'media', 'favicon.ico', 'set-theme', '_nested_admin',
-            'api',       # ← ADD THIS — API routes are not client-scoped URLs
-            'demand',    # ← ADD THIS — safety net for any /demand/ prefixed routes            
+            #'api',       # ← ADD THIS — API routes are not client-scoped URLs
+            #'demand',    # ← ADD THIS — safety net for any /demand/ prefixed routes            
         }
+        if candidate == 'api':
+            # /api/<client_id>/...
+            if len(parts) > 1 and parts[1] not in RESERVED and parts[1]:
+                return parts[1]
+            return None
+
         if candidate in RESERVED:
             return None
 

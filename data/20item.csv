@@ -1,3 +1,15 @@
 client_id,item_id,global_item_id,inherit_global_media,gtin,gpc_brick_code,domain,status,order,name_en,name_hi,name_fr,name_ta,description_en,description_hi,description_fr,description_ta,country_of_origin,image_url,image_alt,barcode,weight_g,length_mm,width_mm,height_mm,care_instructions_en,care_instructions_hi,care_instructions_fr,care_instructions_ta,attributes
-bahushira,bosch-fr7dc-local,bosch-fr7dc,1,,47010101,product,active,1,Bosch FR7DC Retail Pack,बॉश FR7DC रिटेल पैक,,,,Local retail packaging.,स्थानीय रिटेल पैकेजिंग।,,,,https://picsum.photos/seed/boschlocal/400/400,,BOSCHLOCAL001,52,66,22,22,,,,,"{""retailer_pack"": true}"
-bahushira,ngk-bpr6es-local,ngk-bpr6es,1,,47010101,product,active,2,,,,,,,,,,,,,,,,,,,{}
+bahushira,bosch-fr7dc-local,bosch-fr7dc,1,,47010101,product,active,1,Bosch FR7DC Retail Pack,बॉश FR7DC रिटेल पैक,,,Local retail packaging.,स्थानीय रिटेल पैकेजिंग।,,,IN,https://picsum.photos/seed/boschlocal/400/400,,BOSCHLOCAL001,52,66,22,22,,,,,"{""retailer_pack"": true}"
+bahushira,ngk-bpr6es-local,ngk-bpr6es,1,,47010101,product,active,2,,,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-bsh-alt-001,,0,,47010101,product,active,1,Bosch Alternator 14V 65A,,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-bsh-str-001,,0,,47010201,product,active,2,Bosch Starter Motor 12V,,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-tvs-bpf-001,,0,,47020101,product,active,3,TVS Brake Pad Front (Set),,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-tvs-bpr-001,,0,,47020102,product,active,4,TVS Brake Pad Rear (Set),,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-scl-blf-001,,0,,47020201,product,active,5,Sundaram-Clayton Brake Fluid DOT4,,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-bsh-oft-001,,0,,47030101,product,active,6,Bosch Oil Filter (Universal),,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-bsh-aft-001,,0,,47030201,product,active,7,Bosch Air Filter (Passenger Car),,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-mnd-cls-001,,0,,47040101,product,active,8,Minda Clutch Set (HCV),,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-mnd-fwl-001,,0,,47040201,product,active,9,Minda Flywheel Assembly,,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-vlo-hdl-001,,0,,47050101,product,active,10,Valeo Headlamp Bulb H4 55W,,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-vlo-fgl-001,,0,,47050201,product,active,11,Valeo Fog Lamp Kit (Pair),,,,,,,,IN,,,,,,,,,,,,
+autocomp,sku-mnd-trn-001,,0,,47050301,product,active,12,Minda Turn Signal Relay 12V,,,,,,,,IN,,,,,,,,,,,,

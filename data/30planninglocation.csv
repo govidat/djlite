@@ -1,3 +1,8 @@
 code,is_leaf,is_active,notes,client_id,parent_code,name_en,name_fr,name_hi,name_ta,level_label_en,level_label_fr,level_label_hi,level_label_ta
 ho,0,1,,bahushira,,HeadOffice,,,,HO,,,
 chennaibranch,1,1,,bahushira,ho,Chennai Branch,,,,Branch,,,
+tn,0,1,,autocomp,,Tamil Nadu,,,,HO,,,
+chn,1,1,,autocomp,tn,Chennai Branch,,,,Branch,,,
+cbe,1,1,,autocomp,tn,Coimbatore Branch,,,,Branch,,,
+mdu,1,1,,autocomp,tn,Madurai Branch,,,,Branch,,,
+try,1,1,,autocomp,tn,Trichy Branch,,,,Branch,,,

@@ -17,7 +17,7 @@ from django.core.paginator import Paginator
 
 from mysite.models.catalogue import (
     Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue,
-    GlobalItem, GlobalItemAttributeValue,
+    GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue,
     Item, ItemTaxonomyNode, ItemAttributeValue,
     ItemVariant,
     # ItemMedia intentionally NOT imported here
@@ -52,12 +52,233 @@ def get_resolved_taxonomies(client):
 
     return sorted(seen.values(), key=lambda t: t.order)
 
+def _expand_with_ancestors(node_ids):
+    """Walk up parent_id chains to collect all ancestor node ids."""
+    result = set(node_ids)
+    frontier = set(node_ids)
+    while frontier:
+        parents = set(
+            TaxonomyNode.objects
+            .filter(id__in=frontier)
+            .exclude(parent_id=None)
+            .values_list('parent_id', flat=True)
+        )
+        parents -= result
+        result |= parents
+        frontier = parents
+    return result
+
+def _get_attr_types_by_node(client, node_ids, base_ids):
+    
+    #Returns {node_id: [attr_type dicts]} — only attribute types AND
+    #predefined values actually used by this client's visible items
+    #(via ItemAttributeValue or GlobalItemAttributeValue on derived items).
+    
+    global_item_ids = set(
+        Item.objects.filter(id__in=base_ids)
+        .exclude(global_item=None)
+        .values_list('global_item_id', flat=True)
+    )
+
+    # ── Used attribute_type_ids + predefined_value_ids ─────────────
+    used_attr_type_ids = set()
+    used_value_ids_by_attr_type = {}
+
+    item_avs = (
+        ItemAttributeValue.objects
+        .filter(item_id__in=base_ids)
+        .exclude(predefined_value=None)
+        .values_list('attribute_type_id', 'predefined_value_id')
+    )
+    global_avs = (
+        GlobalItemAttributeValue.objects
+        .filter(global_item_id__in=global_item_ids)
+        .exclude(predefined_value=None)
+        .values_list('attribute_type_id', 'predefined_value_id')
+    )
+
+    for attr_type_id, value_id in list(item_avs) + list(global_avs):
+        used_attr_type_ids.add(attr_type_id)
+        used_value_ids_by_attr_type.setdefault(attr_type_id, set()).add(value_id)
+
+    # Also include attribute types used via free-text/number values
+    # (no predefined_value, but still "used")
+    text_number_attr_type_ids = set(
+        ItemAttributeValue.objects
+        .filter(item_id__in=base_ids, predefined_value=None)
+        .values_list('attribute_type_id', flat=True)
+    ) | set(
+        GlobalItemAttributeValue.objects
+        .filter(global_item_id__in=global_item_ids, predefined_value=None)
+        .values_list('attribute_type_id', flat=True)
+    )
+    used_attr_type_ids |= text_number_attr_type_ids
+
+    # ── Resolve client-overridden NodeAttributeType, scoped to used ──
+    qs = NodeAttributeType.objects.filter(
+        Q(client=None) | Q(client=client),
+        node_id__in=node_ids,
+        is_filterable=True,
+        id__in=used_attr_type_ids,
+    ).select_related('node').prefetch_related('predefined_values').order_by(
+        'node_id', 'slug', '-client_id'
+    )
+
+    seen_per_node = {}
+    for at in qs:
+        node_seen = seen_per_node.setdefault(at.node_id, {})
+        if at.slug not in node_seen or at.client is not None:
+            node_seen[at.slug] = at
+
+    by_node = {}
+    for node_id, slug_map in seen_per_node.items():
+        entries = []
+        for at in sorted(slug_map.values(), key=lambda a: a.order):
+            used_value_ids = used_value_ids_by_attr_type.get(at.id, set())
+            values = [
+                {'id': v.id, 'slug': v.slug, 'name': v.name}
+                for v in at.predefined_values.all()
+                if v.id in used_value_ids
+            ]
+            entries.append({
+                'id': at.id, 'slug': at.slug, 'name': at.name,
+                'field_type': at.field_type, 'is_filterable': at.is_filterable,
+                'values': values,
+            })
+        by_node[node_id] = entries
+
+    return by_node
 
 def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None):
+    cache_key = f"taxonomy_tree:{client.client_id}:{taxonomy_slug}"
+    if not include_counts:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+    taxonomy = Taxonomy.objects.filter(
+        Q(client=None) | Q(client=client),
+        slug=taxonomy_slug,
+        is_active=True
+    ).order_by('-client_id').first()
+    if not taxonomy:
+        return []
+
+    # Restrict to nodes actually used by this client's visible items
+    base_ids = list(base_qs.values_list('id', flat=True)) if base_qs is not None else get_base_item_ids(client)
+    #base_ids = base_qs.values_list('id', flat=True) if base_qs is not None else get_base_item_ids(client)
+    global_item_ids = set(
+        Item.objects.filter(id__in=base_ids)
+        .exclude(global_item=None)
+        .values_list('global_item_id', flat=True)
+    )
+
+    used_node_ids = set(
+        ItemTaxonomyNode.objects
+        .filter(item_id__in=base_ids)
+        .values_list('node_id', flat=True)
+    ) | set(
+        GlobalItemTaxonomyNode.objects
+        .filter(global_item_id__in=global_item_ids)
+        .values_list('node_id', flat=True)
+    ) 
+
+    expanded_node_ids = _expand_with_ancestors(used_node_ids)
+
+    nodes = TaxonomyNode.objects.filter(
+        taxonomy=taxonomy,
+        is_active=True,
+        id__in=expanded_node_ids
+    ).filter(
+        Q(client=None) | Q(client=client)
+    ).prefetch_related(
+        'attribute_types__predefined_values'
+    ).order_by('path')
+
+
     """
-    Returns nested tree dict. Cached when include_counts=False.
-    When include_counts=True, counts are computed from base_qs.
+    matched_nodes = TaxonomyNode.objects.filter(id__in=used_node_ids)
+    all_paths = set()
+    for node in matched_nodes:
+        all_paths.add(node.path)
+        all_paths.update(node.get_ancestor_paths())
+
+    nodes = TaxonomyNode.objects.filter(
+        taxonomy=taxonomy,
+        is_active=True,
+        path__in=all_paths
+    ).filter(
+        Q(client=None) | Q(client=client)
+    ).prefetch_related(
+        'attribute_types__predefined_values'
+    ).order_by('path')
     """
+
+    # ... rest unchanged, but cache_key should differentiate per-client always
+    # since used_node_ids depends on client items
+    # Client node overrides global node of same slug
+    node_map_by_slug = {}
+    for node in nodes:
+        key = node.slug
+        if key not in node_map_by_slug or node.client is not None:
+            node_map_by_slug[key] = node
+    ordered_nodes = sorted(node_map_by_slug.values(), key=lambda n: n.path)
+
+    # Counts — one query for all nodes at once
+    counts = {}
+    if include_counts and base_qs is not None:
+        count_qs = (
+            ItemTaxonomyNode.objects
+            .filter(item__in=base_qs, node__in=ordered_nodes)
+            .values('node_id')
+            .annotate(count=Count('item', distinct=True))
+        )
+        counts = {row['node_id']: row['count'] for row in count_qs}
+        
+    attr_types_by_node = _get_attr_types_by_node(client, [n.id for n in ordered_nodes], base_ids)
+    tree = _build_tree(ordered_nodes, counts, attr_types_by_node)
+
+    #tree = _build_tree(ordered_nodes, counts)
+
+    if not include_counts:
+        cache.set(cache_key, tree, timeout=3600)
+
+    return tree
+
+
+
+def _build_tree(nodes, counts=None, attr_types_by_node=None):
+    counts = counts or {}
+    attr_types_by_node = attr_types_by_node or {}
+    node_map = {}
+    roots = []
+    for node in nodes:
+        entry = {
+            'id':        node.id,
+            'slug':      node.slug,
+            'name':      node.name,
+            'depth':     node.depth,
+            'path':      node.path,
+            'gpc_code':  node.gpc_code,
+            'is_global': node.client is None,
+            'attr_types': attr_types_by_node.get(node.id, []),
+            'count':     counts.get(node.id, 0),
+            'children':  [],
+        }
+        node_map[node.id] = entry
+        if node.parent_id and node.parent_id in node_map:
+            node_map[node.parent_id]['children'].append(entry)
+        else:
+            roots.append(entry)
+    return roots
+
+"""    
+    
+def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None):
+    
+    #Returns nested tree dict. Cached when include_counts=False.
+    #When include_counts=True, counts are computed from base_qs.
+    
     cache_key = f"taxonomy_tree:{client.client_id}:{taxonomy_slug}"
 
     if not include_counts:
@@ -109,9 +330,8 @@ def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None)
 
     return tree
 
-
 def _build_tree(nodes, counts=None):
-    """Convert flat ordered list to nested dict tree."""
+    #Convert flat ordered list to nested dict tree.
     counts   = counts or {}
     node_map = {}
     roots    = []
@@ -151,13 +371,69 @@ def _build_tree(nodes, counts=None):
             roots.append(entry)
 
     return roots
-
-
-def get_filterable_attribute_types(client, taxonomy_slug, active_node_ids=None):
+"""
+def get_filterable_attribute_types(client, taxonomy_slug, qs, active_node_ids=None):
     """
-    Returns filterable NodeAttributeTypes for a taxonomy.
+    Returns filterable NodeAttributeTypes for a taxonomy, restricted to
+    attribute types (and predefined values) actually used by items in qs.
     Scoped to selected nodes + ancestors if active_node_ids provided.
     """
+    base_ids = list(qs.values_list('id', flat=True))
+
+    global_item_ids = set(
+        Item.objects.filter(id__in=base_ids)
+        .exclude(global_item=None)
+        .values_list('global_item_id', flat=True)
+    )
+
+    used_attr_type_ids = set(
+        ItemAttributeValue.objects
+        .filter(item_id__in=base_ids)
+        .values_list('attribute_type_id', flat=True)
+    ) | set(
+        GlobalItemAttributeValue.objects
+        .filter(global_item_id__in=global_item_ids)
+        .values_list('attribute_type_id', flat=True)
+    )
+
+    used_value_ids = set(
+        ItemAttributeValue.objects
+        .filter(item_id__in=base_ids)
+        .exclude(predefined_value=None)
+        .values_list('predefined_value_id', flat=True)
+    ) | set(
+        GlobalItemAttributeValue.objects
+        .filter(global_item_id__in=global_item_ids)
+        .exclude(predefined_value=None)
+        .values_list('predefined_value_id', flat=True)
+    )
+
+    qs_attr = NodeAttributeType.objects.filter(
+        Q(client=None) | Q(client=client),
+        is_filterable=True,
+        node__taxonomy__slug=taxonomy_slug,
+        id__in=used_attr_type_ids,
+    ).filter(
+        Q(node__client=None) | Q(node__client=client)
+    ).select_related('node').prefetch_related('predefined_values').order_by(
+        'node__depth', 'order'
+    )
+
+    if active_node_ids:
+        selected_nodes = TaxonomyNode.objects.filter(id__in=active_node_ids)
+        relevant_paths = set()
+        for node in selected_nodes:
+            relevant_paths.add(node.path)
+            relevant_paths.update(node.get_ancestor_paths())
+        qs_attr = qs_attr.filter(node__path__in=relevant_paths)
+
+    return qs_attr, used_value_ids
+"""
+def get_filterable_attribute_types(client, taxonomy_slug, active_node_ids=None):
+    
+    #Returns filterable NodeAttributeTypes for a taxonomy.
+    #Scoped to selected nodes + ancestors if active_node_ids provided.
+    
     qs = NodeAttributeType.objects.filter(
         Q(client=None) | Q(client=client),
         is_filterable=True,
@@ -177,7 +453,7 @@ def get_filterable_attribute_types(client, taxonomy_slug, active_node_ids=None):
         qs = qs.filter(node__path__in=relevant_paths)
 
     return qs
-
+"""
 
 # ══════════════════════════════════════════════════════════════════════
 # 2. ITEM QUERYSET
@@ -301,11 +577,23 @@ def get_item_queryset(client, filters=None):
     # Price range
     price_min = filters.get('price_min')
     price_max = filters.get('price_max')
+
+    if price_min is not None:
+        qs = qs.filter(
+            Q(product_detail__isnull=True) |
+            Q(product_detail__price__gte=price_min)
+        )
+    if price_max is not None:
+        qs = qs.filter(
+            Q(product_detail__isnull=True) |
+            Q(product_detail__price__lte=price_max)
+        )
+    """
     if price_min is not None:
         qs = qs.filter(product_detail__price__gte=price_min)
     if price_max is not None:
         qs = qs.filter(product_detail__price__lte=price_max)
-
+    """
     # In stock
     if filters.get('in_stock'):
         qs = qs.filter(product_detail__stock_quantity__gt=0)
@@ -536,6 +824,26 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
             base_qs=qs,
         )
         active_node_ids = filters.get('node_ids', [])
+
+        attr_type_qs, used_value_ids = get_filterable_attribute_types(
+            client, taxonomy.slug, qs,
+            active_node_ids if active_node_ids else None
+        )
+        attr_types = [
+            {
+                'id':         at.id,
+                'slug':       at.slug,
+                'name':       at.name,
+                'field_type': at.field_type,
+                'values': [
+                    {'id': v.id, 'slug': v.slug, 'name': v.name}
+                    for v in at.predefined_values.all()
+                    if v.id in used_value_ids
+                ],
+            }
+            for at in attr_type_qs
+        ]
+        """
         attr_type_qs = get_filterable_attribute_types(
             client, taxonomy.slug,
             active_node_ids if active_node_ids else None
@@ -553,6 +861,7 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
             }
             for at in attr_type_qs
         ]
+        """
         taxonomy_trees.append({
             'slug':       taxonomy.slug,
             'name':       taxonomy.name,
@@ -676,7 +985,7 @@ def _build_domain_filters(qs, filters):
 
     return domain_filters
 
-
+"""
 def _resolve_client_templates(client):
     cache_key = f"client_templates:{client.client_id}"
     cached = cache.get(cache_key)
@@ -693,7 +1002,7 @@ def _resolve_client_templates(client):
 
     cache.set(cache_key, result, timeout=3600)
     return result
-
+"""
 
 def _resolve_client_templates(client):
     """

@@ -27,7 +27,7 @@ def remove_postgres_indexes(apps, schema_editor):
     if schema_editor.connection.vendor != 'postgresql':
         return
     drops = [
-        'DROP INDEX IF EXISTS uq_actualsale_with_customer'
+        'DROP INDEX IF EXISTS uq_actualsale_with_customer',
         'DROP INDEX IF EXISTS uq_actualsale_no_customer'
         # ... rest of drops
     ]

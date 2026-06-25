@@ -40,8 +40,8 @@ urlpatterns = [
     path('<str:client_id>/catalogue/<str:item_id>/', views.item_detail, name='item_detail'),
 
     # --Demand Planning ------------------------------------------------
-    path('api/demand/',  include('mysite.api.demand.urls')),
-
+    #path('api/demand/',  include('mysite.api.demand.urls')),
+    path('api/<str:client_id>/demand/', include('mysite.api.demand.urls')),
  
     # ── Demand Planning — forecast grid page ──────────────────────────────
     path('demand/forecast-versions/<int:pk>/grid/', views.forecast_grid, name='demand-forecast-grid'),

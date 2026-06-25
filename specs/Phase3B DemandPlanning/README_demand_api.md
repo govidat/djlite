@@ -729,3 +729,30 @@ GET /api/demand/forecast-versions/{id}/export/
 ```
 
 Download and open the `.xlsx` to verify line detail and period summary sheets.
+
+
+### Some useful code snippets
+
+## Start a celery server
+celery -A mydj worker --loglevel=info
+
+## Delete some table values
+
+python manage.py shell
+
+from mysite.models.demand.forecast import ActualSale
+from mysite.models import Client
+client = Client.objects.get(client_id='autocomp')
+deleted = ActualSale.objects.filter(client=client, period_type='month').delete()
+print("Deleted:", deleted)
+
+Cleanup series profile:
+from mysite.models.demand.forecast import SeriesProfile
+from mysite.models import Client
+client = Client.objects.get(client_id='autocomp')
+deleted = SeriesProfile.objects.filter(client=client, period_type='month').delete()
+print("Deleted:", deleted)
+
+## Load Data
+
+ python manage.py runscript load_34actualsale

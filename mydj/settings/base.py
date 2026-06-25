@@ -348,9 +348,17 @@ ACCOUNT_ADAPTER      = 'mysite.adapters.ClientAwareAccountAdapter'
 
 # ── Celery ────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL        = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND    = 'redis://localhost:6379/1'   # or 'django-db' if using django_celery_results
+#CELERY_RESULT_BACKEND    = 'redis://localhost:6379/1'   # or 'django-db' if using django_celery_results
 CELERY_ACCEPT_CONTENT    = ['json']
 CELERY_TASK_SERIALIZER   = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE          = TIME_ZONE   # reuse your existing Django TIME_ZONE
 CELERY_RESULT_BACKEND = 'django-db'
+
+# only list module paths (not individual functions), and only modules that contain @shared_task decorated functions.
+CELERY_IMPORTS = [
+    'mysite.tasks.demand.compute_series_profiles',
+    'mysite.tasks.demand.run_forecast',
+    'mysite.tasks.demand.import_actuals',
+    'mysite.tasks.demand.notifications',
+]

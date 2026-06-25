@@ -11,7 +11,8 @@ from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProf
 from django.contrib.auth.models import User
 
 from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
-from .models import PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
+from .models import PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, ActualSaleLocation, ItemPlanningProfile
+from .models import ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
 """
 @receiver(post_save, sender=GlobalVal)
 @receiver(post_delete, sender=GlobalVal)
@@ -55,7 +56,8 @@ ADMIN_ONLY_MODELS = [
     Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant,
 
     # Demand Planning
-    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
+    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, ActualSaleLocation, ItemPlanningProfile,
+    ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
 ]
 
 # ADMIN Add only for Admin — needed for user creation
@@ -386,18 +388,29 @@ def get_client_id_from_instance(instance):
             return instance.client_id
 
         # One hop via client FK
-        if isinstance(instance, (Theme, Page, NavItem, ClientTemplate, PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale)):
+        if isinstance(instance, (Theme, Page, NavItem, ClientTemplate, PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, 
+                                 ActualSaleImport, ActualSale, ActualSaleLocation, ItemPlanningProfile,
+                                 ForecastVersion, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile)):
             return instance.client.client_id
 
         # Two hops: PageContent → page → client
         if isinstance(instance, (PageContent, Layout)):
             return instance.page.client.client_id
 
+        # Two hops: xxx → ForecastVersion → client
+        if isinstance(instance, (ForecastLine, ForecastAggregate, ForecastOverride, ForecastAccuracy)):
+            return instance.version.client.client_id        
+
+        # Three hops: OverrideSplitWeight → ForecastOverride → ForecastVersion → client
+        if isinstance(instance, OverrideSplitWeight):
+            return instance.override.version.client.client_id
+
         # Two hops: Layout → page → client
         #if isinstance(instance, Layout):
         #    return instance.page.client.client_id
 
-        # Three hops: Component → layout → page → client
+
+       # Three hops: Component → layout → page → client
         if isinstance(instance, Component):
             return instance.layout.page.client.client_id
 

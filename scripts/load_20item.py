@@ -178,22 +178,13 @@ def load_items(
                 ),
 
             "gtin":
-                clean(row.get("gtin")),
+                clean(row.get("gtin"), default=""),
 
             "gpc_brick_code":
                 clean(row.get("gpc_brick_code")),
+            "domain": clean(row.get("domain"), default="generic"),
+            "status": clean(row.get("status"), default="draft"),
 
-            "domain":
-                clean(
-                    row.get("domain"),
-                    default="generic",
-                ),
-
-            "status":
-                clean(
-                    row.get("status"),
-                    default="draft",
-                ),
 
             "order":
                 to_int(row.get("order")),
@@ -201,21 +192,21 @@ def load_items(
             # ── media / identity ─────────────
 
             "country_of_origin":
-                clean(row.get("country_of_origin")),
+                clean(row.get("country_of_origin"), default=""),
 
             "image_url":
-                clean(row.get("image_url")),
+                clean(row.get("image_url"), default=""),
 
             "image_alt":
-                clean(row.get("image_alt")),
+                clean(row.get("image_alt"), default=""),
 
             "barcode":
-                clean(row.get("barcode")),
+                clean(row.get("barcode"), default=""),
 
             # ── dimensions ───────────────────
 
             "weight_g":
-                to_int(row.get("weight_g")),
+                to_int(row.get("weight_g"), default=0),
 
             "length_mm":
                 to_int(row.get("length_mm")),

@@ -15,6 +15,7 @@ from mysite.api.demand.serializers import (
     PlanningLocationTreeSerializer,
     SalesNodeTreeSerializer,
 )
+from mysite.api.permissions import (IsClientMember)
 from utils.feature_control import is_demand_feature_disabled
 
 from django.core.paginator import Paginator, EmptyPage
@@ -50,7 +51,18 @@ class DemandFeatureMixin:
     Mixin for all demand API views.
     Checks the master demand_planning feature flag before processing.
     Assumes request.client is set by your ClientScopedMixin / middleware.
+
+    Also strips the URL-captured `client_id` kwarg, and enforces
+    IsAuthenticated + IsClientMember as the default permission set
+    for all demand API views, so cross-tenant access can't be
+    accidentally reintroduced by a view omitting permission_classes.
     """
+    permission_classes = [IsAuthenticated, IsClientMember]
+
+    def dispatch(self, request, *args, **kwargs):
+        kwargs.pop('client_id', None)
+        return super().dispatch(request, *args, **kwargs)
+
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         result = is_demand_feature_disabled(
@@ -91,8 +103,7 @@ class PlanningLocationHierarchyView(DemandFeatureMixin, APIView):
             ...
         ]
     """
-    permission_classes = [IsAuthenticated]
-
+    
     def get(self, request):
         client      = request.client
         active_only = request.query_params.get('active_only', 'true') == 'true'
@@ -154,7 +165,6 @@ class SalesHierarchyView(DemandFeatureMixin, APIView):
             }
         ]
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         client           = request.client
@@ -232,7 +242,6 @@ class ActualsUploadView(DemandFeatureMixin, APIView):
     Response 400: validation errors (wrong file type, missing period_type)
     Response 403: feature disabled
     """
-    permission_classes = [IsAuthenticated]
     parser_classes     = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -319,7 +328,6 @@ class ActualsUploadStatusView(DemandFeatureMixin, APIView):
             "uploaded_by_name": "Govind K"
         }
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         try:
@@ -356,7 +364,6 @@ class ActualsQueryView(DemandFeatureMixin, APIView):
             "results": [ { ...ActualSale fields... }, ... ]
         }
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         import datetime
@@ -446,7 +453,6 @@ class ActualsTemplateDownloadView(DemandFeatureMixin, APIView):
 
     Generates and streams the .xlsx template for the authenticated client.
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         period_type = request.query_params.get('period_type', 'month')
@@ -515,12 +521,12 @@ from utils.feature_control import is_demand_feature_disabled
 # ─────────────────────────────────────────────────────────────────────────────
 # Mixin: demand feature gate
 # ─────────────────────────────────────────────────────────────────────────────
-
+"""
 class DemandFeatureMixin:
-    """
-    Checks the master demand_planning feature flag on every request.
-    Assumes request.client is set by middleware / ClientScopedMixin.
-    """
+    
+    #Checks the master demand_planning feature flag on every request.
+    #Assumes request.client is set by middleware / ClientScopedMixin.
+    
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         result = is_demand_feature_disabled(
@@ -529,7 +535,7 @@ class DemandFeatureMixin:
         if result['disabled']:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied(detail=result['message'])
-
+"""
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Forecast Version views
@@ -543,7 +549,6 @@ class ForecastVersionListCreateView(DemandFeatureMixin, APIView):
     POST /api/demand/forecast-versions/
          Create a new DRAFT version.
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         qs = (
@@ -586,7 +591,6 @@ class ForecastVersionDetailView(DemandFeatureMixin, APIView):
     """
     GET /api/demand/forecast-versions/{id}/
     """
-    permission_classes = [IsAuthenticated]
 
     def _get_version(self, request, pk):
         return get_object_or_404(
@@ -618,7 +622,6 @@ class ForecastVersionLinesView(DemandFeatureMixin, APIView):
                           to display.
         page / page_size — default 100, max 500
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         import datetime
@@ -708,7 +711,6 @@ class ForecastVersionAggregatesView(DemandFeatureMixin, APIView):
         period_start — ISO date
         period_end   — ISO date
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         import datetime
@@ -757,7 +759,6 @@ class ForecastVersionApproveView(DemandFeatureMixin, APIView):
     lock    → APPROVED   → LOCKED
     copy    → any status → new DRAFT (returns the new version, HTTP 201)
     """
-    permission_classes = [IsAuthenticated]
 
     ACTION_TRANSITIONS = {
         'submit':  ForecastVersion.Status.IN_REVIEW,
@@ -838,7 +839,6 @@ class SeriesProfileListView(DemandFeatureMixin, APIView):
         period_type    — filter by period type
         page / page_size — default 100, max 500
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         qs = (
@@ -902,7 +902,6 @@ class SeriesProfileDetailView(DemandFeatureMixin, APIView):
           Only override_grain, override_strategy, override_note are writable.
           Requires consensus_override feature flag.
     """
-    permission_classes = [IsAuthenticated]
 
     def _get_profile(self, request, pk):
         return get_object_or_404(
@@ -964,7 +963,6 @@ class SeriesProfileEvaluationsView(DemandFeatureMixin, APIView):
     search path reads naturally: rejected levels first, accepted level last.
     Lazy-load alternative to the nested evaluations in the detail endpoint.
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         profile = get_object_or_404(
@@ -992,7 +990,6 @@ class ForecastingConfigView(DemandFeatureMixin, APIView):
           Update thresholds. Staff only.
           ABC tiers must be managed via Django admin.
     """
-    permission_classes = [IsAuthenticated]
 
     def _get_config(self, request):
         return ForecastingConfig.get_for_client(request.client)
@@ -1030,8 +1027,76 @@ class ForecastVersionRunView(DemandFeatureMixin, APIView):
     Chains compute_series_profiles → run_forecast.
     Returns 202 immediately.
     """
-    permission_classes = [IsAuthenticated]
+    def post(self, request, pk):
+        result = is_demand_feature_disabled(request.client, 'forecast_run')
+        if result['disabled']:
+            return Response(
+                {'detail': result['message']},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
+        version = get_object_or_404(
+            ForecastVersion, pk=pk, client=request.client
+        )
+
+        if not version.is_editable:
+            return Response(
+                {'detail': f'Version is {version.status}. Only DRAFT versions can be run.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if version.run_status in ('QUEUED', 'PROFILING', 'RUNNING', 'RECONCILING', 'AGGREGATING'):
+            return Response(
+                {'detail': 'A forecast run is already in progress.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # ── Data sufficiency check (warn, don't block) ────────────────
+        from mysite.models.demand.actuals import ActualSale
+        from django.db.models import Count, Min
+
+        period_counts = ActualSale.objects.filter(
+            client=request.client,
+            period_type=version.period_type,
+        ).values('item_id').annotate(
+            periods=Count('period_start', distinct=True)
+        )
+        min_periods = period_counts.aggregate(m=Min('periods'))['m'] or 0
+        recommended_min = version.horizon_periods * 3
+
+        warnings = []
+        if min_periods < recommended_min:
+            warnings.append(
+                f"Some series have only {min_periods} periods of history. "
+                f"Recommended minimum is {recommended_min} for a "
+                f"{version.horizon_periods}-period horizon. "
+                f"Forecast accuracy may be reduced."
+            )
+
+        # ── Queue the task chain ──────────────────────────────────────
+        from mysite.tasks.demand.compute_series_profiles import compute_series_profiles
+        from mysite.tasks.demand.run_forecast import run_forecast
+
+        task_chain = chain(
+            compute_series_profiles.si(version.client.pk, version.period_type),
+            run_forecast.si(version.pk),
+        )
+        async_result = task_chain.apply_async()
+
+        ForecastVersion.objects.filter(pk=pk).update(
+            run_status='QUEUED',
+            celery_task_id=async_result.id or '',
+            run_error='',
+        )
+
+        return Response({
+            'version_id':      version.pk,
+            'run_status':      'QUEUED',
+            'celery_task_id':  async_result.id,
+            'poll_url':        f'/api/{version.client.client_id}/demand/forecast-versions/{pk}/run-status/',
+            'warnings':        warnings,  # empty list if data is sufficient
+        }, status=status.HTTP_202_ACCEPTED)
+    """
     def post(self, request, pk):
         result = is_demand_feature_disabled(request.client, 'forecast_run')
         if result['disabled']:
@@ -1073,15 +1138,15 @@ class ForecastVersionRunView(DemandFeatureMixin, APIView):
             'version_id':     version.pk,
             'run_status':     'QUEUED',
             'celery_task_id': async_result.id,
-            'poll_url':       f'/api/demand/forecast-versions/{pk}/run-status/',
+            'poll_url': f'/api/{version.client.client_id}/demand/forecast-versions/{pk}/run-status/',
+            
         }, status=status.HTTP_202_ACCEPTED)
-
+    """
 
 class ForecastVersionRunStatusView(DemandFeatureMixin, APIView):
     """
     GET /api/demand/forecast-versions/{id}/run-status/
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
@@ -1139,7 +1204,6 @@ class ForecastOverrideListCreateView(DemandFeatureMixin, APIView):
            Returns HTTP 202 (Accepted) because the Celery task applies
            the override asynchronously.
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         version = _get_draft_version(request, pk)
@@ -1338,7 +1402,6 @@ class ForecastOverrideDetailView(DemandFeatureMixin, APIView):
                                       affected lines, then delete the row, then
                                       refresh ForecastAggregate rollups.
     """
-    permission_classes = [IsAuthenticated]
 
     def _get_override(self, request, pk, override_id):
         version  = _get_draft_version(request, pk)
@@ -1397,7 +1460,6 @@ class ForecastOverrideAffectedLinesView(DemandFeatureMixin, APIView):
     Query params:
         page / page_size  — default 50, max 200
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk, override_id):
         version  = _get_draft_version(request, pk)
@@ -1443,7 +1505,6 @@ class ForecastOverrideSplitWeightView(DemandFeatureMixin, APIView):
           Marks override as is_applied=False so apply_overrides re-runs.
           Fires apply_overrides.delay(version_id).
     """
-    permission_classes = [IsAuthenticated]
 
     def _get_custom_override(self, request, pk, override_id):
         version  = _get_draft_version(request, pk)
@@ -1552,7 +1613,6 @@ class ForecastVersionExportView(DemandFeatureMixin, APIView):
         Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
         Content-Disposition: attachment; filename="forecast_{version_label}.xlsx"
     """
-    permission_classes = [IsAuthenticated]
 
     # Openpyxl style constants — defined once, reused across rows
     _HEADER_FONT     = Font(name='Arial', bold=True, color='FFFFFF', size=10)
@@ -1934,7 +1994,6 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
         'period'    — grouped by period_start (time series of accuracy)
         'item'      — per-item MAPE/Bias (for detailed drilldown)
     """
-    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         import datetime

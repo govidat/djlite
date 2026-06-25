@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-
+from .base import ClientScopedMixin, _user_has_admin_role, ClientLanguageMixinV2, BaseAdminInlinecss
 from mysite.models.demand.forecast import (
     ForecastVersion, ForecastLine, ForecastAggregate,
     ForecastOverride, OverrideSplitWeight, ForecastAccuracy,
@@ -65,7 +65,7 @@ class ForecastOverrideInline(admin.TabularInline):
 # ── ForecastVersionAdmin ──────────────────────────────────────────────────────
 
 #@admin.register(ForecastVersion)
-class ForecastVersionAdmin(admin.ModelAdmin):
+class ForecastVersionAdmin(ClientScopedMixin, admin.ModelAdmin):
 
     list_display = [
         'version_label', 'client', 'period_type',
@@ -74,6 +74,9 @@ class ForecastVersionAdmin(admin.ModelAdmin):
     ]
     list_filter  = ['client', 'status', 'period_type']
     search_fields = ['version_label', 'client__client_id']
+    autocomplete_fields = (
+        'client',
+    )     
     readonly_fields = [
         'status', 'approved_by', 'approved_at', 'locked_at', 'run_status', 'run_error', 'celery_task_id',
         'copied_from', 'created_at', 'updated_at',
@@ -185,7 +188,7 @@ class ForecastAccuracyAdmin(admin.ModelAdmin):
 
 
 #@admin.register(AbcClassDefinition)
-class AbcClassDefinitionAdmin(admin.ModelAdmin):
+class AbcClassDefinitionAdmin(ClientScopedMixin, admin.ModelAdmin):
     """
     Inline editor for a client's ABC tier definitions.
     Displayed inside ForecastingConfigAdmin.
@@ -205,6 +208,9 @@ class AbcClassDefinitionAdmin(admin.ModelAdmin):
     list_display  = ['client', 'rank', 'label', 'cumulative_upper_pct', 'description']
     list_filter   = ['client']
     ordering      = ['client', 'rank']
+    autocomplete_fields = (
+        'client',
+    )    
 
     def get_queryset(self, request):
         return super().get_queryset(request).order_by('client', 'rank')
@@ -212,7 +218,7 @@ class AbcClassDefinitionAdmin(admin.ModelAdmin):
     admin_role_only = True
 
 #@admin.register(ForecastingConfig)
-class ForecastingConfigAdmin(admin.ModelAdmin):
+class ForecastingConfigAdmin(ClientScopedMixin, admin.ModelAdmin):
     """
     One row per client. Superadmin sets thresholds; planners see read-only view.
 
@@ -230,7 +236,9 @@ class ForecastingConfigAdmin(admin.ModelAdmin):
     ]
     list_filter  = ['client']
     search_fields = ['client__client_id', 'client__name']
-
+    autocomplete_fields = (
+        'client',
+    ) 
     fieldsets = [
         (None, {
             'fields': ['client'],
@@ -306,7 +314,7 @@ class ForecastingConfigAdmin(admin.ModelAdmin):
 
 
 #@admin.register(SeriesLevelEvaluation)
-class SeriesLevelEvaluationAdmin(admin.ModelAdmin):
+class SeriesLevelEvaluationAdmin(ClientScopedMixin, admin.ModelAdmin):
     """
     Audit trail of every level evaluated for every series.
     Read-only — populated by the compute_series_profiles Celery task.
@@ -485,7 +493,7 @@ class SeriesLevelEvaluationAdmin(admin.ModelAdmin):
 
 
 #@admin.register(SeriesProfile)
-class SeriesProfileAdmin(admin.ModelAdmin):
+class SeriesProfileAdmin(ClientScopedMixin, admin.ModelAdmin):
     """
     Summary of the level-selection decision per series.
 
@@ -527,6 +535,9 @@ class SeriesProfileAdmin(admin.ModelAdmin):
         'planning_location__code',
         'planning_customer__code',
     ]
+    autocomplete_fields = (
+        'client',
+    )     
     date_hierarchy = 'computed_at'
 
     # Editable fields are ONLY the three planner override fields
@@ -707,7 +718,7 @@ class SeriesProfileAdmin(admin.ModelAdmin):
 # ═════════════════════════════════════════════════════════════════════════════
 
 #@admin.register(ForecastAggregate)
-class ForecastAggregateAdmin(admin.ModelAdmin):
+class ForecastAggregateAdmin(ClientScopedMixin, admin.ModelAdmin):
     """
     Read-only view of pre-rolled aggregate forecasts.
 
@@ -744,6 +755,7 @@ class ForecastAggregateAdmin(admin.ModelAdmin):
     search_fields = [
         'version__version_label',
     ]
+
     date_hierarchy = 'period_start'
     ordering = ['version', 'agg_level', 'period_start']
 
@@ -880,7 +892,7 @@ class OverrideSplitWeightInline(admin.TabularInline):
 # ═════════════════════════════════════════════════════════════════════════════
 
 #@admin.register(ForecastOverride)
-class ForecastOverrideAdmin(admin.ModelAdmin):
+class ForecastOverrideAdmin(ClientScopedMixin, admin.ModelAdmin):
     """
     Planner consensus overrides. Editable only for DRAFT versions.
 
