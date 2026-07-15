@@ -1,0 +1,303 @@
+{% load i18n %}
+{% if show_item_search or show_demand_class or show_abc_class or show_location or show_is_manual or filters.item_id or filters.demand_class or filters.abc_class or filters.location_code or filters.is_manual %}
+<div class="bg-base-200 rounded-box p-4 mb-4" id="series-filter-bar">
+
+    {# Hidden inputs preserve filtered-out values #}
+    {% if not show_item_search and filters.item_id %}
+    <input type="hidden" id="series-item-id" value="{{ filters.item_id }}">
+    {% endif %}
+    {% if not show_demand_class and filters.demand_class %}
+    <input type="hidden" id="series-demand-class-hidden" value="{{ filters.demand_class }}">
+    {% endif %}
+    {% if not show_abc_class and filters.abc_class %}
+    <input type="hidden" id="series-abc-class-hidden" value="{{ filters.abc_class }}">
+    {% endif %}
+    {% if not show_location and filters.location_code %}
+    <input type="hidden" id="series-location-hidden" value="{{ filters.location_code }}">
+    {% endif %}
+
+    {# Active filter badges #}
+    {% if filters.item_id or filters.demand_class or filters.abc_class or filters.location_code or filters.is_manual %}
+    <div class="flex flex-wrap gap-2 mb-3">
+        <span class="text-xs text-base-content/50 self-center">{% trans "Active filters:" %}</span>
+        {% if filters.item_id %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Item" %}: {{ filters.item_id }}
+            <button onclick="clearSeriesFilter('item')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.demand_class %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Demand class" %}: {{ filters.demand_class }}
+            <button onclick="clearSeriesFilter('demand_class')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.abc_class %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "ABC" %}: {{ filters.abc_class }}
+            <button onclick="clearSeriesFilter('abc_class')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.location_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Location" %}: {{ filters.location_code }}
+            <button onclick="clearSeriesFilter('location')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.is_manual %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Manual only" %}
+            <button onclick="clearSeriesFilter('is_manual')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        <button id="series-clear-all" class="badge badge-error gap-1">{% trans "Clear all" %}</button>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-3 items-end">
+        {# ABC level selector — always visible since it changes the meaning of ABC column #}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs font-medium">{% trans "ABC view level" %}</span>
+            </label>
+            <select id="series-abc-level" class="select select-bordered select-sm">
+                {% for value, label in abc_level_choices %}
+                <option value="{{ value }}"
+                        {% if selected_abc_level == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% if show_item_search %}
+        <div class="form-control min-w-[200px]" id="series-sku-wrapper">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Item" %}</span>
+            </label>
+            <div class="relative">
+                <input type="text" id="series-item-search"
+                       class="input input-bordered input-sm w-full"
+                       placeholder="{% trans 'Type 2+ chars…' %}"
+                       autocomplete="off" value="{{ filters.item_id }}">
+                <input type="hidden" id="series-item-id" value="{{ filters.item_id }}">
+                <ul id="series-item-results"
+                    class="hidden absolute z-50 bg-base-100 border border-base-300
+                           rounded-box shadow-lg mt-1 max-h-48 overflow-y-auto
+                           w-full min-w-[240px]">
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if show_demand_class %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Demand class" %}</span>
+            </label>
+            <select id="series-demand-class" class="select select-bordered select-sm">
+                <option value="">{% trans "All" %}</option>
+                {% for cls in demand_classes %}
+                <option value="{{ cls }}"
+                        {% if filters.demand_class == cls %}selected{% endif %}>
+                    {{ cls }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if show_abc_class %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "ABC class" %}</span>
+            </label>
+            <select id="series-abc-class" class="select select-bordered select-sm">
+                <option value="">{% trans "All" %}</option>
+                {% for cls in abc_classes %}
+                <option value="{{ cls }}"
+                        {% if filters.abc_class == cls %}selected{% endif %}>
+                    {{ cls }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if show_location %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Location" %}</span>
+            </label>
+            <select id="series-location" class="select select-bordered select-sm">
+                <option value="">{% trans "All locations" %}</option>
+                {% for code, name in locations %}
+                <option value="{{ code }}"
+                        {% if filters.location_code == code %}selected{% endif %}>
+                    {{ code }} — {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if show_is_manual %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Strategy" %}</span>
+            </label>
+            <select id="series-is-manual" class="select select-bordered select-sm">
+                <option value="">{% trans "All" %}</option>
+                <option value="true"
+                        {% if filters.is_manual == 'true' %}selected{% endif %}>
+                    {% trans "Manual only" %}
+                </option>
+            </select>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endif %}
+
+<script>
+(function() {
+    var baseUrl   = '{% url "demand_ui:series_profile_list" client_id=client.client_id %}';
+    var searchUrl = '{% url "demand_ui:item_search_global" client_id=client.client_id %}';
+    var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var searchTimer = null;
+
+    function getVal(id, hiddenId) {
+        var el = document.getElementById(id);
+        if (el) return el.value;
+        if (hiddenId) { var h = document.getElementById(hiddenId); if (h) return h.value; }
+        return '';
+    }
+
+    function applyFilters() {
+        var params = new URLSearchParams();
+        var itemId      = getVal('series-item-id');
+        var demandClass = getVal('series-demand-class', 'series-demand-class-hidden');
+        var abcClass    = getVal('series-abc-class', 'series-abc-class-hidden');
+        var location    = getVal('series-location', 'series-location-hidden');
+        var isManual    = getVal('series-is-manual');
+        var abcLevel    = getVal('series-abc-level');  // ← add
+
+        if (itemId)      params.set('item_id', itemId);
+        if (demandClass) params.set('demand_class', demandClass);
+        if (abcClass)    params.set('abc_class', abcClass);
+        if (location)    params.set('location_code', location);
+        if (isManual)    params.set('is_manual', isManual);
+        if (abcLevel)    params.set('abc_level', abcLevel);  // ← add
+
+        htmx.ajax('GET', baseUrl + '?' + params.toString(), {
+            target:  '#series-table-container',
+            swap:    'innerHTML',
+            headers: {'HX-Request': 'true'},
+        });
+    }
+
+    window.clearSeriesFilter = function(name) {
+        var map = {
+            'item':         ['series-item-search', 'series-item-id'],
+            'demand_class': ['series-demand-class', 'series-demand-class-hidden'],
+            'abc_class':    ['series-abc-class', 'series-abc-class-hidden'],
+            'location':     ['series-location', 'series-location-hidden'],
+            'is_manual':    ['series-is-manual'],
+        };
+        (map[name] || []).forEach(function(id) {
+            var el = document.getElementById(id); if (el) el.value = '';
+        });
+        applyFilters();
+    };
+
+    ['series-demand-class', 'series-abc-class',
+     'series-location', 'series-is-manual', 'series-abc-level'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', applyFilters);
+    });
+
+    var clearAll = document.getElementById('series-clear-all');
+    if (clearAll) {
+        clearAll.addEventListener('click', function() {
+            ['series-item-search', 'series-item-id',
+             'series-demand-class', 'series-demand-class-hidden',
+             'series-abc-class', 'series-abc-class-hidden',
+             'series-location', 'series-location-hidden',
+             'series-is-manual'].forEach(function(id) {
+                var el = document.getElementById(id); if (el) el.value = '';
+            });
+            applyFilters();
+        });
+    }
+
+    var searchInput = document.getElementById('series-item-search');
+    var valueInput  = document.getElementById('series-item-id');
+    var resultsList = document.getElementById('series-item-results');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var q = this.value.trim();
+            if (valueInput) valueInput.value = q;
+            clearTimeout(searchTimer);
+            if (q.length < 2) { hideResults(); return; }
+            searchTimer = setTimeout(function() {
+                fetch(searchUrl + '?q=' + encodeURIComponent(q), {
+                    headers: {'X-CSRFToken': csrfToken}
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) { renderResults(data.results); });
+            }, 300);
+        });
+        searchInput.addEventListener('change', applyFilters);
+        searchInput.addEventListener('keydown', function(e) {
+            var items  = resultsList ? resultsList.querySelectorAll('li') : [];
+            var active = resultsList ? resultsList.querySelector('li.bg-base-200') : null;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                var next = active ? active.nextElementSibling : items[0];
+                if (active) active.classList.remove('bg-base-200');
+                if (next)   next.classList.add('bg-base-200');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                var prev = active ? active.previousElementSibling : items[items.length-1];
+                if (active) active.classList.remove('bg-base-200');
+                if (prev)   prev.classList.add('bg-base-200');
+            } else if (e.key === 'Enter') {
+                if (active) { e.preventDefault(); active.click(); }
+                else { hideResults(); applyFilters(); }
+            } else if (e.key === 'Escape') { hideResults(); }
+        });
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#series-sku-wrapper')) hideResults();
+        });
+    }
+
+    function renderResults(results) {
+        if (!resultsList) return;
+        resultsList.innerHTML = '';
+        if (!results.length) {
+            resultsList.innerHTML = '<li class="px-4 py-2 text-sm text-base-content/50">No items found</li>';
+            resultsList.classList.remove('hidden');
+            return;
+        }
+        results.forEach(function(item) {
+            var li = document.createElement('li');
+            li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
+            li.textContent = item.item_id + ' — ' + item.name;
+            li.addEventListener('click', function() {
+                if (searchInput) searchInput.value = item.item_id;
+                if (valueInput)  valueInput.value  = item.item_id;
+                hideResults(); applyFilters();
+            });
+            resultsList.appendChild(li);
+        });
+        resultsList.classList.remove('hidden');
+    }
+
+    function hideResults() {
+        if (!resultsList) return;
+        resultsList.classList.add('hidden');
+        resultsList.innerHTML = '';
+    }
+})();
+</script>

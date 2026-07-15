@@ -1,6 +1,25 @@
 {# demand/partials/override_badge.html #}
 {# Context: line (ForecastLine), override (ForecastOverride) #}
-
+{# Usage: include inside an existing <td> — does NOT render its own <td> #}
+{% if line.override_qty is not None %}
+    <span class="badge badge-warning badge-sm font-mono">
+        {% if override and override.override_qty is not None %}
+            {{ line.override_qty|floatformat:0 }}
+        {% elif override and override.override_pct is not None %}
+            {% if override.override_pct >= 0 %}+{% endif %}{{ override.override_pct }}%
+        {% elif override and override.override_value is not None %}
+            ₹{{ override.override_value|floatformat:0 }}
+        {% else %}
+            {{ line.override_qty|floatformat:0 }}
+        {% endif %}
+    </span>
+    {% if override and not override.is_applied %}
+        <span class="badge badge-ghost badge-xs ml-1" title="Pending">⏳</span>
+    {% endif %}
+{% else %}
+    —
+{% endif %}
+{% comment %}
 <td class="forecast-cell forecast-cell--overridden"
     data-line-id="{{ line.pk }}"
     data-override-id="{{ override.pk }}">
@@ -45,3 +64,4 @@
     </button>
   </span>
 </td>
+{% endcomment %}

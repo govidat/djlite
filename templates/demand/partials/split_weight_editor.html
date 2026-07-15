@@ -1,5 +1,7 @@
 {# demand/partials/split_weight_editor.html #}
 {# Context: override, weights (list of OverrideSplitWeight) #}
+{# hx-put="/api/demand/forecast-versions/{{ override.version_id }}/overrides/{{ override.pk }}/split-weights/"  #}
+
 
 <div class="split-weight-editor" id="split-weight-editor">
   <h4>Edit custom weights for override {{ override.pk }}</h4>
@@ -8,7 +10,7 @@
   </p>
 
   <form
-    hx-put="/api/demand/forecast-versions/{{ override.version_id }}/overrides/{{ override.pk }}/split-weights/"
+    hx-put="{% url 'demand_api:override_split_weights' client_id=client.client_id pk=override.version_id override_id=override.pk %}"
     hx-target="#split-weight-editor"
     hx-swap="outerHTML"
     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'

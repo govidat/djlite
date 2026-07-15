@@ -173,6 +173,7 @@ def _make_templates(debug):
                     'mysite.context_processors.settings_constants',
                     'mysite.context_processors.globalval',
                     'mysite.context_processors.client_context',
+                    'mysite.context_processors.demand_planning_nav',
                 ],
                 'loaders': loaders,
                 'builtins': [

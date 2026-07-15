@@ -1,0 +1,16 @@
+{% load i18n %}
+<div class="form-control" id="override-value-input">
+    <label class="label">
+        <span class="label-text">{% trans "Target value (₹)" %}</span>
+        <span class="label-text-alt text-base-content/50">
+            {% trans "Converted to qty using weighted average price, then disaggregated" %}
+        </span>
+    </label>
+    <div class="join">
+        <span class="join-item btn btn-disabled">₹</span>
+        <input type="number" step="0.01" name="override_value"
+               class="input input-bordered join-item"
+               placeholder="{% trans 'e.g. 250000' %}"
+               value="{{ form_data.override_value|default:'' }}">
+    </div>
+</div>

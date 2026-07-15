@@ -1,4 +1,11 @@
 {# demand/partials/override_key_total.html #}
 {# Grand total has no key — empty JSON object is correct #}
+
+{% load i18n %}
+<p class="text-sm text-base-content/60 italic">
+    {% trans "This override applies to the entire forecast version — no key selection needed." %}
+</p>
+{% comment %}
 <input type="hidden" name="override_key" value='{"level": "total"}'>
 <p class="hint">This override applies to all lines in the period.</p>
+{% endcomment %}

@@ -1,0 +1,94 @@
+{% load i18n %}
+<div class="overflow-x-auto">
+    <table class="table table-zebra table-sm">
+        <thead>
+            <tr>
+                <th>{% trans "Level" %}</th>
+                <th>{% trans "Key" %}</th>
+                <th>{% trans "Period" %}</th>
+                <th class="text-right">{% trans "Qty" %}</th>
+                <th class="text-right">{% trans "%" %}</th>
+                <th class="text-right">{% trans "Value (₹)" %}</th>
+                <th>{% trans "Disagg" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "By" %}</th>
+                <th>{% trans "Note" %}</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for override in overrides %}
+            <tr class="hover">
+                <td><span class="badge badge-ghost badge-sm">{{ override.override_level }}</span></td>
+                <td class="font-mono text-xs">{{ override.override_key }}</td>
+                <td>{{ override.period_start|date:"M Y" }}</td>
+                <td class="text-right">
+                    {% if override.override_qty is not None %}{{ override.override_qty|floatformat:0 }}{% else %}—{% endif %}
+                </td>
+                <td class="text-right">
+                    {% if override.override_pct is not None %}{{ override.override_pct|floatformat:1 }}%{% else %}—{% endif %}
+                </td>
+                <td class="text-right">
+                    {% if override.override_value is not None %}₹{{ override.override_value|floatformat:0 }}{% else %}—{% endif %}
+                </td>
+                <td>
+                    <span class="badge badge-ghost badge-sm text-xs">
+                        {{ override.disagg_method|default:"PROPORTIONAL" }}
+                    </span>
+                </td>
+                <td>
+                    {% if override.is_applied %}
+                        <span class="badge badge-success badge-sm">{% trans "Applied" %}</span>
+                    {% else %}
+                        <span class="badge badge-warning badge-sm">{% trans "Pending" %}</span>
+                    {% endif %}
+                </td>
+                <td class="text-xs">{{ override.created_by.get_full_name|default:override.created_by.username }}</td>
+                <td class="text-xs text-base-content/60 max-w-xs truncate">{{ override.override_note|default:"—" }}</td>
+                <td class="flex gap-1 items-center">
+
+                    {# ── Propagation viewer ───────────────────────── #}
+                    <button class="btn btn-ghost btn-xs"
+                            hx-get="{% url 'demand_ui:override_affected' client_id=client.client_id pk=version.pk override_id=override.pk %}"
+                            hx-target="#propagation-container"
+                            title="{% trans 'View affected lines' %}">
+                        🔍
+                    </button>
+
+                    {# ── Custom weight editor — only for CUSTOM disagg ─ #}
+                    {% if override.disagg_method == 'CUSTOM' %}
+                    <button class="btn btn-ghost btn-xs"
+                            hx-get="{% url 'demand_ui:override_split_weights' client_id=client.client_id pk=version.pk override_id=override.pk %}"
+                            hx-target="#split-weight-editor-container"
+                            hx-swap="innerHTML"
+                            title="{% trans 'Edit split weights' %}">
+                        ⚖
+                    </button>
+                    {% endif %}
+
+                    {# ── Delete — only editable + not yet applied ─────── #}
+                    {% if version.is_editable and not override.is_applied %}
+                    <button class="btn btn-ghost btn-xs text-error"
+                            hx-post="{% url 'demand_ui:override_delete' client_id=client.client_id pk=version.pk override_id=override.pk %}"
+                            hx-target="#override-table-container"
+                            hx-swap="innerHTML"
+                            hx-confirm="{% trans 'Delete this override?' %}"
+                            title="{% trans 'Delete override' %}">
+                        {% trans "Delete" %}
+                    </button>
+                    {% endif %}
+
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="11" class="text-center py-8 text-base-content/50">
+                    {% trans "No overrides yet." %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="propagation-container" class="mt-4"></div>

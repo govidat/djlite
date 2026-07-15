@@ -42,19 +42,23 @@ urlpatterns = [
     # --Demand Planning ------------------------------------------------
     #path('api/demand/',  include('mysite.api.demand.urls')),
     path('api/<str:client_id>/demand/', include('mysite.api.demand.urls')),
- 
+
+    # ── Demand Planning — HTML UI (NEW: separate app, client-prefixed) ────
+    path('<str:client_id>/demand/', include('mysite.demand_ui.urls')),
+
+
     # ── Demand Planning — forecast grid page ──────────────────────────────
-    path('demand/forecast-versions/<int:pk>/grid/', views.forecast_grid, name='demand-forecast-grid'),
+    #path('demand/forecast-versions/<int:pk>/grid/', views.forecast_grid, name='demand-forecast-grid'),
     # ── Demand Planning — override HTMX partials ──────────────────────────    
-    path('demand/partials/override-key-field/', views.override_key_field, name='demand-override-key-field'),
-    path('demand/partials/override-value-inputs/', views.override_value_inputs, name='demand-override-value-inputs'),
-    path('demand/partials/encode-override-key/', views.encode_override_key, name='demand-encode-override-key'),
-    path('demand/partials/override-propagation/<int:override_id>/', views.override_propagation, name='demand-override-propagation'),
+    #path('demand/partials/override-key-field/', views.override_key_field, name='demand-override-key-field'),
+    #path('demand/partials/override-value-inputs/', views.override_value_inputs, name='demand-override-value-inputs'),
+    #path('demand/partials/encode-override-key/', views.encode_override_key, name='demand-encode-override-key'),
+    #path('demand/partials/override-propagation/<int:override_id>/', views.override_propagation, name='demand-override-propagation'),
 
     # ── Demand Planning — approval HTMX partials (Sprint 3B.6) ───────────
-    path('demand/partials/approval-panel/<int:pk>/', views.approval_panel, name='demand-approval-panel'),
-    path('demand/partials/approval-reject-form/<int:pk>/', views.approval_reject_form, name='demand-approval-reject-form'),
-    path('demand/partials/approval-copy-form/<int:pk>/', views.approval_copy_form, name='demand-approval-copy-form'),
+    #path('demand/partials/approval-panel/<int:pk>/', views.approval_panel, name='demand-approval-panel'),
+    #path('demand/partials/approval-reject-form/<int:pk>/', views.approval_reject_form, name='demand-approval-reject-form'),
+    #path('demand/partials/approval-copy-form/<int:pk>/', views.approval_copy_form, name='demand-approval-copy-form'),
     #Add BEFORE <str:client_id>/<str:page>/ catch-all:
 
     # ── Catch-all (must stay LAST) ────────────────────────────────────────

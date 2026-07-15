@@ -46,7 +46,7 @@ from mysite.models import Item   # adjust import path to match your project
 logger = logging.getLogger(__name__)
 
 # ── Column spec ───────────────────────────────────────────────────────────────
-REQUIRED_COLUMNS = {'period_start', 'item_id', 'location_code', 'qty'}
+REQUIRED_COLUMNS = {'period_start', 'item_id', 'planning_location_code', 'qty'}
 OPTIONAL_COLUMNS = {'customer_code', 'revenue'}
 ALL_COLUMNS      = REQUIRED_COLUMNS | OPTIONAL_COLUMNS
 
@@ -143,6 +143,15 @@ def _run_import(job: ActualSaleImport):
     df = df.fillna('')
     total_rows = len(df)
 
+    # Drop context-supplied columns silently
+    df.drop(
+        columns=[c for c in (
+            'period_type', 'client_id', 'import_batch_id'
+        ) if c in df.columns],
+        inplace=True,
+        errors='ignore',
+    )
+
     # ── 3. Build FK lookup maps (one query each) ──────────────────────────────
     # Fetch all active items for this client indexed by item_id
     item_map = {
@@ -171,8 +180,11 @@ def _run_import(job: ActualSaleImport):
         period_start_raw = str(row.get('period_start', '')).strip()
         period_start = None
         try:
-            period_start = datetime.date.fromisoformat(period_start_raw)
-            validate_period_start(period_start, period_type)
+            # Strip time component if present (Excel exports datetime as string)
+            period_start_clean = period_start_raw.split(' ')[0].split('T')[0]
+            period_start = datetime.date.fromisoformat(period_start_clean)
+            validate_period_start(period_start, period_type)            
+
         except ValueError as exc:
             row_errors.append(f"period_start: {exc}")
 
@@ -183,13 +195,13 @@ def _run_import(job: ActualSaleImport):
             row_errors.append(f"item_id '{item_id_raw}': not found or inactive")
 
         # location
-        location_code_raw = str(row.get('location_code', '')).strip()
+        location_code_raw = str(row.get('planning_location_code', '')).strip()
         location = location_map.get(location_code_raw)
         if not location:
             row_errors.append(f"location_code '{location_code_raw}': not found or inactive")
 
         # customer (optional)
-        customer_code_raw = str(row.get('customer_code', '')).strip()
+        customer_code_raw = str(row.get('planning_customer_code', '')).strip()
         customer = None
         if customer_code_raw:
             customer = customer_map.get(customer_code_raw)

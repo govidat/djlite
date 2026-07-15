@@ -1,0 +1,304 @@
+{% load i18n %}
+{% if show_item_search or show_location or show_customer or show_period_type or show_period or filters.item_id or filters.location_code or filters.customer_code or filters.period_type or filters.period_start %}
+<div class="bg-base-200 rounded-box p-4 mb-4" id="actuals-filter-bar">
+
+    {# ── Hidden inputs preserve filter values even when filter is hidden ── #}
+    {% if not show_item_search and filters.item_id %}
+    <input type="hidden" id="actuals-item-id" value="{{ filters.item_id }}">
+    {% endif %}
+    {% if not show_location and filters.location_code %}
+    <input type="hidden" id="actuals-location-hidden" value="{{ filters.location_code }}">
+    {% endif %}
+    {% if not show_customer and filters.customer_code %}
+    <input type="hidden" id="actuals-customer-hidden" value="{{ filters.customer_code }}">
+    {% endif %}
+    {% if not show_period_type and filters.period_type %}
+    <input type="hidden" id="actuals-period-type-hidden" value="{{ filters.period_type }}">
+    {% endif %}
+    {% if not show_period and filters.period_start %}
+    <input type="hidden" id="actuals-period-hidden" value="{{ filters.period_start }}">
+    {% endif %}
+
+    {# Active filter badges — show what's currently filtered ─────────── #}
+    {% if filters.item_id or filters.location_code or filters.customer_code or filters.period_type or filters.period_start %}
+    <div class="flex flex-wrap gap-2 mb-3">
+        <span class="text-xs text-base-content/50 self-center">{% trans "Active filters:" %}</span>
+        {% if filters.item_id %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Item" %}: {{ filters.item_id }}
+            <button onclick="clearFilter('item')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.location_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Location" %}: {{ filters.location_code }}
+            <button onclick="clearFilter('location')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.customer_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Customer" %}: {{ filters.customer_code }}
+            <button onclick="clearFilter('customer')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.period_type %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Type" %}: {{ filters.period_type }}
+            <button onclick="clearFilter('period_type')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.period_start %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Period" %}: {{ filters.period_start }}
+            <button onclick="clearFilter('period_start')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        <button id="actuals-clear" class="badge badge-error gap-1">
+            {% trans "Clear all" %}
+        </button>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-3 items-end">
+
+        {% if show_item_search %}
+        <div class="form-control min-w-[200px]" id="actuals-sku-wrapper">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Item" %}</span>
+            </label>
+            <div class="relative">
+                <input type="text" id="actuals-item-search"
+                       class="input input-bordered input-sm w-full"
+                       placeholder="{% trans 'Type 2+ chars…' %}"
+                       autocomplete="off" value="{{ filters.item_id }}">
+                <input type="hidden" id="actuals-item-id" value="{{ filters.item_id }}">
+                <ul id="actuals-item-results"
+                    class="hidden absolute z-50 bg-base-100 border border-base-300
+                           rounded-box shadow-lg mt-1 max-h-48 overflow-y-auto
+                           w-full min-w-[240px]">
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if show_location %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Location" %}</span>
+            </label>
+            <select id="actuals-location" class="select select-bordered select-sm">
+                <option value="">{% trans "All locations" %}</option>
+                {% for code, name in locations %}
+                <option value="{{ code }}"
+                        {% if filters.location_code == code %}selected{% endif %}>
+                    {{ code }} — {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if show_customer %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Customer" %}</span>
+            </label>
+            <select id="actuals-customer" class="select select-bordered select-sm">
+                <option value="">{% trans "All customers" %}</option>
+                {% for code, name in customers %}
+                <option value="{{ code }}"
+                        {% if filters.customer_code == code %}selected{% endif %}>
+                    {{ code }} — {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if show_period_type %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Period type" %}</span>
+            </label>
+            <select id="actuals-period-type" class="select select-bordered select-sm">
+                <option value="">{% trans "All types" %}</option>
+                {% for pt in period_types %}
+                <option value="{{ pt }}"
+                        {% if filters.period_type == pt %}selected{% endif %}>
+                    {{ pt }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if show_period %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Period" %}</span>
+            </label>
+            <select id="actuals-period" class="select select-bordered select-sm">
+                <option value="">{% trans "All periods" %}</option>
+                {% for period in periods %}
+                <option value="{{ period|date:'Y-m-d' }}"
+                        {% if filters.period_start == period|date:'Y-m-d' %}selected{% endif %}>
+                    {{ period|date:"M Y" }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endif %}
+
+<script>
+(function() {
+    var baseUrl   = '{% url "demand_ui:actuals_list" client_id=client.client_id %}';
+    var searchUrl = '{% url "demand_ui:item_search_global" client_id=client.client_id %}';
+    var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var searchTimer = null;
+
+    function getVal(id, hiddenId) {
+        // Check visible element first, then hidden fallback
+        var el = document.getElementById(id);
+        if (el) return el.value;
+        if (hiddenId) {
+            var hidden = document.getElementById(hiddenId);
+            if (hidden) return hidden.value;
+        }
+        return '';
+    }
+
+    function applyFilters() {
+        var params     = new URLSearchParams();
+        var itemId     = getVal('actuals-item-id');
+        var location   = getVal('actuals-location', 'actuals-location-hidden');
+        var customer   = getVal('actuals-customer', 'actuals-customer-hidden');
+        var periodType = getVal('actuals-period-type', 'actuals-period-type-hidden');
+        var period     = getVal('actuals-period', 'actuals-period-hidden');
+
+        if (itemId)     params.set('item_id', itemId);
+        if (location)   params.set('location_code', location);
+        if (customer)   params.set('customer_code', customer);
+        if (periodType) params.set('period_type', periodType);
+        if (period)     params.set('period_start', period);
+
+        htmx.ajax('GET', baseUrl + '?' + params.toString(), {
+            target:  '#actuals-table-container',
+            swap:    'innerHTML',
+            headers: {'HX-Request': 'true'},
+        });
+    }
+
+    window.clearFilter = function(filterName) {
+        var map = {
+            'item':        ['actuals-item-search', 'actuals-item-id'],
+            'location':    ['actuals-location', 'actuals-location-hidden'],
+            'customer':    ['actuals-customer', 'actuals-customer-hidden'],
+            'period_type': ['actuals-period-type', 'actuals-period-type-hidden'],
+            'period_start':['actuals-period', 'actuals-period-hidden'],
+        };
+        (map[filterName] || []).forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        applyFilters();
+    };
+
+    ['actuals-location', 'actuals-customer',
+     'actuals-period-type', 'actuals-period'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', applyFilters);
+    });
+
+    var clearBtn = document.getElementById('actuals-clear');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            ['actuals-item-search', 'actuals-item-id',
+             'actuals-location', 'actuals-location-hidden',
+             'actuals-customer', 'actuals-customer-hidden',
+             'actuals-period-type', 'actuals-period-type-hidden',
+             'actuals-period', 'actuals-period-hidden'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            applyFilters();
+        });
+    }
+
+    // SKU autocomplete
+    var searchInput = document.getElementById('actuals-item-search');
+    var valueInput  = document.getElementById('actuals-item-id');
+    var resultsList = document.getElementById('actuals-item-results');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var q = this.value.trim();
+            if (valueInput) valueInput.value = q;
+            clearTimeout(searchTimer);
+            if (q.length < 2) { hideResults(); return; }
+            searchTimer = setTimeout(function() {
+                fetch(searchUrl + '?q=' + encodeURIComponent(q), {
+                    headers: {'X-CSRFToken': csrfToken}
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) { renderResults(data.results); })
+                .catch(function(err) { console.error('item search:', err); });
+            }, 300);
+        });
+        searchInput.addEventListener('change', applyFilters);
+        searchInput.addEventListener('keydown', function(e) {
+            var items  = resultsList ? resultsList.querySelectorAll('li') : [];
+            var active = resultsList ? resultsList.querySelector('li.bg-base-200') : null;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                var next = active ? active.nextElementSibling : items[0];
+                if (active) active.classList.remove('bg-base-200');
+                if (next)   next.classList.add('bg-base-200');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                var prev = active ? active.previousElementSibling : items[items.length-1];
+                if (active) active.classList.remove('bg-base-200');
+                if (prev)   prev.classList.add('bg-base-200');
+            } else if (e.key === 'Enter') {
+                if (active) { e.preventDefault(); active.click(); }
+                else { hideResults(); applyFilters(); }
+            } else if (e.key === 'Escape') { hideResults(); }
+        });
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#actuals-sku-wrapper')) hideResults();
+        });
+    }
+
+    function renderResults(results) {
+        if (!resultsList) return;
+        resultsList.innerHTML = '';
+        if (!results.length) {
+            resultsList.innerHTML = '<li class="px-4 py-2 text-sm text-base-content/50">No items found</li>';
+            resultsList.classList.remove('hidden');
+            return;
+        }
+        results.forEach(function(item) {
+            var li = document.createElement('li');
+            li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
+            li.textContent = item.item_id + ' — ' + item.name;
+            li.addEventListener('click', function() {
+                if (searchInput) searchInput.value = item.item_id;
+                if (valueInput)  valueInput.value  = item.item_id;
+                hideResults();
+                applyFilters();
+            });
+            resultsList.appendChild(li);
+        });
+        resultsList.classList.remove('hidden');
+    }
+
+    function hideResults() {
+        if (!resultsList) return;
+        resultsList.classList.add('hidden');
+        resultsList.innerHTML = '';
+    }
+})();
+</script>

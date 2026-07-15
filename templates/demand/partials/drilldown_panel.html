@@ -1,0 +1,134 @@
+{% load i18n %}
+{% comment %}
+FILE: templates/demand/partials/drilldown_panel.html
+
+This is the HTMX swap target for the entire drill-down experience.
+Clicking a child row replaces THIS ENTIRE PARTIAL with the same partial
+rendered one level deeper — so breadcrumbs, the value card, the children
+table, and the override button all refresh together and stay consistent.
+{% endcomment %}
+
+<div hx-target="this" hx-swap="outerHTML" id="drilldown-panel">
+
+  {# ── Breadcrumb trail ─────────────────────────────────────────────── #}
+  <div class="breadcrumbs text-sm mb-4">
+    <ul>
+      <li>
+        <a hx-get="{% url 'demand_ui:drilldown' client_id=client.client_id pk=version.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}">
+          🏢 {% trans "Total" %}
+        </a>
+      </li>
+      {% for node in breadcrumbs %}
+      <li>
+        <a hx-get="{% url 'demand_ui:drilldown_location' client_id=client.client_id pk=version.pk location_id=node.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"> 
+          {{ node.code }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {# ── Period switcher ──────────────────────────────────────────────── #}
+  <div class="flex items-center justify-between mb-4">
+    <select class="select select-bordered select-sm"
+            hx-get="{% url 'demand_ui:drilldown' client_id=client.client_id pk=version.pk %}{% if current_location %}?location_id={{ current_location.pk }}{% endif %}"
+            hx-trigger="change" name="agg_period"
+            hx-include="this">
+      {% for p in available_periods %}
+      <option value="{{ p|date:'Y-m-d' }}" {% if p == agg_period %}selected{% endif %}>
+        {{ p|date:"M Y" }}
+      </option>
+      {% endfor %}
+    </select>
+
+    {% if can_override_current %}
+    <button class="btn btn-primary btn-sm"
+            hx-get="{% url 'demand_ui:drilldown_override_form' client_id=client.client_id pk=version.pk location_id=current_location.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"
+            hx-target="#override-modal-content"
+            onclick="document.getElementById('override-modal').showModal()">
+      ✏ {% trans "Enter Override" %}
+    </button>
+    {% endif %}
+  </div>
+
+  {# ── Current-level value card — THE single comprehensible number ───── #}
+  <div class="card bg-primary text-primary-content mb-6">
+    <div class="card-body">
+      <h2 class="card-title">
+        {% if is_client_total %}{% trans "Client Total" %}{% else %}{{ current_location.name }} ({{ current_location.code }}){% endif %}
+      </h2>
+      {% if current_agg %}
+      <div class="flex items-end gap-6">
+        <div>
+          <p class="text-sm opacity-80">{% trans "Final Value" %}</p>
+          <p class="text-3xl font-bold">₹{{ current_agg.total_final_value|floatformat:0 }}</p>
+        </div>
+        <div>
+          <p class="text-sm opacity-80">{% trans "Final Qty" %}</p>
+          <p class="text-xl">{{ current_agg.final_qty|floatformat:0 }}</p>
+        </div>
+        {% if current_agg.override_qty %}
+        <div class="badge badge-outline">{% trans "Overridden" %}</div>
+        {% endif %}
+      </div>
+      {% else %}
+      <p class="opacity-70">{% trans "No aggregate computed yet for this period." %}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Children — clickable drill-down rows ────────────────────────── #}
+  {% if child_rows %}
+  <div class="overflow-x-auto">
+    <table class="table table-zebra">
+      <thead>
+        <tr>
+          <th>{% trans "Location" %}</th>
+          <th class="text-right">{% trans "Final Value" %}</th>
+          <th class="text-right">{% trans "Final Qty" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in child_rows %}
+        <tr class="hover cursor-pointer"
+            hx-get="{% url 'demand_ui:drilldown_location' client_id=client.client_id pk=version.pk location_id=row.location.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"
+            hx-trigger="click">
+          <td>
+            {{ row.location.code }} — {{ row.location.name }}
+            {% if not row.can_override %}
+              <span class="badge badge-ghost badge-xs ml-1" title="{% trans 'View only' %}">🔒</span>
+            {% endif %}
+          </td>
+          <td class="text-right">
+            {% if row.aggregate %}₹{{ row.aggregate.total_final_value|floatformat:0 }}{% else %}—{% endif %}
+          </td>
+          <td class="text-right">
+            {% if row.aggregate %}{{ row.aggregate.final_qty|floatformat:0 }}{% else %}—{% endif %}
+          </td>
+          <td class="text-right text-base-content/40">
+            {% if row.has_children %}▶{% else %}•{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif current_location %}
+  {# Leaf node — no more location children, offer item-level breakdown #}
+  <div class="alert">
+    <span>{% trans "This is a leaf location. " %}</span>
+    <a class="link link-primary"
+       href="{% url 'demand_ui:drilldown_items' client_id=client.client_id pk=version.pk location_id=current_location.pk %}">
+      {% trans "View item-level forecast lines →" %}
+    </a>
+  </div>
+  {% endif %}
+
+  {# ── Override modal — populated via hx-get above ─────────────────── #}
+  <dialog id="override-modal" class="modal">
+    <div class="modal-box" id="override-modal-content"></div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
+
+</div>

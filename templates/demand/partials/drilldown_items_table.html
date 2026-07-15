@@ -1,0 +1,79 @@
+{% load i18n %}
+<div id="drilldown-items-table">
+
+    <div class="overflow-x-auto">
+        <table class="table table-zebra table-sm">
+            <thead>
+                <tr>
+                    <th>{% trans "Item ID" %}</th>
+                    <th>{% trans "Item Name" %}</th>
+                    <th>{% trans "Customer" %}</th>
+                    <th>{% trans "Period" %}</th>
+                    <th class="text-right">{% trans "Statistical Qty" %}</th>
+                    <th class="text-right">{% trans "Override Qty" %}</th>
+                    <th class="text-right">{% trans "Final Qty" %}</th>
+                    <th class="text-right">{% trans "Final Value" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in page_obj %}
+                <tr class="hover">
+                    <td class="font-mono text-sm">{{ line.item.item_id }}</td>
+                    <td>{{ line.item.name }}</td>
+                    <td>{{ line.planning_customer.code|default:"—" }}</td>
+                    <td>{{ line.period_start|date:"M Y" }}</td>
+                    <td class="text-right">{{ line.statistical_qty|floatformat:0 }}</td>
+                    <td class="text-right">
+                        {% if line.override_qty is not None %}
+                            <span class="badge badge-warning badge-sm">
+                                {{ line.override_qty|floatformat:0 }}
+                            </span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td class="text-right font-medium">{{ line.final_qty|floatformat:0 }}</td>
+                    <td class="text-right">
+                        {% if line.final_value is not None %}
+                            ₹{{ line.final_value|floatformat:0 }}
+                        {% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-base-content/50 py-8">
+                        {% trans "No forecast lines for this location." %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Pagination #}
+    {% if page_obj.has_other_pages %}
+    <div class="flex justify-center gap-2 mt-4">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}"
+           class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
+        {% endif %}
+        <span class="btn btn-sm btn-disabled">
+            {% trans "Page" %} {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}"
+           class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if can_override %}
+    <div class="mt-4 flex justify-end">
+        <a href="{% url 'demand_ui:drilldown_override_form' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+           class="btn btn-primary btn-sm">
+            ✏ {% trans "Enter Override for this Location" %}
+        </a>
+    </div>
+    {% endif %}
+
+</div>

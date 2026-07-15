@@ -1,0 +1,318 @@
+{% load i18n %}
+{% if show_item_search or show_location or show_customer or show_period or show_override_filter or filters.item_id or filters.location_code or filters.customer_code or filters.period_start or filters.has_override %}
+<div class="bg-base-200 rounded-box p-4 mb-4" id="lines-filter-bar">
+
+    {# ── Hidden inputs preserve filtered-out values ───────────────── #}
+    {% if not show_item_search and filters.item_id %}
+    <input type="hidden" id="lines-item-id" value="{{ filters.item_id }}">
+    {% endif %}
+    {% if not show_location and filters.location_code %}
+    <input type="hidden" id="lines-location-hidden" value="{{ filters.location_code }}">
+    {% endif %}
+    {% if not show_customer and filters.customer_code %}
+    <input type="hidden" id="lines-customer-hidden" value="{{ filters.customer_code }}">
+    {% endif %}
+    {% if not show_period and filters.period_start %}
+    <input type="hidden" id="lines-period-hidden" value="{{ filters.period_start }}">
+    {% endif %}
+
+    {# ── Active filter badges ─────────────────────────────────────── #}
+    {% if filters.item_id or filters.location_code or filters.customer_code or filters.period_start or filters.has_override %}
+    <div class="flex flex-wrap gap-2 mb-3">
+        <span class="text-xs text-base-content/50 self-center">
+            {% trans "Active filters:" %}
+        </span>
+        {% if filters.item_id %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Item" %}: {{ filters.item_id }}
+            <button onclick="clearLineFilter('item')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.location_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Location" %}: {{ filters.location_code }}
+            <button onclick="clearLineFilter('location')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.customer_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Customer" %}: {{ filters.customer_code }}
+            <button onclick="clearLineFilter('customer')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.period_start %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Period" %}: {{ filters.period_start }}
+            <button onclick="clearLineFilter('period')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.has_override %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Override" %}: {{ filters.has_override }}
+            <button onclick="clearLineFilter('override')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        <button id="lines-clear-all" class="badge badge-error gap-1">
+            {% trans "Clear all" %}
+        </button>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-3 items-end">
+
+        {# SKU autocomplete #}
+        {% if show_item_search %}
+        <div class="form-control min-w-[200px]" id="lines-sku-wrapper">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Item" %}</span>
+            </label>
+            <div class="relative">
+                <input type="text" id="lines-item-search"
+                       class="input input-bordered input-sm w-full"
+                       placeholder="{% trans 'Type 2+ chars…' %}"
+                       autocomplete="off"
+                       value="{{ filters.item_id }}">
+                <input type="hidden" id="lines-item-id"
+                       value="{{ filters.item_id }}">
+                <ul id="lines-item-results"
+                    class="hidden absolute z-50 bg-base-100 border border-base-300
+                           rounded-box shadow-lg mt-1 max-h-48 overflow-y-auto
+                           w-full min-w-[240px]">
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Location #}
+        {% if show_location %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Location" %}</span>
+            </label>
+            <select id="lines-location" class="select select-bordered select-sm">
+                <option value="">{% trans "All locations" %}</option>
+                {% for code, name in locations %}
+                <option value="{{ code }}"
+                        {% if filters.location_code == code %}selected{% endif %}>
+                    {{ code }} — {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {# Customer #}
+        {% if show_customer %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Customer" %}</span>
+            </label>
+            <select id="lines-customer" class="select select-bordered select-sm">
+                <option value="">{% trans "All customers" %}</option>
+                {% for code, name in customers %}
+                <option value="{{ code }}"
+                        {% if filters.customer_code == code %}selected{% endif %}>
+                    {{ code }} — {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {# Period #}
+        {% if show_period %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Period" %}</span>
+            </label>
+            <select id="lines-period" class="select select-bordered select-sm">
+                <option value="">{% trans "All periods" %}</option>
+                {% for period in periods %}
+                <option value="{{ period|date:'Y-m-d' }}"
+                        {% if filters.period_start == period|date:'Y-m-d' %}selected{% endif %}>
+                    {{ period|date:"M Y" }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {# Override filter — only if overrides exist #}
+        {% if show_override_filter %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Override" %}</span>
+            </label>
+            <select id="lines-has-override" class="select select-bordered select-sm">
+                <option value="">{% trans "All lines" %}</option>
+                <option value="true"
+                        {% if filters.has_override == 'true' %}selected{% endif %}>
+                    {% trans "Overridden only" %}
+                </option>
+                <option value="false"
+                        {% if filters.has_override == 'false' %}selected{% endif %}>
+                    {% trans "No override" %}
+                </option>
+            </select>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endif %}
+
+<script>
+(function() {
+    var baseUrl   = '{% url "demand_ui:version_lines" client_id=client.client_id pk=version.pk %}';
+    var searchUrl = '{% url "demand_ui:item_search" client_id=client.client_id pk=version.pk %}';
+    var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var searchTimer = null;
+
+    function getVal(id, hiddenId) {
+        var el = document.getElementById(id);
+        if (el) return el.value;
+        if (hiddenId) {
+            var h = document.getElementById(hiddenId);
+            if (h) return h.value;
+        }
+        return '';
+    }
+
+    function applyFilters() {
+        var params    = new URLSearchParams();
+        var itemId    = getVal('lines-item-id');
+        var location  = getVal('lines-location', 'lines-location-hidden');
+        var customer  = getVal('lines-customer', 'lines-customer-hidden');
+        var period    = getVal('lines-period', 'lines-period-hidden');
+        var override  = getVal('lines-has-override');
+
+        if (itemId)   params.set('item_id', itemId);
+        if (location) params.set('location_code', location);
+        if (customer) params.set('customer_code', customer);
+        if (period)   params.set('period_start', period);
+        if (override) params.set('has_override', override);
+
+        htmx.ajax('GET', baseUrl + '?' + params.toString(), {
+            target:  '#lines-table-container',
+            swap:    'innerHTML',
+            headers: {'HX-Request': 'true'},
+        });
+    }
+
+    window.clearLineFilter = function(filterName) {
+        var map = {
+            'item':     ['lines-item-search', 'lines-item-id'],
+            'location': ['lines-location', 'lines-location-hidden'],
+            'customer': ['lines-customer', 'lines-customer-hidden'],
+            'period':   ['lines-period', 'lines-period-hidden'],
+            'override': ['lines-has-override'],
+        };
+        (map[filterName] || []).forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        applyFilters();
+    };
+
+    ['lines-location', 'lines-customer',
+     'lines-period', 'lines-has-override'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', applyFilters);
+    });
+
+    var clearAll = document.getElementById('lines-clear-all');
+    if (clearAll) {
+        clearAll.addEventListener('click', function() {
+            ['lines-item-search', 'lines-item-id',
+             'lines-location', 'lines-location-hidden',
+             'lines-customer', 'lines-customer-hidden',
+             'lines-period', 'lines-period-hidden',
+             'lines-has-override'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            applyFilters();
+        });
+    }
+
+    // SKU autocomplete
+    var searchInput = document.getElementById('lines-item-search');
+    var valueInput  = document.getElementById('lines-item-id');
+    var resultsList = document.getElementById('lines-item-results');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            var q = this.value.trim();
+            if (valueInput) valueInput.value = q;
+            clearTimeout(searchTimer);
+            if (q.length < 2) { hideResults(); return; }
+            searchTimer = setTimeout(function() {
+                fetch(searchUrl + '?q=' + encodeURIComponent(q), {
+                    headers: {'X-CSRFToken': csrfToken}
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) { renderResults(data.results); })
+                .catch(function(err) { console.error('item search:', err); });
+            }, 300);
+        });
+
+        searchInput.addEventListener('change', applyFilters);
+
+        searchInput.addEventListener('keydown', function(e) {
+            var items  = resultsList ? resultsList.querySelectorAll('li') : [];
+            var active = resultsList ?
+                         resultsList.querySelector('li.bg-base-200') : null;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                var next = active ? active.nextElementSibling : items[0];
+                if (active) active.classList.remove('bg-base-200');
+                if (next)   next.classList.add('bg-base-200');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                var prev = active ?
+                           active.previousElementSibling : items[items.length-1];
+                if (active) active.classList.remove('bg-base-200');
+                if (prev)   prev.classList.add('bg-base-200');
+            } else if (e.key === 'Enter') {
+                if (active) { e.preventDefault(); active.click(); }
+                else { hideResults(); applyFilters(); }
+            } else if (e.key === 'Escape') { hideResults(); }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#lines-sku-wrapper')) hideResults();
+        });
+    }
+
+    function renderResults(results) {
+        if (!resultsList) return;
+        resultsList.innerHTML = '';
+        if (!results.length) {
+            resultsList.innerHTML =
+                '<li class="px-4 py-2 text-sm text-base-content/50">' +
+                '{% trans "No items found" %}</li>';
+            resultsList.classList.remove('hidden');
+            return;
+        }
+        results.forEach(function(item) {
+            var li = document.createElement('li');
+            li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
+            li.textContent = item.item_id + ' — ' + item.name;
+            li.addEventListener('click', function() {
+                if (searchInput) searchInput.value = item.item_id;
+                if (valueInput)  valueInput.value  = item.item_id;
+                hideResults();
+                applyFilters();
+            });
+            resultsList.appendChild(li);
+        });
+        resultsList.classList.remove('hidden');
+    }
+
+    function hideResults() {
+        if (!resultsList) return;
+        resultsList.classList.add('hidden');
+        resultsList.innerHTML = '';
+    }
+})();
+</script>

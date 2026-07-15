@@ -1,0 +1,13 @@
+{% load i18n %}
+<div class="form-control" id="override-value-input">
+    <label class="label">
+        <span class="label-text">{% trans "Override quantity" %}</span>
+        <span class="label-text-alt text-base-content/50">
+            {% trans "Absolute quantity — replaces the statistical forecast" %}
+        </span>
+    </label>
+    <input type="number" step="0.001" name="override_qty"
+           class="input input-bordered"
+           placeholder="{% trans 'e.g. 500' %}"
+           value="{{ form_data.override_qty|default:'' }}">
+</div>

@@ -1,6 +1,23 @@
 {# demand/partials/override_key_location.html #}
+{% load i18n %}
+<div class="form-control">
+    <label class="label"><span class="label-text">{% trans "Location" %}</span></label>
+    <select name="location_code" class="select select-bordered"
+            hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+            hx-trigger="change" hx-target="#override-key-hidden-container"
+            hx-include="closest form">
+        <option value="">{% trans "Select a location…" %}</option>
+        {% for loc in locations %}
+        <option value="{{ loc.code }}">{{ loc.code }} — {{ loc.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div id="override-key-hidden-container"></div>
+
+{% comment %}
 <label>Location code
   <input type="text" name="override_key_location_code" required
          placeholder="e.g. MUM-01">
 </label>
 <input type="hidden" id="override-key-hidden" name="override_key" value="{}">
+{% endcomment %}

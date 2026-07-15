@@ -1,4 +1,110 @@
 {# demand/partials/override_propagation.html #}
+{% load i18n %}
+<div class="card bg-base-100 shadow" id="propagation-panel">
+
+    <div class="card-body p-4">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-sm">{% trans "Lines affected by this override" %}</h3>
+            <button class="btn btn-ghost btn-xs"
+                    onclick="document.getElementById('propagation-panel').innerHTML = ''">
+                ✕ {% trans "Close" %}
+            </button>
+        </div>
+
+        <div class="flex flex-wrap gap-4 text-xs text-base-content/60 mb-3">
+            <span><strong>{% trans "Level" %}:</strong> {{ override.get_override_level_display }}</span>
+            <span><strong>{% trans "Key" %}:</strong> {{ override.override_key }}</span>
+            <span><strong>{% trans "Period" %}:</strong> {{ override.period_start|date:"M Y" }}</span>
+            <span>
+                {% if override.is_applied %}
+                    <span class="badge badge-success badge-sm">✓ {% trans "Applied" %}</span>
+                {% else %}
+                    <span class="badge badge-warning badge-sm">⏳ {% trans "Pending" %}</span>
+                {% endif %}
+            </span>
+            <span><strong>{% trans "Total lines" %}:</strong> {{ count }}</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="table table-xs table-zebra">
+                <thead>
+                    <tr>
+                        <th>{% trans "Item" %}</th>
+                        <th>{% trans "Location" %}</th>
+                        <th>{% trans "Customer" %}</th>
+                        {% if override.override_level == 'sku' %}
+                        <th class="text-right">{% trans "Stat Qty" %}</th>
+                        <th class="text-right">{% trans "Override Qty" %}</th>
+                        <th class="text-right">{% trans "Final Qty" %}</th>
+                        {% endif %}
+                        <th class="text-right">{% trans "Final Value (₹)" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in page.object_list %}
+                    <tr class="{% if line.override_qty %}bg-warning/10{% endif %}">
+                        <td class="font-mono text-xs">
+                            {{ line.item.item_id }}
+                            <span class="text-base-content/50 text-xs">— {{ line.item.name }}</span>
+                        </td>
+                        <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
+                        <td class="text-xs">{{ line.planning_customer.code|default:"—" }}</td>
+                        {% if override.override_level == 'sku' %}
+                        <td class="text-right">{{ line.statistical_qty|floatformat:0 }}</td>
+                        <td class="text-right">
+                            {% if line.override_qty is not None %}
+                                <span class="badge badge-warning badge-sm">
+                                    {{ line.override_qty|floatformat:0 }}
+                                </span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-right font-medium">{{ line.final_qty|floatformat:0 }}</td>
+                        {% endif %}
+                        <td class="text-right">
+                            {% if line.final_value %}₹{{ line.final_value|floatformat:0 }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-base-content/50">
+                            {% trans "No lines matched this override." %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if page.has_previous or page.has_next %}
+        <div class="flex justify-center gap-2 mt-3">
+            {% if page.has_previous %}
+            <button class="btn btn-sm btn-ghost"
+                    hx-get="{% url 'demand_ui:override_propagation' client_id=client.client_id pk=version.pk override_id=override.pk %}?page={{ page.previous_page_number }}"
+                    hx-target="#propagation-panel"
+                    hx-swap="outerHTML">
+                ← {% trans "Previous" %}
+            </button>
+            {% endif %}
+            <span class="btn btn-sm btn-disabled">
+                {{ page.number }} / {{ page.paginator.num_pages }}
+            </span>
+            {% if page.has_next %}
+            <button class="btn btn-sm btn-ghost"
+                    hx-get="{% url 'demand_ui:override_propagation' client_id=client.client_id pk=version.pk override_id=override.pk %}?page={{ page.next_page_number }}"
+                    hx-target="#propagation-panel"
+                    hx-swap="outerHTML">
+                {% trans "Next" %} →
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+{% comment %}
+
+{# demand/partials/override_propagation.html #}
 {# Context: override, page (Page object), count #}
 
 <div class="propagation-panel" id="propagation-panel">
@@ -76,3 +182,4 @@
     Close
   </button>
 </div>
+{% endcomment %}

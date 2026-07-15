@@ -1,0 +1,19 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-xl font-bold">{% trans "Forecast Lines" %}</h2>
+        <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
+    </div>
+    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+       class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
+</div>
+
+<div id="lines-table-container" class="w-full overflow-hidden">
+    {% include "demand/partials/lines_filter_bar.html" %}
+    {% include "demand/partials/lines_table_body.html" %}
+</div>
+
+{% endblock %}

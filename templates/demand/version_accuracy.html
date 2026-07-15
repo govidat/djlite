@@ -1,0 +1,34 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-xl font-bold">{% trans "Forecast Accuracy" %}</h2>
+        <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
+    </div>
+    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+       class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
+</div>
+
+{% if avg_mape is not None %}
+<div class="stats shadow mb-6">
+    <div class="stat">
+        <div class="stat-title">{% trans "Avg MAPE" %}</div>
+        <div class="stat-value text-2xl">{{ avg_mape|floatformat:1 }}%</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">{% trans "Avg Bias" %}</div>
+        <div class="stat-value text-2xl">{{ avg_bias|floatformat:1 }}%</div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">{% trans "Series evaluated" %}</div>
+        <div class="stat-value text-2xl">{{ total_rows }}</div>
+    </div>
+</div>
+{% endif %}
+
+<div id="accuracy-table-container">
+    {% include "demand/partials/accuracy_table_body.html" %}
+</div>
+{% endblock %}

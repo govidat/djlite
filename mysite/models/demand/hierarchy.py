@@ -223,6 +223,10 @@ class PlanningLocation(MaterializedPathMixin):
         indexes = [
             models.Index(fields=["client", "is_leaf"], name="ix_planloc_client_leaf"),
         ]
+        permissions = [
+            ('override_at_location', 'Can create/edit forecast overrides at this location and below'),
+            ('view_at_location',     'Can view demand planning data at this location and below'),
+        ]        
 
     def __str__(self):
         return f"{self.code} — {self.name}"

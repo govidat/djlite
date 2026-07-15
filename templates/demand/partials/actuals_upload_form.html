@@ -1,0 +1,126 @@
+{% load i18n %}
+<div id="actuals-upload-panel">
+<form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+      hx-target="#actuals-upload-panel"
+      hx-swap="outerHTML"
+      hx-encoding="multipart/form-data"
+      hx-indicator="#upload-submit-btn"
+      novalidate
+      class="space-y-4">
+
+    {% csrf_token %}
+    <input type="hidden" name="action" value="upload">
+
+    {# ── Last actuals period — informational ──────────────────── #}
+    {% if latest_period %}
+    <div class="alert alert-info py-2 text-sm">
+        <span>
+            {% trans "Latest actuals on record" %}:
+            <strong>{{ latest_period|date:"M Y" }}</strong>
+            ({{ total_rows }} {% trans "rows total" %})
+        </span>
+    </div>
+    {% else %}
+    <div class="alert alert-warning py-2 text-sm">
+        <span>{% trans "No actuals uploaded yet for this client." %}</span>
+    </div>
+    {% endif %}
+
+    {% if errors.file %}
+    <div class="alert alert-error py-2 text-sm">
+        <span>{{ errors.file }}</span>
+    </div>
+    {% endif %}
+
+    {# ── Period type ──────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">{% trans "Period type" %}</span>
+        </label>
+        <select name="period_type"
+                class="select select-bordered
+                       {% if errors.period_type %}select-error{% endif %}">
+            {% for k, v in period_choices %}
+            <option value="{{ k }}"
+                    {% if k == default_period_type %}selected{% endif %}>
+                {{ v }}
+            </option>
+            {% endfor %}
+        </select>
+        {% if errors.period_type %}
+        <p class="text-error text-xs mt-1">{{ errors.period_type }}</p>
+        {% endif %}
+    </div>
+
+    {# ── File upload ──────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">{% trans "File (.csv or .xlsx)" %}</span>
+        </label>
+        <input type="file" name="file"
+               accept=".csv,.xlsx,.xls"
+               class="file-input file-input-bordered">
+    </div>
+
+    {# ── Template download ─────────────────────────────────────── #}
+    <div class="text-xs text-base-content/50">
+        <a href="{% url 'demand_ui:actuals_template' client_id=client.client_id %}"
+           class="link link-primary">
+            ↓ {% trans "Download template" %}
+        </a>
+        — {% trans "Use this to ensure correct column format" %}
+    </div>
+    <button type="submit"
+            class="btn btn-primary btn-sm w-full"
+            id="upload-submit-btn">
+        <span class="htmx-indicator loading loading-spinner loading-xs mr-2"></span>
+        <span id="upload-btn-text">{% trans "Upload" %}</span>
+    </button>
+    {% comment %}
+    <button type="submit" class="btn btn-primary btn-sm w-full">
+        {% trans "Upload" %}
+    </button>
+    {% endcomment %}
+</form>
+</div>
+<script>
+document.querySelector('[hx-post*="actuals_upload"]') &&
+document.querySelector('[hx-post*="actuals_upload"]').addEventListener('submit', function() {
+    var btn = document.getElementById('upload-submit-btn');
+    var txt = document.getElementById('upload-btn-text');
+    if (btn) btn.disabled = true;
+    if (txt) txt.textContent = '{% trans "Uploading…" %}';
+});
+</script>
+{% comment %}
+
+{% load i18n %}
+<form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+      hx-target="this" hx-swap="outerHTML"
+      hx-encoding="multipart/form-data"
+      class="space-y-4">
+    {% csrf_token %}
+    {% if errors.file %}
+    <div class="alert alert-error"><span>{{ errors.file }}</span></div>
+    {% endif %}
+    {% if errors.period_type %}
+    <div class="alert alert-error"><span>{{ errors.period_type }}</span></div>
+    {% endif %}
+
+    <div class="form-control">
+        <label class="label"><span class="label-text">{% trans "Period type" %}</span></label>
+        <select name="period_type" class="select select-bordered">
+            {% for k, v in period_choices %}
+            <option value="{{ k }}">{{ v }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-control">
+        <label class="label"><span class="label-text">{% trans "File (.csv or .xlsx)" %}</span></label>
+        <input type="file" name="file" accept=".csv,.xlsx,.xls" class="file-input file-input-bordered">
+    </div>
+
+    <button type="submit" class="btn btn-primary w-full">{% trans "Upload" %}</button>
+</form>
+{% endcomment %}

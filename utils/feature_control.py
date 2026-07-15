@@ -7,12 +7,82 @@ from mysite.models import ClientFeatureControl
 from functools import wraps
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
-
+from django.conf import settings
 
 CACHE_TTL = 900  # 15 minutes. Anyway cache bust will take care if there is any change
 
+_FEATURE_HIERARCHY = {
+    "demand_planning": frozenset({
+        "actuals_upload",
+        "forecast_run",
+        "consensus_override",
+        "forecast_approval",
+    }),
+    "inventory":  frozenset(),   # populate in Phase 2
+    "ecommerce":  frozenset(),   # populate in Phase 3
+}
 
-def is_feature_disabled(client, feature):
+# Reverse lookup: sub-feature → parent
+_SUBFEATURE_PARENT = {
+    sub: parent
+    for parent, children in _FEATURE_HIERARCHY.items()
+    for sub in children
+}
+
+
+def is_feature_disabled(client, feature: str) -> dict:
+    """
+    Checks feature flag, respecting parent-child hierarchy.
+    If a sub-feature's parent is disabled, the sub-feature is
+    implicitly disabled regardless of its own row.
+    """
+    parent = _SUBFEATURE_PARENT.get(feature)
+    if parent:
+        master = _check_feature_disabled(client, parent)
+        if master["disabled"]:
+            return {
+                "disabled": True,
+                "message": master["message"] or f"{parent.replace('_', ' ').title()} is not enabled for this account.",
+            }
+    return _check_feature_disabled(client, feature)
+
+def _check_feature_disabled(client, feature: str) -> dict:
+    if client is None and not settings.DEBUG:
+        # No client context — fail open (don't block) but log it
+        import logging
+        logging.getLogger(__name__).warning(
+            "is_feature_disabled called with client=None for feature=%s", feature
+        )
+
+    """Raw DB/cache lookup — no hierarchy logic."""
+    client_id = client.client_id if client else "global"
+    cache_key = f"feature_control:{client_id}:{feature}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    now = timezone.now()
+    base_qs = ClientFeatureControl.objects.filter(
+        feature=feature,
+        is_disabled=True,
+        from_date__lte=now,
+        to_date__gte=now,
+    )
+    obj = base_qs.filter(client__isnull=True).first()
+    if obj is None and client:
+        obj = base_qs.filter(client=client).first()
+
+    result = {"disabled": bool(obj), "message": obj.message if obj else ""}
+    cache.set(cache_key, result, CACHE_TTL)
+    return result
+
+
+# Backward compat — remove once all call sites use is_feature_disabled()
+def is_demand_feature_disabled(client, feature: str) -> dict:
+    return is_feature_disabled(client, feature)
+
+
+def zzis_feature_disabled(client, feature):
     """
     Returns:
         {
@@ -85,15 +155,16 @@ def is_feature_disabled(client, feature):
 # are implicitly disabled regardless of their own rows.
 #
 # Sub-features that require the master switch to be on first:
-_DEMAND_SUBFEATURES = frozenset({
+_ZZDEMAND_SUBFEATURES = frozenset({
     "actuals_upload",
     "forecast_run",
     "consensus_override",
     "forecast_approval",
 })
+
+
  
- 
-def is_demand_feature_disabled(client, feature):
+def zzis_demand_feature_disabled(client, feature):
     """
     Like is_feature_disabled(), but also checks the master "demand_planning"
     switch before checking the sub-feature.
@@ -113,7 +184,7 @@ def is_demand_feature_disabled(client, feature):
             return {"status": "skipped", "reason": result["message"]}
     """
     # Check master switch first (only for sub-features)
-    if feature in _DEMAND_SUBFEATURES:
+    if feature in _ZZDEMAND_SUBFEATURES:
         master = is_feature_disabled(client, "demand_planning")
         if master["disabled"]:
             return {
@@ -155,7 +226,7 @@ def demand_feature_required(feature, template="demand/feature_disabled.html"):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
             client = getattr(request, "client", None)
-            result = is_demand_feature_disabled(client, feature)
+            result = is_feature_disabled(client, feature)
             if result["disabled"]:
                 return render(
                     request,
@@ -197,7 +268,7 @@ def celery_demand_feature_guard(client, feature):
     Return on proceed:
         None
     """
-    result = is_demand_feature_disabled(client, feature)
+    result = is_feature_disabled(client, feature)
     if result["disabled"]:
         return {
             "status": "skipped",

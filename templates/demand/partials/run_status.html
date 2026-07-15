@@ -1,0 +1,74 @@
+{% load i18n %}
+{% comment %}
+This partial polls itself via hx-trigger="every 2s" ONLY while a run is
+in progress. Once COMPLETE or FAILED (or no run_status at all), polling
+stops by simply not including the hx-trigger attribute on that render.
+{% endcomment %}
+
+{% with in_progress="QUEUED,PROFILING,RUNNING,RECONCILING,AGGREGATING"|cut:" " %}
+<div id="run-status-panel"
+     {% if version.run_status in "QUEUED,PROFILING,RUNNING,RECONCILING,AGGREGATING" %}
+     hx-get="{% url 'demand_ui:version_run_status' client_id=client.client_id pk=version.pk %}"
+     hx-trigger="every 2s" hx-swap="outerHTML"
+     {% endif %}
+     class="card bg-base-200">
+  <div class="card-body py-4">
+
+    {% if version.run_status == 'COMPLETE' %}
+      <div class="flex items-center gap-3">
+        <span class="text-success text-2xl">✓</span>
+        <div>
+          <p class="font-semibold">{% trans "Forecast run complete" %}</p>
+          <p class="text-sm text-base-content/60">
+            {{ version.lines.count }} {% trans "forecast lines generated" %}
+          </p>
+        </div>
+      </div>
+
+    {% elif version.run_status == 'FAILED' %}
+      <div class="flex items-start gap-3">
+        <span class="text-error text-2xl">✗</span>
+        <div class="flex-1">
+          <p class="font-semibold text-error">{% trans "Forecast run failed" %}</p>
+          <details class="text-xs mt-1">
+            <summary class="cursor-pointer text-base-content/60">{% trans "Show error" %}</summary>
+            <pre class="whitespace-pre-wrap bg-base-300 p-2 rounded mt-1">{{ version.run_error }}</pre>
+          </details>
+          <button class="btn btn-xs btn-outline mt-2"
+                  hx-post="{% url 'demand_ui:version_run' client_id=client.client_id pk=version.pk %}"
+                  hx-target="#run-status-panel" hx-swap="outerHTML">
+            {% trans "Retry" %}
+          </button>
+        </div>
+      </div>
+
+    {% elif version.run_status %}
+      <div class="flex items-center gap-3">
+        <span class="loading loading-spinner loading-md text-primary"></span>
+        <div>
+          <p class="font-semibold">{{ version.get_run_status_display }}</p>
+          <p class="text-sm text-base-content/60">{% trans "This page updates automatically." %}</p>
+        </div>
+      </div>
+
+    {% else %}
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-semibold">{% trans "No forecast run yet" %}</p>
+          <p class="text-sm text-base-content/60">
+            {% trans "Run the statistical engine to generate ForecastLine rows." %}
+          </p>
+        </div>
+        {% if version.is_editable %}
+        <button class="btn btn-primary btn-sm"
+                hx-post="{% url 'demand_ui:version_run' client_id=client.client_id pk=version.pk %}"
+                hx-target="#run-status-panel" hx-swap="outerHTML">
+          ▶ {% trans "Run Forecast" %}
+        </button>
+        {% endif %}
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endwith %}

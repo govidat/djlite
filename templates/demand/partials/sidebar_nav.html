@@ -1,0 +1,47 @@
+{% load i18n %}
+{% comment %}
+FILE: templates/demand/partials/sidebar_nav.html
+Registered as 'demand_sidebar_nav' in your render_client_template map.
+Clients can override this by dropping a same-named template in their
+own folder, same as catalogue_filter_sidebar.
+{% endcomment %}
+
+<ul class="menu bg-base-200 rounded-box w-full">
+
+  <li class="menu-title">{% trans "Overview" %}</li>
+  <li>
+    <a href="{% url 'demand_ui:dashboard' client_id=client.client_id %}"
+       class="{% if active == 'dashboard' %}active{% endif %}">
+      📊 {% trans "Dashboard" %}
+    </a>
+  </li>
+
+  <li class="menu-title">{% trans "Forecast" %}</li>
+  <li>
+    <a href="{% url 'demand_ui:version_list' client_id=client.client_id %}"
+       class="{% if active == 'versions' %}active{% endif %}">
+      📈 {% trans "Forecast Versions" %}
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'demand_ui:series_profile_list' client_id=client.client_id %}"
+       class="{% if active == 'series_profiles' %}active{% endif %}">
+      🔍 {% trans "Series Classification" %}
+    </a>
+  </li>
+
+  <li class="menu-title">{% trans "Actuals" %}</li>
+  <li>
+    <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+       class="{% if active == 'actuals' %}active{% endif %}">
+      📋 {% trans "View Actuals" %}
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+       class="{% if active == 'actuals_upload' %}active{% endif %}">
+      ⬆️ {% trans "Upload Actuals" %}
+    </a>
+  </li>
+
+</ul>

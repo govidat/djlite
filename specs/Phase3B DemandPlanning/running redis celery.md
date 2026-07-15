@@ -48,7 +48,7 @@ redis-server
 
 Terminal 3 — Celery worker:
 ```bash
-celery -A mysite worker --loglevel=info
+celery -A mydj worker --loglevel=info
 ```
 
 Then re-send the `run/` POST from your `.http` file — you should get `202 Accepted` with `run_status: QUEUED`, and the Celery terminal will show the task chain executing (`compute_series_profiles` → `run_forecast`). Poll `run-status/` every few seconds until `run_status` changes to `COMPLETE` or `FAILED`.

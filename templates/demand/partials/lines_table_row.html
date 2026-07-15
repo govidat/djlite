@@ -1,0 +1,47 @@
+{% load i18n %}
+<tr class="hover" id="line-row-{{ line.pk }}">
+    <td class="font-mono text-xs whitespace-nowrap">{{ line.planning_location.code }}</td>
+    <td class="font-mono text-xs whitespace-nowrap">{{ line.item.item_id }}</td>
+    <td class="whitespace-nowrap">{{ line.item.name }}</td>
+    <td class="whitespace-nowrap">{{ line.planning_customer.code|default:"—" }}</td>
+    <td class="whitespace-nowrap">{{ line.period_start|date:"M Y" }}</td>
+    {% if not show_value_primary %}
+    <td class="text-right">{{ line.statistical_qty|floatformat:0 }}</td>
+    <td class="text-right">
+        {% if line.override_qty is not None %}
+            {% include "demand/partials/override_badge.html" with line=line %}
+        {% else %}—{% endif %}
+    </td>
+    <td class="text-right font-medium">{{ line.final_qty|floatformat:0 }}</td>
+    {% endif %}
+    <td class="text-right">
+        {% if line.statistical_value is not None %}
+            ₹{{ line.statistical_value|floatformat:0 }}
+        {% else %}—{% endif %}
+    </td>
+    <td class="text-right font-medium">
+        {% if line.final_value is not None %}
+            ₹{{ line.final_value|floatformat:0 }}
+        {% else %}—{% endif %}
+    </td>
+</tr>
+{% comment %}
+{% load i18n %}
+<tr class="hover" id="line-row-{{ line.pk }}">
+    <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
+    <td class="font-mono text-xs">{{ line.item.item_id }}</td>
+    <td>{{ line.item.name }}</td>
+    <td>{{ line.planning_customer.code|default:"—" }}</td>
+    <td>{{ line.period_start|date:"M Y" }}</td>
+    <td class="text-right">{{ line.statistical_qty|floatformat:0 }}</td>
+    <td class="text-right">
+        {% if line.override_qty is not None %}
+            <span class="badge badge-warning badge-sm">{{ line.override_qty|floatformat:0 }}</span>
+        {% else %}—{% endif %}
+    </td>
+    <td class="text-right font-medium">{{ line.final_qty|floatformat:0 }}</td>
+    <td class="text-right">
+        {% if line.final_value is not None %}₹{{ line.final_value|floatformat:0 }}{% else %}—{% endif %}
+    </td>
+</tr>
+{% endcomment %}

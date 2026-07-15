@@ -1,0 +1,42 @@
+{% load i18n %}
+<div class="mt-2">
+    <h4 class="font-medium text-sm mb-2">
+        {% trans "Lines affected by this override" %}
+        <span class="badge badge-ghost badge-sm ml-1">{{ lines.count }}</span>
+    </h4>
+    <div class="overflow-x-auto max-h-64 overflow-y-auto">
+        <table class="table table-xs">
+            <thead>
+                <tr>
+                    <th>{% trans "Item" %}</th>
+                    <th>{% trans "Location" %}</th>
+                    <th>{% trans "Customer" %}</th>
+                    
+                    {# Fix — this partial is always scoped to one override's affected lines. If override_level is 'sku', qty is meaningful. If override_level is 'location', 'customer', or 'total', hide qty. #}
+                    {% if override.override_level == 'sku' %}
+                    <th class="text-right">{% trans "Final Qty" %}</th>
+                    {% endif %}                    
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in lines %}
+                <tr>
+                    <td class="font-mono text-xs">{{ line.item.item_id }}</td>
+                    <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
+                    <td class="text-xs">{{ line.planning_customer.code|default:"—" }}</td>
+                    {% if override.override_level == 'sku' %}
+                    <td class="text-right">{{ line.final_qty|floatformat:0 }}</td>
+                    {% endif %}
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-base-content/50">
+                        {% trans "No lines affected." %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

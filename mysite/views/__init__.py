@@ -27,6 +27,11 @@ from mysite.views.catalogue import (
     item_detail,
 )
 
+from mysite.views.taxonomy_tree import (
+    taxonomy_tree_panel,
+    taxonomy_tree_children
+)
+"""
 from mysite.views.demand.forecast_htmx import (
     override_key_field,
     override_value_inputs,
@@ -40,3 +45,4 @@ from mysite.views.demand.forecast_htmx import (
 from mysite.views.demand.forecast_grid import (
     forecast_grid
 )
+"""

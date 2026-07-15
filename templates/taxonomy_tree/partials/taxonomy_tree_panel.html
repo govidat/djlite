@@ -1,0 +1,29 @@
+{% load i18n %}
+
+{# taxonomy_tree/partials/taxonomy_tree_panel.html
+   Top-level container. One collapsible group per taxonomy (Category,
+   Brand, ...). Include this inside your filter bar, e.g.:
+
+   <div id="tx-tree-container"
+        hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_id=client.client_id %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}"
+        hx-trigger="load"
+        hx-target="this">
+     Loading filters...
+   </div>
+#}
+<div class="tx-tree-panel">
+  {% for group in taxonomy_groups %}
+    <div class="tx-tree-group">
+      <div class="tx-tree-group-label">{{ group.name }}</div>
+      <ul class="tx-tree tx-tree-root">
+        {% for node in group.roots %}
+          {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=node client_id=client_id %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% empty %}
+    <p class="tx-tree-empty">
+      {% trans "No taxonomies configured." %}     
+    </p>
+  {% endfor %}
+</div>

@@ -1,0 +1,130 @@
+{% load i18n %}
+<div class="w-full overflow-x-auto">
+    <table class="table table-zebra table-sm w-full min-w-max">
+        <thead>
+            <tr>
+                <th class="whitespace-nowrap">{% trans "Location" %}</th>
+                <th class="whitespace-nowrap">{% trans "Item ID" %}</th>
+                <th class="whitespace-nowrap">{% trans "Item" %}</th>
+                <th class="whitespace-nowrap">{% trans "Customer" %}</th>
+                <th class="whitespace-nowrap">{% trans "Period" %}</th>
+                {% if not show_value_primary %}
+                <th class="text-right whitespace-nowrap">{% trans "Stat Qty" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Override Qty" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Final Qty" %}</th>
+                {% endif %}
+                <th class="text-right whitespace-nowrap">{% trans "Stat Value (₹)" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Final Value (₹)" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in page_obj %}
+            {% include "demand/partials/lines_table_row.html" with line=line show_value_primary=show_value_primary %}
+            {% empty %}
+            <tr>
+                <td colspan="{% if show_value_primary %}7{% else %}10{% endif %}"
+                    class="text-center py-8 text-base-content/50">
+                    {% trans "No forecast lines found." %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+        {# ── Totals footer ─────────────────────────────────────────── #}
+        {% if page_obj.object_list %}
+        <tfoot>
+            {# Page total — only when multiple pages #}
+            {% if is_multipage %}
+            <tr class="border-t border-base-300 text-sm">
+                <td colspan="{% if show_value_primary %}2{% else %}5{% endif %}"
+                    class="text-right text-base-content/60 pr-4 whitespace-nowrap">
+                    {% trans "Page total" %}
+                    <span class="text-xs text-base-content/40 ml-1">
+                        ({{ page_obj.object_list|length }} {% trans "rows" %})
+                    </span>
+                </td>
+                {% if not show_value_primary %}
+                <td class="text-right font-medium">
+                    {% if single_item %}
+                        {{ page_total.total_stat_qty|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+                <td class="text-right font-medium">
+                    {% if single_item %}
+                        {{ page_total.total_final_qty|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+                <td class="text-right font-medium">
+                    {% if single_item %}
+                        {{ page_total.total_final_qty|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+                {% endif %}
+                <td class="text-right font-medium">
+                    ₹{{ page_total.total_stat_value|floatformat:0 }}
+                </td>
+                <td class="text-right font-medium">
+                    ₹{{ page_total.total_final_value|floatformat:0 }}
+                </td>
+            </tr>
+            {% endif %}
+
+            {# Grand total — always shown #}
+            <tr class="border-t-2 border-base-content/20 bg-base-200
+                        font-bold text-sm">
+                <td colspan="{% if show_value_primary %}2{% else %}5{% endif %}"
+                    class="text-right pr-4 whitespace-nowrap">
+                    {% if single_item %}
+                        {% trans "Item total" %}
+                    {% else %}
+                        {% trans "Grand total" %}
+                    {% endif %}
+                    <span class="text-xs font-normal text-base-content/50 ml-1">
+                        ({{ page_obj.paginator.count }} {% trans "rows" %})
+                    </span>
+                </td>
+                {% if not show_value_primary %}
+                <td class="text-right">
+                    {% if single_item %}
+                        {{ grand_total.total_stat_qty|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+                <td class="text-right">
+                    {% if single_item %}
+                        {{ grand_total.total_final_qty|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+                <td class="text-right">
+                    {% if single_item %}
+                        {{ grand_total.total_final_qty|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+                {% endif %}
+                <td class="text-right">
+                    ₹{{ grand_total.total_stat_value|floatformat:0 }}
+                </td>
+                <td class="text-right">
+                    ₹{{ grand_total.total_final_value|floatformat:0 }}
+                </td>
+            </tr>
+        </tfoot>
+        {% endif %}
+
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center gap-2 mt-4">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&customer_code={{ filters.customer_code }}&period_start={{ filters.period_start }}&has_override={{ filters.has_override }}"
+       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
+    {% endif %}
+    <span class="btn btn-sm btn-disabled">
+        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&customer_code={{ filters.customer_code }}&period_start={{ filters.period_start }}&has_override={{ filters.has_override }}"
+       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
+    {% endif %}
+</div>
+{% endif %}

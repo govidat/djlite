@@ -1,0 +1,134 @@
+{% load i18n %}
+<form hx-post="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+      hx-target="#version-table-body"
+      hx-swap="innerHTML"
+      novalidate
+      class="space-y-4">
+
+    {% csrf_token %}
+
+    {% if form_error %}
+    <div class="alert alert-error"><span>{{ form_error }}</span></div>
+    {% endif %}
+
+    {# ── Actuals availability — informational ───────────────────── #}
+    {% if actuals_from and actuals_to %}
+    <div class="alert alert-info py-2 text-xs">
+        <span>
+            {% trans "Actuals available" %}:
+            <strong>{{ actuals_from|date:"M Y" }}</strong>
+            → <strong>{{ actuals_to|date:"M Y" }}</strong>
+            ({{ actuals_periods }} {% trans "periods" %})
+        </span>
+    </div>
+    {% else %}
+    <div class="alert alert-warning py-2 text-xs">
+        <span>
+            {% trans "No actuals uploaded yet." %}
+        </span>
+    </div>
+    {% endif %}
+
+    {# ── Version label ──────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">{% trans "Version label" %}</span>
+        </label>
+        <input type="text" name="version_label"
+               value="{{ form_data.version_label|default:'' }}"
+               class="input input-bordered
+                      {% if errors.version_label %}input-error{% endif %}"
+               placeholder="{% trans 'e.g. Jan-Jun 2025 Baseline' %}">
+        {% if errors.version_label %}
+        <p class="text-error text-xs mt-1">{{ errors.version_label }}</p>
+        {% endif %}
+    </div>
+
+    {# ── Period type ────────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">{% trans "Period type" %}</span>
+        </label>
+        <select name="period_type" class="select select-bordered">
+            {% for k, v in period_choices %}
+            <option value="{{ k }}"
+                    {% if form_data.period_type == k %}selected
+                    {% elif not form_data and k == 'month' %}selected
+                    {% endif %}>
+                {{ v }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    {# ── Base period end ────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">
+                {% trans "Base period end" %}
+            </span>
+            <span class="label-text-alt text-base-content/40">
+                {% trans "last actuals month used to fit model" %}
+            </span>
+        </label>
+        <input type="date" name="base_period_end"
+               value="{{ form_data.base_period_end|default:default_base_end|date:'Y-m-d' }}"
+               class="input input-bordered
+                      {% if errors.base_period_end %}input-error{% endif %}">
+        {% if errors.base_period_end %}
+        <p class="text-error text-xs mt-1">{{ errors.base_period_end }}</p>
+        {% endif %}
+        <p class="text-xs text-base-content/40 mt-1">
+            {% trans "Defaults to end of latest actuals. For backtesting, set this earlier to hold out the last N months." %}
+        </p>
+    </div>
+
+    {# ── Horizon periods ────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">
+                {% trans "Horizon (periods ahead)" %}
+            </span>
+            <span class="label-text-alt text-base-content/40">
+                {% trans "how many periods to forecast" %}
+            </span>
+        </label>
+        <input type="number" name="horizon_periods"
+               min="1" max="36"
+               value="{{ form_data.horizon_periods|default:default_horizon_periods }}"
+               class="input input-bordered
+                      {% if errors.horizon_periods %}input-error{% endif %}">
+        {% if errors.horizon_periods %}
+        <p class="text-error text-xs mt-1">{{ errors.horizon_periods }}</p>
+        {% endif %}
+        <p class="text-xs text-base-content/40 mt-1">
+            {% trans "Forecast starts the period after base period end. For backtesting, set this to the number of holdout periods." %}
+        </p>
+    </div>
+
+    {# ── Notes ──────────────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">{% trans "Notes" %}</span>
+            <span class="label-text-alt text-base-content/40">
+                {% trans "optional" %}
+            </span>
+        </label>
+        <textarea name="notes" rows="2"
+                  class="textarea textarea-bordered textarea-sm"
+                  placeholder="{% trans 'e.g. Backtest — 30 months base, 6 months holdout' %}">{{ form_data.notes|default:'' }}</textarea>
+    </div>
+
+    {# ── Actions ────────────────────────────────────────────────── #}
+    <div class="flex gap-2 pt-2">
+        <button type="submit" class="btn btn-primary btn-sm">
+            {% trans "Create Version" %}
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm"
+                onclick="if(typeof closeVersionModal==='function')
+                         {closeVersionModal();}
+                         else{history.back();}">
+            {% trans "Cancel" %}
+        </button>
+    </div>
+</form>

@@ -1,0 +1,278 @@
+{% load i18n %}
+    {% comment %}
+    <form hx-post="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+        hx-target="#override-table-container"
+        hx-swap="innerHTML"
+        novalidate
+        class="space-y-4">
+    {% endcomment %}     
+<div class="flex items-center justify-between mb-4">
+    <h3 class="font-bold text-lg">{% trans "New Override" %}</h3>
+    <button type="button"
+            class="btn btn-ghost btn-sm btn-circle"
+            onclick="document.getElementById('override-create-modal').classList.add('hidden');
+                     document.getElementById('override-create-modal-content').innerHTML = '';">
+        ✕
+    </button>
+</div>    
+<form hx-post="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+    hx-target="this" hx-swap="outerHTML" novalidate class="space-y-4">
+         
+    {% csrf_token %}
+    {% if form_error %}
+    <div class="alert alert-error"><span>{{ form_error }}</span></div>
+    {% endif %}
+
+    <div class="form-control">
+        <label class="label"><span class="label-text">{% trans "Override level" %}</span></label>
+        <select name="override_level" class="select select-bordered"
+                id="override-level-select">
+        {% comment %}
+        <select name="override_level" class="select select-bordered"
+                hx-get="{% url 'demand_ui:override_key_field' client_id=client.client_id pk=version.pk %}"
+                hx-trigger="change" hx-target="#override-create-modal-content #override-key-container"
+                hx-on:change="
+                    const qtyTab = document.getElementById('otab-qty');
+                    if (['total','location','customer'].includes(this.value)) {
+                        if (typeof showOverrideMode === 'function') showOverrideMode('value');
+                        if (qtyTab) qtyTab.classList.add('hidden');
+                    } else {
+                        if (qtyTab) qtyTab.classList.remove('hidden');
+                    }
+                "
+        >
+        {% endcomment %}
+            <option value="sku" {% if form_data.override_level == 'sku' or not form_data %}selected{% endif %}>{% trans "SKU" %}</option>
+            <option value="location" {% if form_data.override_level == 'location' %}selected{% endif %}>{% trans "Location" %}</option>
+            <option value="customer" {% if form_data.override_level == 'customer' %}selected{% endif %}>{% trans "Customer" %}</option>
+            <option value="total" {% if form_data.override_level == 'total' %}selected{% endif %}>{% trans "Total" %}</option>
+        </select>
+        {% if errors.override_key %}<p class="text-error text-sm mt-1">{{ errors.override_key }}</p>{% endif %}
+    </div>
+
+    <div id="override-key-container">
+        {% include "demand/partials/override_key_sku.html" %}
+    </div>
+
+    <div class="form-control">
+        <label class="label"><span class="label-text">{% trans "Period" %}</span></label>
+        <input type="date" name="period_start" value="{{ form_data.period_start|default:'' }}"
+               class="input input-bordered {% if errors.period_start %}input-error{% endif %}">
+        {% if errors.period_start %}<p class="text-error text-sm mt-1">{{ errors.period_start }}</p>{% endif %}
+    </div>
+
+    <div class="tabs tabs-boxed">
+        {% if override_level != 'total' and override_level != 'location' and override_level != 'customer' %}
+        <a class="tab tab-active" onclick="showOverrideMode('qty')" id="otab-qty">
+            {% trans "Quantity" %}
+        </a>
+        {% endif %}
+        <a class="tab {% if override_level in 'total location customer' %}tab-active{% endif %}"
+        onclick="showOverrideMode('pct')" id="otab-pct">
+            {% trans "Percent" %}
+        </a>
+        <a class="tab" onclick="showOverrideMode('value')" id="otab-value">
+            {% trans "Value (₹)" %}
+        </a>
+    </div>
+
+    {% comment %}
+    <div class="tabs tabs-boxed">
+        <a class="tab tab-active" onclick="showOverrideMode('qty')" id="otab-qty">{% trans "Quantity" %}</a>
+        <a class="tab" onclick="showOverrideMode('pct')" id="otab-pct">{% trans "Percent" %}</a>
+        <a class="tab" onclick="showOverrideMode('value')" id="otab-value">{% trans "Value (₹)" %}</a>
+    </div>
+    {% endcomment %}
+
+    {% if errors.override_value_group %}
+    <div class="alert alert-error"><span>{{ errors.override_value_group }}</span></div>
+    {% endif %}
+
+    <div id="omode-qty" class="form-control">
+        <label class="label"><span class="label-text">{% trans "Override quantity" %}</span></label>
+        <input type="number" step="0.001" name="override_qty"
+               value="{{ form_data.override_qty|default:'' }}" class="input input-bordered">
+    </div>
+    <div id="omode-pct" class="form-control hidden">
+        <label class="label"><span class="label-text">{% trans "Adjustment %" %}</span></label>
+        <input type="number" step="0.001" name="override_pct"
+               value="{{ form_data.override_pct|default:'' }}" class="input input-bordered">
+    </div>
+    <div id="omode-value" class="form-control hidden">
+        <label class="label"><span class="label-text">{% trans "Target value (₹)" %}</span></label>
+        <input type="number" step="0.01" name="override_value"
+               value="{{ form_data.override_value|default:'' }}" class="input input-bordered">
+    </div>
+
+    <div class="form-control">
+        <label class="label"><span class="label-text">{% trans "Disaggregation method" %}</span></label>
+        <select name="disagg_method" class="select select-bordered"
+                onchange="document.getElementById('custom-weights-section')
+                        .classList.toggle('hidden', this.value !== 'CUSTOM')">
+            <option value="PROPORTIONAL">{% trans "Proportional (historical share)" %}</option>
+            <option value="EQUAL">{% trans "Equal split" %}</option>
+            <option value="CUSTOM">{% trans "Custom weights" %}</option>
+        </select>
+    </div>
+    <div id="custom-weights-section" class="hidden">
+        {% include "demand/partials/split_weight_form.html" %}
+    </div>
+
+    <div class="form-control">
+        <label class="label"><span class="label-text">{% trans "Note" %}</span></label>
+        <textarea name="override_note" class="textarea textarea-bordered" rows="2">{{ form_data.override_note|default:'' }}</textarea>
+    </div>
+
+    <div class="flex gap-2">
+        <button type="submit" class="btn btn-primary">{% trans "Save Override" %}</button>
+        <a href="{% url 'demand_ui:override_list' client_id=client.client_id pk=version.pk %}"
+           class="btn btn-ghost">{% trans "Cancel" %}</a>
+    </div>
+</form>
+
+<script>
+
+// ── Override mode tabs ────────────────────────────────────────────────────
+function showOverrideMode(mode) {
+    ['qty', 'pct', 'value'].forEach(function(m) {
+        var modeEl = document.getElementById('omode-' + m);
+        var tabEl  = document.getElementById('otab-' + m);
+        if (modeEl) modeEl.classList.toggle('hidden', m !== mode);
+        if (tabEl)  tabEl.classList.toggle('tab-active', m === mode);
+    });
+}
+
+// ── Level select handler — pure fetch, no HTMX ───────────────────────────
+(function() {
+    var sel = document.getElementById('override-level-select');
+    if (!sel) return;
+
+    // Set initial state
+    updateTabsForLevel(sel.value);
+
+    sel.addEventListener('change', function() {
+        var level = this.value;
+
+        // 1. Update tabs
+        updateTabsForLevel(level);
+
+        // 2. Fetch the key partial via plain fetch — no HTMX involved
+        var url = '{% url "demand_ui:override_key_field" client_id=client.client_id pk=version.pk %}?override_level=' + encodeURIComponent(level);
+
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+            }
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.text();
+        })
+        .then(function(html) {
+            var container = document.getElementById('override-key-container');
+            if (container) {
+                container.innerHTML = html;
+                // Re-process HTMX on newly inserted content
+                htmx.process(container);
+            } else {
+                console.error('override-key-container not found');
+            }
+        })
+        .catch(function(err) {
+            console.error('override_key_field fetch failed:', err);
+        });
+    });
+
+    function updateTabsForLevel(level) {
+        var qtyTab = document.getElementById('otab-qty');
+        var qtyMode = document.getElementById('omode-qty');
+        if (['total', 'location', 'customer'].includes(level)) {
+            if (qtyTab)  qtyTab.classList.add('hidden');
+            if (qtyMode) qtyMode.classList.add('hidden');
+            showOverrideMode('value');
+        } else {
+            if (qtyTab)  qtyTab.classList.remove('hidden');
+            if (qtyMode) qtyMode.classList.remove('hidden');
+        }
+    }
+})();
+/*
+function showOverrideMode(mode) {
+    ['qty', 'pct', 'value'].forEach(m => {
+        const modeEl = document.getElementById('omode-' + m);
+        const tabEl  = document.getElementById('otab-' + m);
+        if (modeEl) modeEl.classList.toggle('hidden', m !== mode);
+        if (tabEl)  tabEl.classList.toggle('tab-active', m === mode);
+    });
+}
+*/
+// Run once on initial render only — sets correct starting tab
+(function() {
+    const sel = document.querySelector('[name="override_level"]');
+    if (sel && ['total', 'location', 'customer'].includes(sel.value)) {
+        showOverrideMode('value');
+    }
+})();
+/*
+function showOverrideMode(mode) {
+    ['qty', 'pct', 'value'].forEach(m => {
+        document.getElementById('omode-' + m).classList.toggle('hidden', m !== mode);
+        document.getElementById('otab-' + m).classList.toggle('tab-active', m === mode);
+    });
+}
+
+// At bottom of override_create_form.html script block
+document.addEventListener('DOMContentLoaded', function() {
+    const level = document.querySelector('[name="override_level"]').value;
+    if (['total', 'location', 'customer'].includes(level)) {
+        showOverrideMode('value');
+    }
+});
+
+// Also wire the level select to switch mode when level changes
+document.querySelector('[name="override_level"]').addEventListener('change', function() {
+    try {
+        if (['total', 'location', 'customer'].includes(this.value)) {
+            showOverrideMode('value');
+            const qtyTab = document.getElementById('otab-qty');
+            if (qtyTab) qtyTab.classList.add('hidden');
+        } else {
+            const qtyTab = document.getElementById('otab-qty');
+            if (qtyTab) qtyTab.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error('override_level change handler error:', err);
+    }
+});
+*/
+/*
+document.addEventListener('DOMContentLoaded', function() {
+    const level = document.querySelector('[name="override_level"]').value;
+    if (level === 'total' || level === 'location') {
+        showOverrideMode('value');
+    }
+});
+*/
+
+
+/*
+document.querySelector('[name="override_level"]').addEventListener('change', function() {
+    if (this.value === 'total' || this.value === 'location') {
+        showOverrideMode('value');
+        document.getElementById('otab-qty') &&
+            document.getElementById('otab-qty').classList.add('hidden');
+    } else {
+        document.getElementById('otab-qty') &&
+            document.getElementById('otab-qty').classList.remove('hidden');
+    }
+});
+*/
+
+/*
+document.querySelector('[name="override_level"]').addEventListener('change', function() {
+    const container = document.querySelector('#override-create-modal-content #override-key-container');
+    console.log('Container found:', !!container, container);
+});
+*/
+</script>

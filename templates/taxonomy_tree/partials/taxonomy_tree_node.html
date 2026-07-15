@@ -1,0 +1,46 @@
+{% load i18n %}
+{# taxonomy_tree/partials/taxonomy_tree_node.html
+   Recursive: includes itself for child nodes. Terminates naturally
+   because `node.children` is only populated for eager (path-to-selection)
+   branches; everything else has an empty children list until the
+   lazy htmx fetch below populates it.
+
+   Selection state travels as plain checkboxes named `taxonomy_node_ids`
+   (multi-select) — the surrounding filter form just needs to submit/
+   re-trigger on change, same as any other filter input.
+#}
+<li class="tx-node" data-node-id="{{ node.id }}">
+  <div class="tx-node-row">
+    {% if node.has_children %}
+      <span
+        class="tx-toggle {% if node.is_expanded %}tx-toggle-open{% endif %}"
+        data-target="tx-children-{{ node.id }}"
+        hx-get="{% url 'demand_ui:taxonomy_tree_children' client_id=client_id node_id=node.id %}"
+        hx-include="[name='taxonomy_node_ids']:checked"
+        hx-target="#tx-children-{{ node.id }}"
+        hx-swap="innerHTML"
+        hx-trigger="click once"
+        onclick="txToggleNode(this)"
+      >{% if node.is_expanded %}▾{% else %}▸{% endif %}</span>
+    {% else %}
+      <span class="tx-toggle tx-toggle-leaf">•</span>
+    {% endif %}
+
+    <label class="tx-node-label">
+      <input
+        type="checkbox"
+        name="taxonomy_node_ids"
+        value="{{ node.id }}"
+        {% if node.is_selected %}checked{% endif %}
+      >
+      {{ node.name }}
+    </label>
+  </div>
+
+  <ul id="tx-children-{{ node.id }}"
+      class="tx-children {% if not node.is_expanded %}tx-collapsed{% endif %}">
+    {% for child in node.children %}
+      {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=child client_id=client_id %}
+    {% endfor %}
+  </ul>
+</li>

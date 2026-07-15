@@ -1,0 +1,67 @@
+.tx-tree-panel {
+  font-size: 0.875rem;
+}
+
+.tx-tree-group {
+  margin-bottom: 0.75rem;
+}
+
+.tx-tree-group-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: #666;
+  margin: 0 0 0.25rem;
+}
+
+.tx-tree,
+.tx-children {
+  list-style: none;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.tx-tree-root {
+  padding-left: 0;
+}
+
+.tx-node-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 2px 0;
+}
+
+.tx-toggle {
+  cursor: pointer;
+  width: 1rem;
+  flex: none;
+  text-align: center;
+  user-select: none;
+  color: #888;
+}
+
+.tx-toggle-leaf {
+  cursor: default;
+  color: #ccc;
+}
+
+.tx-node-label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  line-height: 1.3;
+}
+
+.tx-children.tx-collapsed {
+  display: none;
+}
+
+.tx-node-empty,
+.tx-tree-empty {
+  color: #999;
+  font-style: italic;
+  padding-left: 1.1rem;
+}

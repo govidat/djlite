@@ -1,0 +1,136 @@
+# Supply Network & Replenishment Demand Propagation — Engine Spec
+
+## Context
+
+The platform maintains material stocking points in a multi-tier structure: **HO → DC → Location**.
+Two hierarchies coexist over the same node set and must be kept structurally separate:
+
+1. **Sales/Forecast Hierarchy** — Total → Region → Branch → Location. Used for statistical
+   forecasting and revenue-share disaggregation. Relatively static, geography/org-driven.
+2. **Supply Network** — Vendor → HO → DC → Location. Used for replenishment/sourcing. This is
+   **item-specific, time-dependent, and may diverge in shape from the sales hierarchy** at any node
+   (e.g. an item sold HO→Customer directly, HO→DC for some DCs, Vendor→DC directly for others).
+
+Do not conflate these two structures or let them share a parent-link field. The replenishment
+engine must resolve demand by walking the **Supply Network**, using FCST values that live on the
+**Sales Hierarchy**.
+
+---
+
+## Two-Stage Forecasting
+
+- **Stage 1 — `SALES_CONSENSUS`**: consensus forecast owned by the sales team, generated/reviewed
+  independently at each node. May be optimistic and is not guaranteed additive
+  (`FCST(parent) ≠ Σ FCST(children)` is expected and acceptable here).
+- **Stage 2 — `OPERATING_PLAN`**: derived from Stage 1 by applying a planner-set
+  `ForecastNormalizationFactor` at an anchor node (commonly HO, but any node), then **cascading
+  down using the existing revenue-share disaggregation logic** already used for
+  Total→Region→Branch→Item. Because child-node numbers are *derived* from the parent via fixed
+  shares, additivity holds by construction unless a planner manually overrides a specific node
+  (flag such overrides with `is_manual_override` for audit).
+
+**The Supply Network resolution and replenishment engine must consume `OPERATING_PLAN` exclusively.**
+`SALES_CONSENSUS` is never a direct input to supply planning — it feeds Stage 2 and separately
+serves sales target-setting.
+
+Residual non-additivity (from manual overrides) is NOT silently clamped to zero. It is written to
+a `ForecastReconciliationException` record and surfaced to planners.
+
+---
+
+## Master Data: Supply Network Rules (generic → specific, with split sourcing)
+
+Full item × location assignment (20K+ items) is not maintainable as flat rows. Use a
+condition-technique / access-sequence approach, reusing the existing `Taxonomy`/`TaxonomyNode`
+materialized-path pattern (same mechanism as Phase 2's dynamic taxonomy filter injection).
+
+**Resolution priority (most specific wins, evaluated per item + location + date):**
+1. `scope_type = ITEM` — exact item + location match
+2. `scope_type = TAXONOMY` — walk the item's taxonomy path from its own node to root; deepest
+   ancestor with a matching rule for that location wins
+3. `scope_type = ALL` — location-wide default (e.g. "all items at Location A ← DC1")
+4. No match at any level → hard validation error, never a silent fallback
+
+**Split sourcing**: a scope key + location may resolve to multiple rows (e.g. 60% from HO, 40%
+directly from Vendor), each carrying an `allocation_pct`. All legs for a given resolution must come
+from the **same scope level** (never mix an ITEM-level leg with a TAXONOMY-level leg for the same
+resolution — keeps audit and maintenance tractable). `Σ allocation_pct` across legs must equal
+100%; validate on save AND via a periodic integrity job (since a rule's `valid_to` lapsing can
+silently break a previously-valid split without any row being edited).
+
+**Performance**: never resolve rules at run time. Materialize resolution nightly (or on rule
+change) into a `ResolvedSupplySource` cache table — one row per allocation leg — carrying an FK
+back to the originating rule for audit ("why is Item X at Location A 40% Vendor-sourced?"). The
+replenishment engine reads only from this cache table.
+
+---
+
+## Replenishment Demand Propagation
+
+For each node N in the sales hierarchy, using `OPERATING_PLAN` FCST and `ResolvedSupplySource`
+allocations:
+
+```
+NetOwnDemand(N) = FCST(N) − Σ [ FCST(C) × alloc_pct(C → X)
+                                  for C in sales_children(N)
+                                  for X in resolved_sources(C)
+                                  where X != N ]          # every leg of every child NOT sourced from N
+
+For each resolved source X of N (with its own allocation_pct share of N's total requirement):
+    RR(N, via X) = ( NetOwnDemand(N)
+                    + Σ [ RR(C, via N) for C in sales_children(N) where N ∈ resolved_sources(C) ] )
+                    × allocation_pct(N → X)
+```
+
+This generalizes to arbitrary depth and arbitrary bypass patterns — it does not assume single-level
+bypass, and it does not assume the sales hierarchy and supply network are congruent below the point
+of divergence.
+
+**Conservation invariant** (run as a regression test after every engine change):
+```
+Σ RR at every vendor-facing leg across the network  ==  Σ FCST (OPERATING_PLAN) at every end node
+```
+A violation indicates either a resolution bug (item/location falling through all three scope
+levels) or a bypass-detection bug — not a data anomaly to be tolerated.
+
+### Worked example
+- HO `OPERATING_PLAN` FCST = 300
+- DC1 FCST = 200, sourced 60% HO / 40% Vendor
+- DC2 FCST = 100, sourced 100% Vendor
+
+```
+bypass(DC1) = 200 × 0.40 = 80
+bypass(DC2) = 100 × 1.00 = 100
+NetOwnDemand(HO) = 300 − 80 − 100 = 120
+
+RR(DC1, via HO)     = 200 × 0.60 = 120   → HO supplies DC1: 120
+RR(DC1, via Vendor) = 200 × 0.40 = 80    → DC1 orders Vendor: 80
+RR(DC2, via Vendor) = 100                → DC2 orders Vendor: 100
+RR(HO, via Vendor)  = (120 + 120) = 240  → HO orders Vendor: 240
+
+Check: 240 + 80 + 100 = 420  ==  120 + 200 + 100 = 420 ✓
+```
+
+---
+
+## Rounding
+
+`allocation_pct` is stored and computed as an exact decimal. Rounding to integer/pack quantities
+happens only at the final conversion of `RR × allocation_pct` into an actual order/transfer
+quantity, using largest-remainder allocation, with the rule's `priority` field as tie-breaker for
+where any remainder unit goes.
+
+---
+
+## Engine Interfaces (data the Inventory Decision Engine consumes)
+
+- `ResolvedSupplySource(item, location, effective_date, source_type, source_node/vendor, allocation_pct, resolved_rule)`
+- `NodeReplenishmentRequirement(item, node, date, source_leg, quantity)` — output of the propagation
+  step above; one row per (node, source leg) pair; this is the actual input to buffer sizing / net
+  flow equation / PO-vs-transfer-order determination.
+- `ForecastReconciliationException(item, node, forecast_version, computed_net_demand, status)` —
+  surfaced to planners, not auto-resolved.
+
+Do not let the Inventory Decision Engine read `SALES_CONSENSUS` forecasts or raw
+`SupplyNetworkRule` rows directly — it should only ever touch `OPERATING_PLAN` forecasts and the
+materialized `ResolvedSupplySource` / `NodeReplenishmentRequirement` tables.

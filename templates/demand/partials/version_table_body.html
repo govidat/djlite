@@ -1,0 +1,41 @@
+{% load i18n %}
+{% for version in versions %}
+<tr>
+  <td>
+    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+       class="link link-hover font-medium">{{ version.version_label }}</a>
+  </td>
+  <td>{{ version.get_period_type_display }} · {{ version.horizon_periods }} {% trans "periods" %}</td>
+  <td>
+    <span class="badge
+      {% if version.status == 'DRAFT' %}badge-neutral
+      {% elif version.status == 'IN_REVIEW' %}badge-warning
+      {% elif version.status == 'APPROVED' %}badge-success
+      {% else %}badge-primary{% endif %}">
+      {{ version.get_status_display }}
+    </span>
+  </td>
+  <td>
+    {% if version.run_status == 'COMPLETE' %}
+      <span class="badge badge-success badge-outline">✓ {% trans "Complete" %}</span>
+    {% elif version.run_status == 'FAILED' %}
+      <span class="badge badge-error badge-outline">✗ {% trans "Failed" %}</span>
+    {% elif version.run_status %}
+      <span class="badge badge-warning badge-outline animate-pulse">{{ version.run_status }}</span>
+    {% else %}
+      <span class="text-base-content/40 text-sm">—</span>
+    {% endif %}
+  </td>
+  <td class="text-sm text-base-content/60">{{ version.created_at|date:"d M Y" }}</td>
+  <td>
+    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+       class="btn btn-ghost btn-xs">{% trans "Open" %} →</a>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="6" class="text-center text-base-content/60 py-8">
+    {% trans "No forecast versions match this filter." %}
+  </td>
+</tr>
+{% endfor %}

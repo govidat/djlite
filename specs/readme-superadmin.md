@@ -115,7 +115,7 @@ Add to `Procfile`:
 
 ```
 web: gunicorn mysite.wsgi
-worker: celery -A mysite worker --loglevel=info
+worker: celery -A mydj worker --loglevel=info
 beat: celery -A mysite beat --loglevel=info
 ```
 

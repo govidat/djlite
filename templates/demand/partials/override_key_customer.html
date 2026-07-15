@@ -1,0 +1,27 @@
+{# demand/partials/override_key_customer.html #}
+{% load i18n %}
+<div class="form-control">
+    <label class="label"><span class="label-text">{% trans "Customer" %}</span></label>
+    <select name="customer_code" class="select select-bordered"
+            hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+            hx-trigger="change" hx-target="#override-key-hidden-container"
+            hx-include="closest form">
+        <option value="">{% trans "Select a customer…" %}</option>
+        {% for cust in customers %}
+        <option value="{{ cust.code }}">{{ cust.code }} — {{ cust.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div id="override-key-hidden-container"></div>
+{% comment %}
+{% load i18n %}
+<div class="form-control">
+    <label class="label"><span class="label-text">{% trans "Customer code" %}</span></label>
+    <input type="text" name="customer_code" class="input input-bordered"
+           placeholder="{% trans 'e.g. CUST001' %}"
+           hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+           hx-trigger="blur" hx-target="#override-key-hidden-container"
+           hx-include="closest form">
+</div>
+<div id="override-key-hidden-container"></div>
+{% endcomment %}

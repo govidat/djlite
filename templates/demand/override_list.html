@@ -1,0 +1,220 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-xl font-bold">{% trans "Overrides" %}</h2>
+        <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
+    </div>
+  
+    {% if version.is_editable %}
+    <button id="new-override-btn" class="btn btn-primary btn-sm">
+            + {% trans "New Override" %}
+        </button>       
+    {% comment %}
+        <select name="override_level" class="select select-bordered"
+                id="override-level-select"
+                onchange="
+                    htmx.ajax('GET',
+                        '{% url "demand_ui:override_key_field" client_id=client.client_id pk=version.pk %}?override_level=' + this.value,
+                        {target: '#override-key-container', swap: 'innerHTML'}
+                    );
+                    const qtyTab = document.getElementById('otab-qty');
+                    if (['total','location','customer'].includes(this.value)) {
+                        if (typeof showOverrideMode === 'function') showOverrideMode('value');
+                        if (qtyTab) qtyTab.classList.add('hidden');
+                    } else {
+                        if (qtyTab) qtyTab.classList.remove('hidden');
+                    }
+                ">
+            <option value="sku" {% if form_data.override_level == 'sku' or not form_data %}selected{% endif %}>{% trans "SKU" %}</option>
+            <option value="location" {% if form_data.override_level == 'location' %}selected{% endif %}>{% trans "Location" %}</option>
+            <option value="customer" {% if form_data.override_level == 'customer' %}selected{% endif %}>{% trans "Customer" %}</option>
+            <option value="total" {% if form_data.override_level == 'total' %}selected{% endif %}>{% trans "Total" %}</option>
+        </select>
+        
+        <button class="btn btn-primary btn-sm"
+                hx-get="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+                hx-target="#override-create-modal-content"
+                hx-swap="innerHTML"
+                hx-on:htmx:after-request="document.getElementById('override-create-modal').classList.remove('hidden')">
+            + {% trans "New Override" %}
+        </button>
+        {% endcomment %}
+    {% endif %}
+    {% comment %}
+    {% if version.is_editable %}
+    <button class="btn btn-primary btn-sm"
+            hx-get="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+            hx-target="#override-create-modal-content"
+            hx-swap="innerHTML"
+            hx-on::after-request="document.getElementById('override-create-modal').showModal()">
+    + {% trans "New Override" %}
+    </button>
+    {% endif %}
+    
+    {% if version.is_editable %}
+    <a href="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+       class="btn btn-primary btn-sm">+ {% trans "New Override" %}</a>
+    {% endif %}
+    {% endcomment %}
+</div>
+
+<div id="override-table-container">
+    {% include "demand/partials/override_table_body.html" %}
+</div>
+
+{# Split weight editor — loaded here when ⚖ is clicked on a CUSTOM override #}
+<div id="split-weight-editor-container" class="mt-4"></div>
+
+<div id="override-toast"></div>
+{% comment %}
+<div id="override-toast"
+     hx-on:override-created="
+         this.innerHTML = '<div class=\'alert alert-success\'>Override saved and queued for application.</div>';
+         setTimeout(() => this.innerHTML = '', 4000);
+     ">
+</div>
+{% endcomment %}
+{# ── Create override modal — plain div, not native <dialog> ──────────── #}
+{# ── Create override modal ────────────────────────────────────────────── #}
+<div id="override-create-modal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/50"
+         id="override-modal-backdrop"></div>
+    <div id="override-create-modal-content"
+         class="relative z-10 bg-base-100 rounded-box shadow-xl
+                w-full max-w-xl max-h-[90vh] overflow-y-auto p-6">
+    </div>
+</div>
+{% comment %}
+<div id="override-create-modal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center">
+
+    {# Backdrop #}
+    <div class="absolute inset-0 bg-black/50"
+         onclick="document.getElementById('override-create-modal').classList.add('hidden');
+                  document.getElementById('override-create-modal-content').innerHTML = '';"></div>
+
+    {# Content box — plain Tailwind, no DaisyUI modal-box #}
+    <div id="override-create-modal-content"
+         class="relative z-10 bg-base-100 rounded-box shadow-xl
+                w-full max-w-xl max-h-[90vh] overflow-y-auto p-6">
+    </div>
+</div>
+
+
+<div id="override-create-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/50"
+         onclick="document.getElementById('override-create-modal').classList.add('hidden');
+                  document.getElementById('override-create-modal-content').innerHTML = '';"></div>
+    <div class="modal-box max-w-xl relative z-10" id="override-create-modal-content"></div>
+</div>
+
+{# ── Create override modal ─────────────────────────────────────── #}
+<dialog id="override-create-modal" class="modal"
+        hx-on::close="document.getElementById('override-create-modal-content').innerHTML = ''">
+    <div class="modal-box max-w-xl" id="override-create-modal-content"></div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endcomment %}
+
+{# At the bottom of override_list.html #}
+<script>
+// ── Modal open/close helpers ──────────────────────────────────────────────
+function openOverrideModal() {
+    document.getElementById('override-create-modal').classList.remove('hidden');
+}
+function closeOverrideModal() {
+    document.getElementById('override-create-modal').classList.add('hidden');
+    document.getElementById('override-create-modal-content').innerHTML = '';
+}
+
+// ── New Override button — fetch form then open modal ─────────────────────
+document.getElementById('new-override-btn') &&
+document.getElementById('new-override-btn').addEventListener('click', function() {
+    htmx.ajax(
+        'GET',
+        '{% url "demand_ui:override_create" client_id=client.client_id pk=version.pk %}',
+        {
+            target: '#override-create-modal-content',
+            swap: 'innerHTML',
+        }
+    );
+    // Open modal after short delay to let swap complete
+    // (htmx.ajax is async — we listen for the swap event instead)
+});
+
+// ── Open modal once HTMX has finished swapping content in ────────────────
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'override-create-modal-content') {
+        openOverrideModal();
+    }
+});
+
+// ── Close on backdrop click ───────────────────────────────────────────────
+document.getElementById('override-modal-backdrop') &&
+document.getElementById('override-modal-backdrop').addEventListener('click', closeOverrideModal);
+
+// ── Close on Escape ───────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeOverrideModal();
+});
+
+// ── Close after successful save (triggered by HX-Trigger header) ─────────
+document.body.addEventListener('overrideCreated', function() {
+    closeOverrideModal();
+    const toast = document.getElementById('override-toast');
+    if (toast) {
+        toast.innerHTML = '<div class="alert alert-success mt-2">Override saved and queued for application.</div>';
+        setTimeout(() => { toast.innerHTML = ''; }, 4000);
+    }
+});
+/*
+function showOverrideMode(mode) {
+    ['qty', 'pct', 'value'].forEach(m => {
+        const modeEl = document.getElementById('omode-' + m);
+        const tabEl  = document.getElementById('otab-' + m);
+        if (modeEl) modeEl.classList.toggle('hidden', m !== mode);
+        if (tabEl)  tabEl.classList.toggle('tab-active', m === mode);
+    });
+}
+
+// Set correct initial state on first render
+(function() {
+    const sel = document.getElementById('override-level-select');
+    if (sel && ['total', 'location', 'customer'].includes(sel.value)) {
+        showOverrideMode('value');
+        const qtyTab = document.getElementById('otab-qty');
+        if (qtyTab) qtyTab.classList.add('hidden');
+    }
+})();    
+*/
+/*
+document.body.addEventListener('overrideCreated', function() {
+    const modal = document.getElementById('override-create-modal');
+    modal.classList.add('hidden');
+    document.getElementById('override-create-modal-content').innerHTML = '';
+});
+*/
+// Escape key closes the modal
+/*
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('override-create-modal');
+        if (!modal.classList.contains('hidden')) {
+            modal.classList.add('hidden');
+            document.getElementById('override-create-modal-content').innerHTML = '';
+        }
+    }
+});
+*/
+/*
+document.body.addEventListener('override-created', function() {
+    document.getElementById('override-create-modal').close();
+});
+*/
+</script>
+{% endblock %}
+

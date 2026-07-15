@@ -1,0 +1,99 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-xl font-bold">{{ profile.item.item_id }}</h2>
+        <p class="text-sm text-base-content/60">
+            {{ profile.planning_location.code }}
+            {% if profile.planning_customer %} · {{ profile.planning_customer.code }}{% endif %}
+        </p>
+    </div>
+    <a href="{% url 'demand_ui:series_profile_list' client_id=client.client_id %}"
+       class="btn btn-ghost btn-sm">← {% trans "Back to profiles" %}</a>
+</div>
+
+<div class="grid grid-cols-2 gap-4 mb-6">
+    <div class="card bg-base-200"><div class="card-body py-3">
+        <p class="text-xs text-base-content/60">{% trans "Demand class" %}</p>
+        <p class="font-bold">{{ profile.demand_class_atomic }}</p>
+    </div></div>
+    <div class="card bg-base-200"><div class="card-body py-3">
+        <p class="text-xs text-base-content/60">{% trans "ABC class" %}</p>
+        <p class="font-bold">{{ profile.abc_class_atomic }}</p>
+    </div></div>
+    <div class="card bg-base-200"><div class="card-body py-3">
+        <p class="text-xs text-base-content/60">{% trans "Chosen strategy" %}</p>
+        <p class="font-bold">{{ profile.chosen_strategy }}</p>
+    </div></div>
+    <div class="card bg-base-200"><div class="card-body py-3">
+        <p class="text-xs text-base-content/60">{% trans "Chosen grain" %}</p>
+        <p class="font-bold">{{ profile.chosen_grain }}</p>
+    </div></div>
+</div>
+
+{% if profile.override_grain %}
+<div class="alert alert-warning mb-6">
+    <span>{% trans "Manual override active" %} — {{ profile.override_grain }} / {{ profile.override_strategy }}
+        {% if profile.override_set_by %}by {{ profile.override_set_by.get_full_name }}{% endif %}
+    </span>
+</div>
+{% endif %}
+
+<form method="post"
+      action="{% url 'demand_ui:series_profile_override' client_id=client.client_id pk=profile.pk %}"
+      class="card bg-base-200 mb-6">
+    {% csrf_token %}
+    <div class="card-body space-y-3">
+        <h3 class="font-bold">{% trans "Set manual override" %}</h3>
+        <div class="flex flex-wrap gap-3">
+            <div class="form-control">
+                <label class="label"><span class="label-text">{% trans "Grain" %}</span></label>
+                <input type="text" name="override_grain" value="{{ profile.override_grain|default:'' }}"
+                       class="input input-bordered input-sm" placeholder="e.g. sku_location">
+            </div>
+            <div class="form-control">
+                <label class="label"><span class="label-text">{% trans "Strategy" %}</span></label>
+                <input type="text" name="override_strategy" value="{{ profile.override_strategy|default:'' }}"
+                       class="input input-bordered input-sm" placeholder="e.g. CROSTON">
+            </div>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text">{% trans "Note" %}</span></label>
+            <textarea name="override_note" class="textarea textarea-bordered textarea-sm" rows="2">{{ profile.override_note|default:'' }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-warning btn-sm">{% trans "Save override" %}</button>
+    </div>
+</form>
+
+{% if evaluations %}
+<h3 class="font-bold mb-3">{% trans "Evaluation log" %}</h3>
+<div class="overflow-x-auto">
+    <table class="table table-xs">
+        <thead>
+            <tr>
+                <th>{% trans "Grain" %}</th>
+                <th>{% trans "Accepted?" %}</th>
+                <th>{% trans "Reason" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ev in evaluations %}
+            <tr>
+                <td class="font-mono text-xs">{{ ev.grain }}</td>
+                <td>
+                    {% if ev.is_accepted %}
+                        <span class="badge badge-success badge-sm">✓</span>
+                    {% else %}
+                        <span class="badge badge-ghost badge-sm">✗</span>
+                    {% endif %}
+                </td>
+                <td class="text-xs text-base-content/60">{{ ev.rejection_reason|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

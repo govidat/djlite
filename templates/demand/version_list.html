@@ -1,0 +1,149 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">{% trans "Forecast Versions" %}</h1>
+    <button id="new-version-btn" class="btn btn-primary btn-sm">
+        + {% trans "New Version" %}
+    </button>
+</div>
+
+{# ── Status filter ───────────────────────────────────────────────────── #}
+<div class="tabs tabs-boxed mb-4 w-fit"
+     hx-get="{% url 'demand_ui:version_list' client_id=client.client_id %}"
+     hx-target="#version-table-body"
+     hx-swap="innerHTML"
+     hx-push-url="true">
+    <a class="tab {% if not status_filter %}tab-active{% endif %}"
+       hx-vals='{"status": ""}'>{% trans "All" %}</a>
+    {% for value, label in status_choices %}
+    <a class="tab {% if status_filter == value %}tab-active{% endif %}"
+       hx-vals='{"status": "{{ value }}"}'>{{ label }}</a>
+    {% endfor %}
+</div>
+
+<div class="overflow-x-auto">
+    <table class="table table-zebra">
+        <thead>
+            <tr>
+                <th>{% trans "Label" %}</th>
+                <th>{% trans "Period" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Run Status" %}</th>
+                <th>{% trans "Created" %}</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="version-table-body">
+            {% include "demand/partials/version_table_body.html" %}
+        </tbody>
+    </table>
+</div>
+
+{# ── Create version modal — plain div, not native dialog ────────────── #}
+<div id="version-create-modal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/50"
+         id="version-modal-backdrop"></div>
+    <div id="modal-content"
+         class="relative z-10 bg-base-100 rounded-box shadow-xl
+                w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+    </div>
+</div>
+
+<script>
+function openVersionModal() {
+    document.getElementById('version-create-modal').classList.remove('hidden');
+}
+function closeVersionModal() {
+    document.getElementById('version-create-modal').classList.add('hidden');
+    document.getElementById('modal-content').innerHTML = '';
+}
+
+document.getElementById('new-version-btn').addEventListener('click', function() {
+    htmx.ajax('GET',
+        '{% url "demand_ui:version_create" client_id=client.client_id %}',
+        { target: '#modal-content', swap: 'innerHTML' }
+    );
+});
+
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'modal-content') {
+        openVersionModal();
+    }
+});
+
+document.getElementById('version-modal-backdrop')
+    .addEventListener('click', closeVersionModal);
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeVersionModal();
+});
+
+document.body.addEventListener('versionCreated', function() {
+    closeVersionModal();
+    htmx.ajax('GET',
+        '{% url "demand_ui:version_list" client_id=client.client_id %}',
+        { target: '#version-table-body', swap: 'innerHTML',
+          headers: {'HX-Request': 'true'} }
+    );
+});
+</script>
+
+{% endblock %}
+
+{% comment %}
+
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">{% trans "Forecast Versions" %}</h1>
+  <a href="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+     class="btn btn-primary btn-sm"
+     hx-get="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+     hx-target="#modal-content" hx-trigger="click"
+     onclick="document.getElementById('version-create-modal').showModal()">
+    + {% trans "New Version" %}
+  </a>
+</div>
+
+{# ── Status filter ───────────────────────────────────────────────────── #}
+<div class="tabs tabs-boxed mb-4 w-fit"
+     hx-get="{% url 'demand_ui:version_list' client_id=client.client_id %}"
+     hx-target="#version-table-body" hx-swap="innerHTML" hx-push-url="true">
+  <a class="tab {% if not status_filter %}tab-active{% endif %}"
+     hx-vals='{"status": ""}'>{% trans "All" %}</a>
+  {% for value, label in status_choices %}
+  <a class="tab {% if status_filter == value %}tab-active{% endif %}"
+     hx-vals='{"status": "{{ value }}"}'>{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="overflow-x-auto">
+  <table class="table table-zebra">
+    <thead>
+      <tr>
+        <th>{% trans "Label" %}</th>
+        <th>{% trans "Period" %}</th>
+        <th>{% trans "Status" %}</th>
+        <th>{% trans "Run Status" %}</th>
+        <th>{% trans "Created" %}</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="version-table-body">
+      {% include "demand/partials/version_table_body.html" %}
+    </tbody>
+  </table>
+</div>
+
+{# ── Create-version modal ────────────────────────────────────────────── #}
+<dialog id="version-create-modal" class="modal">
+  <div class="modal-box" id="modal-content"></div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+{% endcomment %}

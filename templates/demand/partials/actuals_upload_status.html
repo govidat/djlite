@@ -1,0 +1,118 @@
+{% load i18n %}
+<div id="actuals-upload-panel"
+     {% if job.status == 'pending' or job.status == 'processing' %}
+     hx-get="{% url 'demand_ui:actuals_upload_status' client_id=client.client_id job_id=job.pk %}"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+    {% if job.status == 'pending' %}
+    <div class="alert alert-info py-2">
+        <span class="loading loading-spinner loading-sm"></span>
+        <span>{% trans "Upload queued — waiting to process…" %}</span>
+    </div>
+
+    {% elif job.status == 'processing' %}
+    <div class="alert alert-info py-2">
+        <span class="loading loading-spinner loading-sm"></span>
+        <span>{% trans "Processing upload…" %}</span>
+    </div>
+
+    {% elif job.status == 'done' %}
+    <div class="space-y-2">
+        <div class="alert alert-success py-2">
+            <span>
+                ✓ {% trans "Upload complete." %}
+                {% if job.row_count %}
+                    <strong>{{ job.row_count }}</strong>
+                    {% trans "rows imported/updated." %}
+                {% endif %}
+                {% if job.error_log %}
+                    <span class="text-warning ml-2">
+                        {% trans "Some rows had errors — see details below." %}
+                    </span>
+                {% endif %}
+            </span>
+        </div>
+
+        {% if job.error_log %}
+        <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox">
+            <div class="collapse-title text-sm font-medium">
+                {% trans "Row-level errors (click to expand)" %}
+            </div>
+            <div class="collapse-content">
+                <pre class="text-xs text-error whitespace-pre-wrap">{{ job.error_log }}</pre>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="flex gap-2">
+            <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+               class="btn btn-sm btn-ghost">
+                {% trans "View actuals" %} →
+            </a>
+            <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+               class="btn btn-sm btn-outline">
+                {% trans "Upload another file" %}
+            </a>
+        </div>
+    </div>
+
+    {% elif job.status == 'failed' %}
+    <div class="space-y-2">
+        <div class="alert alert-error py-2">
+            <span>✗ {% trans "Upload failed." %}</span>
+        </div>
+        {% if job.error_log %}
+        <div class="bg-base-200 rounded p-3 text-xs text-error whitespace-pre-wrap font-mono">
+            {{ job.error_log }}
+        </div>
+        {% endif %}
+        <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+           class="btn btn-sm btn-outline">
+            {% trans "Try again" %}
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+
+{% comment %}
+
+{% load i18n %}
+<div id="upload-status"
+     {% if job.status in 'pending processing' %}
+     hx-get="{% url 'demand_ui:actuals_upload_status' client_id=client.client_id job_id=job.pk %}"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML"
+     {% endif %}>
+
+    {% if job.status == 'pending' or job.status == 'processing' %}
+    <div class="alert alert-info">
+        <span class="loading loading-spinner loading-sm"></span>
+        <span>{% trans "Processing upload…" %} ({{ job.status }})</span>
+    </div>
+
+    {% elif job.status == 'complete' %}
+    <div class="alert alert-success">
+        <span>✓ {% trans "Upload complete." %}
+            {% if job.rows_imported %}
+                {{ job.rows_imported }} {% trans "rows imported." %}
+            {% endif %}
+        </span>
+    </div>
+    <div class="mt-2">
+        <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+           class="btn btn-sm btn-ghost">{% trans "View actuals" %} →</a>
+    </div>
+
+    {% elif job.status == 'failed' %}
+    <div class="alert alert-error">
+        <span>✗ {% trans "Upload failed." %}
+            {% if job.error_message %}— {{ job.error_message }}{% endif %}
+        </span>
+    </div>
+    {% endif %}
+</div>
+{% endcomment %}

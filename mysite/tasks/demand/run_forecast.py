@@ -336,9 +336,185 @@ def apply_overrides(self, version_id: int):
     )
     write_forecast_aggregates(version_id)
 
-
 def _apply_single_override(override, version):
-    """Apply one ForecastOverride to matching ForecastLine rows."""
+    from mysite.models.demand.forecast import ForecastLine
+    from decimal import Decimal
+
+    qs = ForecastLine.objects.filter(
+        version=version,
+        period_type=override.period_type,
+        period_start=override.period_start,
+    )
+
+    key = override.override_key
+    if override.override_level == 'sku':
+        item_id_str = key.get('item_id')
+        if item_id_str:
+            qs = qs.filter(item__item_id=item_id_str)
+    elif override.override_level == 'location':
+        loc_code = key.get('location_code')
+        if loc_code:
+            qs = qs.filter(planning_location__code=loc_code)
+    elif override.override_level == 'customer':
+        cust_code = key.get('customer_code')
+        if cust_code:
+            qs = qs.filter(planning_customer__code=cust_code)
+    # 'total' — no additional filter, all lines for this period
+
+    lines = list(qs.select_related('item'))
+    if not lines:
+        logger.warning(
+            f'_apply_single_override: no matching lines for override {override.pk}'
+        )
+        return
+
+    # ── Percentage override ────────────────────────────────────────────────
+    if override.override_pct is not None:
+        multiplier = Decimal(str(1 + float(override.override_pct) / 100))
+        for line in lines:
+            line.override_qty = (
+                line.statistical_qty * multiplier
+            ).quantize(Decimal('0.001'))
+            line.final_qty   = line.override_qty
+            line.final_value = (
+                line.final_qty * line.price_used
+                if line.price_used else line.statistical_value
+            ).quantize(Decimal('0.01'))
+            line.save(update_fields=['override_qty', 'final_qty', 'final_value'])
+        return
+
+    # ── Absolute qty override ──────────────────────────────────────────────
+    if override.override_qty is not None:
+        total_stat = sum(float(l.statistical_qty) for l in lines) or 1.0
+        override_total = float(override.override_qty)
+
+        if override.disagg_method == 'CUSTOM':
+            weights = {
+                str(sw.child_key): float(sw.weight)
+                for sw in override.split_weights.all()
+            }
+            for line in lines:
+                uid_key = str({'item_id': line.item.item_id})
+                weight  = weights.get(uid_key, 0.0)
+                line.override_qty = Decimal(str(round(override_total * weight, 3)))
+                line.final_qty    = line.override_qty
+                line.final_value  = (
+                    line.final_qty * line.price_used
+                    if line.price_used else Decimal('0')
+                ).quantize(Decimal('0.01'))
+                line.save(update_fields=['override_qty', 'final_qty', 'final_value'])
+
+        elif override.disagg_method == 'EQUAL':
+            equal_share = Decimal(str(round(override_total / len(lines), 3)))
+            for line in lines:
+                line.override_qty = equal_share
+                line.final_qty    = line.override_qty
+                line.final_value  = (
+                    line.final_qty * line.price_used
+                    if line.price_used else Decimal('0')
+                ).quantize(Decimal('0.01'))
+                line.save(update_fields=['override_qty', 'final_qty', 'final_value'])
+
+        else:  # PROPORTIONAL
+            for line in lines:
+                share = float(line.statistical_qty) / total_stat
+                line.override_qty = Decimal(str(round(override_total * share, 3)))
+                line.final_qty    = line.override_qty
+                line.final_value  = (
+                    line.final_qty * line.price_used
+                    if line.price_used else Decimal('0')
+                ).quantize(Decimal('0.01'))
+                line.save(update_fields=['override_qty', 'final_qty', 'final_value'])
+        return
+
+    # ── Value override (₹) ────────────────────────────────────────────────
+    if override.override_value is not None:
+        target_total_value = override.override_value
+
+        # Total statistical value across all affected lines
+        total_stat_value = sum(
+            float(l.statistical_value or 0) for l in lines
+        ) or 1.0
+
+        # The scaling factor — same for all lines in PROPORTIONAL
+        scale = float(target_total_value) / total_stat_value
+
+        for line in lines:
+            if override.disagg_method == 'PROPORTIONAL':
+                # Each line scales by the same factor — preserves mix
+                line.final_value = (
+                    Decimal(str(float(line.statistical_value or 0) * scale))
+                ).quantize(Decimal('0.01'))
+
+            elif override.disagg_method == 'EQUAL':
+                # Each line gets an equal share of the target value
+                line.final_value = (
+                    target_total_value / Decimal(str(len(lines)))
+                ).quantize(Decimal('0.01'))
+
+            elif override.disagg_method == 'CUSTOM':
+                weights = {
+                    str(sw.child_key): float(sw.weight)
+                    for sw in override.split_weights.all()
+                }
+                uid_key = str({'item_id': line.item.item_id})
+                weight  = weights.get(uid_key, 0.0)
+                line.final_value = (
+                    target_total_value * Decimal(str(weight))
+                ).quantize(Decimal('0.01'))
+
+            # Back-calculate final_qty from final_value using this line's price
+            # This is for reference only — value is the source of truth at total level
+            if line.price_used and float(line.price_used) > 0:
+                line.override_qty = (
+                    line.final_value / line.price_used
+                ).quantize(Decimal('0.001'))
+                line.final_qty = line.override_qty
+            else:
+                # No price — preserve statistical qty, just record value override
+                line.override_qty = line.statistical_qty
+                line.final_qty    = line.statistical_qty
+
+            line.save(update_fields=['override_qty', 'final_qty', 'final_value'])
+    """
+    # ── Value override (₹) ────────────────────────────────────────────────
+    if override.override_value is not None:
+        target_value = override.override_value  # this IS the target total ₹
+
+        # Disaggregate by statistical_value share — stable, pre-override base
+        total_stat_value = sum(
+            float(l.statistical_value or 0) for l in lines
+        ) or 1.0
+
+        for line in lines:
+            # Each line's share of the target ₹ value
+            line_val_share   = float(line.statistical_value or 0) / total_stat_value
+            line_value_target = target_value * Decimal(str(line_val_share))
+
+            # Convert that ₹ share to qty using this line's own price
+            if line.price_used and float(line.price_used) > 0:
+                line.override_qty = (
+                    line_value_target / line.price_used
+                ).quantize(Decimal('0.001'))
+            elif total_stat_value > 0 and line.statistical_qty:
+                # No price — fall back to proportional qty split
+                qty_share = float(line.statistical_qty) / (
+                    sum(float(l.statistical_qty) for l in lines) or 1.0
+                )
+                total_stat = sum(float(l.statistical_qty) for l in lines) or 1.0
+                line.override_qty = Decimal(str(round(
+                    float(target_value) / float(line.price_used or 1) * qty_share, 3
+                )))
+            else:
+                line.override_qty = Decimal('0')
+
+            line.final_qty   = line.override_qty
+            line.final_value = line_value_target.quantize(Decimal('0.01'))
+            line.save(update_fields=['override_qty', 'final_qty', 'final_value'])
+        """
+"""
+def _apply_single_override(override, version):
+    #Apply one ForecastOverride to matching ForecastLine rows.#
     from mysite.models.demand.forecast import ForecastLine, ForecastAggregate
     from mysite.models.demand.actuals import ItemPlanningProfile
 
@@ -463,6 +639,7 @@ def _apply_single_override(override, version):
                     ).quantize(Decimal('0.001'))
                 line.save(update_fields=update_fields)
 
+"""
 
 @shared_task(bind=True)
 def compute_accuracy(self, client_id: int):

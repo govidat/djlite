@@ -1,6 +1,7 @@
 # mysite/tasks/demand/compute_series_profiles.py
 
 import logging
+import time
 from collections import defaultdict
 from decimal import Decimal
 
@@ -154,8 +155,6 @@ def compute_series_profiles(self, client_id: int, period_type: str):
 
     # Levels 1..n: Item × Location ancestor at each depth
     df_by_depth: dict[int, pd.DataFrame] = {}
-    for d in df_by_depth:
-        df_by_depth[d]['period_start'] = pd.to_datetime(df_by_depth[d]['period_start']).dt.date        
     for level in loc_levels[1:]:
         d = level['depth']
         anc_col = f'anc_depth_{d}'
@@ -163,6 +162,9 @@ def compute_series_profiles(self, client_id: int, period_type: str):
             df_by_depth[d] = con.execute(
                 _agg_sql(['item_id', anc_col])
             ).df().rename(columns={anc_col: 'loc_ancestor_id'})
+            df_by_depth[d]['period_start'] = (
+                pd.to_datetime(df_by_depth[d]['period_start']).dt.date
+            )
 
     # Item × Leaf Location (all customers)
     df_item_loc = con.execute(
@@ -291,7 +293,7 @@ def compute_series_profiles(self, client_id: int, period_type: str):
                 d       = level['depth']
                 anc_id  = loc_ancestor.get(int(loc_id), {}).get(d)
                 if anc_id is None:
-                    continue  # this location has no ancestor at this depth
+                    continue
 
                 level_df_d = df_by_depth.get(d)
                 if level_df_d is None:
@@ -305,15 +307,23 @@ def compute_series_profiles(self, client_id: int, period_type: str):
                     continue
 
                 val_d = _value_series(rows_d)
+
+                # ── Filter level_df to THIS ancestor node only ──────────────────
+                # This scopes the ABC denominator to item revenue / total revenue
+                # at THIS specific branch/region, not all branches combined.
+                this_anc_df = level_df_d[level_df_d['loc_ancestor_id'] == anc_id]
+
                 e_d = _eval_dict(
                     grain=f'item_loc_depth_{d}',
-                    key={'grain': f'item_loc_depth_{d}',
-                         'location_id': int(anc_id),
-                         'level_label': level['level_label']},
+                    key={
+                        'grain':       f'item_loc_depth_{d}',
+                        'location_id': int(anc_id),
+                        'level_label': level['level_label'],
+                    },
                     eval_period=period_type,
                     qty_list=_qty_series(rows_d, all_periods),
                     item_value=val_d,
-                    level_df=level_df_d,
+                    level_df=this_anc_df,   # ← was level_df_d (all ancestors combined)
                 )
                 evals.append(e_d)
 
@@ -482,8 +492,9 @@ def compute_series_profiles(self, client_id: int, period_type: str):
                 )
             )
 
-        # Build SeriesProfile summary
+        # ── Build SeriesProfile summary ───────────────────────────────────────
         chosen_m = chosen['metrics'] if chosen else {}
+
         atom_rows = df_atomic[
             (df_atomic['item_id'] == item_id) &
             (df_atomic['planning_location_id'] == loc_id) &
@@ -492,7 +503,59 @@ def compute_series_profiles(self, client_id: int, period_type: str):
         atom_qty = _qty_series(atom_rows, all_periods)
         atom_m   = _classify(atom_qty)
         atom_val = _value_series(atom_rows)
-        atom_abc = _compute_abc_at_level(atom_val, df_atomic)
+
+        # ── ABC at the right level ────────────────────────────────────────────
+        # ABC should reflect item importance at the level where the
+        # chosen grain lives, not at the atomic (item×loc×cust) level.
+        # This prevents everything being C because each atomic slice is tiny.
+
+        chosen_grain = chosen['grain'] if chosen else 'item_client'
+
+        if chosen_grain == 'item_cust_location':
+            # ABC at this specific location×customer node
+            loc_cust_df = df_atomic[
+                (df_atomic['planning_location_id'] == loc_id) &
+                (df_atomic['cust_code'] == cust_code)
+            ]
+            atom_abc = _compute_abc_at_level(atom_val, loc_cust_df)
+
+        elif chosen_grain.startswith('item_loc'):
+            # ABC at this specific leaf location (all customers combined)
+            this_loc_df = df_item_loc[
+                df_item_loc['planning_location_id'] == loc_id
+            ]
+            item_loc_val = _value_series(
+                this_loc_df[this_loc_df['item_id'] == item_id]
+            )
+            atom_abc = _compute_abc_at_level(item_loc_val, this_loc_df)
+
+        elif 'location_depth' in chosen_grain:
+            # ABC at this specific DC/region node
+            try:
+                depth = int(chosen_grain.rsplit('_', 1)[-1])
+            except ValueError:
+                depth = None
+            if depth and depth in df_by_depth:
+                anc_id = loc_ancestor.get(int(loc_id), {}).get(depth)
+                dc_df  = df_by_depth[depth]
+                if anc_id is not None:
+                    # Filter to only THIS DC's rows
+                    this_dc_df  = dc_df[dc_df['loc_ancestor_id'] == anc_id]
+                    item_dc_val = _value_series(
+                        this_dc_df[this_dc_df['item_id'] == item_id]
+                    )
+                    atom_abc = _compute_abc_at_level(item_dc_val, this_dc_df)
+                else:
+                    # Fallback to client level
+                    atom_abc = _compute_abc_at_level(ic_val, df_item_client)
+            else:
+                atom_abc = _compute_abc_at_level(ic_val, df_item_client)
+
+        else:
+            # item_client or time-horizon variants — client total level
+            # df_item_client already has one row per item at client level
+            # ic_val is this item's total client revenue — correct numerator
+            atom_abc = _compute_abc_at_level(ic_val, df_item_client)
 
         profiles_to_upsert.append({
             'client_id':             client_id,
@@ -518,45 +581,60 @@ def compute_series_profiles(self, client_id: int, period_type: str):
         })
 
     # ── Persist ────────────────────────────────────────────────────────────────
-    with transaction.atomic():
-        SeriesLevelEvaluation.objects.filter(
-            client_id=client_id, period_type=period_type
-        ).delete()
+    def _persist():
+        with transaction.atomic():
+            SeriesLevelEvaluation.objects.filter(
+                client_id=client_id, period_type=period_type
+            ).delete()
 
-        SeriesLevelEvaluation.objects.bulk_create(
-            evaluations_to_create, batch_size=500, ignore_conflicts=True
-        )
-
-        # Re-query to get PKs (bulk_create doesn't return PKs on all DB backends)
-        eval_pk_map = {
-            (e.item_id, e.grain, str(e.evaluation_key)): e.pk
-            for e in SeriesLevelEvaluation.objects.filter(
-                client_id=client_id, period_type=period_type, is_accepted=True
+            SeriesLevelEvaluation.objects.bulk_create(
+                evaluations_to_create, batch_size=500, ignore_conflicts=True
             )
-        }
 
-        for p in profiles_to_upsert:
-            update_fields = {k: v for k, v in p.items()
-                             if k not in ('client_id', 'item_id',
-                                          'planning_customer_id',
-                                          'planning_location_id', 'period_type')}
-            # Find chosen_evaluation FK
-            # (match by item_id + chosen_grain from accepted evaluations)
-            chosen_eval_pk = eval_pk_map.get(
-                (p['item_id'], p['chosen_grain'],
-                 str({'grain': p['chosen_grain']}))
-            )
-            if chosen_eval_pk:
-                update_fields['chosen_evaluation_id'] = chosen_eval_pk
+            eval_pk_map = {
+                (e.item_id, e.grain, str(e.evaluation_key)): e.pk
+                for e in SeriesLevelEvaluation.objects.filter(
+                    client_id=client_id, period_type=period_type, is_accepted=True
+                )
+            }
 
-            SeriesProfile.objects.update_or_create(
-                client_id=p['client_id'],
-                item_id=p['item_id'],
-                planning_customer_id=p['planning_customer_id'],
-                planning_location_id=p['planning_location_id'],
-                period_type=p['period_type'],
-                defaults=update_fields,
-            )
+            for p in profiles_to_upsert:
+                update_fields = {k: v for k, v in p.items()
+                                if k not in ('client_id', 'item_id',
+                                            'planning_customer_id',
+                                            'planning_location_id', 'period_type')}
+                chosen_eval_pk = eval_pk_map.get(
+                    (p['item_id'], p['chosen_grain'],
+                    str({'grain': p['chosen_grain']}))
+                )
+                if chosen_eval_pk:
+                    update_fields['chosen_evaluation_id'] = chosen_eval_pk
+
+                SeriesProfile.objects.update_or_create(
+                    client_id=p['client_id'],
+                    item_id=p['item_id'],
+                    planning_customer_id=p['planning_customer_id'],
+                    planning_location_id=p['planning_location_id'],
+                    period_type=p['period_type'],
+                    defaults=update_fields,
+                )
+
+    # Retry wrapper for SQLite lock errors
+    retries, delay = 3, 2
+    for attempt in range(retries):
+        try:
+            _persist()
+            break
+        except Exception as exc:
+            if 'database is locked' in str(exc) and attempt < retries - 1:
+                logger.warning(
+                    f'compute_series_profiles: database locked, '
+                    f'retrying in {delay}s (attempt {attempt + 1})'
+                )
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
 
     from collections import Counter
     grain_counts = Counter(p['chosen_grain'] for p in profiles_to_upsert)

@@ -1,4 +1,182 @@
 {# demand/partials/override_key_sku.html #}
+
+{% load i18n %}
+<div class="form-control" id="sku-autocomplete-wrapper">
+    <label class="label">
+        <span class="label-text">{% trans "Item" %}</span>
+        <span class="label-text-alt text-base-content/50">
+            {% trans "Type 2+ characters to search" %}
+        </span>
+    </label>
+
+    {# Hidden field that actually gets submitted #}
+    <input type="hidden" name="item_id" id="item-id-value">
+
+    {# Visible search input #}
+    <input type="text"
+           id="item-id-search"
+           class="input input-bordered"
+           placeholder="{% trans 'Search by code or name…' %}"
+           autocomplete="off">
+
+    {# Dropdown results #}
+    <ul id="item-id-results"
+        class="hidden absolute z-50 bg-base-100 border border-base-300
+               rounded-box shadow-lg mt-1 max-h-60 overflow-y-auto w-full">
+    </ul>
+
+    {# Selected item display #}
+    <div id="item-id-selected" class="hidden mt-2 flex items-center gap-2">
+        <span class="badge badge-success badge-sm">✓</span>
+        <span id="item-id-selected-label" class="text-sm font-medium"></span>
+        <button type="button" class="btn btn-ghost btn-xs"
+                onclick="clearItemSelection()">{% trans "Clear" %}</button>
+    </div>
+</div>
+
+<div id="override-key-hidden-container"></div>
+
+<script>
+(function() {
+    var searchInput  = document.getElementById('item-id-search');
+    var valueInput   = document.getElementById('item-id-value');
+    var resultsList  = document.getElementById('item-id-results');
+    var selectedDiv  = document.getElementById('item-id-selected');
+    var selectedLabel = document.getElementById('item-id-selected-label');
+    var searchTimer  = null;
+    var searchUrl    = '{% url "demand_ui:item_search" client_id=client.client_id pk=version.pk %}';
+    var encodeUrl    = '{% url "demand_ui:encode_override_key" client_id=client.client_id pk=version.pk %}';
+    var csrfToken    = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    searchInput.addEventListener('input', function() {
+        var q = this.value.trim();
+        clearTimeout(searchTimer);
+
+        if (q.length < 2) {
+            hideResults();
+            return;
+        }
+
+        searchTimer = setTimeout(function() {
+            fetch(searchUrl + '?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(data) { renderResults(data.results); })
+            .catch(function(err) { console.error('item search error:', err); });
+        }, 300);
+    });
+
+    function renderResults(results) {
+        resultsList.innerHTML = '';
+        if (!results.length) {
+            resultsList.innerHTML = '<li class="px-4 py-2 text-sm text-base-content/50">{% trans "No items found" %}</li>';
+            resultsList.classList.remove('hidden');
+            return;
+        }
+        results.forEach(function(item) {
+            var li = document.createElement('li');
+            li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
+            li.textContent = item.item_id + ' — ' + item.name;
+            li.addEventListener('click', function() {
+                selectItem(item.item_id, item.item_id + ' — ' + item.name);
+            });
+            resultsList.appendChild(li);
+        });
+        resultsList.classList.remove('hidden');
+    }
+
+    function selectItem(itemId, label) {
+        valueInput.value   = itemId;
+        searchInput.value  = label;
+        selectedLabel.textContent = label;
+        selectedDiv.classList.remove('hidden');
+        hideResults();
+
+        // Encode the override key
+        fetch(encodeUrl + '?item_id=' + encodeURIComponent(itemId), {
+            headers: {'X-CSRFToken': csrfToken}
+        })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+            var container = document.getElementById('override-key-hidden-container');
+            if (container) container.innerHTML = html;
+        });
+    }
+
+    function hideResults() {
+        resultsList.classList.add('hidden');
+        resultsList.innerHTML = '';
+    }
+
+    // Close results on outside click
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#sku-autocomplete-wrapper')) {
+            hideResults();
+        }
+    });
+
+    // Keyboard navigation
+    searchInput.addEventListener('keydown', function(e) {
+        var items = resultsList.querySelectorAll('li');
+        var active = resultsList.querySelector('li.bg-base-200');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            var next = active ? active.nextElementSibling : items[0];
+            if (active) active.classList.remove('bg-base-200');
+            if (next) next.classList.add('bg-base-200');
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            var prev = active ? active.previousElementSibling : items[items.length - 1];
+            if (active) active.classList.remove('bg-base-200');
+            if (prev) prev.classList.add('bg-base-200');
+        } else if (e.key === 'Enter' && active) {
+            e.preventDefault();
+            active.click();
+        } else if (e.key === 'Escape') {
+            hideResults();
+        }
+    });
+})();
+
+window.clearItemSelection = function() {
+    document.getElementById('item-id-value').value = '';
+    document.getElementById('item-id-search').value = '';
+    document.getElementById('item-id-selected').classList.add('hidden');
+    document.getElementById('override-key-hidden-container').innerHTML = '';
+};
+</script>
+
+{% comment %}
+{% load i18n %}
+<div class="form-control">
+    <label class="label"><span class="label-text">{% trans "Item" %}</span></label>
+    <select name="item_id" class="select select-bordered"
+            hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+            hx-trigger="change" hx-target="#override-key-hidden-container"
+            hx-include="closest form">
+        <option value="">{% trans "Select an item…" %}</option>
+        {% for item_id, item_name in items %}
+        <option value="{{ item_id }}">{{ item_id }} — {{ item_name }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div id="override-key-hidden-container"></div>
+
+{% load i18n %}
+<div class="form-control">
+    <label class="label"><span class="label-text">{% trans "Item" %}</span></label>
+    <select name="item_id" class="select select-bordered"
+            hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+            hx-trigger="change" hx-target="#override-key-hidden-container"
+            hx-include="closest form">
+        <option value="">{% trans "Select an item…" %}</option>
+        {% for item in items %}
+        <option value="{{ item.item_id }}">{{ item.item_id }} — {{ item.name }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div id="override-key-hidden-container"></div>
+{% endcomment %}
+{% comment %}
 <label>Item ID
   <input type="text" name="override_key_item_id" required
          placeholder="e.g. ITEM-001"
@@ -8,3 +186,4 @@
          hx-include="[name^='override_key_']">
 </label>
 <input type="hidden" id="override-key-hidden" name="override_key" value="{}">
+{% endcomment %}

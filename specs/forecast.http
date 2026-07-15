@@ -12,6 +12,14 @@
 #  "notes": "Initial baseline run — auto parts TN"
 #}
 
+#In forecast versions > value summary options are available to select total, location, item etc. In that report a filter should also be made available on coumns line period for total; period, location code , final value range for location option;  period, item, final qty range, final value range for item option; period, customer, final value range for Customer option; Also the column lelvel int report is not required. Key field is a bit user unfriendly.
+
+# actual upload form difference
+#period_type	period_start	qty	revenue	client_id	import_batch_id	planning_customer_code	planning_location_code	item_code
+# let the atrributevalue flow from parent - code to be checked - as per GPC atributes are at block level only
+# for forecasting let the default be product_planning taxonony node. If it is not there let it take gpc
+# Optional SalesNode PlanningLocation hierarchy lin kis not visible in any of the reports so far?
+# 
 @baseUrl = http://127.0.0.1:8000
 @client = autocomp
 @auth = Basic autocomp_ad welcome99

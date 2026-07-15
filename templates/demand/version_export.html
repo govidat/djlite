@@ -1,0 +1,29 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="max-w-lg mx-auto mt-8">
+    <h2 class="text-xl font-bold mb-2">{% trans "Export Forecast" %}</h2>
+    <p class="text-sm text-base-content/60 mb-6">{{ version.version_label }}</p>
+
+    <div class="card bg-base-200">
+        <div class="card-body gap-4">
+            <div>
+                <p class="font-medium mb-1">{% trans "Excel (.xlsx)" %}</p>
+                <p class="text-sm text-base-content/60 mb-3">
+                    {% trans "All forecast lines with statistical qty, override qty, final qty, and final value." %}
+                </p>
+                <a href="{% url 'demand_ui:version_export' client_id=client.client_id pk=version.pk %}?format=xlsx"
+                   class="btn btn-primary btn-sm" download>
+                    📥 {% trans "Download .xlsx" %}
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+           class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
+    </div>
+</div>
+{% endblock %}

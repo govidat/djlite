@@ -1,0 +1,76 @@
+{% load i18n %}
+<div id="actuals-upload-panel" class="space-y-4">
+
+    <div class="alert alert-warning">
+        <div>
+            <p class="font-bold">{% trans "Period overlap detected" %}</p>
+            <p class="text-sm mt-1">
+                {% blocktrans with count=overlap_count %}
+                The file contains data for {{ count }} period(s) already
+                in actuals for this client:
+                {% endblocktrans %}
+            </p>
+            <ul class="list-disc list-inside text-sm mt-2">
+                {% for period in overlap_periods %}
+                <li>{{ period|date:"M Y" }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <p class="text-sm text-base-content/70">
+        {% trans "How would you like to proceed?" %}
+    </p>
+
+    {# Option 1 — Cancel #}
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+          hx-target="#actuals-upload-panel"
+          hx-swap="outerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="ignore">
+        <input type="hidden" name="pending_file" value="{{ pending_file }}">
+        <input type="hidden" name="period_type" value="{{ pending_period_type }}">
+        <button type="submit" class="btn btn-ghost btn-sm w-full">
+            ✕ {% trans "Cancel — do not upload" %}
+        </button>
+    </form>
+
+    {# Option 2 — Add to existing #}
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+          hx-target="#actuals-upload-panel"
+          hx-swap="outerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="upload">
+        <input type="hidden" name="pending_file" value="{{ pending_file }}">
+        <input type="hidden" name="pending_period_type" value="{{ pending_period_type }}">
+        <input type="hidden" name="period_type" value="{{ pending_period_type }}">
+        {% for period in overlap_periods %}
+        <input type="hidden" name="overlap_periods" value="{{ period|date:'Y-m-d' }}">
+        {% endfor %}
+        <button type="submit" class="btn btn-warning btn-sm w-full">
+            ↑ {% trans "Add / update rows for overlapping periods" %}
+        </button>
+        <p class="text-xs text-base-content/40 mt-1 text-center">
+            {% trans "Existing rows for same item/location/customer/period will be overwritten. New rows added." %}
+        </p>
+    </form>
+
+    {# Option 3 — Delete then upload fresh #}
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+          hx-target="#actuals-upload-panel"
+          hx-swap="outerHTML"
+          hx-confirm="{% trans 'Delete all existing actuals for the overlapping periods and replace with this file?' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_and_upload">
+        <input type="hidden" name="pending_file" value="{{ pending_file }}">
+        <input type="hidden" name="pending_period_type" value="{{ pending_period_type }}">
+        <input type="hidden" name="period_type" value="{{ pending_period_type }}">
+        {% for period in overlap_periods %}
+        <input type="hidden" name="overlap_periods" value="{{ period|date:'Y-m-d' }}">
+        {% endfor %}
+        <button type="submit" class="btn btn-error btn-sm w-full">
+            🗑 {% trans "Delete existing data for these periods, then upload fresh" %}
+        </button>
+    </form>
+
+</div>

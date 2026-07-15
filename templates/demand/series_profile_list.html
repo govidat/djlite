@@ -1,0 +1,45 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-xl font-bold">{% trans "Series Profiles" %}</h2>
+    <div class="flex items-center gap-3">
+        <div id="recompute-status"></div>
+        <form method="post"
+            action="{% url 'demand_ui:series_profile_recompute' client_id=client.client_id %}">
+            {% csrf_token %}
+            <button id="recompute-btn"
+                    class="btn btn-warning btn-sm"
+                    hx-post="{% url 'demand_ui:series_profile_recompute' client_id=client.client_id %}"
+                    hx-target="#recompute-status"
+                    hx-swap="innerHTML"
+                    hx-on:click="
+                        this.disabled = true;
+                        this.classList.add('btn-disabled');
+                        this.innerHTML = '<span class=\'loading loading-spinner loading-xs\'></span> Running…';
+                    ">
+                ↻ {% trans "Recompute Profiles" %}
+            </button>
+        </form>
+    </div>
+    {% comment %}
+    <div class="flex gap-2 items-center">
+        <div id="recompute-status"></div>
+        <button class="btn btn-warning btn-sm"
+                hx-post="{% url 'demand_ui:series_profile_recompute' client_id=client.client_id %}"
+                hx-target="#recompute-status"
+                hx-swap="innerHTML"
+                hx-indicator="#recompute-spinner">
+            <span id="recompute-spinner" class="htmx-indicator loading loading-spinner loading-xs"></span>
+            ↻ {% trans "Recompute Profiles" %}
+        </button>
+    </div>
+    {% endcomment %}
+</div>
+
+<div id="series-table-container">
+    {% include "demand/partials/series_filter_bar.html" %}
+    {% include "demand/partials/series_profile_table_body.html" %}
+</div>
+{% endblock %}

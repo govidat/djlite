@@ -1,0 +1,94 @@
+{% load i18n %}
+<h3 class="font-bold text-lg mb-1">{% trans "Override at" %} {{ location.code }}</h3>
+<p class="text-sm text-base-content/60 mb-4">
+  {{ location.name }} — {{ agg_period }}
+  {% if current_agg %}
+    · {% trans "Current final value" %}: ₹{{ current_agg.total_final_value|floatformat:0 }}
+  {% endif %}
+</p>
+
+<form hx-post="{% url 'demand_ui:drilldown_override_form' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+      hx-target="this" hx-swap="outerHTML" class="space-y-4">
+  {% csrf_token %}
+  <input type="hidden" name="period_start" value="{{ agg_period }}">
+
+  {% if form_error %}
+  <div class="alert alert-error"><span>{{ form_error }}</span></div>
+  {% endif %}  
+
+  {# ── Three mutually-exclusive override modes ────────────────────────── #}
+  <div class="tabs tabs-boxed">
+    <a class="tab tab-active" onclick="showMode('qty')" id="tab-qty">{% trans "Quantity" %}</a>
+    <a class="tab" onclick="showMode('pct')" id="tab-pct">{% trans "Percent" %}</a>
+    <a class="tab" onclick="showMode('value')" id="tab-value">{% trans "Value (₹)" %}</a>
+  </div>
+
+  <div id="mode-qty" class="form-control">
+    <label class="label"><span class="label-text">{% trans "Absolute quantity for this location" %}</span></label>
+    <input type="number" step="0.001" name="override_qty"
+           hx-get="{% url 'demand_ui:drilldown_override_preview' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+           hx-trigger="input changed delay:400ms" hx-target="#preview-area"
+           hx-include="closest form" class="input input-bordered">
+  </div>
+
+  <div id="mode-pct" class="form-control hidden">
+    <label class="label"><span class="label-text">{% trans "Percentage adjustment (e.g. 10 or -5)" %}</span></label>
+    <input type="number" step="0.001" name="override_pct"
+           hx-get="{% url 'demand_ui:drilldown_override_preview' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+           hx-trigger="input changed delay:400ms" hx-target="#preview-area"
+           hx-include="closest form" class="input input-bordered">
+  </div>
+
+  <div id="mode-value" class="form-control hidden">
+    <label class="label"><span class="label-text">{% trans "Target ₹ value for this location" %}</span></label>
+    <input type="number" step="0.01" name="override_value"
+           hx-get="{% url 'demand_ui:drilldown_override_preview' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+           hx-trigger="input changed delay:400ms" hx-target="#preview-area"
+           hx-include="closest form" class="input input-bordered">
+    <span class="label-text-alt text-base-content/60">
+      {% trans "Converted to qty using weighted average price, then disaggregated proportionally." %}
+    </span>
+  </div>
+
+  <div class="form-control">
+      <label class="label"><span class="label-text">{% trans "Disaggregation method" %}</span></label>
+      <select name="disagg_method" class="select select-bordered"
+              onchange="document.getElementById('custom-weights-section')
+                        .classList.toggle('hidden', this.value !== 'CUSTOM')">
+          <option value="PROPORTIONAL">{% trans "Proportional (historical share)" %}</option>
+          <option value="EQUAL">{% trans "Equal split" %}</option>
+          <option value="CUSTOM">{% trans "Custom weights" %}</option>
+      </select>
+  </div>
+
+  {# Add immediately after the select, before the Note field: #}
+  <div id="custom-weights-section" class="hidden">
+      {% include "demand/partials/split_weight_form.html" %}
+  </div>
+
+
+  <div class="form-control">
+    <label class="label"><span class="label-text">{% trans "Note" %}</span></label>
+    <textarea name="override_note" class="textarea textarea-bordered" rows="2"
+              placeholder="{% trans 'Reason for this override (visible in audit trail)' %}"></textarea>
+  </div>
+
+  {# ── Live preview of impact on children ──────────────────────────────── #}
+  <div id="preview-area"></div>
+
+  <div class="modal-action">
+    <button type="button" class="btn btn-ghost" onclick="document.getElementById('override-modal').close()">
+      {% trans "Cancel" %}
+    </button>
+    <button type="submit" class="btn btn-primary">{% trans "Save Override" %}</button>
+  </div>
+</form>
+
+<script>
+function showMode(mode) {
+  ['qty', 'pct', 'value'].forEach(m => {
+    document.getElementById('mode-' + m).classList.toggle('hidden', m !== mode);
+    document.getElementById('tab-' + m).classList.toggle('tab-active', m === mode);
+  });
+}
+</script>

@@ -1,0 +1,12 @@
+{% load i18n %}
+{# taxonomy_tree/partials/taxonomy_tree_children.html
+   Returned by taxonomy_tree_children view, swapped into the requesting
+   node's #tx-children-{id} container via hx-swap="innerHTML".
+#}
+{% for node in nodes %}
+  {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=node client_id=client_id %}
+{% empty %}
+  <li class="tx-node-empty">
+    {% trans "No sub-categories." %}
+  </li>
+{% endfor %}

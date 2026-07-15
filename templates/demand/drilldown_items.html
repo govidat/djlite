@@ -1,0 +1,19 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="mb-4 flex items-center justify-between">
+    <div>
+        <h2 class="text-lg font-bold">{{ location.code }} — {{ location.name }}</h2>
+        <p class="text-sm text-base-content/60">
+            {% trans "Item-level forecast lines" %} · {{ version.version_label }}
+        </p>
+    </div>
+    <a href="{% url 'demand_ui:drilldown_location' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+       class="btn btn-ghost btn-sm">
+        ← {% trans "Back to drilldown" %}
+    </a>
+</div>
+
+{% include "demand/partials/drilldown_items_table.html" %}
+{% endblock %}

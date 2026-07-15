@@ -1,0 +1,28 @@
+{% load i18n %}
+{% if status == 'running' %}
+<div id="recompute-status-poller"
+     hx-get="{% url 'demand_ui:recompute_status' client_id=client.client_id %}?task_id={{ task_id }}"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML">
+    <div class="flex items-center gap-2 text-sm text-base-content/60">
+        <span class="loading loading-spinner loading-sm text-warning"></span>
+        {% trans "Recomputation running in background…" %}
+    </div>
+</div>
+
+{% elif status == 'done' %}
+<div id="recompute-status-poller">
+    <div class="alert alert-success py-2 text-sm">
+        ✓ {% trans "Recomputation complete. Refresh the page to see updated profiles." %}
+        <a href="{% url 'demand_ui:series_profile_list' client_id=client.client_id %}"
+           class="btn btn-xs btn-ghost ml-2">{% trans "Refresh now" %}</a>
+    </div>
+</div>
+
+{% elif status == 'failed' %}
+<div id="recompute-status-poller">
+    <div class="alert alert-error py-2 text-sm">
+        ✗ {% trans "Recomputation failed. Check Celery logs." %}
+    </div>
+</div>
+{% endif %}

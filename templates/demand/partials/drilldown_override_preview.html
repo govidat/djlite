@@ -1,0 +1,50 @@
+{% load i18n %}
+{% if rows %}
+<div class="mt-4">
+    <p class="text-sm font-medium mb-2 text-base-content/70">
+        {% trans "Estimated impact on child locations" %}
+        <span class="text-xs text-base-content/40 ml-1">
+            ({% trans "proportional approximation" %})
+        </span>
+    </p>
+    <table class="table table-xs">
+        <thead>
+            <tr>
+                <th>{% trans "Location" %}</th>
+                <th class="text-right">{% trans "Before" %}</th>
+                <th class="text-right">{% trans "After" %}</th>
+                <th class="text-right">{% trans "Change" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            {% with diff=row.after_qty|add:row.before_qty|floatformat:0 %}
+            <tr>
+                <td class="font-mono text-sm">{{ row.location.code }}</td>
+                <td class="text-right text-base-content/60">
+                    {{ row.before_qty|floatformat:0 }}
+                </td>
+                <td class="text-right font-medium">
+                    {{ row.after_qty|floatformat:0 }}
+                </td>
+                <td class="text-right">
+                    {% if row.after_qty > row.before_qty %}
+                        <span class="text-success text-xs">▲</span>
+                    {% elif row.after_qty < row.before_qty %}
+                        <span class="text-error text-xs">▼</span>
+                    {% else %}
+                        <span class="text-base-content/30 text-xs">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if note %}
+    <p class="text-xs text-base-content/40 mt-2">{{ note }}</p>
+    {% endif %}
+</div>
+{% elif note %}
+<p class="text-sm text-base-content/50 mt-3">{{ note }}</p>
+{% endif %}

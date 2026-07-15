@@ -19,11 +19,14 @@
   {% endcomment %}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{{client.client_id|default:"App"}}</title>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   {% comment %} 
   <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
   {% endcomment %}
+
+  
   <style>
     :root {
 
@@ -126,7 +129,15 @@
   <script>Datastar.start()</script>  
     <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.0-RC.7/bundles/datastar.js"></script>
   {% endcomment %}
-  
+  {# ── HTMX CSRF setup — must be after htmx.org script loads ── #}
+  <script>
+    document.addEventListener('htmx:configRequest', function(evt) {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) {
+            evt.detail.headers['X-CSRFToken'] = meta.getAttribute('content');
+        }
+    });
+  </script>  
 </body>
 
 </html>

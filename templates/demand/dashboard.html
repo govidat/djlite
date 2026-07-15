@@ -1,0 +1,90 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<h1 class="text-2xl font-bold mb-6">{% trans "Demand Planning Dashboard" %}</h1>
+
+{# ── Status summary cards ────────────────────────────────────────────── #}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="stat bg-base-200 rounded-box">
+    <div class="stat-title">{% trans "Draft" %}</div>
+    <div class="stat-value text-neutral">{{ status_counts.DRAFT }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box">
+    <div class="stat-title">{% trans "In Review" %}</div>
+    <div class="stat-value text-warning">{{ status_counts.IN_REVIEW }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box">
+    <div class="stat-title">{% trans "Approved" %}</div>
+    <div class="stat-value text-success">{{ status_counts.APPROVED }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box">
+    <div class="stat-title">{% trans "Locked" %}</div>
+    <div class="stat-value text-primary">{{ status_counts.LOCKED }}</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+  {# ── Latest version ──────────────────────────────────────────────── #}
+  <div class="card bg-base-200">
+    <div class="card-body">
+      <h2 class="card-title">{% trans "Latest Version" %}</h2>
+      {% if latest_version %}
+        <p class="font-semibold">{{ latest_version.version_label }}</p>
+        <div class="flex items-center gap-2">
+          <span class="badge
+            {% if latest_version.status == 'DRAFT' %}badge-neutral
+            {% elif latest_version.status == 'IN_REVIEW' %}badge-warning
+            {% elif latest_version.status == 'APPROVED' %}badge-success
+            {% else %}badge-primary{% endif %}">
+            {{ latest_version.get_status_display }}
+          </span>
+          {% if pending_overrides_count %}
+          <span class="badge badge-outline">{{ pending_overrides_count }} {% trans "pending overrides" %}</span>
+          {% endif %}
+        </div>
+        <div class="card-actions justify-end mt-4">
+          <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=latest_version.pk %}"
+             class="btn btn-primary btn-sm">{% trans "Open" %} →</a>
+        </div>
+      {% else %}
+        <p class="text-base-content/60">{% trans "No forecast versions yet." %}</p>
+        <div class="card-actions justify-end mt-4">
+          <a href="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+             class="btn btn-primary btn-sm">{% trans "Create First Version" %}</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Recent imports ──────────────────────────────────────────────── #}
+  <div class="card bg-base-200">
+    <div class="card-body">
+      <h2 class="card-title">{% trans "Recent Actuals Uploads" %}</h2>
+      {% if recent_imports %}
+      <ul class="space-y-2">
+        {% for job in recent_imports %}
+        <li class="flex items-center justify-between text-sm">
+          <span>{{ job.file_name|truncatechars:30 }}</span>
+          <span class="badge badge-sm
+            {% if job.status == 'done' %}badge-success
+            {% elif job.status == 'failed' %}badge-error
+            {% else %}badge-warning{% endif %}">
+            {{ job.status }}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+        <p class="text-base-content/60">{% trans "No uploads yet." %}</p>
+      {% endif %}
+      <div class="card-actions justify-end mt-4">
+        <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+           class="btn btn-outline btn-sm">{% trans "Upload Actuals" %}</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,161 @@
+{% load i18n %}
+<div class="overflow-x-auto">
+    <table class="table table-zebra table-sm w-full">
+        <thead>
+            <tr>
+                <th>{% trans "Item" %}</th>
+                <th>{% trans "Location" %}</th>
+                <th>{% trans "Customer" %}</th>
+                <th>{% trans "Period" %}</th>
+                <th>{% trans "Type" %}</th>
+                <th class="text-right">{% trans "Qty" %}</th>
+                <th class="text-right">{% trans "Revenue (₹)" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in page_obj %}
+            <tr class="hover">
+                <td class="font-mono text-xs">{{ sale.item.item_id }}</td>
+                <td class="font-mono text-xs">{{ sale.planning_location.code }}</td>
+                <td class="text-xs">{{ sale.planning_customer.code|default:"—" }}</td>
+                <td>{{ sale.period_start|date:"M Y" }}</td>
+                <td><span class="badge badge-ghost badge-sm">{{ sale.period_type }}</span></td>
+                <td class="text-right">{{ sale.qty|floatformat:0 }}</td>
+                <td class="text-right">
+                    {% if sale.revenue is not None %}
+                        ₹{{ sale.revenue|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center py-8 text-base-content/50">
+                    {% trans "No actuals found." %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+        {# ── Totals footer ──────────────────────────────────────────── #}
+        {% if page_obj.object_list %}
+        <tfoot>
+            {# ── Page total row — only when there are multiple pages ──────── #}
+            {% if is_multipage %}
+            <tr class="border-t border-base-300 text-sm">
+                <td colspan="5" class="text-right text-base-content/60 pr-4">
+                    {% trans "Page total" %}
+                    <span class="text-xs text-base-content/40 ml-1">
+                        ({{ page_obj.object_list|length }} {% trans "rows" %})
+                    </span>
+                </td>
+                <td class="text-right font-medium">
+                    {% if single_item %}
+                        {{ page_total.total_qty|floatformat:0 }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="text-right font-medium">
+                    ₹{{ page_total.total_revenue|floatformat:0 }}
+                </td>
+            </tr>
+            {% endif %}
+
+            {# ── Grand total row — always shown ───────────────────────────── #}
+            <tr class="border-t-2 border-base-content/20 bg-base-200 font-bold text-sm">
+                <td colspan="5" class="text-right pr-4">
+                    {% if single_item %}
+                        {% trans "Item total" %}
+                    {% else %}
+                        {% trans "Grand total" %}
+                    {% endif %}
+                    <span class="text-xs font-normal text-base-content/50 ml-1">
+                        ({{ page_obj.paginator.count }} {% trans "rows" %})
+                    </span>
+                </td>
+                <td class="text-right">
+                    {% if single_item %}
+                        {{ grand_total.total_qty|floatformat:0 }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td class="text-right">
+                    ₹{{ grand_total.total_revenue|floatformat:0 }}
+                </td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center gap-2 mt-4">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&customer_code={{ filters.customer_code }}&period_type={{ filters.period_type }}&period_start={{ filters.period_start }}"
+       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
+    {% endif %}
+    <span class="btn btn-sm btn-disabled">
+        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&customer_code={{ filters.customer_code }}&period_type={{ filters.period_type }}&period_start={{ filters.period_start }}"
+       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% comment %}
+
+{% load i18n %}
+<div class="overflow-x-auto">
+    <table class="table table-zebra table-sm">
+        <thead>
+            <tr>
+                <th>{% trans "Item" %}</th>
+                <th>{% trans "Location" %}</th>
+                <th>{% trans "Customer" %}</th>
+                <th>{% trans "Period" %}</th>
+                <th>{% trans "Type" %}</th>
+                <th class="text-right">{% trans "Quantity" %}</th>
+                <th class="text-right">{% trans "Value (₹)" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in page_obj %}
+            <tr class="hover">
+                <td class="font-mono text-xs">{{ sale.item.item_id }}</td>
+                <td class="font-mono text-xs">{{ sale.planning_location.code }}</td>
+                <td class="text-xs">{{ sale.planning_customer.code|default:"—" }}</td>
+                <td>{{ sale.period_start|date:"M Y" }}</td>
+                <td><span class="badge badge-ghost badge-sm">{{ sale.period_type }}</span></td>
+                <td class="text-right">{{ sale.qty|floatformat:0 }}</td>
+                <td class="text-right">
+                    {% if sale.revenue is not None %}₹{{ sale.revenue|floatformat:0 }}{% else %}—{% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center py-8 text-base-content/50">
+                    {% trans "No actuals found. Upload actuals to get started." %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center gap-2 mt-4">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&period_type={{ filters.period_type }}"
+       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
+    {% endif %}
+    <span class="btn btn-sm btn-disabled">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&period_type={{ filters.period_type }}"
+       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endcomment %}

@@ -1,0 +1,101 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-start justify-between mb-2">
+  <div>
+    <h1 class="text-2xl font-bold">{{ version.version_label }}</h1>
+    <p class="text-base-content/60 text-sm">
+      {{ version.get_period_type_display }} ·
+      {% trans "Base period end" %}: {{ version.base_period_end }} ·
+      {% trans "Horizon" %}: {{ version.horizon_periods }} {% trans "periods" %}
+    </p>
+  </div>
+  <span class="badge badge-lg
+    {% if version.status == 'DRAFT' %}badge-neutral
+    {% elif version.status == 'IN_REVIEW' %}badge-warning
+    {% elif version.status == 'APPROVED' %}badge-success
+    {% else %}badge-primary{% endif %}">
+    {{ version.get_status_display }}
+  </span>
+</div>
+
+{# ── Run status panel (polls itself) ─────────────────────────────────── #}
+<div id="run-status-panel" class="mb-6">
+  {% include "demand/partials/run_status.html" %}
+</div>
+
+{# ── Workflow action buttons ─────────────────────────────────────────── #}
+<div class="flex flex-wrap gap-2 mb-6">
+  {% if version.is_editable %}
+  <button class="btn btn-sm btn-outline"
+          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-vals='{"action": "submit"}' hx-confirm="{% trans 'Submit this version for review?' %}">
+    {% trans "Submit for Review" %}
+  </button>
+  {% endif %}
+  {% if version.status == 'IN_REVIEW' %}
+  <button class="btn btn-sm btn-success"
+          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-vals='{"action": "approve"}' hx-confirm="{% trans 'Approve this version?' %}">
+    {% trans "Approve" %}
+  </button>
+  <button class="btn btn-sm btn-warning"
+          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-vals='{"action": "reject"}' hx-confirm="{% trans 'Send back to Draft?' %}">
+    {% trans "Send Back" %}
+  </button>
+  {% endif %}
+  {% if version.status == 'APPROVED' %}
+  <button class="btn btn-sm btn-primary"
+          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-vals='{"action": "lock"}' hx-confirm="{% trans 'Lock this version? This cannot be undone.' %}">
+    {% trans "Lock" %}
+  </button>
+  {% endif %}
+  <button class="btn btn-sm btn-outline"
+          hx-post="{% url 'demand_ui:version_copy' client_id=client.client_id pk=version.pk %}"
+          hx-prompt="{% trans 'Label for the new copy:' %}" hx-vals='js:{"new_label": event.detail.prompt}'>
+    {% trans "Copy to New Draft" %}
+  </button>
+  <a href="{% url 'demand_ui:version_export' client_id=client.client_id pk=version.pk %}"
+     class="btn btn-sm btn-outline ml-auto">⬇ {% trans "Export" %}</a>
+</div>
+
+{# ── Summary stats ────────────────────────────────────────────────────── #}
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="stat bg-base-200 rounded-box">
+    <div class="stat-title">{% trans "Forecast Lines" %}</div>
+    <div class="stat-value text-lg">{{ line_count }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box">
+    <div class="stat-title">{% trans "Overrides" %}</div>
+    <div class="stat-value text-lg">{{ override_count }}</div>
+    {% if pending_override_count %}
+    <div class="stat-desc text-warning">{{ pending_override_count }} {% trans "pending" %}</div>
+    {% endif %}
+  </div>
+  <div class="stat bg-base-200 rounded-box">
+    <div class="stat-title">{% trans "Aggregate Rows" %}</div>
+    <div class="stat-value text-lg">{{ aggregate_count }}</div>
+  </div>
+</div>
+
+{# ── Tab links ────────────────────────────────────────────────────────── #}
+<div class="tabs tabs-boxed mb-4">
+  <a href="{% url 'demand_ui:version_aggregates' client_id=client.client_id pk=version.pk %}"
+     class="tab tab-active">{% trans "Value Summary" %}</a>
+  <a href="{% url 'demand_ui:version_lines' client_id=client.client_id pk=version.pk %}"
+     class="tab">{% trans "Forecast Grid" %}</a>
+  <a href="{% url 'demand_ui:override_list' client_id=client.client_id pk=version.pk %}"
+     class="tab">{% trans "Overrides" %}</a>
+  <a href="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}"
+     class="tab">{% trans "Accuracy" %}</a>
+</div>
+
+<div class="alert alert-info">
+  <span>
+    {% trans "Start with the Value Summary tab — a single comprehensible ₹ total per category/region is far easier to review than thousands of SKU rows." %}
+  </span>
+</div>
+{% endblock %}
