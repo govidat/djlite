@@ -18,6 +18,16 @@ urlpatterns = [
         views.SalesHierarchyView.as_view(),
         name='demand-sales-hierarchy',
     ),
+    path(
+        'sales-forecast-links/',
+        views.SalesForecastLinkListCreateView.as_view(),
+        name='demand-sales-forecast-links',
+    ),
+    path(
+        'sales-forecast-links/<int:pk>/',
+        views.SalesForecastLinkDetailView.as_view(),
+        name='demand-sales-forecast-link-detail',
+    ),    
 
     # ── Actuals (Sprint 3B.2) ──────────────────────────────────────────────
     path(

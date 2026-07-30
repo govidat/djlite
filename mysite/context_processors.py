@@ -8,7 +8,7 @@ from django.conf import settings
 from utils.globalval import get_globalval
 from utils.common_functions import fetch_clientstatic
 import json # this is just for debugging the json outputs of client/ pages..
-from utils.feature_control import is_feature_disabled
+from utils.feature_control import is_feature_disabled, demand_ui_visible, outlier_ui_visible
 """
 Runs on every request that renders a template. Its job is to add template-ready variables to context. 
 It calls fetch_clientstatic to get the full client dict (with pages, themes, translations etc) and resolves the active theme.
@@ -149,6 +149,8 @@ def demand_planning_nav(request):
     hidden entirely. Fine-grained scoping happens inside the demand UI
     views themselves (location_access.py), not at the navbar level.
     """
+
+
     user = getattr(request, 'user', None)
     if user is None or not user.is_authenticated:
         return {'demand_ui_visible': False, 'demand_ui_role': None}
@@ -156,19 +158,28 @@ def demand_planning_nav(request):
     client = getattr(request, 'client', None)
     if client is None:
         return {'demand_ui_visible': False, 'demand_ui_role': None}
-
+    
+    outlier_ui_visible_result = outlier_ui_visible(client)
+    
     if user.is_superuser:
-        return {'demand_ui_visible': True, 'demand_ui_role': 'admin'}
+        return {'demand_ui_visible': True, 'demand_ui_role': 'admin', 'outlier_ui_visible': outlier_ui_visible_result}
 
-    feature_result = is_feature_disabled(client, 'demand_planning')
-    if feature_result['disabled']:
+    #feature_result = is_feature_disabled(client, 'demand_planning')
+    #if feature_result['disabled']:
+    #    return {'demand_ui_visible': False, 'demand_ui_role': None}
+    demand_ui_visible_result = demand_ui_visible(client)
+    if not demand_ui_visible_result:
         return {'demand_ui_visible': False, 'demand_ui_role': None}
+
 
     group_names = set(user.groups.values_list('name', flat=True))
 
     if 'demand_client_admin' in group_names:
-        return {'demand_ui_visible': True, 'demand_ui_role': 'admin'}
+        return {'demand_ui_visible': True, 'demand_ui_role': 'admin', 'outlier_ui_visible': outlier_ui_visible_result }
     if 'demand_client_planner' in group_names:
-        return {'demand_ui_visible': True, 'demand_ui_role': 'planner'}
+        return {'demand_ui_visible': True, 'demand_ui_role': 'planner', 'outlier_ui_visible': outlier_ui_visible_result}
 
     return {'demand_ui_visible': False, 'demand_ui_role': None}
+
+
+

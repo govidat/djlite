@@ -3,6 +3,8 @@ from .base import (
     LowercaseCharField,
     text_field_validators,
 )
+from django.utils.translation import gettext_lazy as _
+
 class ThemePreset(models.Model):
     themepreset_id = LowercaseCharField(max_length=25, unique=True, db_index=True)
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
@@ -89,3 +91,22 @@ class GlobalVal(models.Model):
     def __str__(self):
         cat_id = getattr(self.globalvalcat, 'globalvalcat_id', '?')
         return f"{cat_id}.{self.key}"
+    
+class DistributionChannel(models.Model):
+    code = models.CharField(_('code'), max_length=2, primary_key=True)
+    label = models.CharField(_('label'), max_length=64)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        app_label = 'mysite'
+        verbose_name = _('00-02B Distribution Channel')
+        verbose_name_plural = _('00-02B Distribution Channels')
+        ordering = ['code']
+
+    def __str__(self):
+        return f'{self.code} - {self.label}'
+
+    #@classmethod
+    #def seed_defaults(cls):
+    #    for code, label in [('00', 'Common'), ('01', 'Retail'), ('02', 'Institutional')]:
+    #        cls.objects.get_or_create(code=code, defaults={'label': label})

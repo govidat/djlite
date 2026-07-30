@@ -1,647 +1,112 @@
 # mysite/tasks/demand/compute_series_profiles.py
 
+"""
+grain encodes WHAT was aggregated and HOW:
+
+'item_loc_dc_cust' — item x leaf location x channel x customer (shape a, atomic) '
+'item_loc_dc' — item x leaf location x channel (shape b)
+'item_loc' — item x leaf location only (link shape c) 
+'item_salesnode_{node_id}' — item rolled up to a SalesNode ancestor 
+'item_salesnode_top_{period}'— item at the root SalesNode, coarser period
+'taxon_{node_id}_loc' — item-hierarchy-rolled variants of all the above, 
+'taxon_{node_id}_salesnode_{sn_id}'
+'taxon_{node_id}_salesnode_top_{period}'
+ 'manual' — entire item hierarchy exhausted, no forecastable level found
+
+
+    'item_loc'                  — item x leaf location only (link shape c)
+    'item_loc_dc'                — item x leaf location x channel (shape b)
+    'item_loc_dc_cust'           — item x leaf location x channel x customer (shape a, atomic)
+    'item_salesnode_{node_id}'   — item rolled up to a SalesNode ancestor
+    'item_salesnode_top_{period}'— item at the root SalesNode, coarser period
+    'taxon_{node_id}_loc'        — item-hierarchy-rolled variants of all the above,
+    'taxon_{node_id}_loc_dc'       prefixed with the TaxonomyNode id in place of item
+    'taxon_{node_id}_loc_dc_cust'
+    'taxon_{node_id}_salesnode_{sn_id}'
+    'taxon_{node_id}_salesnode_top_{period}'
+    'manual'                     — entire item hierarchy exhausted, no forecastable level found
+"""
+# mysite/tasks/demand/compute_series_profiles.py
+#
+# This is the THIN CELERY TASK ORCHESTRATOR, mirroring run_forecast.py's
+# structure exactly. The actual classification engine (run_for_client,
+# persist_results, find_grain_for_series, and every DuckDB helper) lives in
+# a SEPARATE file: utils/demand/compute_series_profiles.py — same name,
+# different directory, on purpose, matching how run_forecast.py imports its
+# logic from utils/demand/forecast_engine.py rather than containing it
+# inline. This file REPLACES whatever was previously in
+# mysite/tasks/demand/compute_series_profiles.py (the old Part A/B/C
+# algorithm) — it does not sit alongside it.
+
+from __future__ import annotations
 import logging
-import time
-from collections import defaultdict
-from decimal import Decimal
-
-import duckdb
-import pandas as pd
 from celery import shared_task
-from django.db import transaction
-from django.utils import timezone
-
-from mysite.models.demand.actuals import ActualSale, get_higher_period_types
-from mysite.models.demand.forecast import (
-    AbcClassDefinition, ForecastingConfig,
-    SeriesLevelEvaluation, SeriesProfile,
-)
-
 logger = logging.getLogger(__name__)
 
-LUMPY_CLASSES = {'LUMPY', 'INSUFFICIENT', 'ZERO'}
 
-
-@shared_task(bind=True)
+@shared_task(bind=True, max_retries=1, default_retry_delay=120)
 def compute_series_profiles(self, client_id: int, period_type: str):
     """
-    Full multi-level classification: dynamic location depth,
-    dynamic product hierarchy, dynamic time horizons.
+    Recompute SeriesProfile / SeriesLevelEvaluation for every series of this
+    client at this period_type, using ALL available actuals history (not
+    tied to any single ForecastVersion — SeriesProfile is a client+period_type
+    -level artifact, reused across versions).
+
+    Chained ahead of run_forecast via ForecastVersionRunView / version_run:
+        chain(compute_series_profiles.si(client_id, period_type),
+              run_forecast.si(version_id))
+    Called with .si() (immutable signature) — this task's return value is
+    discarded by the chain either way, but raising on a genuine failure
+    (e.g. no actuals at all) aborts the chain before run_forecast runs
+    against stale/missing profiles, which is the behavior we want.
+
+    Does NOT touch ForecastVersion.run_status — this task only knows
+    client_id/period_type, not which version(s) are waiting on it.
+    run_status transitions ('PROFILING' etc.) happen inside run_forecast
+    itself, which does have the version.
     """
-    from mysite.models import Client
-    from utils.demand.hierarchy_utils import (
-        get_location_levels,
-        get_product_hierarchy_levels,
-    )
+    from mysite.models.demand.actuals import ActualSale
+    from utils.demand.compute_series_profiles import run_for_client, persist_results
 
-    client = Client.objects.get(pk=client_id)
-    config = ForecastingConfig.get_for_client(client)
-    abc_defs = AbcClassDefinition.get_or_create_defaults(client)
-
-    adi_thr = float(config.adi_threshold)
-    cv2_thr = float(config.cv2_threshold)
-    min_nz  = config.min_nonzero_periods
-
-    # ── Derive search space from client's actual hierarchies ──────────────────
-
-    # Location levels: [{depth, level_label, location_ids, is_leaf}]
-    loc_levels = get_location_levels(client_id)
-    # loc_levels[0] is always Client Total (virtual).
-    # loc_levels[1..n] are actual PlanningLocation levels from the DB.
-
-    # Product levels: [{depth, level_label, node_ids}] — finest to coarsest
-    prod_levels = get_product_hierarchy_levels(client_id)
-    # prod_levels[0] is the level just above SKU (e.g. Brand or SubCategory).
-    # prod_levels[-1] is the root (Category or similar).
-
-    # Time horizons: list of period_type strings coarser than base
-    time_horizons = get_higher_period_types(period_type, config.time_horizon_steps)
-
-    logger.info(
-        f'compute_series_profiles: client={client_id} period={period_type}\n'
-        f'  location levels: {[l["level_label"] for l in loc_levels]}\n'
-        f'  product levels: {[l["level_label"] for l in prod_levels]}\n'
-        f'  time horizons: {time_horizons}\n'
-        f'  ADI≥{adi_thr} CV²≥{cv2_thr} min_nz={min_nz}'
-    )
-
-    # ── Pull actuals ──────────────────────────────────────────────────────────
-    qs = (
+    earliest = (
         ActualSale.objects
-        .filter(client=client, period_type=period_type)
-        .select_related(
-            'item',
-            'planning_location',
-            'planning_customer',
-        )
-        .values(
-            'item_id', 'item__item_id',
-            'planning_customer_id', 'planning_customer__code',
-            'planning_location_id', 'planning_location__code',
-            'planning_location__path',    # materialized path for ancestor lookup
-            'period_start', 'qty', 'revenue',
-        )
+        .filter(client_id=client_id, period_type=period_type)
         .order_by('period_start')
+        .values_list('period_start', flat=True)
+        .first()
     )
-
-    if not qs.exists():
-        logger.info(f'compute_series_profiles: no actuals for client {client_id}')
-        return
-
-    df = pd.DataFrame(list(qs))
-    df['qty']     = df['qty'].astype(float)
-    df['revenue'] = df['revenue'].fillna(0).astype(float)
-    df['cust_code'] = df['planning_customer__code'].fillna('__NULL__')
-
-    # Build ancestor lookup from materialized path
-    # path = "1/4/12/" → ancestors at depth 1 = node 1, depth 2 = node 4
-    def _ancestor_at_depth(path: str, target_depth: int) -> int | None:
-        """Return the location_id at target_depth in the path, or None."""
-        parts = [p for p in path.split('/') if p]
-        # parts[0] is depth-1 node, parts[1] is depth-2, etc.
-        idx = target_depth - 1
-        return int(parts[idx]) if idx < len(parts) else None
-
-    # Build location_id → location_id-at-depth-n lookup
-    # Used to group locations by their ancestor at each level
-    loc_id_to_path = df.groupby('planning_location_id')['planning_location__path'].first().to_dict()
-
-    def _loc_ancestor(loc_id: int, depth: int) -> int | None:
-        path = loc_id_to_path.get(loc_id, '')
-        return _ancestor_at_depth(path, depth)
-
-    # For each location_id, build its ancestor at each location level depth
-    all_loc_ids = df['planning_location_id'].unique()
-    loc_ancestor: dict[int, dict[int, int | None]] = {}
-    for loc_id in all_loc_ids:
-        loc_ancestor[loc_id] = {
-            level['depth']: _loc_ancestor(loc_id, level['depth'])
-            for level in loc_levels[1:]  # skip virtual level 0
-        }
-
-    # Add ancestor columns to df
-    for level in loc_levels[1:]:
-        d = level['depth']
-        col = f'anc_depth_{d}'
-        df[col] = df['planning_location_id'].map(
-            lambda lid, d=d: loc_ancestor.get(int(lid), {}).get(d)
-        )
-
-    # ── Build time spine ──────────────────────────────────────────────────────
-    all_periods   = sorted(df['period_start'].unique().tolist())
-    analysis_from = all_periods[0]
-    analysis_to   = all_periods[-1]
-
-    # ── DuckDB aggregations ───────────────────────────────────────────────────
-    con = duckdb.connect()
-    con.register('actuals', df)
-
-    def _agg_sql(group_cols: list[str], extra_cols: str = '') -> str:
-        """Build a GROUP BY aggregation SQL."""
-        gc = ', '.join(group_cols)
-        return f"""
-            SELECT {gc},
-                   period_start,
-                   SUM(qty) AS qty,
-                   SUM(revenue) AS revenue
-                   {', ' + extra_cols if extra_cols else ''}
-            FROM actuals
-            GROUP BY {gc}, period_start
-        """
-
-    # Level 0: Item × Client (virtual — all locations)
-    df_item_client = con.execute(_agg_sql(['item_id'])).df()
-    df_item_client['period_start'] = pd.to_datetime(df_item_client['period_start']).dt.date
-
-    # Levels 1..n: Item × Location ancestor at each depth
-    df_by_depth: dict[int, pd.DataFrame] = {}
-    for level in loc_levels[1:]:
-        d = level['depth']
-        anc_col = f'anc_depth_{d}'
-        if anc_col in df.columns:
-            df_by_depth[d] = con.execute(
-                _agg_sql(['item_id', anc_col])
-            ).df().rename(columns={anc_col: 'loc_ancestor_id'})
-            df_by_depth[d]['period_start'] = (
-                pd.to_datetime(df_by_depth[d]['period_start']).dt.date
-            )
-
-    # Item × Leaf Location (all customers)
-    df_item_loc = con.execute(
-        _agg_sql(['item_id', 'planning_location_id',
-                  'planning_location__code'])
-    ).df()
-    df_item_loc['period_start'] = pd.to_datetime(df_item_loc['period_start']).dt.date
-
-    # Atomic: Item × Customer × Leaf Location
-    df_atomic = con.execute(
-        _agg_sql(['item_id', 'cust_code', 'planning_customer_id',
-                  'planning_location_id', 'planning_location__code'])
-    ).df()
-    df_atomic['period_start'] = pd.to_datetime(df_atomic['period_start']).dt.date
-    
-    # Quarterly aggregations for Part C time horizons
-    df_time_agg: dict[str, pd.DataFrame] = {}
-    for h_period in time_horizons:
-        from mysite.models.demand.actuals import PERIOD_FREQ_MAP
-        freq = PERIOD_FREQ_MAP.get(h_period)
-        if not freq:
-            continue
-        try:
-            tmp = df[['item_id', 'period_start', 'qty', 'revenue']].copy()
-            tmp['period_start'] = pd.to_datetime(tmp['period_start'])
-            agg = (
-                tmp.groupby(['item_id', pd.Grouper(key='period_start', freq=freq)])
-                .agg({'qty': 'sum', 'revenue': 'sum'})
-                .reset_index()
-            )
-            agg['period_start'] = agg['period_start'].dt.date
-            df_time_agg[h_period] = agg
-        except Exception as exc:
-            logger.warning(f'Time agg failed for {h_period}: {exc}')
-
-    # ── Helper: build qty series from filtered DataFrame ──────────────────────
-    def _qty_series(filtered: pd.DataFrame, periods: list) -> list[float]:
-        pq = dict(zip(filtered['period_start'], filtered['qty']))
-        return [pq.get(p, 0.0) for p in periods]
-
-    def _value_series(filtered: pd.DataFrame) -> float:
-        return float(filtered['revenue'].sum())
-
-    # ── Helper: classify ──────────────────────────────────────────────────────
-    def _classify(qty_list: list) -> dict:
-        series = [Decimal(str(q)) for q in qty_list]
-        return SeriesProfile.compute_syntetos_boylan(
-            series, adi_thr, cv2_thr, min_nz
-        )
-
-    # ── Helper: ABC at a level ────────────────────────────────────────────────
-    def _compute_abc_at_level(
-        item_value: float,
-        level_df: pd.DataFrame,
-    ) -> dict:
-        """
-        Compute ABC for item_value given all items' values in level_df.
-        level_df must contain a 'revenue' column grouped by item_id.
-        """
-        all_values = level_df.groupby('item_id')['revenue'].sum().sort_values(ascending=False).tolist()
-        return AbcClassDefinition.compute_class(
-            item_value, all_values, abc_defs
-        )
-
-    # ── Helper: build SeriesLevelEvaluation dict ──────────────────────────────
-    def _eval_dict(
-        grain: str,
-        key: dict,
-        eval_period: str,
-        qty_list: list,
-        item_value: float,
-        level_df: pd.DataFrame,
-    ) -> dict:
-        m   = _classify(qty_list)
-        abc = _compute_abc_at_level(item_value, level_df)
-        return {
-            'grain':           grain,
-            'evaluation_key':  key,
-            'eval_period':     eval_period,
-            'metrics':         m,
-            'abc':             abc,
-            'total_value':     item_value,
-            'is_forecastable': m['demand_class'] not in LUMPY_CLASSES,
-        }
-
-    # ── Main per-series loop ──────────────────────────────────────────────────
-    evaluations_to_create: list[SeriesLevelEvaluation] = []
-    profiles_to_upsert: list[dict] = []
-
-    # Get unique atomic series
-    atomic_groups = df_atomic.groupby(
-        ['item_id', 'cust_code', 'planning_customer_id',
-         'planning_location_id', 'planning_location__code'], dropna=False
+    latest = (
+        ActualSale.objects
+        .filter(client_id=client_id, period_type=period_type)
+        .order_by('-period_start')
+        .values_list('period_start', flat=True)
+        .first()
     )
-
-    for keys, _ in atomic_groups:
-        item_id   = keys[0]
-        cust_code = keys[1]
-        cust_id   = keys[2]
-        loc_id    = keys[3]
-        loc_code  = keys[4]
-        cust_id_int = None if pd.isna(cust_id) else int(cust_id)
-
-        evals: list[dict] = []
-        chosen: dict | None = None
-
-        # ── Step 0: Item × Client ─────────────────────────────────────────────
-        ic_rows = df_item_client[df_item_client['item_id'] == item_id]
-        ic_qty  = _qty_series(ic_rows, all_periods)
-        ic_val  = _value_series(ic_rows)
-        e0 = _eval_dict(
-            grain='item_client',
-            key={'grain': 'item_client'},
-            eval_period=period_type,
-            qty_list=ic_qty,
-            item_value=ic_val,
-            level_df=df_item_client,
+    if earliest is None or latest is None:
+        # Matches run_forecast's own "no actuals" check — raise so the chain
+        # aborts here instead of proceeding to run_forecast with nothing to work with.
+        raise ValueError(
+            f'compute_series_profiles: no ActualSale rows for client_id={client_id}, '
+            f'period_type={period_type!r} — cannot classify or forecast.'
         )
-        evals.append(e0)
 
-        if e0['is_forecastable']:
-            # ── PART A: drill DOWN location hierarchy ─────────────────────────
-            prev_accepted = e0  # last forecastable level
+    try:
+        run_output = run_for_client(client_id, period_type, earliest, latest)
+        persist_results(client_id, period_type, earliest, latest, run_output)
+    except Exception as exc:
+        logger.exception(
+            f'compute_series_profiles failed for client_id={client_id}, '
+            f'period_type={period_type!r}: {exc}'
+        )
+        raise  # re-raise: let the chain abort, don't silently proceed to run_forecast
 
-            for level in loc_levels[1:]:
-                d       = level['depth']
-                anc_id  = loc_ancestor.get(int(loc_id), {}).get(d)
-                if anc_id is None:
-                    continue
-
-                level_df_d = df_by_depth.get(d)
-                if level_df_d is None:
-                    continue
-
-                rows_d = level_df_d[
-                    (level_df_d['item_id'] == item_id) &
-                    (level_df_d['loc_ancestor_id'] == anc_id)
-                ]
-                if rows_d.empty:
-                    continue
-
-                val_d = _value_series(rows_d)
-
-                # ── Filter level_df to THIS ancestor node only ──────────────────
-                # This scopes the ABC denominator to item revenue / total revenue
-                # at THIS specific branch/region, not all branches combined.
-                this_anc_df = level_df_d[level_df_d['loc_ancestor_id'] == anc_id]
-
-                e_d = _eval_dict(
-                    grain=f'item_loc_depth_{d}',
-                    key={
-                        'grain':       f'item_loc_depth_{d}',
-                        'location_id': int(anc_id),
-                        'level_label': level['level_label'],
-                    },
-                    eval_period=period_type,
-                    qty_list=_qty_series(rows_d, all_periods),
-                    item_value=val_d,
-                    level_df=this_anc_df,   # ← was level_df_d (all ancestors combined)
-                )
-                evals.append(e_d)
-
-                if e_d['is_forecastable']:
-                    prev_accepted = e_d   # keep drilling
-                else:
-                    # Hit LUMPY — step back
-                    chosen = prev_accepted
-                    break
-
-            else:
-                # Finished all location levels without going LUMPY
-                # Now try customer grain if config says so
-                if config.evaluate_customer_grain:
-                    leaf_rows = df_item_loc[
-                        (df_item_loc['item_id'] == item_id) &
-                        (df_item_loc['planning_location_id'] == loc_id)
-                    ]
-                    at_rows = df_atomic[
-                        (df_atomic['item_id'] == item_id) &
-                        (df_atomic['planning_location_id'] == loc_id) &
-                        (df_atomic['cust_code'] == cust_code)
-                    ]
-                    if not at_rows.empty:
-                        at_val = _value_series(at_rows)
-                        e_at = _eval_dict(
-                            grain='item_cust_location',
-                            key={'grain': 'item_cust_location',
-                                 'location_id': int(loc_id),
-                                 'location_code': loc_code,
-                                 'customer_code': cust_code},
-                            eval_period=period_type,
-                            qty_list=_qty_series(at_rows, all_periods),
-                            item_value=at_val,
-                            level_df=df_atomic[
-                                df_atomic['planning_location_id'] == loc_id
-                            ],
-                        )
-                        evals.append(e_at)
-                        if e_at['is_forecastable']:
-                            prev_accepted = e_at
-
-                if chosen is None:
-                    chosen = prev_accepted
-
-        else:
-            # ── PART B: Item is LUMPY at client level ─────────────────────────
-            # Roll UP through product hierarchy
-
-            for prod_level in prod_levels:
-                # Build series: sum all items in the same product group
-                # at this level that belong to this item
-                # (requires ItemTaxonomyMapping join — simplified here)
-                node_ids = prod_level.get('node_ids', [])
-                if not node_ids:
-                    continue
-
-                # Placeholder: extend with actual taxonomy lookup
-                # For each node in prod_level that contains item_id:
-                # sum actuals of all items in that node
-                node_id = None  # resolve item → node at this level
-                if node_id is None:
-                    continue
-
-                # Build aggregated series for this product group
-                # (requires a pre-built item → node_id mapping per level)
-                # Omitted here — wire in your ItemTaxonomyMapping query
-                pass  # replace with actual implementation
-
-            # ── PART C: time aggregation ──────────────────────────────────────
-            for h_period in time_horizons:
-                if chosen:
-                    break
-                h_df = df_time_agg.get(h_period)
-                if h_df is None:
-                    continue
-                h_periods = sorted(h_df['period_start'].unique().tolist())
-                if len(h_periods) < min_nz:
-                    continue
-
-                # Step C-H-0: Item × Client × Time Horizon
-                ic_h_rows = h_df[h_df['item_id'] == item_id]
-                if not ic_h_rows.empty:
-                    ic_h_qty = _qty_series(ic_h_rows, h_periods)
-                    ic_h_val = _value_series(ic_h_rows)
-                    e_ch = _eval_dict(
-                        grain=f'item_client_{h_period}',
-                        key={'grain': f'item_client_{h_period}',
-                             'period_type': h_period},
-                        eval_period=h_period,
-                        qty_list=ic_h_qty,
-                        item_value=ic_h_val,
-                        level_df=h_df,
-                    )
-                    evals.append(e_ch)
-                    if e_ch['is_forecastable']:
-                        chosen = e_ch
-                        break
-
-                # Step C-H-n: product hierarchy × time horizon
-                # (extend with actual taxonomy loop — same pattern as Part B)
-
-            # Final fallback: MANUAL
-            if not chosen:
-                e_manual = {
-                    'grain':          'item_client',
-                    'evaluation_key': {'grain': 'item_client', 'note': 'MANUAL'},
-                    'eval_period':    period_type,
-                    'metrics': {
-                        'demand_class': 'LUMPY', 'recommended_strategy': 'MANUAL',
-                        'total_periods': len(all_periods), 'nonzero_periods': 0,
-                        'total_qty': Decimal('0'), 'adi': None, 'cv2': None,
-                        'zero_rate': Decimal('1'),
-                    },
-                    'abc':         e0['abc'],
-                    'total_value': ic_val,
-                    'is_forecastable': False,
-                }
-                evals.append(e_manual)
-                chosen = e_manual
-
-        # Mark chosen and build rejection reasons
-        for ev in evals:
-            ev['is_accepted'] = (ev is chosen)
-            if not ev['is_accepted']:
-                m = ev['metrics']
-                ev['rejection_reason'] = (
-                    f"{m['demand_class']} (ADI={m.get('adi','—')}, "
-                    f"CV²={m.get('cv2','—')})"
-                    if m['demand_class'] in LUMPY_CLASSES else ''
-                )
-            else:
-                ev['rejection_reason'] = ''
-
-        # Build SeriesLevelEvaluation objects
-        for ev in evals:
-            m = ev['metrics']
-            evaluations_to_create.append(
-                SeriesLevelEvaluation(
-                    client_id=client_id,
-                    item_id=item_id,
-                    planning_customer_id=(
-                        cust_id_int
-                        if ev['grain'] == 'item_cust_location'
-                        else None
-                    ),
-                    period_type=period_type,
-                    grain=ev['grain'],
-                    evaluation_key=ev['evaluation_key'],
-                    eval_period_type=ev.get('eval_period', period_type),
-                    analysis_from=analysis_from,
-                    analysis_to=analysis_to,
-                    total_periods=m['total_periods'],
-                    nonzero_periods=m['nonzero_periods'],
-                    total_qty=m['total_qty'],
-                    total_value=Decimal(str(round(ev.get('total_value', 0), 2))),
-                    adi=m.get('adi'),
-                    cv2=m.get('cv2'),
-                    zero_rate=m['zero_rate'],
-                    abc_class=ev['abc'].get('abc_class', ''),
-                    value_share_pct_at_level=ev['abc'].get('value_share_pct'),
-                    demand_class=m['demand_class'],
-                    is_accepted=ev.get('is_accepted', False),
-                    rejection_reason=ev.get('rejection_reason', ''),
-                    recommended_strategy=m.get('recommended_strategy', ''),
-                )
-            )
-
-        # ── Build SeriesProfile summary ───────────────────────────────────────
-        chosen_m = chosen['metrics'] if chosen else {}
-
-        atom_rows = df_atomic[
-            (df_atomic['item_id'] == item_id) &
-            (df_atomic['planning_location_id'] == loc_id) &
-            (df_atomic['cust_code'] == cust_code)
-        ]
-        atom_qty = _qty_series(atom_rows, all_periods)
-        atom_m   = _classify(atom_qty)
-        atom_val = _value_series(atom_rows)
-
-        # ── ABC at the right level ────────────────────────────────────────────
-        # ABC should reflect item importance at the level where the
-        # chosen grain lives, not at the atomic (item×loc×cust) level.
-        # This prevents everything being C because each atomic slice is tiny.
-
-        chosen_grain = chosen['grain'] if chosen else 'item_client'
-
-        if chosen_grain == 'item_cust_location':
-            # ABC at this specific location×customer node
-            loc_cust_df = df_atomic[
-                (df_atomic['planning_location_id'] == loc_id) &
-                (df_atomic['cust_code'] == cust_code)
-            ]
-            atom_abc = _compute_abc_at_level(atom_val, loc_cust_df)
-
-        elif chosen_grain.startswith('item_loc'):
-            # ABC at this specific leaf location (all customers combined)
-            this_loc_df = df_item_loc[
-                df_item_loc['planning_location_id'] == loc_id
-            ]
-            item_loc_val = _value_series(
-                this_loc_df[this_loc_df['item_id'] == item_id]
-            )
-            atom_abc = _compute_abc_at_level(item_loc_val, this_loc_df)
-
-        elif 'location_depth' in chosen_grain:
-            # ABC at this specific DC/region node
-            try:
-                depth = int(chosen_grain.rsplit('_', 1)[-1])
-            except ValueError:
-                depth = None
-            if depth and depth in df_by_depth:
-                anc_id = loc_ancestor.get(int(loc_id), {}).get(depth)
-                dc_df  = df_by_depth[depth]
-                if anc_id is not None:
-                    # Filter to only THIS DC's rows
-                    this_dc_df  = dc_df[dc_df['loc_ancestor_id'] == anc_id]
-                    item_dc_val = _value_series(
-                        this_dc_df[this_dc_df['item_id'] == item_id]
-                    )
-                    atom_abc = _compute_abc_at_level(item_dc_val, this_dc_df)
-                else:
-                    # Fallback to client level
-                    atom_abc = _compute_abc_at_level(ic_val, df_item_client)
-            else:
-                atom_abc = _compute_abc_at_level(ic_val, df_item_client)
-
-        else:
-            # item_client or time-horizon variants — client total level
-            # df_item_client already has one row per item at client level
-            # ic_val is this item's total client revenue — correct numerator
-            atom_abc = _compute_abc_at_level(ic_val, df_item_client)
-
-        profiles_to_upsert.append({
-            'client_id':             client_id,
-            'item_id':               item_id,
-            'planning_customer_id':  cust_id_int,
-            'planning_location_id':  int(loc_id),
-            'period_type':           period_type,
-            'analysis_from':         analysis_from,
-            'analysis_to':           analysis_to,
-            'total_periods':         atom_m['total_periods'],
-            'nonzero_periods':       atom_m['nonzero_periods'],
-            'total_qty':             atom_m['total_qty'],
-            'total_value':           Decimal(str(round(atom_val, 2))),
-            'adi':                   atom_m.get('adi'),
-            'cv2':                   atom_m.get('cv2'),
-            'zero_rate':             atom_m['zero_rate'],
-            'demand_class_atomic':   atom_m['demand_class'],
-            'abc_class_atomic':      atom_abc.get('abc_class', ''),
-            'chosen_grain':          chosen['grain'] if chosen else '',
-            'chosen_demand_class':   chosen_m.get('demand_class', ''),
-            'chosen_strategy':       chosen_m.get('recommended_strategy', 'MANUAL'),
-            'chosen_eval_period':    chosen.get('eval_period', period_type) if chosen else period_type,
-        })
-
-    # ── Persist ────────────────────────────────────────────────────────────────
-    def _persist():
-        with transaction.atomic():
-            SeriesLevelEvaluation.objects.filter(
-                client_id=client_id, period_type=period_type
-            ).delete()
-
-            SeriesLevelEvaluation.objects.bulk_create(
-                evaluations_to_create, batch_size=500, ignore_conflicts=True
-            )
-
-            eval_pk_map = {
-                (e.item_id, e.grain, str(e.evaluation_key)): e.pk
-                for e in SeriesLevelEvaluation.objects.filter(
-                    client_id=client_id, period_type=period_type, is_accepted=True
-                )
-            }
-
-            for p in profiles_to_upsert:
-                update_fields = {k: v for k, v in p.items()
-                                if k not in ('client_id', 'item_id',
-                                            'planning_customer_id',
-                                            'planning_location_id', 'period_type')}
-                chosen_eval_pk = eval_pk_map.get(
-                    (p['item_id'], p['chosen_grain'],
-                    str({'grain': p['chosen_grain']}))
-                )
-                if chosen_eval_pk:
-                    update_fields['chosen_evaluation_id'] = chosen_eval_pk
-
-                SeriesProfile.objects.update_or_create(
-                    client_id=p['client_id'],
-                    item_id=p['item_id'],
-                    planning_customer_id=p['planning_customer_id'],
-                    planning_location_id=p['planning_location_id'],
-                    period_type=p['period_type'],
-                    defaults=update_fields,
-                )
-
-    # Retry wrapper for SQLite lock errors
-    retries, delay = 3, 2
-    for attempt in range(retries):
-        try:
-            _persist()
-            break
-        except Exception as exc:
-            if 'database is locked' in str(exc) and attempt < retries - 1:
-                logger.warning(
-                    f'compute_series_profiles: database locked, '
-                    f'retrying in {delay}s (attempt {attempt + 1})'
-                )
-                time.sleep(delay)
-                delay *= 2
-            else:
-                raise
-
-    from collections import Counter
-    grain_counts = Counter(p['chosen_grain'] for p in profiles_to_upsert)
-    class_counts = Counter(p['demand_class_atomic'] for p in profiles_to_upsert)
+    n_series = len(run_output['results'])
+    n_manual = sum(1 for r in run_output['results'] if r['grain'] == 'manual')
     logger.info(
-        f'compute_series_profiles: client={client_id} '
-        f'total={len(profiles_to_upsert)} '
-        f'chosen_grain={dict(grain_counts)} '
-        f'atomic_class={dict(class_counts)}'
+        f'compute_series_profiles: client_id={client_id}, period_type={period_type!r} — '
+        f'{n_series} series classified ({n_manual} fell through to MANUAL).'
     )
+    return {'client_id': client_id, 'period_type': period_type,
+            'n_series': n_series, 'n_manual': n_manual}
+
+

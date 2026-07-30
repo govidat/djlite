@@ -10,6 +10,19 @@
 #   - request.client is set by your existing ClientScopedMixin / middleware
 #   - the user is authenticated and has access to this client
 #   - utils.feature_control.is_demand_feature_disabled exists (Sprint 3B.0)
+# Changes from the current version:
+#   1. outlier_ui_visible computed via the shared helper (also used
+#      by the context processor, so sidebar visibility and this view's own
+#      netting decision can never drift out of sync with each other).
+#   2. exclude_outliers read from the request (radio button), defaulting to
+#      client.forecastingconfig.reporting_uses_net_actuals when not present
+#      on the query string yet (first load), same "missing config -> raw"
+#      fallback used elsewhere in the outlier-management feature.
+#   3. base_qs switches between plain ActualSale and
+#      actuals_queryset_with_net(..., use_net=True) depending on the
+#      toggle; qty_field/revenue_field name switches from 'qty'/'revenue'
+#      to 'net_qty'/'net_revenue' accordingly, used in every Sum(...).
+ 
 
 from __future__ import annotations
 
@@ -24,6 +37,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.db.models import Count, Min
+from django.views.decorators.http import require_POST
 
 from mysite.models.demand.forecast import (
     ForecastVersion, ForecastLine, ForecastAggregate,
@@ -31,7 +45,7 @@ from mysite.models.demand.forecast import (
     AbcClassDefinition, ForecastingConfig,
 )
 from mysite.models.demand.actuals import (
-    ActualSale, ActualSaleImport, PERIOD_TYPE_CHOICES,
+    ActualSale, ActualSaleOutlierAdjustment, ActualSaleImport, PERIOD_TYPE_CHOICES,
 )
 from mysite.models.demand.hierarchy import (
     PlanningLocation
@@ -56,6 +70,15 @@ from django.db.models.functions import Coalesce
 from utils.taxonomy_filters import (
         resolve_item_ids_for_multiple_nodes, parse_node_ids_param, TaxonomyFilterError,
     )
+
+
+from utils.feature_control import outlier_ui_visible as _outlier_ui_visible
+from utils.demand.actuals_net import actuals_queryset_with_net
+
+from mysite.tasks.demand.detect_outliers import flag_stale_forecast_versions
+ 
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -492,13 +515,14 @@ def version_lines(request, pk, client_id=None):
     qs = (
         ForecastLine.objects
         .filter(version=version)
-        .select_related('item', 'planning_location', 'planning_customer')
+        .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
         .order_by('period_start', 'planning_location__code', 'item__item_id')
     )
 
     item_id       = request.GET.get('item_id', '').strip()
     location_code = request.GET.get('location_code', '').strip()
     customer_code = request.GET.get('customer_code', '').strip()
+    channel_code  = request.GET.get('channel_code', '').strip()
     has_override  = request.GET.get('has_override', '')
     period_start  = request.GET.get('period_start', '').strip()
 
@@ -508,6 +532,8 @@ def version_lines(request, pk, client_id=None):
         qs = qs.filter(planning_location__code=location_code)
     if customer_code:
         qs = qs.filter(planning_customer__code=customer_code)
+    if channel_code:
+        qs = qs.filter(distribution_channel__code=channel_code)
     if has_override == 'true':
         qs = qs.filter(override_qty__isnull=False)
     elif has_override == 'false':
@@ -526,6 +552,17 @@ def version_lines(request, pk, client_id=None):
         .values_list('planning_customer__code', 'planning_customer__name')
         .distinct().order_by('planning_customer__code')
     )
+    if version.client.is_distribution_channel_enabled():
+        channel_count = qs.values('distribution_channel').distinct().count()
+        show_channel = channel_count > 1
+        channels = list(
+            qs.exclude(distribution_channel__isnull=True)
+            .values_list('distribution_channel__code', 'distribution_channel__label')
+            .distinct().order_by('distribution_channel__code')
+        )
+    else:
+        show_channel = False
+        channels = []
     periods = list(
         qs.values_list('period_start', flat=True)
         .distinct().order_by('period_start')
@@ -571,6 +608,7 @@ def version_lines(request, pk, client_id=None):
         'item_id':       item_id,
         'location_code': location_code,
         'customer_code': customer_code,
+        'channel_code':  channel_code,
         'has_override':  has_override,
         'period_start':  period_start,
     }
@@ -581,6 +619,7 @@ def version_lines(request, pk, client_id=None):
         'filters':        filters,
         'locations':      locations,
         'customers':      customers,
+        'channels':       channels,
         'periods':        periods,
         'grand_total':    grand_total,
         'page_total':     page_total,
@@ -588,6 +627,7 @@ def version_lines(request, pk, client_id=None):
         'is_multipage':   page_obj.has_other_pages(),
         'show_location':  len(locations) > 1,
         'show_customer':  len(customers) > 1,
+        'show_channel':   show_channel,
         'show_period':    len(periods) > 1,
         'show_item_search': distinct_items > 1,
         'show_override_filter': qs.filter(
@@ -616,10 +656,17 @@ def version_line_row(request, pk, line_id, client_id=None):
     to refresh just that row (final_qty / final_value recompute).
     """
     line = get_object_or_404(
-        ForecastLine.objects.select_related('item', 'planning_location', 'planning_customer'),
+        ForecastLine.objects.select_related('item', 'planning_location', 'planning_customer', 'distribution_channel'),
         pk=line_id, version_id=pk, version__client=request.client,
     )
-    return render(request, 'demand/partials/lines_table_row.html', {'line': line})
+    show_channel = (
+        line.version.client.is_distribution_channel_enabled()
+        and ForecastLine.objects.filter(version=line.version)
+            .values('distribution_channel').distinct().count() > 1
+    )
+    return render(request, 'demand/partials/lines_table_row.html', {
+        'line': line, 'show_channel': show_channel,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -961,119 +1008,7 @@ def version_aggregates(request, pk, client_id=None):
 
     return render(request, 'demand/version_aggregates.html', context)
 
-"""
-@login_required
-def version_aggregates(request, pk, client_id=None):
 
-
-    blocked = feature_gate(request, 'demand_planning')
-    if blocked:
-        return blocked
-
-    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
-
-    agg_level = request.GET.get('agg_level', 'total')
-    valid_levels = ['total', 'location', 'item', 'customer']
-    if agg_level not in valid_levels:
-        agg_level = 'total'
-
-    qs = (
-        ForecastAggregate.objects
-        .filter(version=version, agg_level=agg_level)
-        .order_by('period_start', 'agg_key')
-    )
-
-    # ── Distinct item count — drives qty column visibility ────────────────
-    # At 'item' level, each row IS one item so we check distinct agg_key count
-    # At other levels (total, location, customer) qty is a sum across items
-    # and is not meaningful — always hide it
-    if agg_level == 'item':
-        distinct_items = qs.values('agg_key').distinct().count()
-        single_item = distinct_items == 1
-        show_qty = True
-    else:
-        # total/location/customer — qty never meaningful
-        single_item = False
-        show_qty = False
-    #show_qty = single_item  # qty only shown when drilling into one item
-
-    # ── Totals ────────────────────────────────────────────────────────────
-    from django.db.models import Sum
-    from django.db.models.functions import Coalesce
-    from django.db.models import DecimalField
-
-    grand_total = qs.aggregate(
-        total_stat_value=Coalesce(
-            Sum('total_statistical_value'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-        total_final_value=Coalesce(
-            Sum('total_final_value'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-        total_stat_qty=Coalesce(
-            Sum('statistical_qty'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-        total_final_qty=Coalesce(
-            Sum('final_qty'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-    )
-
-    paginator = Paginator(qs, 50)
-    page_obj  = paginator.get_page(request.GET.get('page', 1))
-
-    is_multipage = page_obj.has_other_pages()
-
-    # Page total
-    page_ids = [a.pk for a in page_obj.object_list]
-    page_total = ForecastAggregate.objects.filter(pk__in=page_ids).aggregate(
-        total_stat_value=Coalesce(
-            Sum('total_statistical_value'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-        total_final_value=Coalesce(
-            Sum('total_final_value'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-        total_stat_qty=Coalesce(
-            Sum('statistical_qty'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-        total_final_qty=Coalesce(
-            Sum('final_qty'), Decimal('0'),
-            output_field=DecimalField()
-        ),
-    )
-
-    # has_override flag per row
-    aggregates = list(page_obj.object_list)
-    for agg in aggregates:
-        stat  = agg.total_statistical_value
-        final = agg.total_final_value
-        if stat is not None and final is not None:
-            agg.has_override = abs(float(final) - float(stat)) > 0.5
-        else:
-            agg.has_override = False
-
-    context = {
-        'version':       version,
-        'aggregates':    aggregates,
-        'page_obj':      page_obj,
-        'agg_level':     agg_level,
-        'agg_level_choices': valid_levels,
-        'grand_total':   grand_total,
-        'page_total':    page_total,
-        'show_qty':      show_qty,
-        'single_item':   single_item,
-        'is_multipage':  is_multipage,
-    }
-
-    if _is_htmx(request):
-        return render(request, 'demand/partials/aggregates_table_body.html', context)
-    return render(request, 'demand/version_aggregates.html', context)
-"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1266,7 +1201,7 @@ def override_affected_lines(request, pk, override_id, client_id=None):
         version_id=pk,
         period_type=override.period_type,
         period_start=override.period_start,
-    ).select_related('item', 'planning_location', 'planning_customer')
+    ).select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
 
     key = override.override_key
     if override.override_level == 'sku' and key.get('item_id'):
@@ -1276,8 +1211,14 @@ def override_affected_lines(request, pk, override_id, client_id=None):
     elif override.override_level == 'customer' and key.get('customer_code'):
         qs = qs.filter(planning_customer__code=key['customer_code'])
 
+    client = override.version.client
+    if client.is_distribution_channel_enabled():
+        show_channel = qs.values('distribution_channel').distinct().count() > 1
+    else:
+        show_channel = False
+
     return render(request, 'demand/partials/override_affected_lines.html', {
-        'override': override, 'lines': qs, 'active_nav': 'versions',
+        'override': override, 'lines': qs, 'show_channel': show_channel, 'active_nav': 'versions',
     })
 
 
@@ -1366,9 +1307,15 @@ def version_accuracy(request, pk, client_id=None):
     qs = (
         ForecastAccuracy.objects
         .filter(version=version)
-        .select_related('item', 'planning_location', 'planning_customer')
+        .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
         .order_by('-mape')
     )
+
+    if version.client.is_distribution_channel_enabled():
+        channel_count = qs.values('distribution_channel').distinct().count()
+        show_channel = channel_count > 1
+    else:
+        show_channel = False
 
     avg_mape = None
     avg_bias = None
@@ -1384,6 +1331,7 @@ def version_accuracy(request, pk, client_id=None):
         'version': version, 'accuracy_rows': rows[:200],
         'avg_mape': avg_mape, 'avg_bias': avg_bias,
         'total_rows': len(rows),
+        'show_channel': show_channel,
         'active_nav': 'versions',
     }
     if _is_htmx(request):
@@ -1409,13 +1357,14 @@ def actuals_list(request, client_id=None):
     qs = (
         ActualSale.objects
         .filter(client=request.client)
-        .select_related('item', 'planning_location', 'planning_customer')
+        .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
         .order_by('-period_start')
     )
 
     item_id       = request.GET.get('item_id', '').strip()
     location_code = request.GET.get('location_code', '').strip()
     customer_code = request.GET.get('customer_code', '').strip()
+    channel_code  = request.GET.get('channel_code', '').strip()
     period_type   = request.GET.get('period_type', '').strip()
     period_start  = request.GET.get('period_start', '').strip()
 
@@ -1425,6 +1374,8 @@ def actuals_list(request, client_id=None):
         qs = qs.filter(planning_location__code=location_code)
     if customer_code:
         qs = qs.filter(planning_customer__code=customer_code)
+    if channel_code:
+        qs = qs.filter(distribution_channel__code=channel_code)
     if period_type:
         qs = qs.filter(period_type=period_type)
     if period_start:
@@ -1441,6 +1392,17 @@ def actuals_list(request, client_id=None):
         .values_list('planning_customer__code', 'planning_customer__name')
         .distinct().order_by('planning_customer__code')
     )
+    if request.client.is_distribution_channel_enabled():
+        channel_count = qs.values('distribution_channel').distinct().count()
+        show_channel = channel_count > 1
+        channels = list(
+            qs.exclude(distribution_channel__isnull=True)
+            .values_list('distribution_channel__code', 'distribution_channel__label')
+            .distinct().order_by('distribution_channel__code')
+        )
+    else:
+        show_channel = False
+        channels = []
     period_types = list(
         qs.order_by().values_list('period_type', flat=True)
         .distinct().order_by('period_type')
@@ -1493,6 +1455,7 @@ def actuals_list(request, client_id=None):
         'item_id':       item_id,
         'location_code': location_code,
         'customer_code': customer_code,
+        'channel_code':  channel_code,
         'period_type':   period_type,
         'period_start':  period_start,
     }
@@ -1502,10 +1465,12 @@ def actuals_list(request, client_id=None):
         'filters':      filters,
         'locations':    locations,
         'customers':    customers,
+        'channels':     channels,
         'period_types': period_types,
         'periods':      periods,
         'show_location':       len(locations) > 1,
         'show_customer':       len(customers) > 0,
+        'show_channel':        show_channel,
         'show_period_type':    len(period_types) > 1,
         'show_period':         len(periods) > 1,
         'show_item_search':    distinct_items > 1,
@@ -1524,6 +1489,219 @@ def actuals_list(request, client_id=None):
         )
         return HttpResponse(html)
     return render(request, 'demand/actuals_list.html', context)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Actuals — value summary (Total / Item / Location / Customer), mirrors
+# version_aggregates() above. There's no separate "ActualAggregate" model —
+# ActualSale rows are grouped live per level with .values().annotate().
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def actuals_aggregates(request, client_id=None):
+    """
+    GET /{client_id}/demand/actuals/aggregates/
+ 
+    Query params: agg_level (total|location|item|customer),
+    exclude_outliers (1|0, only meaningful when outlier management is
+    active for this client).
+    """
+    blocked = feature_gate(request, 'demand_planning')
+    if blocked:
+        return blocked
+ 
+    agg_level = request.GET.get('agg_level', 'total')
+    valid_levels = ['total', 'location', 'item', 'customer']
+    if agg_level not in valid_levels:
+        agg_level = 'total'
+ 
+    # ── Filters ────────────────────────────────────────────────────────────
+    period_start  = request.GET.get('period_start', '').strip()
+    location_code = request.GET.get('location_code', '').strip()
+    item_id       = request.GET.get('item_id', '').strip()
+    customer_code = request.GET.get('customer_code', '').strip()
+    qty_min       = request.GET.get('qty_min', '').strip()
+    qty_max       = request.GET.get('qty_max', '').strip()
+    revenue_min   = request.GET.get('revenue_min', '').strip()
+    revenue_max   = request.GET.get('revenue_max', '').strip()
+ 
+    # ── Outlier include/exclude toggle ──────────────────────────────────────
+    outlier_ui_visible_flag = _outlier_ui_visible(request.client)
+ 
+    exclude_outliers = False
+    if outlier_ui_visible_flag:
+        exclude_outliers_param = request.GET.get('exclude_outliers')
+        if exclude_outliers_param is not None:
+            exclude_outliers = exclude_outliers_param in ('1', 'true', 'True')
+        else:
+            # First load with no explicit choice yet — default from the
+            # client's reporting flag, same "missing config -> raw" fallback
+            # used elsewhere (missing config itself also -> raw/False).
+            forecasting_config = getattr(request.client, 'forecasting_config', None)
+            exclude_outliers = bool(
+                forecasting_config and forecasting_config.reporting_uses_net_actuals
+            )
+ 
+    if exclude_outliers:
+        base_qs = actuals_queryset_with_net(request.client, use_net=True)
+        qty_field = 'net_qty'
+        revenue_field = 'net_revenue'
+    else:
+        base_qs = ActualSale.objects.filter(client=request.client)
+        qty_field = 'qty'
+        revenue_field = 'revenue'
+ 
+    # Row-level filters — applied before grouping
+    qs = base_qs
+    if period_start:
+        qs = qs.filter(period_start=period_start)
+    if agg_level == 'location' and location_code:
+        qs = qs.filter(planning_location__code=location_code)
+    if agg_level == 'item' and item_id:
+        qs = qs.filter(item__item_id__icontains=item_id)
+    if agg_level == 'customer' and customer_code:
+        qs = qs.filter(planning_customer__code=customer_code)
+ 
+    # ── Group by level ─────────────────────────────────────────────────────
+    group_fields = ['period_start']
+    if agg_level == 'location':
+        group_fields.append('planning_location__code')
+    elif agg_level == 'item':
+        group_fields.append('item__item_id')
+    elif agg_level == 'customer':
+        group_fields.append('planning_customer__code')
+ 
+    grouped = (
+        qs.values(*group_fields)
+        .annotate(
+            total_qty=Coalesce(Sum(qty_field), Decimal('0'), output_field=DecimalField()),
+            total_revenue=Coalesce(Sum(revenue_field), Decimal('0'), output_field=DecimalField()),
+        )
+        .order_by(*group_fields)
+    )
+ 
+    rows = list(grouped)
+ 
+    # Post-aggregation (HAVING-style) range filters — done in Python since
+    # these apply to the summed values, not the raw row values.
+    def _to_decimal(raw):
+        try:
+            return Decimal(raw)
+        except Exception:
+            return None
+ 
+    if qty_min and (d := _to_decimal(qty_min)) is not None:
+        rows = [r for r in rows if r['total_qty'] >= d]
+    if qty_max and (d := _to_decimal(qty_max)) is not None:
+        rows = [r for r in rows if r['total_qty'] <= d]
+    if revenue_min and (d := _to_decimal(revenue_min)) is not None:
+        rows = [r for r in rows if r['total_revenue'] >= d]
+    if revenue_max and (d := _to_decimal(revenue_max)) is not None:
+        rows = [r for r in rows if r['total_revenue'] <= d]
+ 
+    # ── Friendly display key per row ──────────────────────────────────────
+    for row in rows:
+        if agg_level == 'total':
+            row['display_key'] = 'All'
+        elif agg_level == 'location':
+            row['display_key'] = row.get('planning_location__code') or '—'
+        elif agg_level == 'item':
+            row['display_key'] = row.get('item__item_id') or '—'
+        elif agg_level == 'customer':
+            row['display_key'] = row.get('planning_customer__code') or '—'
+ 
+    # ── Distinct item count — drives "Item total" vs "Grand total" label ──
+    single_item = False
+    if agg_level == 'item':
+        distinct_items = len({r['item__item_id'] for r in rows})
+        single_item = distinct_items == 1
+ 
+    # ── Dropdown choices — from this client's full actuals, not the
+    #    level-filtered qs, independent of the currently applied filter.
+    #    Uses base_qs (net-or-raw) purely for consistent client scoping —
+    #    period_start/location_code/customer_code values themselves don't
+    #    depend on qty/revenue, so this is unaffected by the toggle. ──────
+    periods = list(
+        base_qs.values_list('period_start', flat=True)
+        .distinct().order_by('period_start')
+    )
+    location_choices = []
+    if agg_level == 'location':
+        location_choices = list(
+            base_qs.exclude(planning_location__isnull=True)
+            .values_list('planning_location__code', 'planning_location__name')
+            .distinct().order_by('planning_location__code')
+        )
+    customer_choices = []
+    if agg_level == 'customer':
+        customer_choices = list(
+            base_qs.exclude(planning_customer__isnull=True)
+            .values_list('planning_customer__code', 'planning_customer__name')
+            .distinct().order_by('planning_customer__code')
+        )
+ 
+    # ── Grand total — across every row matching filters (pre-pagination) ──
+    grand_total = {
+        'total_qty':     sum((r['total_qty'] for r in rows), Decimal('0')),
+        'total_revenue': sum((r['total_revenue'] for r in rows), Decimal('0')),
+    }
+ 
+    paginator = Paginator(rows, 50)
+    page_obj  = paginator.get_page(request.GET.get('page', 1))
+ 
+    page_total = {
+        'total_qty': sum(
+            (r['total_qty'] for r in page_obj.object_list), Decimal('0')
+        ),
+        'total_revenue': sum(
+            (r['total_revenue'] for r in page_obj.object_list), Decimal('0')
+        ),
+    }
+ 
+    filters = {
+        'period_start':      period_start,
+        'location_code':     location_code,
+        'item_id':           item_id,
+        'customer_code':     customer_code,
+        'qty_min':           qty_min,
+        'qty_max':           qty_max,
+        'revenue_min':       revenue_min,
+        'revenue_max':       revenue_max,
+        'exclude_outliers':  exclude_outliers,
+    }
+ 
+    context = {
+        'aggregates':                page_obj.object_list,
+        'page_obj':                  page_obj,
+        'agg_level':                 agg_level,
+        'agg_level_choices':         valid_levels,
+        'grand_total':               grand_total,
+        'page_total':                page_total,
+        'single_item':               single_item,
+        'is_multipage':              page_obj.has_other_pages(),
+        'filters':                   filters,
+        'periods':                   periods,
+        'location_choices':          location_choices,
+        'customer_choices':          customer_choices,
+        'active_nav':                'actuals',
+        'outlier_ui_visible': outlier_ui_visible_flag,
+    }
+ 
+    if _is_htmx(request):
+        from django.template.loader import render_to_string
+        html = (
+            render_to_string(
+                'demand/partials/actuals_aggregates_filter_bar.html',
+                context, request
+            ) +
+            render_to_string(
+                'demand/partials/actuals_aggregates_table_body.html',
+                context, request
+            )
+        )
+        return HttpResponse(html)
+ 
+    return render(request, 'demand/actuals_aggregates.html', context)
+
 
 @login_required
 @require_http_methods(['GET', 'POST'])
@@ -1899,10 +2077,15 @@ def series_profile_list(request, client_id=None):
     qs = (
         SeriesProfile.objects
         .filter(client=request.client)
-        .select_related('item', 'planning_location', 'planning_customer')
+        .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
         .order_by('item__item_id', 'planning_location__code',
                   'planning_customer__code')
     )
+
+    if request.client.is_distribution_channel_enabled():
+        show_channel = qs.values('distribution_channel').distinct().count() > 1
+    else:
+        show_channel = False
 
     # ── Apply filters ─────────────────────────────────────────────────────────
     if demand_class:
@@ -2128,6 +2311,7 @@ def series_profile_list(request, client_id=None):
         ),
         'show_is_manual':     qs.filter(chosen_strategy='MANUAL').exists(),
         'show_item_search':   distinct_items > 1,
+        'show_channel':       show_channel,
         'period_choices':     PERIOD_TYPE_CHOICES,
         'active_nav': 'series_profiles'
     }
@@ -2279,3 +2463,254 @@ def recompute_status(request, client_id=None):
         'status':  status,
         'task_id': task_id,
     })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Outlier Management
+# ─────────────────────────────────────────────────────────────────────────────
+
+from mysite.tasks.demand.detect_outliers import run_outlier_detection
+
+from datetime import timedelta
+ 
+@login_required
+def outlier_detection_form(request, client_id):
+    """
+    GET renders the range-picker form fragment.
+ 
+    Proposed range (Q4):
+      - If a previous run's range is on record: propose picking up right
+        where it left off (day after last_outlier_detection_range_end)
+        through the latest actuals period currently available — i.e.
+        "run detection on everything new since last time."
+      - If there's no previous run at all: propose the client's full
+        available actuals range (earliest through latest period_start) —
+        i.e. "here's everything there is, in case you want to run once
+        over all of it first."
+      - If there's nothing new since the last run (suggested start would
+        be after the latest available data), don't propose a range at
+        all — surface that there's nothing new instead of pre-filling a
+        start date past the end of the data.
+    """
+    client = request.client
+    config = getattr(client, "forecasting_config", None)  # was "forecastingconfig"
+ 
+    actuals_bounds = ActualSale.objects.filter(client=client).aggregate(
+        earliest=Min("period_start"), latest=Max("period_start"),
+    )
+    earliest_actual_period = actuals_bounds["earliest"]
+    latest_actual_period = actuals_bounds["latest"]
+ 
+    suggested_start = None
+    suggested_end = latest_actual_period
+    no_new_data = False
+ 
+    if config and config.last_outlier_detection_range_end:
+        suggested_start = config.last_outlier_detection_range_end + timedelta(days=1)
+    else:
+        suggested_start = earliest_actual_period
+ 
+    if suggested_start and latest_actual_period and suggested_start > latest_actual_period:
+        # Last run already covered everything there currently is.
+        suggested_start = None
+        suggested_end = None
+        no_new_data = True
+    elif suggested_start is None:
+        # No previous run AND no actuals at all for this client yet.
+        no_new_data = True
+ 
+    return render(request, "demand/outliers/partials/_detection_form.html", {
+        "suggested_start": suggested_start,
+        "suggested_end": suggested_end,
+        "no_new_data": no_new_data,
+        "forecasting_config": config,
+    })
+ 
+ 
+
+@login_required
+@require_POST
+def trigger_outlier_detection(request, client_id):
+    client = request.client
+    period_start = request.POST.get("period_start")
+    period_end = request.POST.get("period_end")
+    if not period_start or not period_end:
+        return render(request, "demand/outliers/partials/_detection_form.html", {
+            "error": "Both a start and end period are required.",
+            "forecasting_config": getattr(client, "forecasting_config", None),  # was "forecastingconfig"
+        })
+ 
+    run_outlier_detection.delay(
+        client_id=client.client_id,
+        target_period_start=period_start,
+        target_period_end=period_end,
+        triggered_by_user_id=request.user.id,
+    )
+    return render(request, "demand/outliers/partials/_detection_triggered.html", {
+        "period_start": period_start, "period_end": period_end,
+    })
+
+
+@login_required
+def outlier_queue(request, client_id):
+    client = request.client
+    qs = ActualSaleOutlierAdjustment.objects.filter(
+        actual_sale__client=client
+    ).select_related(
+        "actual_sale", "actual_sale__item", "actual_sale__planning_location",
+        "actual_sale__planning_customer", "actual_sale__distribution_channel",
+    )
+ 
+    status = request.GET.get("status", "CANDIDATE")
+    if status:
+        qs = qs.filter(status=status)
+ 
+    return render(request, "demand/outliers/queue.html", {
+        "adjustments": qs.order_by("-created_at")[:200],
+        "current_status": status,
+        "active_nav": "outlier_queue",
+        "forecasting_config": getattr(client, "forecasting_config", None),  # was "forecastingconfig"
+        "outlier_candidate_count": ActualSaleOutlierAdjustment.objects.filter(
+            actual_sale__client=client, status="CANDIDATE"
+        ).count(),
+    })
+ 
+
+
+
+@login_required
+@require_POST
+def outlier_confirm(request, client_id, pk):
+    adj = get_object_or_404(ActualSaleOutlierAdjustment, pk=pk, actual_sale__client=request.client)
+    if "qty_adjustment" in request.POST:
+        adj.qty_adjustment = request.POST["qty_adjustment"]
+    if "revenue_adjustment" in request.POST:
+        adj.revenue_adjustment = request.POST["revenue_adjustment"] or None
+    adj.confirm(user=request.user)
+    return render(request, "demand/outliers/partials/_row.html", {"adjustment": adj})
+
+
+@login_required
+@require_POST
+def outlier_reject(request, client_id, pk):
+    adj = get_object_or_404(ActualSaleOutlierAdjustment, pk=pk, actual_sale__client=request.client)
+    adj.reject(user=request.user)
+    return render(request, "demand/outliers/partials/_row.html", {"adjustment": adj})
+
+
+@login_required
+def raise_exception_form(request, client_id, actual_sale_id):
+    actual = get_object_or_404(ActualSale, pk=actual_sale_id, client=request.client)
+    if request.method == "POST":
+        adj, created = ActualSaleOutlierAdjustment.objects.get_or_create(
+            actual_sale=actual,
+            defaults={"detected_by": "USER", "status": "CANDIDATE"},
+        )
+        adj.qty_adjustment = request.POST.get("qty_adjustment")
+        adj.revenue_adjustment = request.POST.get("revenue_adjustment") or None
+        adj.reason = request.POST.get("reason", "")
+        adj.created_by = request.user
+        try:
+            adj.full_clean()
+        except Exception as exc:
+            return render(request, "demand/outliers/partials/_raise_exception_form.html",
+                           {"actual": actual, "errors": exc.message_dict})
+        adj.confirm(user=request.user)  # planner-raised exceptions are self-confirming
+        return render(request, "demand/outliers/partials/_row.html", {"adjustment": adj})
+
+    return render(request, "demand/outliers/partials/_raise_exception_form.html", {"actual": actual})
+
+@login_required
+def outlier_decisions_report(request, client_id):
+    client = request.client
+    qs = ActualSaleOutlierAdjustment.objects.filter(
+        actual_sale__client=client
+    ).exclude(status="CANDIDATE").select_related(
+        "actual_sale", "actual_sale__item", "actual_sale__planning_location",
+        "actual_sale__planning_customer", "actual_sale__distribution_channel",
+        "created_by", "confirmed_by",
+    )
+    for param, field in [
+        ("item", "actual_sale__item_id"),
+        ("planning_location", "actual_sale__planning_location_id"),
+        ("planning_customer", "actual_sale__planning_customer_id"),
+        ("distribution_channel", "actual_sale__distribution_channel_id"),
+        ("status", "status"),
+        ("detected_by", "detected_by"),
+    ]:
+        value = request.GET.get(param)
+        if value:
+            qs = qs.filter(**{field: value})
+    if request.GET.get("period_start"):
+        qs = qs.filter(actual_sale__period_start__gte=request.GET["period_start"])
+    if request.GET.get("period_end"):
+        qs = qs.filter(actual_sale__period_start__lte=request.GET["period_end"])
+
+    return render(request, "demand/outliers/decisions_report.html", {
+        "adjustments": qs.order_by("-confirmed_at")[:500],
+        "active_nav": "outlier_decisions",
+    })
+
+
+@login_required
+@require_POST
+def outlier_revise(request, client_id, pk):
+    """
+    Edit a previously CONFIRMED/REJECTED adjustment's qty/revenue or status —
+    reuses the same mutable record per the earlier one-to-one decision, not a
+    new row. Re-running clean() enforces the same qty/revenue ceiling.
+    """
+    adj = get_object_or_404(ActualSaleOutlierAdjustment, pk=pk, actual_sale__client=request.client)
+    if "qty_adjustment" in request.POST:
+        adj.qty_adjustment = request.POST["qty_adjustment"]
+    if "revenue_adjustment" in request.POST:
+        adj.revenue_adjustment = request.POST["revenue_adjustment"] or None
+    new_status = request.POST.get("status")
+    if new_status in ("CONFIRMED", "REJECTED"):
+        adj.status = new_status
+        adj.confirmed_by = request.user
+        from django.utils import timezone
+        adj.confirmed_at = timezone.now()
+    try:
+        adj.full_clean()
+    except Exception as exc:
+        return render(request, "demand/outliers/partials/_decision_row.html",
+                       {"adjustment": adj, "errors": exc.message_dict})
+    adj.save()
+    # Note: flag_stale_forecast_versions fires automatically via the post_save
+    # signal on ActualSaleOutlierAdjustment (see signals.py delta) — no need
+    # to call it explicitly here, even though status may not have changed on
+    # every revision (e.g. only the qty_adjustment amount was edited). If you
+    # want stale-flagging on amount-only edits too (not just status flips),
+    # keep the signal firing unconditionally on any CONFIRMED/REJECTED save
+    # rather than gating it on an actual transition.
+    return render(request, "demand/outliers/partials/_decision_row.html", {"adjustment": adj})
+
+
+@login_required
+@require_POST
+def outlier_undo_decision(request, client_id, pk):
+    """
+    Reverts a CONFIRMED/REJECTED adjustment back to CANDIDATE — the same
+    mutable record, not a new one (consistent with the one-to-one design).
+    Clearing confirmed_by/confirmed_at means it reads as "never decided"
+    again, and it'll show up in the Outlier Review Queue's CANDIDATE tab
+    immediately (no need to wait for a detection run — it already exists).
+ 
+    Undoing a CONFIRMED adjustment changes its netting status (it was
+    excluded from forecast/reporting nets; back at CANDIDATE it no longer
+    is) — the shared post_save signal only re-flags stale forecast versions
+    on transitions TO CONFIRMED/REJECTED, not back to CANDIDATE, so this
+    view calls flag_stale_forecast_versions explicitly rather than relying
+    on that signal to cover a case it wasn't written for.
+ 
+    Returns an empty 200 response; the row's hx-swap="delete" removes it
+    from the Decisions Report page regardless of body content, since this
+    row no longer belongs there once its status is CANDIDATE again.
+    """
+    adj = get_object_or_404(ActualSaleOutlierAdjustment, pk=pk, actual_sale__client=request.client)
+    adj.status = 'CANDIDATE'
+    adj.confirmed_by = None
+    adj.confirmed_at = None
+    adj.save()
+    flag_stale_forecast_versions.delay(actual_sale_id=adj.actual_sale_id)
+    return HttpResponse(status=200)

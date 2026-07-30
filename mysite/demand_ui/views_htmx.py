@@ -144,11 +144,17 @@ def override_propagation(request, override_id, client_id=None):
     except EmptyPage:
         page = paginator.page(paginator.num_pages)
 
+    if version.client.is_distribution_channel_enabled():
+        show_channel = qs.values('distribution_channel').distinct().count() > 1
+    else:
+        show_channel = False
+
     return render(request, 'demand/partials/override_propagation.html', {
         'override': override,
         'version':  version,
         'page':     page,
         'count':    paginator.count,
+        'show_channel': show_channel,
     })
 
 @login_required

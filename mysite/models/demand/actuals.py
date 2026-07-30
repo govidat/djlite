@@ -87,7 +87,7 @@ Natural key: (client, planning_location, item, planning_customer,
               period_type, period_start)
 Use update_or_create on this key to make uploads idempotent.
 """
-
+from django.conf import settings
 import datetime
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
@@ -95,8 +95,10 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
+from mysite.models import DistributionChannel
 from calendar import monthrange
-
+from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
 # ─────────────────────────────────────────────────────────────────────────────
 # Period helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -250,11 +252,10 @@ class ActualSaleImport(models.Model):
         related_name="actual_sale_imports",
     )
     uploaded_by = models.ForeignKey(
-        "auth.User",
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='actual_sale_imported'
     )
+
     uploaded_at  = models.DateTimeField(auto_now_add=True)
     file_name    = models.CharField(max_length=512)
     period_type  = models.CharField(
@@ -316,18 +317,7 @@ class ActualSale(models.Model):
             "Item must have status='active'."
         ),
     )    
-    """
-    # ── Item: leaf TaxonomyNode from product_planning Taxonomy ────────────────
-    item = models.ForeignKey(
-        "mysite.TaxonomyNode",
-        on_delete=models.PROTECT,
-        related_name="actual_sales",
-        verbose_name=_("item"),
-        help_text=_(
-            "Must be a leaf node of the Taxonomy with slug='product_planning'."
-        ),
-    )
-    """
+
     # ── Customer (nullable = unattributed) ────────────────────────────────────
     planning_customer = models.ForeignKey(
         PlanningCustomer,
@@ -340,6 +330,17 @@ class ActualSale(models.Model):
             "Null means demand is not attributed to any specific customer or group."
         ),
     )
+    distribution_channel = models.ForeignKey(
+        DistributionChannel,
+        on_delete=models.PROTECT,
+        default='00',
+        related_name="actual_sales",
+        verbose_name=_("distribution channel"),
+        help_text=_(
+            "Default to 00-Common if multiple Distribution Channels are not present."
+        ),        
+    )
+
     # ── Period ────────────────────────────────────────────────────────────────
     period_type = models.CharField(
         _("period type"),
@@ -396,7 +397,7 @@ class ActualSale(models.Model):
         unique_together = [
             (
                 "client", "planning_location", "item",
-                "planning_customer", "period_type", "period_start",
+                "distribution_channel", "planning_customer", "period_type", "period_start",
             ), # this can be removed in pg as there is another index to take care
         ]
         ordering = ["period_type", "period_start", "planning_location", "item"]
@@ -423,9 +424,20 @@ class ActualSale(models.Model):
                 fields=["client", "period_type", "period_start", "period_end"],
                 name="ix_actualsale_period_range",
             ),
+            # NEW — grain search hits this combination constantly
+            models.Index(fields=["client", "planning_location", "distribution_channel",
+                                "planning_customer", "period_type", "period_start"],
+                        name="ix_actualsale_grain_lookup"
+            ),            
         ]
 
     def save(self, *args, **kwargs):
+        # If this client doesn't use Distribution Channel, force '00' silently —
+        # never surface the field or reject a write over it. clean() below still
+        # protects direct/admin saves that bypass this, but the normal path is:
+        # form doesn't show the field -> this fills it in.
+        if self.client_id and not self.client.is_distribution_channel_enabled():
+            self.distribution_channel_id = '00'        
         # Auto-compute period_end before every save
         if self.period_type and self.period_start:
             self.period_end = compute_period_end(self.period_start, self.period_type)
@@ -450,7 +462,28 @@ class ActualSale(models.Model):
             raise ValidationError(_("Item must belong to the same client."))
         if self.item_id and self.item.status != "active":
             raise ValidationError(_("Only active items can have actuals recorded against them."))
-        
+        # ── NEW: distribution_channel must be in the client's allowed set ──────
+        # ── Distribution Channel ────────────────────────────────────────────────
+        if self.client_id:
+            if self.client.is_distribution_channel_enabled():
+                allowed_codes = self.client.get_allowed_distribution_channel_codes()
+                if self.distribution_channel_id and self.distribution_channel_id not in allowed_codes:
+                    raise ValidationError({
+                        "distribution_channel": _(
+                            "%(code)s is not an allowed distribution channel for this client."
+                        ) % {"code": self.distribution_channel_id}
+                    })
+            else:
+                # Disabled clients shouldn't be able to submit a non-default channel
+                # at all (this only trips if something bypassed the UI/save() coercion
+                # above — e.g. a direct .full_clean() call before save()).
+                if self.distribution_channel_id and self.distribution_channel_id != '00':
+                    raise ValidationError({
+                        "distribution_channel": _(
+                            "This client does not use Distribution Channel tracking; "
+                            "only the default channel (00) is permitted."
+                        )
+                    })    
 
         # Enforce period_start is a valid anchor for the chosen period_type
         if self.period_start and self.period_type:
@@ -458,6 +491,9 @@ class ActualSale(models.Model):
                 validate_period_start(self.period_start, self.period_type)
             except ValueError as exc:
                 raise ValidationError({"period_start": str(exc)})
+            
+    # Change Steps: If ActualSale is modified, following codes need to be reviewed:
+    # mysite>admin>demand.py>ActualSaleAdmin
 """            
 Celery Task: `process_summary_actuals_import`
 
@@ -478,6 +514,91 @@ total_qty       decimal      required
 total_revenue   decimal      optional
 
 """
+
+class ActualSaleOutlierAdjustment(models.Model):
+    """
+    Single mutable record, one-to-one with the ActualSale row it adjusts.
+    No separate grain-keyed uniqueness is needed — ActualSale's own unique
+    constraint already guarantees one row per grain, so a 1:1 FK is a clean
+    match with no aggregation required to compute a net position.
+    """
+    DETECTED_BY_CHOICES = [("SYSTEM", _("System")), ("USER", _("User"))]
+    STATUS_CHOICES = [
+        ("CANDIDATE", _("Candidate")),
+        ("CONFIRMED", _("Confirmed")),
+        ("REJECTED", _("Rejected")),
+    ]
+
+    actual_sale = models.OneToOneField(
+        ActualSale, on_delete=models.CASCADE, related_name="outlier_adjustment",
+    )
+    qty_adjustment = models.DecimalField(
+        _("qty adjustment"), max_digits=14, decimal_places=3,
+        help_text=_("Portion of actual_sale.qty attributable to the outlier; deducted, not the full row."),
+    )
+    revenue_adjustment = models.DecimalField(
+        _("revenue adjustment"), max_digits=16, decimal_places=2, null=True, blank=True,
+        help_text=_("Independent of qty_adjustment. Optional, mirroring ActualSale.revenue."),
+    )
+    detected_by = models.CharField(_("detected by"), max_length=8, choices=DETECTED_BY_CHOICES)
+    status = models.CharField(
+        _("status"), max_length=12, choices=STATUS_CHOICES, default="CANDIDATE",
+    )
+    reason = models.CharField(_("reason"), max_length=255, blank=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='outlier_created'
+    )
+
+    confirmed_by = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='outlier_confirmed'
+    )
+    confirmed_at = models.DateTimeField(_("confirmed at"), null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "mysite"
+        indexes = [
+            models.Index(fields=["status"], name="ix_outlieradj_status"),
+        ]
+        verbose_name = _("02-05B Actual Sale Outlier Adjustment")
+        verbose_name_plural = _("02-05B Actual Sale Outlier Adjustments")
+
+    def __str__(self):
+        return f"{self.actual_sale} | qty_adj={self.qty_adjustment} | {self.status}"
+
+    def clean(self):
+        if self.qty_adjustment is not None and self.actual_sale_id:
+            if self.qty_adjustment > self.actual_sale.qty:
+                raise ValidationError({"qty_adjustment": _("Cannot exceed the actual's qty.")})
+            if self.qty_adjustment < 0:
+                raise ValidationError({"qty_adjustment": _("Cannot be negative.")})
+        if (
+            self.revenue_adjustment is not None
+            and self.actual_sale_id
+            and self.actual_sale.revenue is not None
+        ):
+            if self.revenue_adjustment > self.actual_sale.revenue:
+                raise ValidationError({"revenue_adjustment": _("Cannot exceed the actual's revenue.")})
+            if self.revenue_adjustment < 0:
+                raise ValidationError({"revenue_adjustment": _("Cannot be negative.")})
+
+    def confirm(self, user):
+        from django.utils import timezone
+        self.status = "CONFIRMED"
+        self.confirmed_by = user
+        self.confirmed_at = timezone.now()
+        self.full_clean()
+        self.save()
+
+    def reject(self, user):
+        self.status = "REJECTED"
+        self.confirmed_by = user
+        self.confirmed_at = None
+        self.save()
+
 class ActualSaleLocation(models.Model):
     """
     Location-level summary actuals. One row per (client, location, period).

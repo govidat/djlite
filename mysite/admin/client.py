@@ -96,7 +96,7 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
         )
         fieldsets = [
             ('General', {
-                'fields': ('client_id', 'parent', 'language_choices', 'default_language', 'nb_title_svg_pre', 'nb_title_svg_suf'),
+                'fields': ('client_id', 'parent', 'language_choices', 'default_language', 'distribution_channel_choices', 'nb_title_svg_pre', 'nb_title_svg_suf'),
                 'classes': ('collapse',),
             }),            
             ('Main Language', {
@@ -114,29 +114,7 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
             ))
         return tuple(fieldsets)
 
-    """
-    def get_fieldsets(self, request, obj=None):
 
-        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-            request,
-            ['name', 'nb_title'],
-            obj
-        )
-        return (
-            ('General', {
-                'fields': ('client_id', 'parent', 'language_choices', 'default_language', 'nb_title_svg_pre', 'nb_title_svg_suf'),
-                'classes': ('collapse',),
-            }),
-            ('Main Language', {
-                'fields': main_ln_fields,
-                'classes': ('collapse',),
-            }),
-            ('Other Languages', {
-                'fields': other_ln_fields,
-                'classes': ('collapse',),
-            }),
-        )
-    """
     def get_inline_instances(self, request, obj=None):
         if obj is None:
             return []

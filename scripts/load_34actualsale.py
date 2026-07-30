@@ -12,6 +12,7 @@ from mysite.models import (
     PlanningCustomer,
     ActualSale,
     ActualSaleImport,
+    DistributionChannel
 )
 
 from scripts.helpers import (
@@ -62,25 +63,31 @@ def load_val01(
     client_ids = {
         clean(row.get("client_id"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if row.get("client_id")
     }
 
     location_codes = {
         clean(row.get("planning_location_code"), lower=True)
         for row in rows
-        if clean(row.get("planning_location_code"))
+        if row.get("planning_location_code")
     }
 
     customer_codes = {
         clean(row.get("planning_customer_code"), lower=True)
         for row in rows
-        if clean(row.get("planning_customer_code"))
+        if row.get("planning_customer_code")
     }
 
     item_codes = {
         clean(row.get("item_code"), lower=True)
         for row in rows
-        if clean(row.get("item_code"))
+        if row.get("item_code")
+    }
+
+    distribution_channel_codes = {
+        clean(row.get("distribution_channel_code"), lower=True)
+        for row in rows
+        if row.get("distribution_channel_code")
     }
 
     # =========================================================================
@@ -138,6 +145,13 @@ def load_val01(
         )
 
         items[key] = obj
+
+    distribution_channels = {
+        c.code: c
+        for c in DistributionChannel.objects.filter(
+            code__in=distribution_channel_codes
+        )
+    }
 
     # =========================================================================
     # CREATE IMPORT BATCH
@@ -207,6 +221,11 @@ def load_val01(
             lower=True,
         )
 
+        distribution_channel_code = clean(
+            row.get("distribution_channel_code"),
+            lower=True,
+        )        
+
         period_type = clean(
             row.get("period_type"),
             lower=True,
@@ -260,6 +279,7 @@ def load_val01(
             planning_location_code,
             planning_customer_code,
             item_code,
+            distribution_channel_code,
             period_type,
             period_start,
         )
@@ -351,6 +371,34 @@ def load_val01(
                 continue
 
         # =====================================================================
+        # DISTRIBUTION_CHANNEL
+        # =====================================================================
+
+        distribution_channel = None
+        if distribution_channel_code:
+
+            distribution_channel = distribution_channels.get(
+                (
+                    distribution_channel_code
+                )
+            )
+
+            if not distribution_channel:
+
+                msg = (
+                    f"Missing distribution_channel: "
+                    f"{client_id} / "
+                    f"{distribution_channel_code}"
+                )
+
+                print(msg)
+
+                error_logs.append(msg)
+
+                skipped_count += 1
+                continue
+
+        # =====================================================================
         # ITEM
         # =====================================================================
 
@@ -390,6 +438,7 @@ def load_val01(
 
             "import_batch":
                 import_batch,
+            
         }
 
         # =====================================================================
@@ -402,6 +451,8 @@ def load_val01(
                 f"[DRY RUN] "
                 f"{client_id} / "
                 f"{planning_location_code} / "
+                f"{planning_customer_code} / "
+                f"{distribution_channel_code} / "
                 f"{item_code} / "
                 f"{period_type} / "
                 f"{period_start}"
@@ -424,6 +475,8 @@ def load_val01(
                 planning_location=planning_location,
 
                 planning_customer=planning_customer,
+
+                distribution_channel=distribution_channel,
 
                 item=item,
 

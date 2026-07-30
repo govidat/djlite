@@ -12,7 +12,7 @@ def forecast_grid(request, pk):
     """
     Main forecast grid page.
     Pivots ForecastLine rows into grid_rows — one entry per
-    (location, item, customer) with a list of per-period cells.
+    (location, channel, item, customer) with a list of per-period cells.
     """
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
 
@@ -25,7 +25,7 @@ def forecast_grid(request, pk):
     )
     period_labels = [p.strftime('%b-%y') for p in periods]
 
-    # Active overrides keyed by (item_id, location_code, period_start)
+    # Active overrides keyed by (item_id, period_start)
     # Used to attach the override object to each cell
     applied_overrides = {
         (o.override_key.get('item_id'), o.period_start): o
@@ -35,14 +35,14 @@ def forecast_grid(request, pk):
         ).select_related('created_by')
     }
 
-    # Paginated lines — page by unique (location, item, customer) key
-    # Build a list of unique row keys first, then fetch lines for that page
+    # Paginated lines — page by unique (location, channel, item, customer) key
     row_keys = list(
         ForecastLine.objects
         .filter(version=version)
         .order_by('planning_location__code', 'item__item_id')
         .values_list(
             'planning_location__code',
+            'distribution_channel__code',
             'item__item_id',
             'planning_customer__code',
         )
@@ -62,9 +62,10 @@ def forecast_grid(request, pk):
     # Fetch all lines for the current page keys in one query
     from django.db.models import Q
     key_filter = Q()
-    for loc_code, item_id, cust_code in page_keys:
+    for loc_code, channel_code, item_id, cust_code in page_keys:
         key_filter |= Q(
             planning_location__code=loc_code,
+            distribution_channel__code=channel_code,
             item__item_id=item_id,
             planning_customer__code=cust_code,
         )
@@ -73,7 +74,7 @@ def forecast_grid(request, pk):
         ForecastLine.objects
         .filter(version=version)
         .filter(key_filter)
-        .select_related('item', 'planning_location', 'planning_customer')
+        .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
         .order_by('planning_location__code', 'item__item_id', 'period_start')
     )
 
@@ -82,6 +83,7 @@ def forecast_grid(request, pk):
     for line in page_lines:
         row_key = (
             line.planning_location.code,
+            line.distribution_channel.code,
             line.item.item_id,
             line.planning_customer.code if line.planning_customer else '',
         )
@@ -89,6 +91,7 @@ def forecast_grid(request, pk):
             line_index[row_key] = {
                 'key':           '-'.join(row_key),
                 'location_code': line.planning_location.code,
+                'channel_code':  line.distribution_channel.code,
                 'item_id':       line.item.item_id,
                 'item_name':     line.item.name,
                 'customer_code': line.planning_customer.code
@@ -118,12 +121,23 @@ def forecast_grid(request, pk):
         .order_by('-created_at')
     )
 
+    if version.client.is_distribution_channel_enabled():
+        channel_count = (
+            ForecastLine.objects
+            .filter(version=version)
+            .values('distribution_channel').distinct().count()
+        )
+        show_channel = channel_count > 1
+    else:
+        show_channel = False
+
     return render(request, 'demand/forecast_grid.html', {
         'version':       version,
-        'lines':         page,           # Page object for pagination controls
+        'lines':         page,
         'periods':       periods,
         'period_labels': period_labels,
         'grid_rows':     grid_rows,
         'overrides':     overrides,
         'locations':     locations,
+        'show_channel':  show_channel,
     })

@@ -71,64 +71,7 @@ class ClientPageView(TemplateView):
             return None
 
         return content.htmlblob or None
-    """
-    def _resolve_page_content(self, client_obj, page_id, active_lang):
-        
-        #Returns translated htmlblob for the page.
-        #Fallback handled automatically by django-modeltranslation.
-        
-        from mysite.models import Page, PageContent
 
-        try:
-            page_obj = Page.objects.get(
-                client=client_obj,
-                page_id=page_id
-            )
-        except Page.DoesNotExist:
-            return None
-
-        try:
-            content = PageContent.objects.get(page=page_obj)
-        except PageContent.DoesNotExist:
-            return None
-
-        return content.htmlblob or None
-    
-    def _resolve_page_content(self, client_obj, page_id, active_lang):
-        
-        #Returns the HTML string for the best available language match,
-        #or None if no PageContent exists for this page.
-        #Priority: active_lang → 'en' → first available row
-        
-        from mysite.models import Page, PageContent
-
-        try:
-            page_obj = Page.objects.get(
-                client=client_obj,
-                page_id=page_id
-            )
-        except Page.DoesNotExist:
-            return None
-
-        contents = list(
-            PageContent.objects
-            .filter(page=page_obj)
-            .values('language_code', 'html')
-        )
-
-        if not contents:
-            return None
-
-        # Build lookup dict
-        content_map = {c['language_code']: c['html'] for c in contents}
-
-        # Priority fallback
-        return (
-            content_map.get(active_lang)
-            or content_map.get('en')
-            or contents[0]['html']   # first available
-        )        
-    """
 
 def landing_page(request):
     """

@@ -14,7 +14,7 @@ pytest mysite/tests/demand/ --cov=mysite.models.demand --cov=mysite.tasks.demand
 import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
-from mysite.models.demand.hierarchy import SalesNode, CustomerSalesAssignment, PlanningLocation
+from mysite.models.demand.hierarchy import SalesNode, PlanningLocation
 import datetime
 
 
@@ -145,57 +145,164 @@ class TestPathMaterialization:
 
 
 @pytest.mark.django_db
-class TestCustomerSalesAssignment:
+class TestSalesForecastLinkAPI:
 
-    def test_date_effectivity_no_overlap_allowed(
-        self, client_obj, planning_customer
+    def test_create_shape_c_link(self, api_client, leaf_location, sales_leaf):
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': leaf_location.pk,
+            'sales_node': sales_leaf.pk,
+            'valid_from': '2024-01-01',
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert data['link_type'] == 'c'
+        assert data['location_code'] == 'LEAF-01'
+        assert data['channel_code'] is None
+        assert data['customer_code'] is None
+        assert data['is_active'] is True
+
+    def test_create_defaults_valid_from_to_today(self, api_client, leaf_location, sales_leaf):
+        """valid_from is optional in the request — the view defaults it to today."""
+        import datetime
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': leaf_location.pk,
+            'sales_node': sales_leaf.pk,
+        })
+        assert response.status_code == 201
+        assert response.json()['valid_from'] == datetime.date.today().isoformat()
+
+    def test_create_shape_a_link(
+        self, api_client, leaf_location, sales_leaf,
+        distribution_channel_common, planning_customer,
     ):
-        """Two open assignments for the same customer must be rejected."""
-        from django.core.exceptions import ValidationError
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': leaf_location.pk,
+            'sales_node': sales_leaf.pk,
+            'distribution_channel': distribution_channel_common.pk,
+            'planning_customer': planning_customer.pk,
+            'valid_from': '2024-01-01',
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert data['link_type'] == 'a'
+        assert data['customer_code'] == 'CUST-01'
+        assert data['channel_code'] == '00'
 
-        sales_root = SalesNode.objects.create(
-            client=client_obj, code='NSM', name='National'
+    def test_customer_without_channel_rejected(
+        self, api_client, leaf_location, sales_leaf, planning_customer,
+    ):
+        """Shape must be a (loc+dc+cust), b (loc+dc), or c (loc) —
+        loc+cust with no channel isn't a valid shape."""
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': leaf_location.pk,
+            'sales_node': sales_leaf.pk,
+            'planning_customer': planning_customer.pk,
+            'valid_from': '2024-01-01',
+        })
+        assert response.status_code == 400
+
+    def test_non_leaf_location_rejected(self, api_client, root_location, sales_leaf):
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': root_location.pk,
+            'sales_node': sales_leaf.pk,
+            'valid_from': '2024-01-01',
+        })
+        assert response.status_code == 400
+
+    def test_non_leaf_sales_node_rejected(self, api_client, leaf_location, sales_root, sales_leaf):
+        """sales_leaf is a child of sales_root, so sales_root is not a leaf."""
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': leaf_location.pk,
+            'sales_node': sales_root.pk,
+            'valid_from': '2024-01-01',
+        })
+        assert response.status_code == 400
+
+    def test_valid_to_before_valid_from_rejected(self, api_client, leaf_location, sales_leaf):
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': leaf_location.pk,
+            'sales_node': sales_leaf.pk,
+            'valid_from': '2024-06-01',
+            'valid_to': '2024-01-01',
+        })
+        assert response.status_code == 400
+
+    def test_overlapping_open_link_rejected(self, api_client, sales_forecast_link_shape_c,
+                                             leaf_location, sales_leaf):
+        """Ported from the old CustomerSalesAssignment overlap test: two
+        open (valid_to=NULL) rows for the same key must be rejected."""
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.post(url, {
+            'planning_location': leaf_location.pk,
+            'sales_node': sales_leaf.pk,
+            'valid_from': '2024-06-01',   # overlaps the fixture's open row starting 2024-01-01
+        })
+        assert response.status_code == 400
+
+    def test_list_filters_by_link_type(
+        self, api_client, sales_forecast_link_shape_c, sales_forecast_link_shape_a,
+    ):
+        client, user = api_client
+        url = reverse('demand-sales-forecast-links')
+        response = client.get(url, {'link_type': 'a'})
+        assert response.status_code == 200
+        data = response.json()
+        assert data['count'] == 1
+        assert data['results'][0]['link_type'] == 'a'
+
+    def test_delete_closes_active_link(self, api_client, sales_forecast_link_shape_c):
+        """DELETE on an active link closes it (sets valid_to=today) rather
+        than hard-deleting, to preserve history."""
+        import datetime
+        client, user = api_client
+        url = reverse('demand-sales-forecast-link-detail', args=[sales_forecast_link_shape_c.pk])
+        response = client.delete(url)
+        assert response.status_code == 200
+        assert response.json()['valid_to'] == datetime.date.today().isoformat()
+
+        sales_forecast_link_shape_c.refresh_from_db()
+        assert sales_forecast_link_shape_c.valid_to == datetime.date.today()
+
+    def test_delete_hard_deletes_never_active_link(self, api_client, leaf_location, sales_leaf):
+        """A link whose valid_from is in the future has no history to
+        preserve — DELETE removes it outright."""
+        import datetime
+        from mysite.models.demand.hierarchy import SalesForecastLink
+
+        future_link = SalesForecastLink.objects.create(
+            client=leaf_location.client, planning_location=leaf_location, sales_node=sales_leaf,
+            valid_from=datetime.date.today() + datetime.timedelta(days=30),
         )
-        sales_leaf = SalesNode.objects.create(
-            client=client_obj, code='REP-01', name='Rep 1',
-            parent=sales_root
-        )
+        client, user = api_client
+        url = reverse('demand-sales-forecast-link-detail', args=[future_link.pk])
+        response = client.delete(url)
+        assert response.status_code == 204
+        assert not SalesForecastLink.objects.filter(pk=future_link.pk).exists()
 
-        # First assignment — open-ended
-        a1 = CustomerSalesAssignment(
-            client=client_obj,
-            #a1 = CustomerSalesAssignment(
-            planning_customer=planning_customer,
-            sales_node=sales_leaf,
-            valid_from=datetime.date(2024, 1, 1),
-            valid_to=None,
-        )
-        a1.full_clean()
-        a1.save()
-
-        # Second overlapping assignment — should be rejected
-        a2 = CustomerSalesAssignment(
-            client=client_obj,
-            planning_customer=planning_customer,
-            sales_node=sales_leaf,
-            valid_from=datetime.date(2024, 6, 1),
-            valid_to=None,
-        )
-        # Your clean() method or a DB constraint should raise here.
-        # If you haven't added overlap validation to clean() yet, add it:
-        #
-        #   def clean(self):
-        #       overlapping = CustomerSalesAssignment.objects.filter(
-        #           planning_customer=self.planning_customer,
-        #           valid_to__isnull=True,
-        #       ).exclude(pk=self.pk)
-        #       if overlapping.exists():
-        #           raise ValidationError(
-        #               "Customer already has an open assignment. "
-        #               "Close the existing one before creating a new one."
-        #           )
-        with pytest.raises(ValidationError):
-            a2.full_clean()
-
-
-# **Action required:** Add the overlap check to `CustomerSalesAssignment.clean()` as shown in the comment above — the test verifies it.
+    def test_sales_hierarchy_includes_forecast_links(
+        self, api_client, sales_root, sales_leaf, sales_forecast_link_shape_c,
+    ):
+        client, user = api_client
+        url = reverse('demand-sales-hierarchy')
+        response = client.get(url)
+        assert response.status_code == 200
+        data = response.json()
+        root = data[0]
+        leaf = root['children'][0]
+        assert len(leaf['forecast_links']) == 1
+        assert leaf['forecast_links'][0]['location_code'] == 'LEAF-01'

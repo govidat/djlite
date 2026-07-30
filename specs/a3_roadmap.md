@@ -338,6 +338,100 @@ React SPA frontend served under `/{client_id}/planning/`.
 - [ ] Celery task `process_summary_actuals_import` for `ActualSaleLocation`
 - [ ] Excel template: `management/commands/generate_actuals_template.py` — produces a `.xlsx` with correct column headers for client download
 - [ ] Unit tests: duplicate upload → idempotent; invalid item FK → error row; valid upload → `ActualSale` row count correct
+
+### Sprint 3B.2b — Outlier Management (Detection + Planner Review)
+-Models & migrations
+
+ Create mysite/models/demand/outliers.py with ActualSaleOutlierAdjustment:
+actual_sale — OneToOneField(ActualSale, on_delete=CASCADE, related_name='outlier_adjustment')
+qty_adjustment — DecimalField(max_digits=14, decimal_places=3)
+revenue_adjustment — DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
+detected_by — CharField(choices=[('SYSTEM','System'),('USER','User')])
+status — CharField(choices=[('CANDIDATE','Candidate'),('CONFIRMED','Confirmed'),('REJECTED','Rejected')], default='CANDIDATE')
+reason — CharField(max_length=255, blank=True)
+created_by, confirmed_by — ForeignKey(User, null=True, on_delete=SET_NULL, related_name='+')
+confirmed_at — DateTimeField(null=True, blank=True)
+clean(): raise ValidationError if qty_adjustment > actual_sale.qty, or if revenue_adjustment and actual_sale.revenue are both set and revenue_adjustment > actual_sale.revenue
+Meta: app_label='mysite', index on status, verbose_name='02-06 Actual Sale Outlier Adjustment'
+ Migration adding six new fields directly to the existing Client model (no new table): mad_threshold (Decimal, default 3.5), persistence_periods (PositiveSmallInt, default 3), min_history_periods (PositiveSmallInt, default 12), forecast_uses_net_actuals (Bool, default True), reporting_uses_net_actuals (Bool, default True), abc_classification_uses_net_actuals (Bool, default True)
+ Migration adding ix_outlieradj_status index (status column on ActualSaleOutlierAdjustment)
+ Add outlier_management key to ClientFeatureControl (module on/off switch, consistent with other optional Phase 3B modules — separate from the six always-present Client fields above)
+ Register ActualSaleOutlierAdjustment in mysite/models/demand/__init__.py exports
+
+Query-time netting helper
+
+ Create mysite/utils/demand/actuals_net.py:
+actuals_queryset_with_net(client, use_net: bool) — returns ActualSale queryset with select_related('outlier_adjustment') and .annotate(net_qty=..., net_revenue=...)
+use_net=False path: net_qty=F('qty'), net_revenue=F('revenue') (straight passthrough)
+use_net=True path: Case/When on outlier_adjustment__status='CONFIRMED' subtracting qty_adjustment / Coalesce(revenue_adjustment, 0), else passthrough
+ Unit test: row with no adjustment → net equals raw under both use_net values
+ Unit test: row with CANDIDATE/REJECTED adjustment → net equals raw even when use_net=True
+ Unit test: row with CONFIRMED adjustment → net correctly subtracted only when use_net=True
+
+Detection engine
+
+ Celery task detect_outlier_candidates(client_id, import_batch_id) in mysite/tasks/demand/detect_outliers.py:
+Load the Client row; read mad_threshold, persistence_periods, min_history_periods directly (no separate config model/lookup)
+Query newly-imported ActualSale rows for import_batch_id
+Group into series by (planning_location, item, distribution_channel, planning_customer)
+Skip series with fewer than min_history_periods periods of history
+Run MAD/STL-residual detection per series against mad_threshold
+Apply the persistence check: an elevation sustained for persistence_periods or more consecutive periods is a level shift, not flagged
+For each flagged ActualSale row without an existing outlier_adjustment, build an ActualSaleOutlierAdjustment(status='CANDIDATE', detected_by='SYSTEM', qty_adjustment=<suggested>)
+bulk_create the adjustment rows
+Send a Django message / notification to the client's planner(s) with the new candidate count
+ Wire trigger: post_save signal (or explicit call at the end of the existing import-completion path) on ActualSaleImport.status → 'COMPLETE' invokes detect_outlier_candidates.delay(...)
+ Unit test: synthetic single-period spike fixture → flagged
+ Unit test: synthetic sustained increase lasting exactly persistence_periods → not flagged
+ Unit test: two Client fixtures with different mad_threshold → different candidate sets on identical ActualSale fixture data
+ Unit test: series shorter than min_history_periods → skipped entirely, no adjustment created
+
+Stale-forecast flagging
+
+ Celery task flag_stale_forecast_versions(actual_sale_id) in the same task module:
+Load the ActualSale row and its period_start
+Query ForecastVersion rows with status='DRAFT' whose horizon window covers period_start
+Set stale_actuals=True on each (add this field via migration on ForecastVersion if not already present) — no auto-rerun
+ Wire trigger: post_save signal on ActualSaleOutlierAdjustment when status transitions to/from 'CONFIRMED'
+ Unit test: confirming an adjustment inside a DRAFT version's horizon sets stale_actuals=True on that version only, not on unrelated versions
+ Unit test: rejecting a previously-confirmed adjustment also re-flags affected DRAFT versions
+
+Views / endpoints (Django Template + HTMX)
+
+ demand_ui/views/outliers.py — OutlierQueueView (full page, GET /demand/outliers/): filterable by status, item, planning_location, planning_customer, distribution_channel, period range; paginated
+ OutlierConfirmView (POST /demand/outliers/{id}/confirm/, HTMX): sets status='CONFIRMED', confirmed_by, confirmed_at; returns the re-rendered row fragment
+ OutlierRejectView (POST /demand/outliers/{id}/reject/, HTMX): sets status='REJECTED'; returns the re-rendered row fragment
+ RaiseExceptionView (GET/POST /demand/actuals/{actual_sale_id}/outlier/raise/, HTMX): GET renders the form fragment from the Actuals Dashboard drill-down row; POST validates (qty_adjustment <= actual_sale.qty, etc. via clean()) and creates a CONFIRMED, detected_by='USER' adjustment directly
+ Thin DRF GET /api/demand/outliers/ JSON endpoint — candidate count only, for the nav badge
+ Unit tests: confirm/reject views update status correctly and return the expected fragment; raise-exception view rejects an over-limit submission with a form error, not a 500
+
+Templates
+
+ templates/demand_ui/outliers/queue.html — full-page queue, extends the existing base layout
+ templates/demand_ui/outliers/_row.html — HTMX swap target for confirm/reject
+ templates/demand_ui/outliers/_raise_exception_form.html — HTMX form fragment
+ Add nav badge (open candidate count) to the shared demand_ui nav partial
+ Add stale_actuals badge to the Forecast Version list template for affected DRAFT versions
+
+Admin
+
+ ActualSaleOutlierAdjustmentAdmin: list filter on status, linked actual_sale display, read-only detected_by/created_by/confirmed_by/confirmed_at
+ Add the six new fields to the existing ClientAdmin fieldset (grouped under an "Outlier Detection" collapsible section with the "leave untouched if not sure" help text already on the model fields)
+
+Wrap-up
+
+ Update CHANGELOG / migration notes
+ Confirm python manage.py makemigrations --check is clean before merging
+- [ ] Admin: ActualSaleOutlierAdjustmentAdmin with status filter, linked actual_sale display; OutlierDetectionConfigAdmin for threshold tuning
+- [ ] Unit tests:
+Candidate detection flags a known synthetic spike, does not flag a sustained increase lasting persistence_periods periods
+Two Clients with different OutlierDetectionConfig thresholds produce different candidate sets on identical actuals fixtures
+Missing OutlierDetectionConfig row falls back to system defaults without error
+clean() rejects an adjustment exceeding actual_sale.qty / .revenue
+actuals_queryset_with_net(use_net=True) returns correct net_qty/net_revenue for a row with a CONFIRMED adjustment, and unmodified values for a row with a CANDIDATE/REJECTED adjustment or none
+actuals_queryset_with_net(use_net=False) returns raw values regardless of adjustment status
+Confirming an adjustment for a period inside a DRAFT version's horizon sets stale_actuals=True on that version only
+
 ---
  
 ### Sprint 3B.3 — Forecast Models and Version Management
@@ -362,6 +456,7 @@ React SPA frontend served under `/{client_id}/planning/`.
  
 ### Sprint 3B.4 — Statistical Forecast Engine
 - [ ] Create `utils/demand/forecast_engine.py`:
+Statistical Forecast Engine: build_actuals_dataframe uses the query-time net/raw join gated by Client.forecast_uses_net_actuals. Add unit test: a forecast run against a Client with a confirmed outlier adjustment produces a materially different statistical forecast than the same run with the adjustment rejected — regression guard proving the net path is actually consumed.
   - `build_actuals_dataframe(client_id, period_start, period_end)` → Polars DataFrame via DuckDB
   - `build_summing_matrix(client_id)` → numpy array `S` + `tags` dict for three hierarchy dimensions
   - `run_statsforecast(actuals_df, horizon_months)` → forecasts DataFrame
@@ -383,17 +478,20 @@ React SPA frontend served under `/{client_id}/planning/`.
 ---
  
 ### Sprint 3B.5 — Consensus Override Engine
+compute_proportional_shares uses the same helper, gated by client.forecast_uses_net_actuals, for same-period-last-year share calculation.
 - [ ] Create `utils/demand/override_engine.py`:
   - `resolve_leaf_lines(version_id, override_key, override_level)` → list of leaf `ForecastLine` PKs in subtree
   - `compute_proportional_shares(leaf_lines, base_year, base_month_range)` → dict of leaf_pk → share
   - `apply_override(override_id)` → updates `ForecastLine.override_qty` for each leaf
   - `recompute_aggregates(version_id, affected_agg_keys)` → updates `ForecastAggregate` records
+  
 - [ ] Routing logic: subtree < 500 leaves → synchronous; ≥ 500 → Celery task `propagate_override(override_id)`
 - [ ] REST endpoints:
   - `GET/POST /api/demand/forecast-versions/{id}/overrides/`
   - `DELETE /api/demand/forecast-versions/{id}/overrides/{override_id}/` (reverts leaf lines to statistical)
 - [ ] Unit tests:
   - Proportional disaggregation sums to override total (within rounding tolerance)
+  Consensus Override Engine: compute_proportional_shares uses the same net/raw query helper for same-period-last-year share calculation.
   - Override revert restores statistical_qty values
   - LOCKED version rejects override POST
 ---
@@ -408,8 +506,15 @@ React SPA frontend served under `/{client_id}/planning/`.
 - [ ] REST endpoint: `GET /api/demand/forecast-versions/{id}/accuracy/`
 - [ ] Unit tests: MAPE formula; WMAPE aggregate; division-by-zero guard (actual = 0)
 ---
- 
-### Sprint 3B.7 — React SPA Frontend
+
+### Sprint 3B.7a — Demand Planning UI (Django Template + HTMX): 
+the Outlier Review Queue is delivered as part of Sprint 3B.2b itself (see task list above) rather than as a separate frontend sprint, since the existing demand_ui/ app already uses Django Template + HTMX — there's no separate SPA build to schedule. Sprint 3B.7 only needs:
+
+ Link the Outlier Review Queue into the main demand_ui navigation
+ Confirm the stale_actuals badge renders correctly alongside other Forecast Version statuses in the existing dashboard views
+ Cross-browser check consistent with existing demand_ui QA pass (the project has hit Firefox-specific dialog issues before — worth including outlier confirm/reject dialogs in that pass)
+
+### Sprint 3B.7b — React SPA Frontend
 - [ ] Scaffold React app under `frontend/planning/` (Vite + TypeScript)
 - [ ] Served under `/{client_id}/planning/` via a Django catch-all view that returns `planning.html` shell
 - [ ] Auth: shares Django session cookie; DRF SessionAuthentication on all demand API endpoints
@@ -433,6 +538,15 @@ React SPA frontend served under `/{client_id}/planning/`.
   - MAPE / Bias / WMAPE by product group, by location, by sales node
   - Sortable AG Grid; ECharts bar chart for top N worst-performing SKUs
 - [ ] Unit tests (Vitest): AG Grid cell edit triggers correct API call; polling interval logic; share computation display
+
+
+ Candidate list (AG Grid): item × planning_location × distribution_channel × planning_customer × period, system-suggested qty/revenue adjustment, confidence indicator
+ Inline confirm/reject actions; confirm opens an edit form (planner can adjust the suggested qty/revenue split before confirming)
+ "Raise exception" action from within the Actuals Dashboard drill-down table — lets a planner flag any ActualSale row directly, not only system-suggested candidates
+ Badge/count on nav showing open candidate count
+ stale_actuals badge shown against affected DRAFT forecast versions
+ Detection sensitivity settings panel (client admin only) — edits OutlierDetectionConfig
+ Unit tests (Vitest): confirm action triggers correct API call with edited values; raise-exception form validation (cannot exceed the row's qty/revenue)
 ---
  
 ### Sprint 3B.8 — Phase 3A Integration

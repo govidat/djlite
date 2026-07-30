@@ -32,6 +32,7 @@
                         <th>{% trans "Item" %}</th>
                         <th>{% trans "Location" %}</th>
                         <th>{% trans "Customer" %}</th>
+                        {% if show_channel %}<th>{% trans "Channel" %}</th>{% endif %}
                         {% if override.override_level == 'sku' %}
                         <th class="text-right">{% trans "Stat Qty" %}</th>
                         <th class="text-right">{% trans "Override Qty" %}</th>
@@ -49,6 +50,7 @@
                         </td>
                         <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
                         <td class="text-xs">{{ line.planning_customer.code|default:"—" }}</td>
+                        {% if show_channel %}<td class="text-xs">{{ line.distribution_channel.code|default:"—" }}</td>{% endif %}
                         {% if override.override_level == 'sku' %}
                         <td class="text-right">{{ line.statistical_qty|floatformat:0 }}</td>
                         <td class="text-right">
@@ -66,7 +68,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-base-content/50">
+                        <td colspan="{% if show_channel %}8{% else %}7{% endif %}" class="text-center py-4 text-base-content/50">
                             {% trans "No lines matched this override." %}
                         </td>
                     </tr>

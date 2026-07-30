@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 
 from mysite.admin.global_config import (
-    ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline
+    ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline, DistributionChannelAdmin
 )
 from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientFeatureControlAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin #ClientTemplateAdmin
 
@@ -14,7 +14,7 @@ from mysite.admin.users import (
 )
 from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, TaxonomyNodeAdmin, NodeAttributeTypeAdmin, NodeAttributeValueAdmin
 
-from mysite.admin.demand import PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, CustomerSalesAssignmentAdmin, ActualSaleAdmin, ItemPlanningProfileAdmin
+from mysite.admin.demand import PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, SalesForecastLinkAdmin, ActualSaleAdmin, ItemPlanningProfileAdmin
 
 from mysite.admin.demand_forecast import ( 
     ForecastVersionAdmin, ForecastLineAdmin, ForecastAccuracyAdmin, 
@@ -23,7 +23,7 @@ from mysite.admin.demand_forecast import (
 )
 
 from mysite.models import (
-    ThemePreset, GlobalValCat, GlobalVal,
+    ThemePreset, GlobalValCat, GlobalVal, DistributionChannel,
     Client, ClientBlock, ClientFeatureControl, 
     ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper,
     Theme, ClientLocation,
@@ -34,7 +34,7 @@ from mysite.models import (
     GlobalItem, Taxonomy, Item,
     TaxonomyNode, NodeAttributeType, NodeAttributeValue,
     # Demand Planning
-    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, ItemPlanningProfile,
+    PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, ActualSaleImport, ActualSale, ItemPlanningProfile,
     ForecastVersion, ForecastLine, ForecastAccuracy, 
     AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile,
     ForecastAggregate, ForecastOverride
@@ -48,6 +48,9 @@ admin.site.register(ClientFeatureControl,          ClientFeatureControlAdmin)
 
 
 admin.site.register(ThemePreset,          ThemePresetAdmin)
+admin.site.register(DistributionChannel,          DistributionChannelAdmin)
+
+
 admin.site.register(GlobalValCat,         GlobalValCatAdmin)
 admin.site.register(Client,               ClientAdmin)
 admin.site.register(ClientContentStructured,  ClientContentStructuredAdmin)
@@ -70,7 +73,7 @@ admin.site.register( NodeAttributeValue,  NodeAttributeValueAdmin)
 admin.site.register( PlanningLocation,  PlanningLocationAdmin)
 admin.site.register( PlanningCustomer,  PlanningCustomerAdmin)
 admin.site.register( SalesNode,  SalesNodeAdmin)
-admin.site.register( CustomerSalesAssignment,  CustomerSalesAssignmentAdmin)
+admin.site.register( SalesForecastLink,  SalesForecastLinkAdmin)
 admin.site.register( ActualSale,  ActualSaleAdmin)
 admin.site.register( ItemPlanningProfile,  ItemPlanningProfileAdmin)
 # Forecasting

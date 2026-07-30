@@ -14,6 +14,7 @@ from .global_config import (
     ThemePreset,
     GlobalValCat,
     GlobalVal,
+    DistributionChannel
 )
 
 from .client import (
@@ -80,9 +81,9 @@ from .demand import (
     PlanningLocation,
     PlanningCustomer,
     SalesNode,
-    CustomerSalesAssignment,
+    SalesForecastLink,
     ActualSaleImport,
-    ActualSale,
+    ActualSale,ActualSaleOutlierAdjustment,
     ActualSaleLocation, ItemPlanningProfile,
     ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, 
     AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile

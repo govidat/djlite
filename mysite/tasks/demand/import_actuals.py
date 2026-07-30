@@ -14,12 +14,13 @@ This is the core of Sprint 3B.2. The task:
 ### 4.1 Expected column headers in the upload file
 
 ```
-period_start    YYYY-MM-DD   required
-item_id         string       required — must match Item.item_id for this client
-location_code   string       required — must match PlanningLocation.code
-customer_code   string       optional — blank = unattributed (planning_customer=NULL)
-qty             decimal      required
-revenue         decimal      optional
+period_start              YYYY-MM-DD   required
+item_id                   string       required — must match Item.item_id for this client
+location_code             string       required — must match PlanningLocation.code
+customer_code             string       optional — blank = unattributed (planning_customer=NULL)
+distribution_channel_code string       optional — defaults to '00'
+qty                       decimal      required
+revenue                   decimal      optional
 ```
 
 `period_type` is NOT a column in the file — it is specified at upload time
@@ -41,13 +42,13 @@ from mysite.models.demand.actuals import (
     compute_period_end, validate_period_start,
 )
 from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
-from mysite.models import Item   # adjust import path to match your project
+from mysite.models import Item, DistributionChannel
 
 logger = logging.getLogger(__name__)
 
 # ── Column spec ───────────────────────────────────────────────────────────────
 REQUIRED_COLUMNS = {'period_start', 'item_id', 'planning_location_code', 'qty'}
-OPTIONAL_COLUMNS = {'customer_code', 'revenue'}
+OPTIONAL_COLUMNS = {'customer_code', 'distribution_channel_code', 'revenue'}
 ALL_COLUMNS      = REQUIRED_COLUMNS | OPTIONAL_COLUMNS
 
 # ── Batch size for bulk_create ────────────────────────────────────────────────
@@ -168,6 +169,15 @@ def _run_import(job: ActualSaleImport):
         cust.code: cust
         for cust in PlanningCustomer.objects.filter(client=client, is_active=True)
     }
+    # Fetch distribution channels allowed for this client
+    if client.is_distribution_channel_enabled():
+        allowed_channel_codes = client.get_allowed_distribution_channel_codes()
+    else:
+        allowed_channel_codes = {'00'}
+    channel_map = {
+        ch.code: ch
+        for ch in DistributionChannel.objects.filter(code__in=allowed_channel_codes)
+    }
 
     # ── 4. Parse and validate each row ───────────────────────────────────────
     valid_records = []
@@ -210,6 +220,20 @@ def _run_import(job: ActualSaleImport):
                     f"customer_code '{customer_code_raw}': not found or inactive"
                 )
 
+        # distribution_channel (optional — defaults to '00')
+        channel_code_raw = str(row.get('distribution_channel_code', '')).strip()
+        channel_code = channel_code_raw or '00'
+        channel = channel_map.get(channel_code)
+        if not channel:
+            if channel_code_raw:
+                row_errors.append(
+                    f"distribution_channel_code '{channel_code_raw}': not allowed for this client"
+                )
+            else:
+                row_errors.append(
+                    "distribution_channel_code: default channel '00' is not configured for this client"
+                )
+
         # qty
         qty_raw = str(row.get('qty', '')).strip()
         qty = None
@@ -238,16 +262,17 @@ def _run_import(job: ActualSaleImport):
 
         valid_records.append(
             ActualSale(
-                client            = client,
-                item              = item,
-                planning_location = location,
-                planning_customer = customer,
-                period_type       = period_type,
-                period_start      = period_start,
-                period_end        = period_end,
-                qty               = qty,
-                revenue           = revenue,
-                import_batch      = job,
+                client               = client,
+                item                 = item,
+                planning_location    = location,
+                planning_customer    = customer,
+                distribution_channel = channel,
+                period_type          = period_type,
+                period_start         = period_start,
+                period_end           = period_end,
+                qty                  = qty,
+                revenue              = revenue,
+                import_batch         = job,
             )
         )
 
@@ -255,10 +280,10 @@ def _run_import(job: ActualSaleImport):
     # update_conflicts=True makes this idempotent:
     # re-uploading the same file updates qty/revenue rather than failing
     # on the unique_together constraint.
-    update_fields = ['qty', 'revenue', 'import_batch']
+    update_fields = ['qty', 'revenue', 'distribution_channel', 'import_batch']
     unique_fields = [
-        'client', 'planning_location', 'item',
-        'planning_customer', 'period_type', 'period_start',
+        'client', 'planning_location', 'distribution_channel',
+        'item', 'planning_customer', 'period_type', 'period_start',
     ]
 
     inserted_count = 0

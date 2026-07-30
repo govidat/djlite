@@ -99,6 +99,67 @@ def planning_customer(db, client_obj):
 
 
 @pytest.fixture
+def distribution_channel_common(db):
+    from mysite.models import DistributionChannel
+    dc, _ = DistributionChannel.objects.get_or_create(
+        code='00', defaults={'label': 'Common'},
+    )
+    return dc
+
+
+@pytest.fixture
+def distribution_channel_retail(db):
+    from mysite.models import DistributionChannel
+    dc, _ = DistributionChannel.objects.get_or_create(
+        code='01', defaults={'label': 'Retail'},
+    )
+    return dc
+
+
+@pytest.fixture
+def sales_root(db, client_obj):
+    from mysite.models.demand.hierarchy import SalesNode
+    return SalesNode.objects.create(
+        client=client_obj, code='NSM', name='National', level_label='National',
+    )
+
+
+@pytest.fixture
+def sales_leaf(db, client_obj, sales_root):
+    from mysite.models.demand.hierarchy import SalesNode
+    leaf = SalesNode.objects.create(
+        client=client_obj, code='REP-01', name='Rep 1', level_label='Sales Rep',
+        parent=sales_root,
+    )
+    leaf.refresh_from_db()
+    return leaf
+
+
+@pytest.fixture
+def sales_forecast_link_shape_c(db, client_obj, leaf_location, sales_leaf):
+    """Shape 'c' — leaf_location only, no channel/customer."""
+    from mysite.models.demand.hierarchy import SalesForecastLink
+    import datetime
+    return SalesForecastLink.objects.create(
+        client=client_obj, planning_location=leaf_location, sales_node=sales_leaf,
+        valid_from=datetime.date(2024, 1, 1),
+    )
+
+
+@pytest.fixture
+def sales_forecast_link_shape_a(db, client_obj, leaf_location, sales_leaf,
+                                 distribution_channel_common, planning_customer):
+    """Shape 'a' — leaf_location + distribution_channel + planning_customer."""
+    from mysite.models.demand.hierarchy import SalesForecastLink
+    import datetime
+    return SalesForecastLink.objects.create(
+        client=client_obj, planning_location=leaf_location, sales_node=sales_leaf,
+        distribution_channel=distribution_channel_common, planning_customer=planning_customer,
+        valid_from=datetime.date(2024, 1, 1),
+    )
+
+
+@pytest.fixture
 def planner_user(db, django_user_model):
     user, _ = django_user_model.objects.get_or_create(
         username='planner',
@@ -168,7 +229,7 @@ def draft_version(db, client_obj, planner_user):
 
 
 @pytest.fixture
-def draft_version_with_lines(db, draft_version, active_item, leaf_location):
+def draft_version_with_lines(db, draft_version, active_item, leaf_location, distribution_channel_common):
     from mysite.models.demand.forecast import ForecastLine
 
     periods = [
@@ -178,43 +239,45 @@ def draft_version_with_lines(db, draft_version, active_item, leaf_location):
     lines = []
     for ps, pe in periods:
         line = ForecastLine.objects.create(
-            version           = draft_version,
-            item              = active_item,
-            planning_location = leaf_location,
-            planning_customer = None,
-            period_type       = 'month',
-            period_start      = ps,
-            period_end        = pe,
-            statistical_qty   = Decimal('100.000'),
-            final_qty         = Decimal('100.000'),
-            price_used        = Decimal('150.00'),
-            statistical_value = Decimal('15000.00'),
-            final_value       = Decimal('15000.00'),
-            model_used        = 'AutoETS',
-            forecast_level    = 'item_cust_location',
+            version              = draft_version,
+            item                 = active_item,
+            planning_location    = leaf_location,
+            planning_customer    = None,
+            distribution_channel = distribution_channel_common,
+            period_type          = 'month',
+            period_start         = ps,
+            period_end           = pe,
+            statistical_qty      = Decimal('100.000'),
+            final_qty            = Decimal('100.000'),
+            price_used           = Decimal('150.00'),
+            statistical_value    = Decimal('15000.00'),
+            final_value          = Decimal('15000.00'),
+            model_used           = 'AutoETS',
+            forecast_level       = 'item_cust_location',
         )
         lines.append(line)
     return draft_version, lines[0], lines[1]
 
 @pytest.fixture
-def series_profile(db, client_obj, active_item, leaf_location, planning_customer):
+def series_profile(db, client_obj, active_item, leaf_location, planning_customer, distribution_channel_common):
     from mysite.models.demand.forecast import SeriesProfile
     import datetime
     return SeriesProfile.objects.create(
-        client            = client_obj,
-        item              = active_item,
-        planning_location = leaf_location,
-        planning_customer = planning_customer,
-        period_type       = 'month',
-        analysis_from     = datetime.date(2023, 1, 1),
-        analysis_to       = datetime.date(2024, 12, 31),
-        total_periods     = 24,
-        nonzero_periods   = 20,
-        total_qty         = Decimal('2400.000'),
-        zero_rate         = Decimal('0.1667'),
-        demand_class_atomic = 'SMOOTH',
-        abc_class_atomic    = 'A',
-        chosen_grain      = 'item_cust_location',
-        chosen_strategy   = 'AUTOETS',
-        chosen_eval_period = 'month',
+        client               = client_obj,
+        item                 = active_item,
+        planning_location    = leaf_location,
+        planning_customer    = planning_customer,
+        distribution_channel = distribution_channel_common,
+        period_type          = 'month',
+        analysis_from        = datetime.date(2023, 1, 1),
+        analysis_to          = datetime.date(2024, 12, 31),
+        total_periods        = 24,
+        nonzero_periods      = 20,
+        total_qty            = Decimal('2400.000'),
+        zero_rate            = Decimal('0.1667'),
+        demand_class_atomic  = 'SMOOTH',
+        abc_class_atomic     = 'A',
+        chosen_grain         = 'item_cust_location',
+        chosen_strategy      = 'AUTOETS',
+        chosen_eval_period   = 'month',
     )

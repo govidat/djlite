@@ -4,8 +4,12 @@
 {% block demand_content %}
 <div class="flex items-center justify-between mb-6">
     <h2 class="text-xl font-bold">{% trans "Actual Sales" %}</h2>
-    <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
-       class="btn btn-primary btn-sm">↑ {% trans "Upload Actuals" %}</a>
+    <div class="flex gap-2">
+        <a href="{% url 'demand_ui:actuals_aggregates' client_id=client.client_id %}"
+           class="btn btn-ghost btn-sm">Σ {% trans "View Summary" %}</a>
+        <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+           class="btn btn-primary btn-sm">↑ {% trans "Upload Actuals" %}</a>
+    </div>
 </div>
 
 <div id="actuals-table-container">
@@ -16,39 +20,3 @@
 
 
 {% endblock %}
-
-{% comment %}
-
-
-{% extends "demand/_base_demand.html" %}
-{% load i18n %}
-
-{% block demand_content %}
-<div class="flex items-center justify-between mb-6">
-    <h2 class="text-xl font-bold">{% trans "Actual Sales" %}</h2>
-    <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
-       class="btn btn-primary btn-sm">↑ {% trans "Upload Actuals" %}</a>
-</div>
-
-<div class="flex flex-wrap gap-2 mb-4"
-     hx-get="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
-     hx-trigger="change delay:400ms"
-     hx-target="#actuals-table-container"
-     hx-include="this">
-    <input type="text" name="item_id" value="{{ filters.item_id }}"
-           placeholder="{% trans 'Item ID' %}" class="input input-bordered input-sm w-40">
-    <input type="text" name="location_code" value="{{ filters.location_code }}"
-           placeholder="{% trans 'Location' %}" class="input input-bordered input-sm w-32">
-    <select name="period_type" class="select select-bordered select-sm">
-        <option value="">{% trans "All periods" %}</option>
-        {% for k, v in period_choices %}
-        <option value="{{ k }}" {% if filters.period_type == k %}selected{% endif %}>{{ v }}</option>
-        {% endfor %}
-    </select>
-</div>
-
-<div id="actuals-table-container">
-    {% include "demand/partials/actuals_table_body.html" %}
-</div>
-{% endblock %}
-{% endcomment %}

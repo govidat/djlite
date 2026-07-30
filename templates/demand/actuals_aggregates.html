@@ -1,0 +1,39 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-xl font-bold">{% trans "Actuals Summary" %}</h2>
+        <p class="text-sm text-base-content/60">{% trans "Actual Sales" %}</p>
+    </div>
+    <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+       class="btn btn-ghost btn-sm">← {% trans "Back to detail view" %}</a>
+</div>
+
+{# ── Level selector ────────────────────────────────────────────────── #}
+<div class="tabs tabs-boxed mb-4 w-fit" id="actuals-agg-level-tabs">
+    {% for level in agg_level_choices %}
+    <a class="tab {% if agg_level == level %}tab-active{% endif %}"
+       id="actuals-agg-tab-{{ level }}"
+       hx-get="{% url 'demand_ui:actuals_aggregates' client_id=client.client_id %}?agg_level={{ level }}"
+       hx-target="#actuals-aggregates-container"
+       hx-swap="innerHTML"
+       hx-headers='{"HX-Request": "true"}'
+       hx-on:click="
+           document.querySelectorAll('#actuals-agg-level-tabs .tab')
+               .forEach(function(t){t.classList.remove('tab-active')});
+           this.classList.add('tab-active');
+       ">
+        {{ level|capfirst }}
+    </a>
+    {% endfor %}
+</div>
+
+{# ── Filter bar + table — both inside swap target ─────────────────── #}
+<div id="actuals-aggregates-container">
+    {% include "demand/partials/actuals_aggregates_filter_bar.html" %}
+    {% include "demand/partials/actuals_aggregates_table_body.html" %}
+</div>
+
+{% endblock %}

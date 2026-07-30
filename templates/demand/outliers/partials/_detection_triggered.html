@@ -1,0 +1,5 @@
+{% load i18n %}
+{# Swapped into #detection-status after successfully queueing detection. #}
+<p class="alert alert-info text-sm">
+  {% blocktrans %}Detection started for {{ period_start }} to {{ period_end }} — this runs in the background. Refresh the page in a moment to see new candidates and an updated "last run" range.{% endblocktrans %}
+</p>

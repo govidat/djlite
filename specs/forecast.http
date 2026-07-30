@@ -20,6 +20,284 @@
 # for forecasting let the default be product_planning taxonony node. If it is not there let it take gpc
 # Optional SalesNode PlanningLocation hierarchy lin kis not visible in any of the reports so far?
 # 
+
+"""
+Distribution Channel values to be 2 char key in global_config.py> distribution_channel model. To be maintained afresh
+Values are 00 Common, 01 Retail, 02 Institutional
+Distribution Channel to be a foreign key relationship for Actual Sales, with default values as 00.
+In planningparameters of CLient the set of allowed values of Distribution Channel to be maintained with default 00.
+Sales Team Hierarchy to be maintained per Client. At the lowest level of Sales Hierarchy a link has to be maintained and this will be in the form of:
+a. Leaf Location/ Distribution Channel / Customer level b.Leaf Location/ Distribution Channel level c. Leaf Location level. Data to be searched this way until it gets a value.
+Below mentioned models need modification for the same.
+Rest of the Sales Hierarchy to be taken from below existing models:
+
+Grain selection to be based on the following steps:
+Sales Team is a key contributor to Sales Forecasting consensus building. The link to Sales hierarchy as mentioned above is :
+a. Leaf Location/ Distribution Channel / Customer level b.Leaf Location/ Distribution Channel level c. Leaf Location level.
+
+
+if a - item/ leaf location / distribution channel / customer  
+if b - item/ leaf location / distribution channel
+if c - item/ leaf location 
+item / Sales Hierarchy + 1 ... till end of Sales Hierarchy
+item / Top level Sales Hierarchy / Period hierarchy
+
+if a - item hierarchy + 1 / leaf location / distribution channel / customer  
+if b - item hierarchy + 1 / leaf location / distribution channel
+if c - item hierarchy + 1 / leaf location
+item hierarchy + 1 / Sales Hierarchy + 1 ... till end of Sales Hierarchy
+item hierarchy + 1 / item / Top level Sales Hierarchy / Period hierarchy
+Repeat above 5 steps till end of item hierarchy
+
+Sequenced rollout
+Migrations first, in this order (each depends on the previous): 
+DistributionChannel model + seed data → 
+ActualSale.distribution_channel FK (default '00', backfill, widen unique_together) 
+→ SalesForecastLink model → ForecastingConfig new fields (planning_producthierarchy, allowed_distribution_channels, 
+default_distribution_channel, drop evaluate_customer_grain) → 
+SeriesProfile.distribution_channel FK + widened unique_together.
+Backfill SalesForecastLink from whatever mapping currently exists (even if it's just "every leaf location → its immediate parent as a pseudo sales node") — nothing downstream works without at least shape-c coverage.
+Data-quality pass: run a read-only report of which leaf locations have no SalesForecastLink and which items have no ItemTaxonomyNode in the configured planning_producthierarchy taxonomy, before turning on the new engine — both degrade gracefully, but you want to know the blast radius, not discover it in a forecast run.
+Swap hierarchy_utils.py (below) — pure additions/bulk versions, safe to deploy independently.
+Swap compute_series_profiles.py (below) — this is the behavior change; 
+run it once in a dry-run/staging mode against a real client and spot-check SeriesLevelEvaluation rows before wiring it into the Celery task.
+Patch forecast_engine.py disaggregation (below) last, once grain strings from step 5 are actually landing in SeriesProfile.chosen_grain — 
+it keys off those exact strings.
+Reconciliation step in run_forecast.py — revisit once 6 is in; it's now largely redundant for the bias it was meant to catch (residual disaggregation handles that at the source), so decide whether to keep it as a coherence smoother or drop it.
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. Planning Customer Hierarchy
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PlanningCustomer(MaterializedPathMixin):
+    """
+    Standalone customer / customer-group hierarchy for Demand Planning.
+
+    Completely independent of CustomerProfile (eCommerce buyer tied to auth.User).
+    Two kinds of nodes are used:
+
+    1. REAL customer   — leaf node representing a specific buyer (is_group=False).
+    2. PLANNING group  — aggregate node representing unattributed or grouped
+                         demand (is_group=True), e.g. 'Walk-in / Retail'.
+
+    ActualSale.planning_customer is nullable (null = truly unattributed demand).
+    When a real customer is not individually tracked, create a group node instead
+    and assign all such demand to it.
+    """
+
+    CUSTOMER_TYPE_CHOICES = [
+        ("real",  _("Real customer")),
+        ("pseudo", _("Dummy customer")),
+        ("group", _("Planning group")),
+    ]
+
+    client = models.ForeignKey(
+        "mysite.Client",
+        on_delete=models.CASCADE,
+        related_name="planning_customers",
+        verbose_name=_("client"),
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="children",
+        verbose_name=_("parent"),
+    )
+    code = models.CharField(_("code"), max_length=64)
+    name = models.CharField(_("name"), max_length=255, blank=True)   # modeltranslation blank=True to be present expands blank=True to be added
+    customer_type = models.CharField(
+        _("customer type"),
+        max_length=16,
+        choices=CUSTOMER_TYPE_CHOICES,
+        default="real",
+        help_text=_("Actuals and forecasts are NOT stored at group level"),
+    )
+    level_label = models.CharField(
+        _("level label"),
+        max_length=64,
+        help_text=_("E.g. 'Channel', 'Key Account', 'Customer'."),
+        blank=True   # modeltranslation blank=True to be present expands blank=True to be added
+    )
+    # Optional: store the external ERP / CRM ID for sync purposes
+    external_id = models.CharField(
+        _("external ID"),
+        max_length=128,
+        blank=True,
+        db_index=True,
+        help_text=_("ERP / CRM identifier. Used during data import to match rows."),
+    )
+    is_active = models.BooleanField(_("active"), default=True)
+    notes = models.TextField(_("notes"), blank=True)
+
+    class Meta:
+        app_label = "mysite"
+        unique_together = [("client", "code")]
+        ordering = ["path"]
+        verbose_name = _("02-02 Planning Customer")
+        verbose_name_plural = _("02-02 Planning Customers")
+        indexes = [
+            models.Index(
+                fields=["client", "customer_type"],
+                name="ix_plancust_client_type",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.parent_id and self.parent.client_id != self.client_id:
+            raise ValidationError(_("Parent customer must belong to the same client."))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. Sales Node Hierarchy (Sales Force Org Chart)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SalesNode(MaterializedPathMixin):
+    """
+    Represents the sales-force organisational chart for demand planning.
+
+    Levels might be: National Sales Manager → Regional Manager → Area Manager → Sales Rep
+    Leaf nodes are individual sales reps who are assigned to PlanningCustomers.
+
+    Optionally linked to a PlanningLocation (the geography this node covers),
+    but that link is informational — it does not drive data access.
+    """
+
+    client = models.ForeignKey(
+        "mysite.Client",
+        on_delete=models.CASCADE,
+        related_name="sales_nodes",
+        verbose_name=_("client"),
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="children",
+        verbose_name=_("parent node"),
+    )
+    # Optional soft link to a planning location (purely informational)
+    planning_location = models.ForeignKey(
+        PlanningLocation,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sales_nodes",
+        verbose_name=_("planning location"),
+        help_text=_("The location this sales node primarily covers. Informational only."),
+    )
+    code = models.CharField(_("code"), max_length=64)
+    name = models.CharField(_("name"), max_length=255, blank=True)   # modeltranslation blank=True to be present expands blank=True to be added
+    level_label = models.CharField(
+        _("level label"),
+        max_length=64,
+        help_text=_("E.g. 'National Manager', 'Area Manager', 'Sales Rep'."), 
+        blank=True)   # modeltranslation blank=True to be present expands blank=True to be added
+    is_active = models.BooleanField(_("active"), default=True)
+
+    class Meta:
+        app_label = "mysite"
+        unique_together = [("client", "code")]
+        ordering = ["path"]
+        verbose_name = _("02-03 Sales Node")
+        verbose_name_plural = _("02-03 Sales Nodes")
+
+    def __str__(self):
+        return f"{self.code} — {self.name}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.parent_id and self.parent.client_id != self.client_id:
+            raise ValidationError(_("Parent sales node must belong to the same client."))
+        if self.planning_location_id and self.planning_location.client_id != self.client_id:
+            raise ValidationError(_("Planning location must belong to the same client."))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. Customer → Sales Node Assignment (date-effective)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CustomerSalesAssignment(models.Model):
+    """
+    Date-effective assignment of a PlanningCustomer leaf to a SalesNode leaf.
+
+    A customer can be re-assigned (e.g. territory realignment) by closing the
+    current row (valid_to = today) and creating a new row.
+
+    For historical forecast accuracy, actuals are always attributed to the
+    SalesNode that was active *at the time of sale* (join on valid_from/valid_to).
+    """
+    client = models.ForeignKey(
+        "mysite.Client",
+        on_delete=models.CASCADE,
+        related_name="customer_sales_nodes",
+        verbose_name=_("client")
+    )
+    planning_customer = models.ForeignKey(
+        PlanningCustomer,
+        on_delete=models.CASCADE,
+        related_name="sales_assignments",
+        verbose_name=_("planning customer"),
+    )
+    sales_node = models.ForeignKey(
+        SalesNode,
+        on_delete=models.PROTECT,
+        related_name="customer_assignments",
+        verbose_name=_("sales node"),
+    )
+    valid_from = models.DateField(_("valid from"))
+    valid_to = models.DateField(
+        _("valid to"),
+        null=True,
+        blank=True,
+        help_text=_("Leave blank for the currently active assignment."),
+    )
+
+    class Meta:
+        app_label = "mysite"
+        verbose_name = _("02-04 Customer Sales Assignment")
+        verbose_name_plural = _("02-04 Customer Sales Assignments")
+        indexes = [
+            models.Index(
+                fields=["planning_customer", "valid_from"],
+                name="ix_custsales_cust_from",
+            ),
+            models.Index(
+                fields=["sales_node", "valid_from"],
+                name="ix_custsales_node_from",
+            ),
+        ]
+
+    def __str__(self):
+        to = self.valid_to or "present"
+        return f"{self.planning_customer} → {self.sales_node} ({self.valid_from}–{to})"
+
+    def clean(self):
+
+        from django.core.exceptions import ValidationError
+        #if not self.client_id:
+        #    self.client = self.planning_customer.client        
+        overlapping = CustomerSalesAssignment.objects.filter(
+            planning_customer=self.planning_customer,
+            valid_to__isnull=True,
+        ).exclude(pk=self.pk)
+
+        if overlapping.exists():
+            raise ValidationError(
+                _("Customer already has an open assignment.")
+            )
+        if self.valid_to and self.valid_to < self.valid_from:
+            raise ValidationError(_("valid_to must be on or after valid_from."))
+        if self.planning_customer.client_id != self.sales_node.client_id:
+            raise ValidationError(
+                _("Planning customer and sales node must belong to the same client.")
+            )
+"""
 @baseUrl = http://127.0.0.1:8000
 @client = autocomp
 @auth = Basic autocomp_ad welcome99

@@ -16,21 +16,14 @@ own folder, same as catalogue_filter_sidebar.
     </a>
   </li>
 
-  <li class="menu-title">{% trans "Forecast" %}</li>
-  <li>
-    <a href="{% url 'demand_ui:version_list' client_id=client.client_id %}"
-       class="{% if active == 'versions' %}active{% endif %}">
-      📈 {% trans "Forecast Versions" %}
-    </a>
-  </li>
-  <li>
-    <a href="{% url 'demand_ui:series_profile_list' client_id=client.client_id %}"
-       class="{% if active == 'series_profiles' %}active{% endif %}">
-      🔍 {% trans "Series Classification" %}
-    </a>
-  </li>
 
   <li class="menu-title">{% trans "Actuals" %}</li>
+  <li>
+    <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+       class="{% if active == 'actuals_upload' %}active{% endif %}">
+      ⬆️ {% trans "Upload Actuals" %}
+    </a>
+  </li>
   <li>
     <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
        class="{% if active == 'actuals' %}active{% endif %}">
@@ -38,10 +31,46 @@ own folder, same as catalogue_filter_sidebar.
     </a>
   </li>
   <li>
-    <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
-       class="{% if active == 'actuals_upload' %}active{% endif %}">
-      ⬆️ {% trans "Upload Actuals" %}
+    <a href="{% url 'demand_ui:actuals_aggregates' client_id=client.client_id %}"
+       class="{% if active == 'actuals' %}active{% endif %}">
+      📋 {% trans "View Actuals Aggregates" %}
     </a>
   </li>
+
+  {% if outlier_ui_visible %}
+  <li class="menu-title">{% trans "Outliers" %}</li>
+  <li>
+    <a href="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}"
+       class="{% if active == 'outlier_queue' %}active{% endif %}">
+      ⚠️ {% trans "Outlier Review Queue" %}
+      {% if outlier_candidate_count %}
+        <span class="badge badge-sm badge-warning">{{ outlier_candidate_count }}</span>
+      {% endif %}
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'demand_ui:outlier_decisions_report' client_id=client.client_id %}"
+       class="{% if active == 'outlier_decisions' %}active{% endif %}">
+      🗂️ {% trans "Outlier Decisions Report" %}
+    </a>
+  </li>
+  {% endif %}
+
+  <li class="menu-title">{% trans "Forecast" %}</li>
+
+  <li>
+    <a href="{% url 'demand_ui:series_profile_list' client_id=client.client_id %}"
+       class="{% if active == 'series_profiles' %}active{% endif %}">
+      🔍 {% trans "Series Classification" %}
+    </a>
+  </li>
+
+  <li>
+    <a href="{% url 'demand_ui:version_list' client_id=client.client_id %}"
+       class="{% if active == 'versions' %}active{% endif %}">
+      📈 {% trans "Forecast Versions" %}
+    </a>
+  </li>
+
 
 </ul>

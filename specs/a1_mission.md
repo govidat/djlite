@@ -78,7 +78,7 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
 |-------|-------|
 | 1 | Multi-tenant CMS: page builder, multilingual content, theme system, user auth — **substantially complete** |
 | 2 | Generic Item Catalogue: domain-agnostic items, multi-taxonomy, HTMX faceted filters — **complete** |
-| 3B | Demand Planning: actuals ingestion, statistical forecasting, hierarchical reconciliation, consensus override — **builds before 3A; feeds into 3A order creation and 3C** |
+| 3B | Demand Planning: actuals ingestion, outlier detection and planner-confirmed net actuals,, statistical forecasting, hierarchical reconciliation, consensus override — **builds before 3A; feeds into 3A order creation and 3C** |
 | 3A | eCommerce: Inquiry → Quotation → Order lifecycle, SAP-style pricing engine, Beckn-aligned models — **in progress** |
 | 3C | **Inventory Decision Engine**: policy-driven replenishment, multi-echelon supply network propagation, MRP-style netting, DDMRP, vendor-scheme cost optimization, exception-driven planner workbenches — **builds after 3B; consumes `OPERATING_PLAN` forecasts only, never `SALES_CONSENSUS`; independent of 3A except for shared `Item`/`ClientLocation` master data** |
 | 4 | Beckn / ONDC network participation: BPP role, async callbacks, digital signatures, ONDC registry; probabilistic forecasting; ML demand models |
@@ -125,7 +125,7 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
 - Attribute inheritance: TaxonomyNode attrs inherited by items, overridable at item level
 - Client can reference and derive from global items and global taxonomy nodes  
 
-### 9. Demand Planning Module (Phase 3B)
+## Phase 3B Demand Planning Module
  
 #### Business Context
  
@@ -142,14 +142,16 @@ The module generates statistical forecasts, allows business consensus overrides 
 Three independent hierarchies operate in parallel on the same Item and Customer base:
  
 **Product Hierarchy** — extends the existing `Taxonomy` / `TaxonomyNode` system.
-A dedicated Taxonomy slug `product_planning` carries the 3–5 level product grouping used in forecasting (Category → Sub-category → Brand → SKU). This reuses Phase 2 infrastructure without new models.
+A dedicated Taxonomy slug `product_planning` carries the 3–5 level product grouping used in forecasting (Category → Sub-category → Brand → SKU). This reuses Phase 2 infrastructure without new models. If a separate 'product_planning' is not used then the generic 'gpc' to be used. Alternatively the hierarchy to be used for planning purpose to be part of the Client Master (TBD).
  
 **Geography / Location Hierarchy** — extends `ClientLocation`.
 `ClientLocation` gains a `parent` self-FK (nullable) enabling a Region → Branch → Location tree. Depth is unrestricted; materialized path is added alongside the FK for efficient subtree queries (same pattern as `TaxonomyNode`).
+Important change: This Location Hierarchy is not relevant for forecasting purpose. This can be dropped and the Sales Hierarchy alone to be used for aggregation. Leaf location from which a Customer is served to be part of the forecast process as we want the independent demand to be captured at that level. Any sale to be mapped to the lowest level in the Sales Hierarchy. Simplest is a one to one mapping with the location. Else Customer Groups to be maintained and linked to the lowest in Sales Hierarchy.
  
 **Sales Hierarchy** — new model tree.
-`SalesNode(client, name, level_label, parent→self, location→ClientLocation nullable)` represents the org chart of the sales force. `CustomerSalesAssignment(customer, sales_node, valid_from, valid_to)` assigns each Customer to a leaf SalesNode with date effectivity.
- 
+`SalesNode(client, name, level_label, parent→self, location→ClientLocation nullable)` represents the org chart of the sales force. (Depreacted - `CustomerSalesAssignment(customer, sales_node, valid_from, valid_to)` assigns each Customer to a leaf SalesNode with date effectivity.)
+`SalesForecatLink (customer, sales_node, planning_location, distribution_channel, planning_customer, valid_from, valid_to)` assigns each Customer to a leaf SalesNode with date effectivity.
+
 Demand Planning to be a stand alone module and hence Customer data to be independent of CustomerProfile which is eCommerce dependent. Let a standalone Client level Customer Hierarchy be maintained for Demand Planning. This can be an arbitrary planning level Customer Hierarchy and data to be pushed directly and does not have any linkage to eCommerce sales. 
 Item hierarchy to flow from catalog module that is already in place. 
 Sales team hierarchy to be made separately for this module. 
@@ -167,7 +169,22 @@ At the lowest level, demand data will be maintained at  Planning Location, Item,
 Both `ActualSale` and `ActualSaleLocation` are **append-only by design**. Corrections are made by posting a new row with a negative quantity delta (same convention as accounting ledgers), preserving a full audit trail. A `resolved_actuals` database view (or materialized view) aggregates the net position per key combination.
  
 Unique constraint on `ActualSale`: `(client, item, customer, location, year, month)` — enforced at DB level; import service uses `INSERT ... ON CONFLICT DO UPDATE` for idempotency.
- 
+
+#### Outlier Management (Actuals Exception Handling)
+
+Real actuals occasionally contain one-off events (bulk sales, data-entry errors, partial-period anomalies) that should not shape the statistical baseline. This is handled as a hybrid system/planner workflow, not a pure automated filter and not a pure manual review queue.
+
+Design principle: ActualSale remains exactly as documented — one row per client × planning_location × item × distribution_channel × planning_customer × period_type × period_start combination, enforced by the existing unique constraint. Outlier handling is a separate, additive layer that never mutates or deletes an actual row.
+
+One-to-one adjustment. Each outlier adjustment is a single mutable record tied one-to-one to the specific ActualSale row it adjusts (OneToOneField), not a separately-keyed grain match. Since ActualSale rows don't duplicate at this grain, this is a clean 1:1 — no aggregation across rows is needed to compute a net position for a given row.
+Partial exclusion. An adjustment is not all-or-nothing. The planner (or the system, for high-confidence candidates) records how much of the row's qty/revenue is attributable to the one-off event — e.g. 400 of 500 qty and 3,500 of 5,000 revenue — rather than excluding the whole row. Qty and revenue adjustments are captured independently, since a bulk order often carries a different unit rate than the row's normal mix. Revenue adjustment is optional, mirroring ActualSale.revenue being nullable.
+Detection. After each actuals import, a statistical pass (residual-based — MAD or STL-residual thresholding) flags candidate rows. Detection looks for transient spikes, not sustained level shifts — a value that persists across a Client-configured number of periods is treated as a regime change, not a candidate, and is left alone.
+Detection sensitivity is Client-configurable, seeded from a system starter default — the same reused pattern as the existing per-Client SEIL/ADI-CV² thresholds.
+Planner review queue. Planners confirm or reject system-detected candidates, and may also raise their own exception directly against any ActualSale row (e.g. a bulk sale they know about that didn't trip the statistical threshold). A "one-off" call can be revisited later by editing the same adjustment record.
+Net position, computed at query time. Because the grain is 1:1 and duplicate-free, "net actuals" for a given row is simply qty − qty_adjustment (and revenue − revenue_adjustment where both are present) for CONFIRMED adjustments — computed via a join at query time in the forecast engine, reporting, and ABC classification code paths, rather than maintained as a separately materialized table. This avoids a staleness-tracking layer for a subtraction this cheap.
+Net by default everywhere. The statistical forecast engine, financial/revenue reporting, and ABC classification all read the net position by default. A Client can opt any one of these back to raw ActualSale via its own feature flag if, for example, finance wants the bulk sale visible in revenue reporting.
+Hierarchy scope. Outlier adjustments apply at the leaf ActualSale row. Hierarchy roll-ups (Product / Sales / Location) are computed programmatically off the already-net leaf rows — adjustments are never independently propagated up a hierarchy.
+
 #### Forecast Engine Architecture
  
 **Forecast versioning** is first-class. Every forecast run produces a `ForecastVersion` record; multiple versions coexist for the same Client and period so that statistical, consensus, and approved forecasts can be compared.
@@ -215,7 +232,7 @@ After each month closes, a Celery task joins `ActualSale` against the approved `
 - No external data feeds (weather, macro indicators) — deferred.
 - No real-time point-of-sale data ingestion — batch monthly upload only.
 - No ML models (XGBoost, LightGBM) — statistical models only in Phase 3B.
-
+- Outlier handling covers statistical candidate detection and planner-confirmed exclusion from the forecast baseline (and, by default, from reporting/ABC classification) only. It is not a general data-quality / anomaly-detection product; it does not attempt to auto-correct root-cause data entry errors upstream of ActualSale.
 ### 10. Inventory Decision Engine (Phase 3C)
 
 #### Naming and Scope Correction

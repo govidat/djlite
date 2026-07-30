@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from .models import GlobalVal
+from .models import GlobalVal, DistributionChannel
 from utils.globalval import bust_globalval_cache
 
 from django.core.cache import cache
@@ -11,8 +11,9 @@ from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProf
 from django.contrib.auth.models import User
 
 from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
-from .models import PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, ActualSaleLocation, ItemPlanningProfile
+from .models import PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, ActualSaleImport, ActualSale, ActualSaleOutlierAdjustment, ActualSaleLocation, ItemPlanningProfile
 from .models import ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
+
 """
 @receiver(post_save, sender=GlobalVal)
 @receiver(post_delete, sender=GlobalVal)
@@ -56,7 +57,7 @@ ADMIN_ONLY_MODELS = [
     Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant,
 
     # Demand Planning
-    PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale, ActualSaleLocation, ItemPlanningProfile,
+    PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, ActualSaleImport, ActualSale, ActualSaleOutlierAdjustment, ActualSaleLocation, ItemPlanningProfile,
     ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
 ]
 
@@ -67,7 +68,7 @@ ADMIN_ADD_ONLY_MODELS = [
 
 # ADMIN View only for Admin — to check if needed
 ADMIN_VIEW_ONLY_MODELS = [
-    GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue
+    GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, DistributionChannel
 ]
 
 # Actions per role per category
@@ -381,14 +382,14 @@ def get_client_id_from_instance(instance):
     Walk up the ownership chain to find the client_id.
     Returns None if the chain cannot be resolved (e.g. orphaned record).
     """
-    # PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, ActualSaleImport, ActualSale
+    # PlanningLocation, PlanningCustomer, SalesNode, ActualSaleImport, ActualSale
     try:
         # Direct
         if isinstance(instance, Client):
             return instance.client_id
 
         # One hop via client FK
-        if isinstance(instance, (Theme, Page, NavItem, ClientTemplate, PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment, 
+        if isinstance(instance, (Theme, Page, NavItem, ClientTemplate, PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, 
                                  ActualSaleImport, ActualSale, ActualSaleLocation, ItemPlanningProfile,
                                  ForecastVersion, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile)):
             return instance.client.client_id
@@ -400,7 +401,11 @@ def get_client_id_from_instance(instance):
         # Two hops: xxx → ForecastVersion → client
         if isinstance(instance, (ForecastLine, ForecastAggregate, ForecastOverride, ForecastAccuracy)):
             return instance.version.client.client_id        
-
+        
+        # Two hops: ActualSaleOutlierAdjustment → actual_sale → client
+        if isinstance(instance, ActualSaleOutlierAdjustment):
+            return instance.actual_sale.client.client_id
+        
         # Three hops: OverrideSplitWeight → ForecastOverride → ForecastVersion → client
         if isinstance(instance, OverrideSplitWeight):
             return instance.override.version.client.client_id
@@ -512,6 +517,28 @@ def clear_feature_control_cache(sender, instance, **kwargs):
         cache.delete(
             f"feature_control:{instance.client.client_id}:{feature}"
         )
+
+# ── ActualSaleOutlierAdjustment → flag stale DRAFT forecast versions ──
+
+@receiver(post_save, sender=ActualSaleOutlierAdjustment)
+def outlier_adjustment_status_changed(sender, instance, **kwargs):
+    """
+    When a planner confirms or rejects an outlier adjustment, any DRAFT
+    ForecastVersion whose horizon covers the adjusted actual's period
+    should be flagged stale — its stored ForecastLine values were computed
+    before this confirmation/rejection. Firing on every save (not just the
+    exact transition) is harmless — the task is idempotent — but if you'd
+    rather avoid redundant Celery calls on unrelated field edits (e.g. a
+    planner tweaking `reason` after confirming), guard with an
+    update_fields check instead:
+
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "status" not in update_fields:
+            return
+    """
+    if instance.status in ("CONFIRMED", "REJECTED"):
+        from mysite.tasks.demand.detect_outliers import flag_stale_forecast_versions
+        flag_stale_forecast_versions.delay(actual_sale_id=instance.actual_sale_id)
 
 # ── Registration helper (called from AppConfig.ready) ─────────────────
 

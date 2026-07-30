@@ -12,7 +12,130 @@ Every demand page extends this instead of "base.html" directly.
 Menu items use {% url 'demand_ui:...' client_id=client.client_id %}
 matching the catalogue convention of passing client_id explicitly.
 Old {% render_client_template 'demand_sidebar_nav' active=active_nav %}
+
+NEW: desktop sidebar is collapsible (Q5) — persisted via localStorage
+since navigation here is full page loads, not a SPA, so a plain CSS
+checkbox-peer toggle (like the mobile drawer below) would reset on every
+navigation. The collapsed state is applied via a tiny inline script
+before paint, and toggled by #demand-sidebar-toggle-btn.
 {% endcomment %}
+
+
+
+{% block content %}
+<style>
+  /* Plain CSS (not a Tailwind utility) so this works regardless of the
+     JIT/purge content scan — the class is added by JS at runtime, not
+     present in any template's static class list. */
+  #demand-shell.demand-sidebar-collapsed #demand-desktop-sidebar {
+    display: none;
+  }
+</style>
+<div class="min-h-screen bg-base-100" id="demand-shell">
+
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex gap-6 items-start">
+
+      {# ── Desktop sidebar nav ──────────────────────────────────────── #}
+      <aside class="w-56 shrink-0 hidden lg:block" id="demand-desktop-sidebar">
+        <div class="sticky top-20">
+          {% include "demand/partials/sidebar_nav.html" with active=active_nav %}
+          
+        </div>
+      </aside>
+
+      {# ── Main content ─────────────────────────────────────────────── #}
+      <main class="flex-1 min-w-0 overflow-x-hidden">
+
+        {# Mobile nav toggle #}
+        <div class="flex items-center justify-between mb-4 lg:hidden">
+          <label for="demand-drawer-toggle" class="btn btn-outline btn-sm gap-2 cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 4h18M7 8h10M10 12h4"/>
+            </svg>
+            {% trans "Menu" %}
+          </label>
+          <span class="text-sm text-base-content/60">{{ client.name }}</span>
+        </div>
+
+        {# Desktop sidebar collapse/expand toggle — hidden on mobile, where
+           the drawer above is the only sidebar mechanism. #}
+        <div class="hidden lg:flex items-center mb-4">
+          <button type="button" id="demand-sidebar-toggle-btn"
+                  onclick="toggleDemandSidebar()"
+                  class="btn btn-ghost btn-sm gap-2" title="{% trans 'Toggle sidebar' %}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 4h18M3 10h18M3 16h18"/>
+            </svg>
+            <span class="sr-only">{% trans "Toggle sidebar" %}</span>
+          </button>
+        </div>
+
+        {# Django messages → DaisyUI toasts #}
+        {% if messages %}
+        <div class="mb-4 space-y-2">
+          {% for message in messages %}
+          <div class="alert {% if message.tags == 'error' %}alert-error{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
+            <span>{{ message }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block demand_content %}{% endblock %}
+
+      </main>
+    </div>
+  </div>
+
+  {# ── Mobile drawer ─────────────────────────────────────────────────── #}
+  <input type="checkbox" id="demand-drawer-toggle" class="sr-only peer/drawer">
+  <label for="demand-drawer-toggle"
+         class="fixed inset-0 z-40 bg-black/50 opacity-0 pointer-events-none
+                peer-checked/drawer:opacity-100 peer-checked/drawer:pointer-events-auto
+                transition-opacity duration-300 lg:hidden cursor-pointer">
+  </label>
+  <div class="fixed top-0 left-0 h-full w-72 bg-base-100 z-50 shadow-2xl
+              -translate-x-full peer-checked/drawer:translate-x-0
+              transition-transform duration-300 overflow-y-auto p-4 lg:hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold text-lg">{% trans "Demand Planning" %}</h2>
+      <label for="demand-drawer-toggle" class="btn btn-ghost btn-sm btn-circle cursor-pointer">✕</label>
+    </div>
+    {% render_client_template 'demand_sidebar_nav' active=active_nav %}
+  </div>
+
+</div>
+
+<script>
+(function() {
+  var STORAGE_KEY = 'demandSidebarCollapsed';
+  var shell = document.getElementById('demand-shell');
+  if (!shell) return;
+
+  if (localStorage.getItem(STORAGE_KEY) === '1') {
+    shell.classList.add('demand-sidebar-collapsed');
+  }
+
+  window.toggleDemandSidebar = function() {
+    var collapsed = shell.classList.toggle('demand-sidebar-collapsed');
+    localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+  };
+})();
+</script>
+{% endblock %}
+
+{% comment %}
+{% extends "base.html" %}
+{% load i18n %}
+{% load my_tags %}
+
+
+
 
 {% block content %}
 <div class="min-h-screen bg-base-100">
@@ -80,3 +203,5 @@ Old {% render_client_template 'demand_sidebar_nav' active=active_nav %}
 
 </div>
 {% endblock %}
+{% endcomment %}
+

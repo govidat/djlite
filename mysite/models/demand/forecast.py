@@ -18,6 +18,7 @@ from mysite.models.demand.hierarchy import (
     PlanningLocation,
     PlanningCustomer,
 )
+from mysite.models import DistributionChannel
 
 User = get_user_model()
 
@@ -267,6 +268,11 @@ class ForecastVersion(models.Model):
         default=Status.DRAFT,
         db_index=True,
     )
+    stale_actuals = models.BooleanField(
+        default=False,
+        help_text=_("True if a confirmed outlier adjustment was recorded against an actual "
+                     "covered by this version's horizon after the version was generated."),
+    )    
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -437,15 +443,16 @@ class ForecastVersion(models.Model):
         original_lines = list(self.lines.all())
         cloned_lines = [
             ForecastLine(
-                version           = new_version,
-                item              = line.item,
-                planning_customer = line.planning_customer,
-                planning_location = line.planning_location,
-                period_type       = line.period_type,
-                period_start      = line.period_start,
-                period_end        = line.period_end,
-                statistical_qty   = line.statistical_qty,
-                override_qty      = line.override_qty,
+                version              = new_version,
+                item                 = line.item,
+                planning_customer    = line.planning_customer,
+                planning_location    = line.planning_location,
+                distribution_channel = line.distribution_channel,
+                period_type          = line.period_type,
+                period_start         = line.period_start,
+                period_end           = line.period_end,
+                statistical_qty      = line.statistical_qty,
+                override_qty         = line.override_qty,
                 # bulk_create bypasses save(), so compute final_qty explicitly here
                 final_qty         = line.override_qty if line.override_qty is not None
                                     else line.statistical_qty,
@@ -498,6 +505,14 @@ class ForecastLine(models.Model):
         on_delete=models.PROTECT,
         related_name='forecast_lines',
         verbose_name=_('planning location'),
+    )
+    distribution_channel = models.ForeignKey(
+        DistributionChannel,
+        on_delete=models.PROTECT,
+        default='00',
+        related_name="forecast_lines",
+        verbose_name=_("distribution channel"),
+        help_text=_("Default to 00-Common if multiple Distribution Channels are not present."),
     )
     # Period
     period_type  = models.CharField(_('period type'),  max_length=16, choices=PERIOD_TYPE_CHOICES)
@@ -598,7 +613,8 @@ class ForecastLine(models.Model):
         unique_together = [
             (
                 'version', 'item', 'planning_customer',
-                'planning_location', 'period_type', 'period_start',
+                'planning_location', 'distribution_channel',
+                'period_type', 'period_start',
             ),
         ]
         ordering    = ['period_start', 'planning_location', 'item']
@@ -1116,6 +1132,14 @@ class ForecastAccuracy(models.Model):
         related_name='forecast_accuracy',
         verbose_name=_('planning location'),
     )
+    distribution_channel = models.ForeignKey(
+        DistributionChannel,
+        on_delete=models.PROTECT,
+        default='00',
+        related_name="forecast_accuracy",
+        verbose_name=_("distribution channel"),
+        help_text=_("Default to 00-Common if multiple Distribution Channels are not present."),
+    )
     # Period
     period_type  = models.CharField(_('period type'),  max_length=16, choices=PERIOD_TYPE_CHOICES)
     period_start = models.DateField(_('period start'))
@@ -1147,7 +1171,8 @@ class ForecastAccuracy(models.Model):
         unique_together = [
             (
                 'version', 'item', 'planning_customer',
-                'planning_location', 'period_type', 'period_start',
+                'planning_location', 'distribution_channel',
+                'period_type', 'period_start',
             ),
         ]
         ordering    = ['period_start', 'item']
@@ -1387,17 +1412,60 @@ class ForecastingConfig(models.Model):
     )
 
     # ── Include customer dimension ─────────────────────────────────────────────
-    evaluate_customer_grain = models.BooleanField(
-        _('evaluate customer grain'),
-        default=True,
+    #evaluate_customer_grain = models.BooleanField(
+    #    _('evaluate customer grain'),
+    #    default=True,
+    #    help_text=_(
+    #        'If True, Part A evaluation drills down to '
+    #        'Item × Leaf Location × Planning Customer '
+    #        'as the finest possible grain. '
+    #        'If False, the finest grain is Item × Leaf Location.'
+    #    ),
+    #)
+    # ── Outlier detection & net-actuals configuration ──────────────────────
+    mad_threshold = models.DecimalField(
+        max_digits=6, decimal_places=2, default=3.5,
+        help_text=_("For Actual Sale outlier detection. Leave it untouched if not sure."),
+    )
+    persistence_periods = models.PositiveSmallIntegerField(
+        default=3,
         help_text=_(
-            'If True, Part A evaluation drills down to '
-            'Item × Leaf Location × Planning Customer '
-            'as the finest possible grain. '
-            'If False, the finest grain is Item × Leaf Location.'
+            "For Actual Sale outlier detection. Leave it untouched if not sure. Number of "
+            "consecutive periods a sustained elevation must hold before it's treated as a "
+            "level shift rather than a candidate."
+        ),
+    )
+    min_history_periods = models.PositiveSmallIntegerField(
+        default=12,
+        help_text=_(
+            "For Actual Sale outlier detection. Leave it untouched if not sure. Skip detection "
+            "for a series with fewer periods of history than this."
+        ),
+    )
+    forecast_uses_net_actuals = models.BooleanField(default=True)
+    reporting_uses_net_actuals = models.BooleanField(default=True)
+    abc_classification_uses_net_actuals = models.BooleanField(default=True)
+
+    # ── Product hierarchy taxonomy ───────────────────────────────────────────
+    planning_producthierarchy = models.CharField(
+        _('planning product hierarchy'),
+        max_length=64, default='gpc',
+        help_text=_(
+            'Taxonomy slug for the item product hierarchy used during '
+            'automated grain search (e.g. gpc, custom_planning). '
+            'Defaults to "gpc".'
         ),
     )
 
+# ── NEW: manual-trigger tracking ────────────────────────────────────────
+    last_outlier_detection_run_at = models.DateTimeField(null=True, blank=True)
+    last_outlier_detection_run_by = models.ForeignKey(
+        'auth.User', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="+",
+    )
+    last_outlier_detection_range_start = models.DateField(null=True, blank=True)
+    last_outlier_detection_range_end = models.DateField(null=True, blank=True)
+    
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -1623,6 +1691,14 @@ class SeriesProfile(models.Model):
         PlanningLocation, on_delete=models.PROTECT,
         related_name='series_profiles',
     )
+    distribution_channel = models.ForeignKey(
+        DistributionChannel,
+        on_delete=models.PROTECT,
+        default='00',
+        related_name="series_profiles",
+        verbose_name=_("distribution channel"),
+        help_text=_("Default to 00-Common if multiple Distribution Channels are not present."),
+    )
     period_type = models.CharField(max_length=16, choices=PERIOD_TYPE_CHOICES)
 
     # ── Analysis window ───────────────────────────────────────────────────────
@@ -1692,7 +1768,7 @@ class SeriesProfile(models.Model):
         app_label = 'mysite'
         unique_together = [
             ('client', 'item', 'planning_customer',
-             'planning_location', 'period_type'),
+             'planning_location', 'distribution_channel', 'period_type'),
         ]
         ordering = ['item__item_id', 'planning_location__code']
         verbose_name        = _('02-14 Series Profile')

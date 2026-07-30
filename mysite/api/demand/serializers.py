@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from mysite.models.demand.hierarchy import (
-    PlanningLocation, SalesNode, CustomerSalesAssignment, PlanningCustomer,
+    PlanningLocation, SalesNode, SalesForecastLink, PlanningCustomer,
 )
 from mysite.models.demand.forecast import (
     ForecastVersion, ForecastLine,
@@ -15,6 +15,7 @@ from mysite.models.demand.forecast import (
     SeriesLevelEvaluation,
     SeriesProfile,
 )
+from mysite.models import DistributionChannel
 # ─────────────────────────────────────────────────────────────────────────────
 # Planning Location tree
 # ─────────────────────────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ class PlanningLocationTreeSerializer(serializers.ModelSerializer):
 # ─────────────────────────────────────────────────────────────────────────────
 # Sales Node tree
 # ─────────────────────────────────────────────────────────────────────────────
-
+"""
 class CustomerSalesAssignmentSerializer(serializers.ModelSerializer):
     customer_code = serializers.CharField(
         source='planning_customer.code', read_only=True
@@ -57,8 +58,97 @@ class CustomerSalesAssignmentSerializer(serializers.ModelSerializer):
     class Meta:
         model  = CustomerSalesAssignment
         fields = ['id', 'customer_code', 'customer_name', 'valid_from', 'valid_to']
+"""
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Sales Forecast Link  (leaf-of-hierarchy link used by grain search)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SalesForecastLinkSerializer(serializers.ModelSerializer):
+    """Read serializer — used in list/detail responses and nested under
+    SalesNodeTreeSerializer (see forecast_links below)."""
+
+    location_code   = serializers.CharField(source='planning_location.code', read_only=True)
+    location_name   = serializers.CharField(source='planning_location.name', read_only=True)
+    channel_code    = serializers.CharField(
+        source='distribution_channel.code', read_only=True, default=None
+    )
+    channel_label   = serializers.CharField(
+        source='distribution_channel.label', read_only=True, default=None
+    )
+    customer_code   = serializers.CharField(
+        source='planning_customer.code', read_only=True, default=None
+    )
+    customer_name   = serializers.CharField(
+        source='planning_customer.name', read_only=True, default=None
+    )
+    sales_node_code = serializers.CharField(source='sales_node.code', read_only=True)
+    sales_node_name = serializers.CharField(source='sales_node.name', read_only=True)
+    link_type       = serializers.CharField(read_only=True)     # model @property: 'a'|'b'|'c'
+    is_active       = serializers.BooleanField(read_only=True)  # NEW — model @property
+
+    class Meta:
+        model  = SalesForecastLink
+        fields = [
+            'id', 'link_type', 'is_active',
+            'planning_location', 'location_code', 'location_name',
+            'distribution_channel', 'channel_code', 'channel_label',
+            'planning_customer', 'customer_code', 'customer_name',
+            'sales_node', 'sales_node_code', 'sales_node_name',
+            'valid_from', 'valid_to',
+        ]
+
+
+class SalesForecastLinkCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = SalesForecastLink
+        fields = ['planning_location', 'distribution_channel', 'planning_customer',
+                   'sales_node', 'valid_from', 'valid_to']
+
+    def validate(self, attrs):
+        if attrs.get('planning_customer') and not attrs.get('distribution_channel'):
+            raise serializers.ValidationError(
+                "A customer-level link also requires a distribution_channel (shape 'a' only)."
+            )
+        if attrs.get('valid_to') and attrs.get('valid_from') and attrs['valid_to'] < attrs['valid_from']:
+            raise serializers.ValidationError("valid_to must be on or after valid_from.")
+        return attrs
+
+class SalesNodeTreeSerializer(serializers.ModelSerializer):
+    children             = serializers.SerializerMethodField()
+    forecast_links        = serializers.SerializerMethodField()   # NEW
+    location_code        = serializers.CharField(
+        source='planning_location.code', read_only=True, default=None
+    )
+    location_name        = serializers.CharField(
+        source='planning_location.name', read_only=True, default=None
+    )
+
+    class Meta:
+        model  = SalesNode
+        fields = [
+            'id', 'code', 'name', 'level_label', 'is_active',
+            'depth', 'path',
+            'location_code', 'location_name',
+            'forecast_links',                                     # NEW
+            'children',
+        ]
+
+    def get_children(self, obj):
+        children = getattr(obj, '_children', [])
+        return SalesNodeTreeSerializer(children, many=True).data
+
+    #def get_forecast_links(self, obj):
+    #    links = getattr(obj, '_forecast_links', [])
+    #    active = [l for l in links if l.is_active]
+    #    return SalesForecastLinkSerializer(active, many=True).data
+
+    def get_forecast_links(self, obj):
+        links = getattr(obj, '_forecast_links', [])
+        return SalesForecastLinkSerializer(links, many=True).data
+
+"""
 class SalesNodeTreeSerializer(serializers.ModelSerializer):
     children             = serializers.SerializerMethodField()
     active_assignments   = serializers.SerializerMethodField()
@@ -91,7 +181,7 @@ class SalesNodeTreeSerializer(serializers.ModelSerializer):
             if a.valid_from <= today and (a.valid_to is None or a.valid_to >= today)
         ]
         return CustomerSalesAssignmentSerializer(assignments, many=True).data
-
+"""
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Actuals serializers (used by Sprint 3B.2 endpoints)
@@ -124,7 +214,9 @@ class ActualSaleSerializer(serializers.ModelSerializer):
     customer_code     = serializers.CharField(
         source='planning_customer.code', read_only=True, default=None
     )
-
+    distribution_channel_code = serializers.CharField(
+        source='distribution_channel.code', read_only=True, default=None
+    )
     class Meta:
         from mysite.models.demand.actuals import ActualSale
         model  = ActualSale
@@ -132,6 +224,7 @@ class ActualSaleSerializer(serializers.ModelSerializer):
             'id',
             'item_id', 'item_name',
             'location_code', 'customer_code',
+            'distribution_channel_code',
             'period_type', 'period_start', 'period_end',
             'qty', 'revenue',
         ]
@@ -202,6 +295,9 @@ class ForecastLineSerializer(serializers.ModelSerializer):
     customer_code = serializers.CharField(
         source='planning_customer.code', read_only=True, default=None
     )
+    distribution_channel_code = serializers.CharField(
+        source='distribution_channel.code', read_only=True, default=None
+    )
 
     class Meta:
         model  = ForecastLine
@@ -209,6 +305,7 @@ class ForecastLineSerializer(serializers.ModelSerializer):
             'id',
             'item_id', 'item_name',
             'location_code', 'customer_code',
+            'distribution_channel_code',
             'period_type', 'period_start', 'period_end',
             'statistical_qty', 'override_qty', 'final_qty', 'forecast_level', 'model_used', 
             'price_used', 'statistical_value', 'override_value', 'final_value',
@@ -280,7 +377,8 @@ class ForecastingConfigSerializer(serializers.ModelSerializer):
             'id',
             'adi_threshold', 'cv2_threshold', 'min_nonzero_periods',
             'time_horizon_steps',
-            'evaluate_customer_grain',
+            'planning_producthierarchy',
+            #'evaluate_customer_grain',
             'abc_class_definitions',
             'derived_time_horizons',
             'updated_at',
@@ -390,6 +488,9 @@ class SeriesProfileSerializer(serializers.ModelSerializer):
     customer_code = serializers.CharField(
         source='planning_customer.code', read_only=True, default=None
     )
+    distribution_channel_code = serializers.CharField(
+        source='distribution_channel.code', read_only=True, default=None
+    )
 
     # Computed properties from model
     effective_grain    = serializers.CharField(read_only=True)
@@ -411,6 +512,7 @@ class SeriesProfileSerializer(serializers.ModelSerializer):
             # Identity
             'item_id', 'item_name',
             'location_code', 'customer_code',
+            'distribution_channel_code',
             'period_type',
             'analysis_from', 'analysis_to', 'computed_at',
             # Atomic grain metrics
@@ -434,6 +536,7 @@ class SeriesProfileSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'item_id', 'item_name', 'location_code', 'customer_code',
+            'distribution_channel_code',
             'period_type', 'analysis_from', 'analysis_to', 'computed_at',
             'total_periods', 'nonzero_periods', 'total_qty', 'total_value',
             'adi', 'cv2', 'zero_rate',
@@ -523,6 +626,9 @@ class SeriesProfileListSerializer(serializers.ModelSerializer):
     customer_code = serializers.CharField(
         source='planning_customer.code', read_only=True, default=None
     )
+    distribution_channel_code = serializers.CharField(
+        source='distribution_channel.code', read_only=True, default=None
+    )
     effective_grain    = serializers.CharField(read_only=True)
     effective_strategy = serializers.CharField(read_only=True)
     is_overridden      = serializers.BooleanField(read_only=True)
@@ -533,6 +639,7 @@ class SeriesProfileListSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'item_id', 'location_code', 'customer_code',
+            'distribution_channel_code',
             'period_type',
             # Key metrics for list scanning
             'abc_class_atomic', 'demand_class_atomic',
@@ -681,6 +788,9 @@ class AffectedLineSerializer(serializers.ModelSerializer):
     customer_code = serializers.CharField(
         source='planning_customer.code', read_only=True, default=None
     )
+    distribution_channel_code = serializers.CharField(
+        source='distribution_channel.code', read_only=True, default=None
+    )
 
     class Meta:
         model  = ForecastLine
@@ -688,6 +798,7 @@ class AffectedLineSerializer(serializers.ModelSerializer):
             'id',
             'item_id', 'item_name',
             'location_code', 'customer_code',
+            'distribution_channel_code',
             'period_start',
             'statistical_qty',   # original statistical forecast
             'override_qty',      # what the override set it to

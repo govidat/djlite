@@ -64,7 +64,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from mysite.models import Client, Item
+        from mysite.models import Client, Item, DistributionChannel
         from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
 
         client_id   = options['client']
@@ -94,6 +94,17 @@ class Command(BaseCommand):
             .values_list('code', flat=True)[:n_examples]
         ) + ['']   # include blank to show optional
 
+        # Conditionally include distribution channel
+        distribution_channel_enabled = client.is_distribution_channel_enabled()
+        if distribution_channel_enabled:
+            allowed_codes = client.get_allowed_distribution_channel_codes()
+            sample_channels = list(
+                DistributionChannel.objects.filter(code__in=allowed_codes)
+                .values_list('code', flat=True)[:n_examples]
+            )
+        else:
+            sample_channels = []
+
         # ── Build workbook ────────────────────────────────────────────────────
         wb = openpyxl.Workbook()
 
@@ -111,6 +122,14 @@ class Command(BaseCommand):
             "Planning location code. Must be an active leaf location."),
             ("planning_customer_code",    24, sample_customers[0] if sample_customers else "",
             "Optional. Leave blank for unattributed demand."),
+        ]
+        if distribution_channel_enabled:
+            columns.append(
+                ("distribution_channel_code", 24,
+                 sample_channels[0] if sample_channels else "00",
+                 "Distribution channel code. Must be an allowed channel for this client.")
+            )
+        columns += [
             ("qty",            14, "100",
              "Sales quantity in base UoM. Must be >= 0."),
             ("revenue",        16, "15000.00",
@@ -135,6 +154,12 @@ class Command(BaseCommand):
                 sample_items[ex_row % len(sample_items)] if sample_items else f"ITEM-00{ex_row+1}",
                 sample_locations[ex_row % len(sample_locations)] if sample_locations else f"LOC-00{ex_row+1}",
                 sample_customers[ex_row % len(sample_customers)],
+            ]
+            if distribution_channel_enabled:
+                row_vals.append(
+                    sample_channels[ex_row % len(sample_channels)] if sample_channels else "00"
+                )
+            row_vals += [
                 str((ex_row + 1) * 100),
                 str((ex_row + 1) * 15000),
             ]
@@ -173,6 +198,12 @@ class Command(BaseCommand):
             ("item_id       — Must match an active item for this client.", False),
             ("location_code — Must match an active leaf planning location.", False),
             ("customer_code — Optional. Leave blank for unattributed demand.", False),
+        ]
+        if distribution_channel_enabled:
+            instructions.append(
+                ("distribution_channel_code — Required. Must be an allowed channel for this client.", False)
+            )
+        instructions += [
             ("qty           — Decimal number >= 0. Required.", False),
             ("revenue       — Decimal number. Optional.", False),
             ("", False),
@@ -204,6 +235,12 @@ class Command(BaseCommand):
              list(PlanningCustomer.objects.filter(client=client, is_active=True)
                   .values_list('code', flat=True)[:200])),
         ]
+        if distribution_channel_enabled:
+            ref_cols.append(
+                ("Valid Distribution Channel Codes",
+                 list(DistributionChannel.objects.filter(code__in=allowed_codes)
+                      .values_list('code', flat=True)[:200]))
+            )
 
         for col_idx, (heading, values) in enumerate(ref_cols, start=1):
             cell       = ws_ref.cell(row=1, column=col_idx, value=heading)

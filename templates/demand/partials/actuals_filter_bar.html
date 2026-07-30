@@ -1,5 +1,5 @@
 {% load i18n %}
-{% if show_item_search or show_location or show_customer or show_period_type or show_period or filters.item_id or filters.location_code or filters.customer_code or filters.period_type or filters.period_start %}
+{% if show_item_search or show_location or show_customer or show_channel or show_period_type or show_period or filters.item_id or filters.location_code or filters.customer_code or filters.channel_code or filters.period_type or filters.period_start %}
 <div class="bg-base-200 rounded-box p-4 mb-4" id="actuals-filter-bar">
 
     {# ── Hidden inputs preserve filter values even when filter is hidden ── #}
@@ -18,9 +18,12 @@
     {% if not show_period and filters.period_start %}
     <input type="hidden" id="actuals-period-hidden" value="{{ filters.period_start }}">
     {% endif %}
+    {% if not show_channel and filters.channel_code %}
+    <input type="hidden" id="actuals-channel-hidden" value="{{ filters.channel_code }}">
+    {% endif %}
 
     {# Active filter badges — show what's currently filtered ─────────── #}
-    {% if filters.item_id or filters.location_code or filters.customer_code or filters.period_type or filters.period_start %}
+    {% if filters.item_id or filters.location_code or filters.customer_code or filters.channel_code or filters.period_type or filters.period_start %}
     <div class="flex flex-wrap gap-2 mb-3">
         <span class="text-xs text-base-content/50 self-center">{% trans "Active filters:" %}</span>
         {% if filters.item_id %}
@@ -39,6 +42,12 @@
         <span class="badge badge-neutral gap-1">
             {% trans "Customer" %}: {{ filters.customer_code }}
             <button onclick="clearFilter('customer')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.channel_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Channel" %}: {{ filters.channel_code }}
+            <button onclick="clearFilter('channel')" class="ml-1 font-bold">×</button>
         </span>
         {% endif %}
         {% if filters.period_type %}
@@ -115,6 +124,23 @@
         </div>
         {% endif %}
 
+        {% if show_channel %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Channel" %}</span>
+            </label>
+            <select id="actuals-channel" class="select select-bordered select-sm">
+                <option value="">{% trans "All channels" %}</option>
+                {% for ch in channels %}
+                <option value="{{ ch.code }}"
+                        {% if filters.channel_code == ch.code %}selected{% endif %}>
+                    {{ ch.code }} — {{ ch.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
         {% if show_period_type %}
         <div class="form-control">
             <label class="label py-0 mb-1">
@@ -176,12 +202,14 @@
         var itemId     = getVal('actuals-item-id');
         var location   = getVal('actuals-location', 'actuals-location-hidden');
         var customer   = getVal('actuals-customer', 'actuals-customer-hidden');
+        var channel    = getVal('actuals-channel', 'actuals-channel-hidden');
         var periodType = getVal('actuals-period-type', 'actuals-period-type-hidden');
         var period     = getVal('actuals-period', 'actuals-period-hidden');
 
         if (itemId)     params.set('item_id', itemId);
         if (location)   params.set('location_code', location);
         if (customer)   params.set('customer_code', customer);
+        if (channel)    params.set('channel_code', channel);
         if (periodType) params.set('period_type', periodType);
         if (period)     params.set('period_start', period);
 
@@ -197,6 +225,7 @@
             'item':        ['actuals-item-search', 'actuals-item-id'],
             'location':    ['actuals-location', 'actuals-location-hidden'],
             'customer':    ['actuals-customer', 'actuals-customer-hidden'],
+            'channel':     ['actuals-channel', 'actuals-channel-hidden'],
             'period_type': ['actuals-period-type', 'actuals-period-type-hidden'],
             'period_start':['actuals-period', 'actuals-period-hidden'],
         };
@@ -207,7 +236,7 @@
         applyFilters();
     };
 
-    ['actuals-location', 'actuals-customer',
+    ['actuals-location', 'actuals-customer', 'actuals-channel',
      'actuals-period-type', 'actuals-period'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', applyFilters);
@@ -219,6 +248,7 @@
             ['actuals-item-search', 'actuals-item-id',
              'actuals-location', 'actuals-location-hidden',
              'actuals-customer', 'actuals-customer-hidden',
+             'actuals-channel', 'actuals-channel-hidden',
              'actuals-period-type', 'actuals-period-type-hidden',
              'actuals-period', 'actuals-period-hidden'].forEach(function(id) {
                 var el = document.getElementById(id);

@@ -28,3 +28,7 @@ class ThemePresetAdmin(admin.ModelAdmin):
     #fields = ["language_id", "label_obj"]
     search_fields = ("themepreset_id",)
 
+class DistributionChannelAdmin(admin.ModelAdmin):
+    #list_display = ("language_id", "label_obj")
+    #fields = ["language_id", "label_obj"]
+    search_fields = ("code",)

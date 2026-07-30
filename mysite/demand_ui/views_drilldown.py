@@ -300,7 +300,7 @@ def drilldown_items(request, pk, location_id, client_id=None):
     qs = (
         ForecastLine.objects
         .filter(version=version, planning_location=location)
-        .select_related('item', 'planning_customer')
+        .select_related('item', 'planning_customer', 'distribution_channel')
         .order_by('period_start', 'item__item_id')
     )
     paginator = Paginator(qs, 50)
@@ -311,9 +311,14 @@ def drilldown_items(request, pk, location_id, client_id=None):
         version=version,
         planning_location=location,
     ).values('item__item_id').distinct().count()
+    if version.client.is_distribution_channel_enabled():
+        show_channel = qs.values('distribution_channel').distinct().count() > 1
+    else:
+        show_channel = False
     context = {
         'version': version, 'location': location,
         'page_obj': page_obj, 'can_override': can_override_here,
+        'show_channel': show_channel,
     }
     context['show_qty'] = distinct_items == 1
     if _is_htmx(request):

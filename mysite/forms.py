@@ -4,7 +4,7 @@ from django.conf import settings
 
 from django.contrib.auth.models import User
 from allauth.account.forms import SignupForm
-from .models import CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation
+from .models import DistributionChannel, CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation
 from django.utils.translation import gettext_lazy as _
 
 class ClientForm(forms.ModelForm):
@@ -24,17 +24,38 @@ class ClientForm(forms.ModelForm):
         label="Default Language"
     ) 
 
+    # ── NEW ──────────────────────────────────────────────────────────────────
+    distribution_channel_choices = forms.MultipleChoiceField(
+        choices=[],  # populated in __init__ — DB-backed, not settings-backed
+        widget=forms.CheckboxSelectMultiple,
+        required=False,  # unchecked/empty = unrestricted (NULL), not invalid
+        label="Distribution Channel choices",
+        help_text="Leave all unchecked if Distribution Channel is not required.",
+    )
+
     class Meta:
         model = Client
         fields = ['client_id', 'parent', 'name', 'nb_title', 'nb_title_svg_pre', 'nb_title_svg_suf'] # Include all fields
-        
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.fields['distribution_channel_choices'].choices = [
+            (dc.code, f'{dc.code} - {dc.label}')
+            for dc in DistributionChannel.objects.filter(is_active=True).order_by('code')
+        ]
+
         # If an instance already exists, populate the form field with current data
         if self.instance and self.instance.pk and self.instance.language_list:
             # language_list is already a list of codes e.g. ['en', 'ta']
             # MultipleChoiceField just needs that list directly
             self.fields['language_choices'].initial = self.instance.language_list
+
+        # NEW — only pre-check boxes if a restriction is actually set;
+        # NULL stays as "nothing checked" = unrestricted, matching save() below.
+        if self.instance and self.instance.pk and self.instance.allowed_distribution_channels:
+            self.fields['distribution_channel_choices'].initial = self.instance.allowed_distribution_channels
+
 
     def clean(self):
         cleaned = super().clean()
@@ -51,6 +72,10 @@ class ClientForm(forms.ModelForm):
         instance = super().save(commit=False)
         instance.language_list = self.cleaned_data['language_choices']
         instance.default_language = self.cleaned_data['default_language']
+        # NEW — empty selection means "no restriction" -> store NULL, not [].
+        selected_channels = self.cleaned_data.get('distribution_channel_choices') or []
+        instance.allowed_distribution_channels = selected_channels or None
+
         if commit:
             instance.save()
         return instance    

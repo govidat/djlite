@@ -15,7 +15,7 @@ from mysite.models.demand.forecast import (
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def version_with_lines(db, draft_version, active_item, leaf_location):
+def version_with_lines(db, draft_version, active_item, leaf_location, distribution_channel_common):
     from mysite.models.demand.forecast import ForecastLine
     periods = [
         (datetime.date(2025, 1, 1), datetime.date(2025, 1, 31)),
@@ -27,6 +27,7 @@ def version_with_lines(db, draft_version, active_item, leaf_location):
         lines.append(ForecastLine.objects.create(
             version=draft_version, item=active_item,
             planning_location=leaf_location, planning_customer=None,
+            distribution_channel=distribution_channel_common,
             period_type='month', period_start=ps, period_end=pe,
             statistical_qty=Decimal('100.000'), final_qty=Decimal('100.000'),
             price_used=Decimal('150.00'), statistical_value=Decimal('15000.00'),
@@ -276,7 +277,8 @@ class TestApprovalWorkflow:
 class TestAccuracyDashboard:
 
     @pytest.fixture
-    def version_with_accuracy(self, draft_version, active_item, leaf_location):
+    def version_with_accuracy(self, draft_version, active_item, leaf_location,
+                              distribution_channel_common):
         for ps, pe in [
             (datetime.date(2025, 1, 1), datetime.date(2025, 1, 31)),
             (datetime.date(2025, 2, 1), datetime.date(2025, 2, 28)),
@@ -286,6 +288,7 @@ class TestAccuracyDashboard:
                 item                 = active_item,
                 planning_location    = leaf_location,
                 planning_customer    = None,
+                distribution_channel = distribution_channel_common,
                 period_type          = 'month',
                 period_start         = ps,
                 period_end           = pe,

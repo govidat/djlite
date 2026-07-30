@@ -71,15 +71,17 @@ Three independent planning hierarchies, fully decoupled from eCommerce models:
   PlanningLocation    — arbitrary location tree (Region → Zone → DC → Branch)
   PlanningCustomer    — arbitrary customer / customer-group tree
   SalesNode           — sales-force org chart
-  CustomerSalesAssignment — date-effective assignment of PlanningCustomer → SalesNode leaf
-
+  
+  SalesForecastLink - Linking a Planning_Location (leaf), Planning_Customer, distribution_channel and lowest Sales_Node leaf
 None of these carry FKs to ClientLocation or CustomerProfile.
 """
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 
-
+def first_day_of_current_year():
+    return timezone.localdate().replace(month=1, day=1)
 # ─────────────────────────────────────────────────────────────────────────────
 # Materialized-path mixin (same pattern as TaxonomyNode)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -395,16 +397,9 @@ class SalesNode(MaterializedPathMixin):
 # 4. Customer → Sales Node Assignment (date-effective)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CustomerSalesAssignment(models.Model):
-    """
-    Date-effective assignment of a PlanningCustomer leaf to a SalesNode leaf.
+"""
+class ZZCustomerSalesAssignment(models.Model):
 
-    A customer can be re-assigned (e.g. territory realignment) by closing the
-    current row (valid_to = today) and creating a new row.
-
-    For historical forecast accuracy, actuals are always attributed to the
-    SalesNode that was active *at the time of sale* (join on valid_from/valid_to).
-    """
     client = models.ForeignKey(
         "mysite.Client",
         on_delete=models.CASCADE,
@@ -470,3 +465,118 @@ class CustomerSalesAssignment(models.Model):
             raise ValidationError(
                 _("Planning customer and sales node must belong to the same client.")
             )
+"""        
+class SalesForecastLink(models.Model):
+    """
+    Date-effective link from a demand-side key to a SalesNode leaf, used for
+    forecast grain resolution AND (now) sales-team territory history —
+    replaces CustomerSalesAssignment.
+
+    Exactly one of three shapes per row, same as before:
+      a) planning_location (leaf) + distribution_channel + planning_customer
+      b) planning_location (leaf) + distribution_channel   (customer NULL)
+      c) planning_location (leaf) only                     (channel & customer NULL)
+
+    valid_to NULL = currently active. Historical rows (valid_to set) are kept
+    for territory-history reporting; grain search resolves against whatever
+    is active as of a given date (see resolve_sales_forecast_link).
+    """
+    client = models.ForeignKey(
+        "mysite.Client", on_delete=models.CASCADE,
+        related_name="sales_forecast_links",
+    )
+    sales_node = models.ForeignKey(
+        SalesNode, on_delete=models.PROTECT,           # PROTECT, not CASCADE — see note below
+        related_name="forecast_links",
+        limit_choices_to={'children__isnull': True},
+    )
+    planning_location = models.ForeignKey(
+        PlanningLocation, on_delete=models.CASCADE,
+        related_name="sales_forecast_links",
+        limit_choices_to={'is_leaf': True},
+    )
+    distribution_channel = models.ForeignKey(
+        "mysite.DistributionChannel", on_delete=models.PROTECT,
+        null=True, blank=True, related_name="+",
+    )
+    planning_customer = models.ForeignKey(
+        PlanningCustomer, on_delete=models.CASCADE,
+        null=True, blank=True, related_name="sales_forecast_links",
+    )
+
+    # ── NEW: date-effectivity ──────────────────────────────────────────────
+    valid_from = models.DateField(_("valid from"), default=first_day_of_current_year,)
+
+    valid_to = models.DateField(
+        _("valid to"), null=True, blank=True,
+        help_text=_("Leave blank for the currently active link."),
+    )
+
+    class Meta:
+        app_label = "mysite"
+        constraints = [
+            # DB-level: at most one OPEN row per key combo. Overlapping
+            # CLOSED ranges are still possible at the DB level — caught in
+            # clean() below, same limitation CustomerSalesAssignment had.
+            models.UniqueConstraint(
+                fields=["client", "planning_location", "distribution_channel", "planning_customer"],
+                condition=models.Q(valid_to__isnull=True),
+                name="uq_sales_forecast_link_open",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["client", "planning_location"], name="ix_sfl_client_loc"),
+            models.Index(fields=["client", "planning_location", "valid_from"], name="ix_sfl_loc_from"),
+        ]
+        verbose_name = _("02-15 Sales Forecast Link")
+        verbose_name_plural = _("02-15 Sales Forecast Links")
+
+    @property
+    def link_type(self) -> str:
+        if self.planning_customer_id and self.distribution_channel_id:
+            return 'a'
+        if self.distribution_channel_id:
+            return 'b'
+        return 'c'
+
+    @property
+    def is_active(self) -> bool:
+        #from django.utils import timezone
+        today = timezone.now().date()
+        return self.valid_from <= today and (self.valid_to is None or self.valid_to >= today)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        import datetime
+
+        if self.sales_node_id and self.sales_node.children.exists():
+            raise ValidationError(_("Sales forecast links must point to a leaf SalesNode."))
+        if self.planning_location_id and not self.planning_location.is_leaf:
+            raise ValidationError(_("Sales forecast links must use a leaf PlanningLocation."))
+        for fk_name in ("sales_node", "planning_location", "planning_customer"):
+            obj = getattr(self, fk_name, None)
+            if obj is not None and obj.client_id != self.client_id:
+                raise ValidationError(_(f"{fk_name} must belong to the same client."))
+        if self.planning_customer_id and not self.distribution_channel_id:
+            raise ValidationError(_(
+                "A customer-level link also requires a distribution_channel (shape 'a' only)."
+            ))
+
+        # ── NEW: date validation, same pattern as CustomerSalesAssignment ──
+        if self.valid_to and self.valid_to < self.valid_from:
+            raise ValidationError(_("valid_to must be on or after valid_from."))
+
+        overlapping = SalesForecastLink.objects.filter(
+            client_id=self.client_id,
+            planning_location_id=self.planning_location_id,
+            distribution_channel_id=self.distribution_channel_id,
+            planning_customer_id=self.planning_customer_id,
+        ).exclude(pk=self.pk)
+
+        self_to = self.valid_to or datetime.date.max
+        for other in overlapping:
+            other_to = other.valid_to or datetime.date.max
+            if self.valid_from <= other_to and other.valid_from <= self_to:
+                raise ValidationError(
+                    _("Overlapping date range for this location/channel/customer link.")
+                )

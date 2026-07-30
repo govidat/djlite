@@ -19,6 +19,7 @@
                 {% endif %}
                 {% if display_mode == 'atomic' %}
                 <th class="whitespace-nowrap">{% trans "Customer" %}</th>
+                {% if show_channel %}<th class="whitespace-nowrap">{% trans "Channel" %}</th>{% endif %}
                 {% endif %}
                 <th class="whitespace-nowrap">{% trans "Demand class" %}</th>
                 <th class="whitespace-nowrap">
@@ -64,6 +65,11 @@
                 <td class="text-xs">
                     {{ profile.planning_customer.code|default:"—" }}
                 </td>
+                {% if show_channel %}
+                <td class="text-xs">
+                    {{ profile.distribution_channel.code|default:"—" }}
+                </td>
+                {% endif %}
                 {% endif %}
 
                 <td>
@@ -113,7 +119,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="10" class="text-center py-8 text-base-content/50">
+                <td colspan="{% if show_channel and display_mode == 'atomic' %}11{% else %}10{% endif %}" class="text-center py-8 text-base-content/50">
                     {% trans "No series profiles found. Run the forecast to generate profiles." %}
                 </td>
             </tr>
@@ -125,14 +131,14 @@
 {% if page_obj.has_other_pages %}
 <div class="flex justify-center gap-2 mt-4">
     {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}&item_id={{ filters.item_id }}&demand_class={{ filters.demand_class }}&abc_class={{ filters.abc_class }}&abc_level={{ filters.abc_level }}&location_code={{ filters.location_code }}&is_manual={{ filters.is_manual }}"
+    <a href="?page={{ page_obj.previous_page_number }}&item_id={{ filters.item_id }}&demand_class={{ filters.demand_class }}&abc_class={{ filters.abc_class }}&abc_level={{ filters.abc_level }}&location_code={{ filters.location_code }}&channel_code={{ filters.channel_code }}&is_manual={{ filters.is_manual }}"
        class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
     {% endif %}
     <span class="btn btn-sm btn-disabled">
         {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
     </span>
     {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&item_id={{ filters.item_id }}&demand_class={{ filters.demand_class }}&abc_class={{ filters.abc_class }}&abc_level={{ filters.abc_level }}&location_code={{ filters.location_code }}&is_manual={{ filters.is_manual }}"
+    <a href="?page={{ page_obj.next_page_number }}&item_id={{ filters.item_id }}&demand_class={{ filters.demand_class }}&abc_class={{ filters.abc_class }}&abc_level={{ filters.abc_level }}&location_code={{ filters.location_code }}&channel_code={{ filters.channel_code }}&is_manual={{ filters.is_manual }}"
        class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
     {% endif %}
 </div>

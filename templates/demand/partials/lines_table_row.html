@@ -4,6 +4,7 @@
     <td class="font-mono text-xs whitespace-nowrap">{{ line.item.item_id }}</td>
     <td class="whitespace-nowrap">{{ line.item.name }}</td>
     <td class="whitespace-nowrap">{{ line.planning_customer.code|default:"—" }}</td>
+    {% if show_channel %}<td class="whitespace-nowrap">{{ line.distribution_channel.code|default:"—" }}</td>{% endif %}
     <td class="whitespace-nowrap">{{ line.period_start|date:"M Y" }}</td>
     {% if not show_value_primary %}
     <td class="text-right">{{ line.statistical_qty|floatformat:0 }}</td>

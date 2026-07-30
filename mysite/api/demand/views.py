@@ -7,19 +7,25 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils.translation import gettext_lazy as _
-from django.db import transaction
+from django.db import transaction as _transaction
 from mysite.models.demand.hierarchy import (
-    PlanningLocation, SalesNode, CustomerSalesAssignment,
+    PlanningLocation, SalesNode, SalesForecastLink
 )
+
 from mysite.api.demand.serializers import (
     PlanningLocationTreeSerializer,
     SalesNodeTreeSerializer,
+    SalesForecastLinkSerializer,
+    SalesForecastLinkCreateSerializer,
 )
+
 from mysite.api.permissions import (IsClientMember)
 from utils.feature_control import is_demand_feature_disabled
 
 from django.core.paginator import Paginator, EmptyPage
 #from django.contrib.auth.decorators import login_required
+from django.db.models import Sum, Count, Min, Q
+
 def build_tree(nodes, parent_id=None):
     """
     Assemble a flat list of model instances (ordered by path) into a nested
@@ -136,7 +142,8 @@ class SalesHierarchyView(DemandFeatureMixin, APIView):
     Query params:
         active_only=true  (default: true) — exclude is_active=False nodes
         with_assignments=true (default: true) — include customer assignments
-
+         with_forecast_links=true (default: true) — NEW: include SalesForecastLink
+                                    rows resolved to each leaf sales node.
     Response shape:
         [
             {
@@ -169,17 +176,19 @@ class SalesHierarchyView(DemandFeatureMixin, APIView):
     def get(self, request):
         client           = request.client
         active_only      = request.query_params.get('active_only', 'true') == 'true'
-        with_assignments = request.query_params.get('with_assignments', 'true') == 'true'
+        #with_assignments = request.query_params.get('with_assignments', 'true') == 'true'
+        with_forecast_links = request.query_params.get('with_forecast_links', 'true') == 'true'
 
         qs = SalesNode.objects.filter(client=client).order_by('path')
         if active_only:
             qs = qs.filter(is_active=True)
 
         nodes = list(qs)
-
+        node_ids = [n.pk for n in nodes]
+        """
         # Pre-fetch all assignments in ONE query and attach to nodes
         if with_assignments:
-            node_ids    = [n.pk for n in nodes]
+            
             assignments = (
                 CustomerSalesAssignment.objects
                 .filter(sales_node_id__in=node_ids)
@@ -196,11 +205,154 @@ class SalesHierarchyView(DemandFeatureMixin, APIView):
         else:
             for node in nodes:
                 node._assignments = []
+        """
+        # NEW — mirrors the assignments prefetch exactly.
+        if with_forecast_links:
+            from django.utils import timezone
+            today = timezone.now().date()
+            links = (
+                SalesForecastLink.objects
+                .filter(sales_node_id__in=node_ids, valid_from__lte=today)
+                .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
+                .select_related('planning_location', 'distribution_channel', 'planning_customer')
+                .order_by('planning_location__code')
+            )
+            link_map = {}
+            for l in links:
+                link_map.setdefault(l.sales_node_id, []).append(l)
+            for node in nodes:
+                node._forecast_links = link_map.get(node.pk, [])
+        else:
+            for node in nodes:
+                node._forecast_links = []
 
         roots = build_tree(nodes)
         serializer = SalesNodeTreeSerializer(roots, many=True)
         return Response(serializer.data)
-    
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET  /api/demand/sales-forecast-links/
+# POST /api/demand/sales-forecast-links/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SalesForecastLinkListCreateView(DemandFeatureMixin, APIView):
+    """
+    GET  — list SalesForecastLink rows for the client. Supports filtering by
+           planning_location, sales_node, link_type (derived, filtered in
+           Python since it's a model property, not a DB column).
+
+    POST — create one link. client is taken from request.client, never from
+           the request body (matches ForecastOverrideListCreateView's pattern
+           of trusting server-side scoping over client-supplied fields).
+    """
+
+    def get(self, request):
+        client = request.client
+        qs = (
+            SalesForecastLink.objects
+            .filter(client=client)
+            .select_related('planning_location', 'distribution_channel',
+                             'planning_customer', 'sales_node')
+            .order_by('planning_location__code', 'valid_from')
+        )
+
+        p = request.query_params
+        if p.get('planning_location'):
+            qs = qs.filter(planning_location_id=p['planning_location'])
+        if p.get('sales_node'):
+            qs = qs.filter(sales_node_id=p['sales_node'])
+
+        # NEW — active_only=true (default true) restricts to currently-open
+        # rows; as_of=YYYY-MM-DD asks "what was active on this date"
+        # instead (for territory-history lookups).
+        active_only = p.get('active_only', 'true') == 'true'
+        as_of_param = p.get('as_of')
+        if as_of_param:
+            try:
+                import datetime
+                as_of = datetime.date.fromisoformat(as_of_param)
+            except ValueError:
+                return Response({'as_of': 'Use YYYY-MM-DD format.'}, status=status.HTTP_400_BAD_REQUEST)
+            qs = qs.filter(valid_from__lte=as_of).filter(
+                Q(valid_to__isnull=True) | Q(valid_to__gte=as_of)
+            )
+        elif active_only:
+            from django.utils import timezone
+            today = timezone.now().date()
+            qs = qs.filter(valid_from__lte=today).filter(
+                Q(valid_to__isnull=True) | Q(valid_to__gte=today)
+            )
+        # active_only=false with no as_of -> full history, unfiltered
+
+        results = list(qs)
+        link_type = p.get('link_type')
+        if link_type in ('a', 'b', 'c'):
+            results = [r for r in results if r.link_type == link_type]
+
+        serializer = SalesForecastLinkSerializer(results, many=True)
+        return Response({'count': len(results), 'results': serializer.data})
+
+    def post(self, request):
+        client = request.client
+        data = request.data.copy()
+        if not data.get('valid_from'):
+            from django.utils import timezone
+            data['valid_from'] = timezone.now().date().isoformat()
+
+        serializer = SalesForecastLinkCreateSerializer(data=data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.db import IntegrityError
+
+        try:
+            with _transaction.atomic():
+                instance = SalesForecastLink(client=client, **serializer.validated_data)
+                instance.full_clean()
+                instance.save()
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, 'message_dict') else {'detail': exc.messages}
+            return Response(detail, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError:
+            return Response(
+                {'detail': 'An open link with this location/channel/customer combination already exists.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(SalesForecastLinkSerializer(instance).data, status=status.HTTP_201_CREATED)
+# ─────────────────────────────────────────────────────────────────────────────
+# GET/DELETE /api/demand/sales-forecast-links/{pk}/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SalesForecastLinkDetailView(DemandFeatureMixin, APIView):
+    """GET one link. DELETE closes it (sets valid_to=today) if currently
+    active — preserving history, matching how CustomerSalesAssignment
+    territory changes worked. A link that was never effective (valid_from
+    in the future, or already closed) is hard-deleted instead, since there's
+    no history worth keeping."""
+
+    def _get(self, request, pk):
+        from django.shortcuts import get_object_or_404
+        return get_object_or_404(SalesForecastLink, pk=pk, client=request.client)
+
+    def get(self, request, pk):
+        link = self._get(request, pk)
+        return Response(SalesForecastLinkSerializer(link).data)
+
+    def delete(self, request, pk):
+        from django.utils import timezone
+        link = self._get(request, pk)
+        today = timezone.now().date()
+
+        if link.is_active:
+            link.valid_to = today
+            link.full_clean()
+            link.save(update_fields=['valid_to'])
+            return Response(SalesForecastLinkSerializer(link).data, status=status.HTTP_200_OK)
+
+        link.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 #3.1 `POST /api/demand/actuals/upload/`
@@ -350,6 +502,7 @@ class ActualsQueryView(DemandFeatureMixin, APIView):
         item_id         — filter by Item.item_id (exact)
         location_code   — filter by PlanningLocation.code (exact)
         customer_code   — filter by PlanningCustomer.code (exact)
+        distribution_channel_code   — filter by DistributionChannel.code (exact)
         period_type     — filter by period type
         period_start    — ISO date, filter period_start >= this date
         period_end      — ISO date, filter period_end <= this date
@@ -372,7 +525,7 @@ class ActualsQueryView(DemandFeatureMixin, APIView):
         qs = (
             ActualSale.objects
             .filter(client=request.client)
-            .select_related('item', 'planning_location', 'planning_customer')
+            .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
             .order_by('period_start', 'planning_location__code', 'item__item_id')
         )
 
@@ -387,6 +540,9 @@ class ActualsQueryView(DemandFeatureMixin, APIView):
 
         if p.get('customer_code'):
             qs = qs.filter(planning_customer__code=p['customer_code'])
+
+        if p.get('distribution_channel_code'):
+            qs = qs.filter(distribution_channel__code=p['distribution_channel_code'])            
 
         if p.get('period_type'):
             qs = qs.filter(period_type=p['period_type'])
@@ -485,7 +641,7 @@ class ActualsTemplateDownloadView(DemandFeatureMixin, APIView):
     
 
 
-from django.db.models import Count
+#from django.db.models import Count
 #from django.core.paginator import Paginator, EmptyPage
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -1053,7 +1209,7 @@ class ForecastVersionRunView(DemandFeatureMixin, APIView):
 
         # ── Data sufficiency check (warn, don't block) ────────────────
         from mysite.models.demand.actuals import ActualSale
-        from django.db.models import Count, Min
+        #from django.db.models import Count, Min
 
         period_counts = ActualSale.objects.filter(
             client=request.client,
@@ -1096,52 +1252,7 @@ class ForecastVersionRunView(DemandFeatureMixin, APIView):
             'poll_url':        f'/api/{version.client.client_id}/demand/forecast-versions/{pk}/run-status/',
             'warnings':        warnings,  # empty list if data is sufficient
         }, status=status.HTTP_202_ACCEPTED)
-    """
-    def post(self, request, pk):
-        result = is_demand_feature_disabled(request.client, 'forecast_run')
-        if result['disabled']:
-            return Response({'detail': result['message']},
-                            status=status.HTTP_403_FORBIDDEN)
 
-        version = get_object_or_404(
-            ForecastVersion, pk=pk, client=request.client
-        )
-
-        if not version.is_editable:
-            return Response(
-                {'detail': f'Version is {version.status}. Only DRAFT versions can be run.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if version.run_status in ('QUEUED','PROFILING','RUNNING','RECONCILING','AGGREGATING'):
-            return Response(
-                {'detail': 'A forecast run is already in progress.'},
-                status=status.HTTP_409_CONFLICT,
-            )
-
-        from mysite.tasks.demand.compute_series_profiles import compute_series_profiles
-        from mysite.tasks.demand.run_forecast import run_forecast
-
-        task_chain   = chain(
-            compute_series_profiles.si(version.client.pk, version.period_type),
-            run_forecast.si(version.pk),
-        )
-        async_result = task_chain.apply_async()
-
-        ForecastVersion.objects.filter(pk=pk).update(
-            run_status='QUEUED',
-            celery_task_id=async_result.id or '',
-            run_error='',
-        )
-
-        return Response({
-            'version_id':     version.pk,
-            'run_status':     'QUEUED',
-            'celery_task_id': async_result.id,
-            'poll_url': f'/api/{version.client.client_id}/demand/forecast-versions/{pk}/run-status/',
-            
-        }, status=status.HTTP_202_ACCEPTED)
-    """
 
 class ForecastVersionRunStatusView(DemandFeatureMixin, APIView):
     """
@@ -1267,7 +1378,7 @@ class ForecastOverrideListCreateView(DemandFeatureMixin, APIView):
         )
 
         import json as _json
-        from django.db import transaction as _transaction
+        #from django.db import transaction as _transaction
 
         split_weights_json = request.data.get('split_weights_json')
         if split_weights_json and override.disagg_method == ForecastOverride.DisaggMethod.CUSTOM:
@@ -1318,7 +1429,7 @@ def _build_affected_lines_qs(override, version):
             period_type  = override.period_type,
             period_start = override.period_start,
         )
-        .select_related('item', 'planning_location', 'planning_customer')
+        .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
         .order_by('planning_location__code', 'item__item_id')
     )
 
@@ -1548,7 +1659,7 @@ class ForecastOverrideSplitWeightView(DemandFeatureMixin, APIView):
         validated_weights = serializer.validated_data['weights']
 
         # Atomically replace all weights for this override
-        with transaction.atomic():
+        with _transaction.atomic():
             override.split_weights.all().delete()
             OverrideSplitWeight.objects.bulk_create([
                 OverrideSplitWeight(
@@ -1874,7 +1985,7 @@ class ForecastVersionExportView(DemandFeatureMixin, APIView):
         ws = wb.create_sheet(title='Summary')
 
         from mysite.models.demand.forecast import ForecastAggregate
-        from django.db.models import Sum, Count, Q
+        #from django.db.models import Sum, Count, Q
 
         # Try ForecastAggregate first (populated by 3B.4 write_forecast_aggregates)
         agg_rows = (

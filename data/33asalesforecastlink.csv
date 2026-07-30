@@ -1,0 +1,6 @@
+client_id,planning_location_code,distribution_channel_code,planning_customer_code,sales_node_code,valid_from,valid_to
+autocomp,del-01,,,rm-ntn,2024-01-01,
+autocomp,mum-01,00,,rm-wtn,2024-01-01,
+autocomp,chn-01,00,cust-chn-001,rm-ntn,2024-01-01,2024-12-31
+autocomp,chn-01,00,cust-chn-001,rm-north-2,2025-01-01,
+autocomp,chn-01,01,cust-chn-002,rm-ntn,2024-01-01,

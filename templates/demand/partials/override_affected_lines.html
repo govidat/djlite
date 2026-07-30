@@ -11,6 +11,7 @@
                     <th>{% trans "Item" %}</th>
                     <th>{% trans "Location" %}</th>
                     <th>{% trans "Customer" %}</th>
+                    {% if show_channel %}<th>{% trans "Channel" %}</th>{% endif %}
                     
                     {# Fix — this partial is always scoped to one override's affected lines. If override_level is 'sku', qty is meaningful. If override_level is 'location', 'customer', or 'total', hide qty. #}
                     {% if override.override_level == 'sku' %}
@@ -24,6 +25,7 @@
                     <td class="font-mono text-xs">{{ line.item.item_id }}</td>
                     <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
                     <td class="text-xs">{{ line.planning_customer.code|default:"—" }}</td>
+                    {% if show_channel %}<td class="text-xs">{{ line.distribution_channel.code|default:"—" }}</td>{% endif %}
                     {% if override.override_level == 'sku' %}
                     <td class="text-right">{{ line.final_qty|floatformat:0 }}</td>
                     {% endif %}
@@ -31,7 +33,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center text-base-content/50">
+                    <td colspan="{% if show_channel %}5{% else %}4{% endif %}" class="text-center text-base-content/50">
                         {% trans "No lines affected." %}
                     </td>
                 </tr>

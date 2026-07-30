@@ -8,6 +8,7 @@
                     <th>{% trans "Item ID" %}</th>
                     <th>{% trans "Item Name" %}</th>
                     <th>{% trans "Customer" %}</th>
+                    {% if show_channel %}<th>{% trans "Channel" %}</th>{% endif %}
                     <th>{% trans "Period" %}</th>
                     <th class="text-right">{% trans "Statistical Qty" %}</th>
                     <th class="text-right">{% trans "Override Qty" %}</th>
@@ -21,6 +22,7 @@
                     <td class="font-mono text-sm">{{ line.item.item_id }}</td>
                     <td>{{ line.item.name }}</td>
                     <td>{{ line.planning_customer.code|default:"—" }}</td>
+                    {% if show_channel %}<td>{{ line.distribution_channel.code|default:"—" }}</td>{% endif %}
                     <td>{{ line.period_start|date:"M Y" }}</td>
                     <td class="text-right">{{ line.statistical_qty|floatformat:0 }}</td>
                     <td class="text-right">
@@ -41,7 +43,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-base-content/50 py-8">
+                    <td colspan="{% if show_channel %}9{% else %}8{% endif %}" class="text-center text-base-content/50 py-8">
                         {% trans "No forecast lines for this location." %}
                     </td>
                 </tr>

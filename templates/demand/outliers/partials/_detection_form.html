@@ -1,0 +1,31 @@
+{% load i18n %}
+{# Range-picker for "Run Outlier Detection". Loaded on queue page load, re-rendered with an
+   error message if submitted without both bounds. suggested_start/suggested_end are proposed
+   by the view from actuals data availability and the last run's covered range — see
+   outlier_detection_form. #}
+{% if no_new_data %}
+  <div class="alert alert-info text-sm">
+    {% trans "No new actuals since the last detection run — nothing to run yet." %}
+  </div>
+{% endif %}
+<form hx-post="{% url 'demand_ui:trigger_outlier_detection' client_id=client.client_id %}"
+      hx-target="#detection-status" hx-swap="innerHTML"
+      class="flex flex-wrap gap-4 items-end">
+  {% if error %}<div class="alert alert-error text-sm">{{ error }}</div>{% endif %}
+
+  <label class="form-control">
+    <span class="label-text">{% trans "From period" %}</span>
+    <input type="date" id="period_start" name="period_start"
+           value="{{ suggested_start|date:'Y-m-d' }}" required
+           class="input input-bordered input-sm">
+  </label>
+
+  <label class="form-control">
+    <span class="label-text">{% trans "To period" %}</span>
+    <input type="date" id="period_end" name="period_end"
+           value="{{ suggested_end|date:'Y-m-d' }}" required
+           class="input input-bordered input-sm">
+  </label>
+
+  <button type="submit" class="btn btn-primary btn-sm">{% trans "Run Outlier Detection" %}</button>
+</form>

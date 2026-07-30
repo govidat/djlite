@@ -26,7 +26,7 @@ class ForecastLineInline(admin.TabularInline):
     show_change_link = True
     fields         = [
         'period_type', 'period_start', 'item',
-        'planning_location', 'planning_customer',
+        'planning_location', 'distribution_channel', 'planning_customer',
         'statistical_qty', 'override_qty', 'final_qty',
         'price_used', 'statistical_value', 'override_value', 'final_value'
     ]
@@ -36,7 +36,7 @@ class ForecastLineInline(admin.TabularInline):
         # Limit inline to first 50 rows to keep admin responsive
         return (
             super().get_queryset(request)
-            .select_related('item', 'planning_location', 'planning_customer')
+            .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
             .order_by('period_start', 'item__item_id')[:50]
         )
 
@@ -70,7 +70,7 @@ class ForecastVersionAdmin(ClientScopedMixin, admin.ModelAdmin):
     list_display = [
         'version_label', 'client', 'period_type',
         'base_period_end', 'horizon_periods',
-        'status_badge', 'created_by', 'created_at',
+        'status_badge', 'stale_actuals', 'created_by', 'created_at',
     ]
     list_filter  = ['client', 'status', 'period_type']
     search_fields = ['version_label', 'client__client_id']
@@ -79,7 +79,7 @@ class ForecastVersionAdmin(ClientScopedMixin, admin.ModelAdmin):
     )     
     readonly_fields = [
         'status', 'approved_by', 'approved_at', 'locked_at', 'run_status', 'run_error', 'celery_task_id',
-        'copied_from', 'created_at', 'updated_at',
+        'copied_from', 'stale_actuals', 'created_at', 'updated_at',
     ]
     fieldsets = [
         (_('Identity'), {
@@ -98,7 +98,7 @@ class ForecastVersionAdmin(ClientScopedMixin, admin.ModelAdmin):
         }),
         (_('Workflow'), {
             'fields': [
-                'status', 'run_status', 'run_error', 'celery_task_id', 'created_by',
+                'status', 'run_status', 'run_error', 'stale_actuals', 'celery_task_id', 'created_by',
                 'approved_by', 'approved_at', 'locked_at',
             ],
         }),
@@ -144,7 +144,7 @@ class ForecastVersionAdmin(ClientScopedMixin, admin.ModelAdmin):
 class ForecastLineAdmin(admin.ModelAdmin):
     list_display   = [
         'version', 'period_type', 'period_start',
-        'item', 'planning_location', 'planning_customer',
+        'item', 'planning_location', 'distribution_channel', 'planning_customer',
         'statistical_qty', 'override_qty', 'final_qty', 'forecast_level', 'model_used',
         'price_used', 'statistical_value', 'override_value', 'final_value'
     ]
@@ -162,7 +162,7 @@ class ForecastLineAdmin(admin.ModelAdmin):
             super().get_queryset(request)
             .select_related(
                 'version', 'item',
-                'planning_location', 'planning_customer',
+                'planning_location', 'distribution_channel', 'planning_customer',
             )
         )
 
@@ -175,12 +175,14 @@ class ForecastLineAdmin(admin.ModelAdmin):
 class ForecastAccuracyAdmin(admin.ModelAdmin):
     list_display  = [
         'version', 'period_start', 'item',
+        'planning_location', 'distribution_channel',
         'actual_qty', 'forecast_qty', 'mape', 'bias',
     ]
     list_filter   = ['version__client', 'period_type']
     search_fields = ['item__item_id', 'version__version_label']
     readonly_fields = [
         'version', 'item', 'planning_customer', 'planning_location',
+        'distribution_channel',
         'period_type', 'period_start', 'period_end',
         'actual_qty', 'forecast_qty', 'mape', 'bias', 'computed_at',
     ]
@@ -229,7 +231,9 @@ class ForecastingConfigAdmin(ClientScopedMixin, admin.ModelAdmin):
         'client',
         'adi_threshold', 'cv2_threshold', 'min_nonzero_periods',
         'time_horizon_steps',
-        'evaluate_customer_grain',
+        'mad_threshold', 'persistence_periods', 'min_history_periods',         'forecast_uses_net_actuals', 'reporting_uses_net_actuals', 'abc_classification_uses_net_actuals', 
+        'planning_producthierarchy', 
+        #'evaluate_customer_grain',
         'abc_tier_summary',
         'abc_tiers_link',       # ← replaces the inline
         'updated_at',
@@ -267,16 +271,43 @@ class ForecastingConfigAdmin(ClientScopedMixin, admin.ModelAdmin):
                 'Set to 0 to disable time aggregation entirely.'
             ),
         }),
-        (_('Grain Options'), {
-            'fields': ['evaluate_customer_grain'],
+        (_('Planning Hierarchy'), {
+            'fields': ['planning_producthierarchy'],
             'description': _(
-                'If enabled, Part A drills down to '
-                'Item × Leaf Location × Planning Customer as the finest grain. '
-                'Disable if customer-level actuals are not available or reliable.'
+                'Taxonomy slug for the item product hierarchy used during '
+                'automated grain search. Default is "gpc".'
             ),
         }),
-    ]
+        (_("Outlier Detection"), {
+            "classes": ("collapse",),
+            "fields": (
+                "mad_threshold", "persistence_periods", "min_history_periods",
+                "forecast_uses_net_actuals", "reporting_uses_net_actuals",
+                "abc_classification_uses_net_actuals",
+            ),
+        }),
+        (_("Outlier Detection — Last Run"), {
+            "classes": ("collapse",),
+            "fields": (
+                "last_outlier_detection_run_at", "last_outlier_detection_run_by",
+                "last_outlier_detection_range_start", "last_outlier_detection_range_end",
+            ),
+        }),
 
+        
+        #(_('Grain Options'), {
+        #    'fields': ['evaluate_customer_grain'],
+        #    'description': _(
+        #        'If enabled, Part A drills down to '
+        #        'Item × Leaf Location × Planning Customer as the finest grain. '
+        #        'Disable if customer-level actuals are not available or reliable.'
+        #    ),
+        #}),
+    ]
+    readonly_fields = (
+        "last_outlier_detection_run_at", "last_outlier_detection_run_by",
+        "last_outlier_detection_range_start", "last_outlier_detection_range_end",
+    )
     #inlines = [AbcClassDefinitionInline]
 
     @admin.display(description='ABC Tiers')
@@ -509,6 +540,7 @@ class SeriesProfileAdmin(ClientScopedMixin, admin.ModelAdmin):
         'item_code',
         'location_code',
         'customer_code',
+        'distribution_channel',
         'period_type',
         'abc_class_badge',
         'demand_class_badge',
@@ -543,6 +575,7 @@ class SeriesProfileAdmin(ClientScopedMixin, admin.ModelAdmin):
     # Editable fields are ONLY the three planner override fields
     readonly_fields = [
         'client', 'item', 'planning_customer', 'planning_location',
+        'distribution_channel',
         'period_type',
         'analysis_from', 'analysis_to', 'computed_at',
         'total_periods', 'nonzero_periods', 'total_qty', 'total_value',
@@ -560,7 +593,7 @@ class SeriesProfileAdmin(ClientScopedMixin, admin.ModelAdmin):
         (_('Series Identity'), {
             'fields': [
                 ('client', 'period_type'),
-                ('item', 'planning_location', 'planning_customer'),
+                ('item', 'planning_location', 'distribution_channel', 'planning_customer'),
                 ('analysis_from', 'analysis_to', 'computed_at'),
             ],
         }),
@@ -693,7 +726,7 @@ class SeriesProfileAdmin(ClientScopedMixin, admin.ModelAdmin):
             super().get_queryset(request)
             .select_related(
                 'item', 'planning_location',
-                'planning_customer', 'chosen_evaluation',
+                'distribution_channel', 'planning_customer', 'chosen_evaluation',
             )
         )
 

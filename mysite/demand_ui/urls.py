@@ -23,7 +23,7 @@ urlpatterns = [
     path('items/search/', views_htmx.item_search, name='item_search_global'),
 
     # ── Taxonomy tree filter widget ──────────────────────────────────
-   path('taxonomy-tree/', taxonomy_tree_panel, name='taxonomy_tree_panel'),
+    path('taxonomy-tree/', taxonomy_tree_panel, name='taxonomy_tree_panel'),
     path('taxonomy-tree/<int:node_id>/children/', taxonomy_tree_children, name='taxonomy_tree_children'),
 
     # ── Forecast Versions ────────────────────────────────────────────────────
@@ -85,11 +85,23 @@ urlpatterns = [
     path('actuals/upload/', views.actuals_upload, name='actuals_upload'),
     path('actuals/upload/<int:job_id>/status/', views.actuals_upload_status, name='actuals_upload_status'),
     path('actuals/template/', views.actuals_template_download, name='actuals_template'),
-
+    path('actuals/aggregates/', views.actuals_aggregates, name='actuals_aggregates'),
     # ── Series Profiles ───────────────────────────────────────────────────────
     path('series-profiles/', views.series_profile_list, name='series_profile_list'),
     path('series-profiles/<int:pk>/', views.series_profile_detail, name='series_profile_detail'),
     path('series-profiles/<int:pk>/override/', views.series_profile_override, name='series_profile_override'),
     path('series-profiles/recompute/', views.recompute_series_profiles, name='series_profile_recompute'),
     path('series-profiles/recompute/status/', views.recompute_status, name='recompute_status'),    
+    # ── Outliers ───────────────────────────────────────────────────────
+    path("outliers/", views.outlier_queue, name="outlier_queue"),
+    path("outliers/<int:pk>/confirm/", views.outlier_confirm, name="outlier_confirm"),
+    path("outliers/<int:pk>/reject/", views.outlier_reject, name="outlier_reject"),
+    path("outliers/<int:pk>/undo/", views.outlier_undo_decision, name="outlier_undo_decision"),
+    path("actuals/<int:actual_sale_id>/outlier/raise/", views.raise_exception_form, name="raise_exception_form"),
+    path("outliers/detection-form/", views.outlier_detection_form, name="outlier_detection_form"),
+    path("outliers/run-detection/", views.trigger_outlier_detection, name="trigger_outlier_detection"),
+    path("outliers/decisions/", views.outlier_decisions_report, name="outlier_decisions_report"),
+    path("outliers/decisions/<int:pk>/revise/", views.outlier_revise, name="outlier_revise"),    
+ 
+
 ]

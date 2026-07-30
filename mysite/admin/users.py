@@ -284,59 +284,6 @@ class ClientUserMembershipInline(admin.TabularInline):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
-    """    
-    def get_formset(self, request, obj=None, **kwargs):
-        
-        #Attach client PK to request so autocomplete can use it
-        
-        if obj:
-            # obj = ClientGroup → get its client
-            request._current_client_id = obj.client.id
-        else:
-            request._current_client_id = None
-
-        return super().get_formset(request, obj, **kwargs)
-    """
-    """
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-        if db_field.name == "user" and request.resolver_match:
-            object_id = request.resolver_match.kwargs.get("object_id")
-
-            if object_id:
-                try:
-                    group = ClientGroup.objects.select_related('client').get(pk=object_id)
-                    client_pk = group.client.id
-
-                    # 🔑 Inject client into autocomplete URL
-                    formfield.widget.attrs["data-autocomplete-light-url"] += f"?client_id={client_pk}"
-
-                except ClientGroup.DoesNotExist:
-                    pass
-
-        return formfield
-    """
-    """
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == 'user': #and not request.user.is_superuser:
-            # Only show users whose ClientUserProfile belongs to this client
-            client_id = request.resolver_match.kwargs.get('object_id')
-            if client_id:
-                try:
-                    client = Client.objects.get(pk=client_id)
-                    kwargs['queryset'] = User.objects.filter(
-                        client_profile__client=client,  # scoped to same client
-                        is_superuser=False,
-                    )
-                except Client.DoesNotExist:
-                    kwargs['queryset'] = User.objects.none()
-            else:
-                kwargs['queryset'] = User.objects.none()
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-    """    
-
-
     def has_view_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True

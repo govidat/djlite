@@ -1,0 +1,75 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<h1 class="text-2xl font-bold mb-2">{% trans "Outlier Decisions Report" %}</h1>
+<p class="text-base-content/70 mb-6">
+  {% blocktrans %}Every confirmed or rejected outlier decision, across all periods — audit and revise past calls here.{% endblocktrans %}
+  {% trans "New, unreviewed candidates live on the" %}
+  <a class="link" href="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}">{% trans "Outlier Review Queue" %}</a>
+  {% trans "instead." %}
+</p>
+
+<div id="outlier-decisions-report">
+
+  {# ── Filters ──────────────────────────────────────────────────────────── #}
+  <form hx-get="{% url 'demand_ui:outlier_decisions_report' client_id=client.client_id %}"
+        hx-target="#outlier-decisions-report" hx-select="#outlier-decisions-report"
+        hx-swap="outerHTML" hx-push-url="true" class="flex flex-wrap gap-4 items-end mb-6">
+    <label class="form-control">
+      <span class="label-text">{% trans "Status" %}</span>
+      <select name="status" class="select select-bordered select-sm">
+        <option value="">{% trans "All" %}</option>
+        <option value="CONFIRMED">{% trans "Confirmed" %}</option>
+        <option value="REJECTED">{% trans "Rejected" %}</option>
+      </select>
+    </label>
+    <label class="form-control">
+      <span class="label-text">{% trans "Detected by" %}</span>
+      <select name="detected_by" class="select select-bordered select-sm">
+        <option value="">{% trans "All" %}</option>
+        <option value="SYSTEM">{% trans "System" %}</option>
+        <option value="USER">{% trans "Planner" %}</option>
+      </select>
+    </label>
+    <label class="form-control">
+      <span class="label-text">{% trans "Period from" %}</span>
+      <input type="date" name="period_start" class="input input-bordered input-sm">
+    </label>
+    <label class="form-control">
+      <span class="label-text">{% trans "Period to" %}</span>
+      <input type="date" name="period_end" class="input input-bordered input-sm">
+    </label>
+    <button type="submit" class="btn btn-primary btn-sm">{% trans "Filter" %}</button>
+  </form>
+
+  {# ── Decisions table ──────────────────────────────────────────────────── #}
+  <div class="overflow-x-auto">
+    <table class="table table-zebra">
+      <thead>
+        <tr>
+          <th>{% trans "Item" %}</th>
+          <th>{% trans "Location" %}</th>
+          <th>{% trans "Channel" %}</th>
+          <th>{% trans "Customer" %}</th>
+          <th>{% trans "Period" %}</th>
+          <th>{% trans "Actual Qty" %}</th>
+          <th>{% trans "Outlier Qty" %}</th>
+          <th>{% trans "Outlier Value" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Decided by / when" %}</th>
+          <th>{% trans "Reason" %}</th>
+          <th>{% trans "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody id="decision-rows">
+        {% for adjustment in adjustments %}
+          {% include "demand/outliers/partials/_decision_row.html" %}
+        {% empty %}
+          <tr><td colspan="12" class="text-base-content/60">{% trans "No decisions match these filters." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

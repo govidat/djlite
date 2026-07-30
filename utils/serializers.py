@@ -1,6 +1,7 @@
 # utils/serializers.py
 
 from django.db.models import ForeignKey
+from decimal import Decimal
 
 from utils.i18n import (
     resolve_translated_value,
@@ -59,7 +60,8 @@ def serialize_model_resolved(
         else:
 
             value = getattr(instance, name)
-
+            if isinstance(value, Decimal):
+                value = str(value) #float(value)
         if value not in [None, '']:
             data[name] = value
 

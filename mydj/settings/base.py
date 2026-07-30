@@ -362,4 +362,5 @@ CELERY_IMPORTS = [
     'mysite.tasks.demand.run_forecast',
     'mysite.tasks.demand.import_actuals',
     'mysite.tasks.demand.notifications',
+    'mysite.tasks.demand.detect_outliers',
 ]

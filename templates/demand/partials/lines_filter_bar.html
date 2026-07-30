@@ -1,5 +1,5 @@
 {% load i18n %}
-{% if show_item_search or show_location or show_customer or show_period or show_override_filter or filters.item_id or filters.location_code or filters.customer_code or filters.period_start or filters.has_override %}
+{% if show_item_search or show_location or show_customer or show_channel or show_period or show_override_filter or filters.item_id or filters.location_code or filters.customer_code or filters.channel_code or filters.period_start or filters.has_override %}
 <div class="bg-base-200 rounded-box p-4 mb-4" id="lines-filter-bar">
 
     {# ── Hidden inputs preserve filtered-out values ───────────────── #}
@@ -15,9 +15,12 @@
     {% if not show_period and filters.period_start %}
     <input type="hidden" id="lines-period-hidden" value="{{ filters.period_start }}">
     {% endif %}
+    {% if not show_channel and filters.channel_code %}
+    <input type="hidden" id="lines-channel-hidden" value="{{ filters.channel_code }}">
+    {% endif %}
 
     {# ── Active filter badges ─────────────────────────────────────── #}
-    {% if filters.item_id or filters.location_code or filters.customer_code or filters.period_start or filters.has_override %}
+    {% if filters.item_id or filters.location_code or filters.customer_code or filters.channel_code or filters.period_start or filters.has_override %}
     <div class="flex flex-wrap gap-2 mb-3">
         <span class="text-xs text-base-content/50 self-center">
             {% trans "Active filters:" %}
@@ -38,6 +41,12 @@
         <span class="badge badge-neutral gap-1">
             {% trans "Customer" %}: {{ filters.customer_code }}
             <button onclick="clearLineFilter('customer')" class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.channel_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Channel" %}: {{ filters.channel_code }}
+            <button onclick="clearLineFilter('channel')" class="ml-1 font-bold">×</button>
         </span>
         {% endif %}
         {% if filters.period_start %}
@@ -119,6 +128,24 @@
         </div>
         {% endif %}
 
+        {# Channel #}
+        {% if show_channel %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Channel" %}</span>
+            </label>
+            <select id="lines-channel" class="select select-bordered select-sm">
+                <option value="">{% trans "All channels" %}</option>
+                {% for ch in channels %}
+                <option value="{{ ch.code }}"
+                        {% if filters.channel_code == ch.code %}selected{% endif %}>
+                    {{ ch.code }} — {{ ch.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
         {# Period #}
         {% if show_period %}
         <div class="form-control">
@@ -183,12 +210,14 @@
         var itemId    = getVal('lines-item-id');
         var location  = getVal('lines-location', 'lines-location-hidden');
         var customer  = getVal('lines-customer', 'lines-customer-hidden');
+        var channel   = getVal('lines-channel', 'lines-channel-hidden');
         var period    = getVal('lines-period', 'lines-period-hidden');
         var override  = getVal('lines-has-override');
 
         if (itemId)   params.set('item_id', itemId);
         if (location) params.set('location_code', location);
         if (customer) params.set('customer_code', customer);
+        if (channel)  params.set('channel_code', channel);
         if (period)   params.set('period_start', period);
         if (override) params.set('has_override', override);
 
@@ -204,6 +233,7 @@
             'item':     ['lines-item-search', 'lines-item-id'],
             'location': ['lines-location', 'lines-location-hidden'],
             'customer': ['lines-customer', 'lines-customer-hidden'],
+            'channel':  ['lines-channel', 'lines-channel-hidden'],
             'period':   ['lines-period', 'lines-period-hidden'],
             'override': ['lines-has-override'],
         };
@@ -214,7 +244,7 @@
         applyFilters();
     };
 
-    ['lines-location', 'lines-customer',
+    ['lines-location', 'lines-customer', 'lines-channel',
      'lines-period', 'lines-has-override'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', applyFilters);
@@ -226,6 +256,7 @@
             ['lines-item-search', 'lines-item-id',
              'lines-location', 'lines-location-hidden',
              'lines-customer', 'lines-customer-hidden',
+             'lines-channel', 'lines-channel-hidden',
              'lines-period', 'lines-period-hidden',
              'lines-has-override'].forEach(function(id) {
                 var el = document.getElementById(id);

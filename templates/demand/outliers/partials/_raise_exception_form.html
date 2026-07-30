@@ -1,0 +1,46 @@
+{% load i18n %}
+{# Opened from the Actuals Dashboard drill-down row for a specific ActualSale. Planner raises an
+   exception directly, without waiting for system detection. #}
+<form hx-post="{% url 'demand_ui:raise_exception_form' client_id=client.client_id actual_sale_id=actual.pk %}"
+      hx-target="this" hx-swap="outerHTML" class="card bg-base-200 p-4 space-y-2">
+  {% if errors %}
+    <div class="alert alert-error text-sm">
+      <ul>
+        {% for field, messages in errors.items %}
+          <li>{{ field }}: {{ messages|join:", " }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <p class="text-sm text-base-content/70">
+    {{ actual.item }} · {{ actual.planning_location }} · {{ actual.period_start|date:"M Y" }}
+    — {% trans "qty" %} {{ actual.qty }}{% if actual.revenue %}, {% trans "revenue" %} {{ actual.revenue }}{% endif %}
+  </p>
+
+  <label class="form-control">
+    <span class="label-text">
+      {% blocktrans with max_qty=actual.qty %}Qty to exclude (max {{ max_qty }}){% endblocktrans %}
+    </span>
+    <input type="number" step="0.001" name="qty_adjustment" max="{{ actual.qty }}" required
+           class="input input-bordered input-sm">
+  </label>
+
+  {% if actual.revenue %}
+    <label class="form-control">
+      <span class="label-text">
+        {% blocktrans with max_rev=actual.revenue %}Revenue to exclude (max {{ max_rev }}){% endblocktrans %}
+      </span>
+      <input type="number" step="0.01" name="revenue_adjustment" max="{{ actual.revenue }}"
+             class="input input-bordered input-sm">
+    </label>
+  {% endif %}
+
+  <label class="form-control">
+    <span class="label-text">{% trans "Reason" %}</span>
+    <input type="text" name="reason" placeholder="{% trans 'e.g. one-off distributor bulk order' %}"
+           class="input input-bordered input-sm">
+  </label>
+
+  <button type="submit" class="btn btn-primary btn-sm">{% trans "Raise Exception" %}</button>
+</form>

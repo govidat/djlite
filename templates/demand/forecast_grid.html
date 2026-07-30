@@ -85,6 +85,7 @@
               <th class="col-item-id">Item ID</th>
               <th class="col-item-name">Item</th>
               <th class="col-customer">Customer</th>
+              {% if show_channel %}<th class="col-channel">Channel</th>{% endif %}
               {# One <th> per forecast period #}
               {% for label in period_labels %}
                 <th class="col-period">{{ label }}</th>
@@ -106,6 +107,7 @@
               <td class="col-item-id">{{ row.item_id }}</td>
               <td class="col-item-name">{{ row.item_name }}</td>
               <td class="col-customer">{{ row.customer_code|default:"—" }}</td>
+              {% if show_channel %}<td class="col-channel">{{ row.channel_code }}</td>{% endif %}
 
               {% for cell in row.cells %}
               <td class="forecast-cell
@@ -135,7 +137,7 @@
             </tr>
             {% empty %}
               <tr>
-                <td colspan="{{ periods|length|add:4 }}" class="grid-empty">
+                <td colspan="{% if show_channel %}{{ periods|length|add:5 }}{% else %}{{ periods|length|add:4 }}{% endif %}" class="grid-empty">
                   No forecast lines found.
                 </td>
               </tr>

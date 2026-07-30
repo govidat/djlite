@@ -6,6 +6,7 @@
                 <th>{% trans "Item" %}</th>
                 <th>{% trans "Location" %}</th>
                 <th>{% trans "Customer" %}</th>
+                {% if show_channel %}<th>{% trans "Channel" %}</th>{% endif %}
                 <th class="text-right">{% trans "MAPE %" %}</th>
                 <th class="text-right">{% trans "Bias %" %}</th>
             </tr>
@@ -16,6 +17,7 @@
                 <td class="font-mono text-xs">{{ row.item.item_id }}</td>
                 <td class="font-mono text-xs">{{ row.planning_location.code }}</td>
                 <td>{{ row.planning_customer.code|default:"—" }}</td>
+                {% if show_channel %}<td>{{ row.distribution_channel.code|default:"—" }}</td>{% endif %}
                 <td class="text-right">
                     {% if row.mape is not None %}
                         <span class="{% if row.mape > 50 %}text-error{% elif row.mape > 25 %}text-warning{% else %}text-success{% endif %}">
@@ -29,7 +31,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="text-center py-8 text-base-content/50">
+                <td colspan="{% if show_channel %}6{% else %}5{% endif %}" class="text-center py-8 text-base-content/50">
                     {% trans "No accuracy data. Run the forecast against actuals first." %}
                 </td>
             </tr>

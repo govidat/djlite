@@ -4,10 +4,10 @@ Exposes demand-planning models at the mysite.models.demand package level.
 Add more imports here as actuals.py and forecast.py are created in later sprints.
 """
 
-from .hierarchy import PlanningLocation, PlanningCustomer, SalesNode, CustomerSalesAssignment
+from .hierarchy import PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink
 from mysite.models.demand.actuals import (
     ActualSaleImport,
-    ActualSale, ActualSaleLocation, ItemPlanningProfile
+    ActualSale, ActualSaleOutlierAdjustment, ActualSaleLocation, ItemPlanningProfile
 )
 from mysite.models.demand.forecast import (
   ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, 
@@ -18,9 +18,10 @@ __all__ = [
     'PlanningLocation',
     'PlanningCustomer',
     'SalesNode',
-    'CustomerSalesAssignment',
+    'SalesForecastLink',
     'ActualSaleImport',
     'ActualSale',
+    'ActualSaleOutlierAdjustment',
     'ActualSaleLocation', 'ItemPlanningProfile',
     'ForecastVersion', 'ForecastLine', 'ForecastAggregate', 'ForecastOverride', 'OverrideSplitWeight', 'ForecastAccuracy', 
     'AbcClassDefinition', 'ForecastingConfig', 'SeriesLevelEvaluation', 'SeriesProfile'

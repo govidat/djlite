@@ -11,12 +11,15 @@ from django.conf import settings
 
 CACHE_TTL = 900  # 15 minutes. Anyway cache bust will take care if there is any change
 
+# ALSO UPDATE utils > feature_control.py
+
 _FEATURE_HIERARCHY = {
     "demand_planning": frozenset({
         "actuals_upload",
         "forecast_run",
         "consensus_override",
         "forecast_approval",
+        "outlier_management"
     }),
     "inventory":  frozenset(),   # populate in Phase 2
     "ecommerce":  frozenset(),   # populate in Phase 3
@@ -82,118 +85,6 @@ def is_demand_feature_disabled(client, feature: str) -> dict:
     return is_feature_disabled(client, feature)
 
 
-def zzis_feature_disabled(client, feature):
-    """
-    Returns:
-        {
-            "disabled": bool,
-            "message": str,
-        }
-
-    Priority:
-        1. Global rule (client=None)
-        2. Client-specific rule
-    """
-
-    client_id = client.client_id if client else "global"
-
-    cache_key = f"feature_control:{client_id}:{feature}"
-
-    cached = cache.get(cache_key)
-
-    if cached is not None:
-        return cached
-
-    now = timezone.now()
-
-    base_qs = ClientFeatureControl.objects.filter(
-        feature=feature,
-        is_disabled=True,
-        from_date__lte=now,
-        to_date__gte=now,
-    )
-
-    # ── GLOBAL override has precedence ─────────────────────
-    obj = base_qs.filter(
-        client__isnull=True
-    ).first()
-
-    # ── client-specific rule ───────────────────────────────
-    if obj is None and client:
-        obj = base_qs.filter(
-            client=client
-        ).first()
-
-    result = {
-        "disabled": bool(obj),
-        "message": (
-            obj.message
-            if obj else ""
-        )
-    }
-
-    cache.set(cache_key, result, CACHE_TTL)
-
-    return result
-
-# ─────────────────────────────────────────────────────────────────────────────
-# DELTA ADDITIONS to utils/feature_control.py
-# Paste these below your existing is_feature_disabled() function.
-# No changes needed to the existing function.
-# ─────────────────────────────────────────────────────────────────────────────
- 
-# Add this import at the top of the file (with your existing imports):
-#   from functools import wraps
-#   from django.core.exceptions import PermissionDenied
-#   from django.shortcuts import render
- 
- 
-# ── 1. Demand Planning sub-feature hierarchy ──────────────────────────────────
-#
-# The five demand planning features have a parent-child relationship:
-# if "demand_planning" (master switch) is disabled, all sub-features
-# are implicitly disabled regardless of their own rows.
-#
-# Sub-features that require the master switch to be on first:
-_ZZDEMAND_SUBFEATURES = frozenset({
-    "actuals_upload",
-    "forecast_run",
-    "consensus_override",
-    "forecast_approval",
-})
-
-
- 
-def zzis_demand_feature_disabled(client, feature):
-    """
-    Like is_feature_disabled(), but also checks the master "demand_planning"
-    switch before checking the sub-feature.
- 
-    Returns the same dict shape as is_feature_disabled():
-        {"disabled": bool, "message": str}
- 
-    Usage (views):
-        result = is_demand_feature_disabled(request.client, "actuals_upload")
-        if result["disabled"]:
-            return render(request, "demand/feature_disabled.html",
-                          {"message": result["message"]}, status=403)
- 
-    Usage (Celery tasks):
-        result = is_demand_feature_disabled(client, "forecast_run")
-        if result["disabled"]:
-            return {"status": "skipped", "reason": result["message"]}
-    """
-    # Check master switch first (only for sub-features)
-    if feature in _ZZDEMAND_SUBFEATURES:
-        master = is_feature_disabled(client, "demand_planning")
-        if master["disabled"]:
-            return {
-                "disabled": True,
-                "message": master["message"] or "Demand Planning is not enabled for this account.",
-            }
- 
-    return is_feature_disabled(client, feature)
- 
  
 # ── 2. View decorator ─────────────────────────────────────────────────────────
 #
@@ -277,7 +168,38 @@ def celery_demand_feature_guard(client, feature):
         }
     return None
  
+
+def outlier_ui_visible(client) -> bool:
+    """
+    True when the outlier-management UI (sidebar section, aggregates
+    include/exclude toggle) should be shown for this client.
  
+    ClientFeatureControl is a DISABLER, not an enabler — no row at all
+    means the feature is available by default; a row only takes effect
+    while is_disabled=True and now falls within [from_date, to_date].
+    is_feature_disabled() already encodes that plus the parent/sub-feature
+    cascade ('outlier_management' -> 'demand_planning'), so this is a thin
+    wrapper rather than a second implementation of the same check — kept
+    here (not duplicated inline in the context processor and the view) so
+    both call sites can never drift out of sync with each other.
+    """
+    if client is None:
+        return False
+ 
+    # Adjust this import to wherever is_feature_disabled actually lives.
+    #from mysite.utils.features import is_feature_disabled
+ 
+    result = is_feature_disabled(client, 'outlier_management')
+    return not result['disabled']
+
+def demand_ui_visible(client) -> bool:
+
+    if client is None:
+        return False
+ 
+    result = is_feature_disabled(client, 'demand_planning')
+    return not result['disabled']
+
 # ── 4. Cache invalidation helper ─────────────────────────────────────────────
 #
 # Call this from a post_save signal or admin action whenever a

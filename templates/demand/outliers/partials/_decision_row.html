@@ -1,0 +1,59 @@
+{% load i18n %}
+{# One row in the Historical Decisions Report. Re-rendered in place after a revision via HTMX;
+   removed from the DOM entirely (hx-swap="delete") after Undo, since an undone row no longer
+   belongs on this page — it goes back to CANDIDATE and shows up in the Outlier Review Queue. #}
+<tr id="decision-row-{{ adjustment.pk }}">
+  <td>{{ adjustment.actual_sale.item }}</td>
+  <td>{{ adjustment.actual_sale.planning_location }}</td>
+  <td>{{ adjustment.actual_sale.distribution_channel }}</td>
+  <td>{{ adjustment.actual_sale.planning_customer|default:"—" }}</td>
+  <td>{{ adjustment.actual_sale.period_start|date:"M Y" }}</td>
+  <td>{{ adjustment.actual_sale.qty }}</td>
+
+  <td>
+    {% if errors %}
+      <div class="alert alert-error text-xs p-2">
+        <ul>
+          {% for field, messages in errors.items %}
+            <li>{{ field }}: {{ messages|join:", " }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    <form hx-post="{% url 'demand_ui:outlier_revise' client_id=client.client_id pk=adjustment.pk %}"
+          hx-target="#decision-row-{{ adjustment.pk }}" hx-swap="outerHTML"
+          class="flex gap-2 items-center">
+      <input type="number" step="0.001" name="qty_adjustment"
+             value="{{ adjustment.qty_adjustment }}" max="{{ adjustment.actual_sale.qty }}"
+             class="input input-bordered input-xs w-24">
+  </td>
+
+  <td>
+      {% if adjustment.actual_sale.revenue %}
+        <input type="number" step="0.01" name="revenue_adjustment"
+               value="{{ adjustment.revenue_adjustment|default_if_none:'' }}"
+               max="{{ adjustment.actual_sale.revenue }}" class="input input-bordered input-xs w-24">
+      {% else %}
+        —
+      {% endif %}
+  </td>
+
+  <td>
+      <select name="status" class="select select-bordered select-xs">
+        <option value="CONFIRMED" {% if adjustment.status == "CONFIRMED" %}selected{% endif %}>{% trans "Confirmed" %}</option>
+        <option value="REJECTED" {% if adjustment.status == "REJECTED" %}selected{% endif %}>{% trans "Rejected" %}</option>
+      </select>
+  </td>
+
+  <td>{{ adjustment.confirmed_by|default:"—" }} · {{ adjustment.confirmed_at|date:"d M Y, H:i"|default:"—" }}</td>
+  <td>{{ adjustment.reason|default:"—" }}</td>
+  <td class="flex gap-2">
+      <button type="submit" class="btn btn-primary btn-xs">{% trans "Revise" %}</button>
+    </form>
+    <form hx-post="{% url 'demand_ui:outlier_undo_decision' client_id=client.client_id pk=adjustment.pk %}"
+          hx-target="#decision-row-{{ adjustment.pk }}" hx-swap="delete"
+          hx-confirm="{% trans 'Move this back to the Outlier Review Queue as a new candidate?' %}">
+      <button type="submit" class="btn btn-ghost btn-xs">{% trans "Undo" %}</button>
+    </form>
+  </td>
+</tr>

@@ -1,0 +1,93 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+{% load static %}
+
+{% comment "" %}
+templates/
+└── demand/
+    └── outliers/
+        ├── queue.html                       ← full-page Outlier Review Queue
+        ├── decisions_report.html            ← full-page Historical Decisions Report
+        └── partials/
+            ├── _row.html                    ← queue row (confirm/reject swap target)
+            ├── _decision_row.html           ← decisions report row (revise swap target)
+            ├── _raise_exception_form.html   ← planner-raised exception, from Actuals Dashboard drill-down
+            ├── _detection_form.html         ← range-picker for "Run Outlier Detection"
+            └── _detection_triggered.html    ← confirmation shown after detection is queued
+{% endcomment %}
+
+{% block demand_content %}
+<h1 class="text-2xl font-bold mb-6">{% trans "Outlier Review Queue" %}</h1>
+
+<div id="outlier-queue">
+
+  {# ── Detection trigger + last-run status ─────────────────────────────── #}
+  <div class="card bg-base-200 mb-6">
+    <div class="card-body">
+      <p class="text-sm text-base-content/70">
+        {% trans "Last run" %}:
+        {% if forecasting_config.last_outlier_detection_run_at %}
+          {{ forecasting_config.last_outlier_detection_run_at|date:"d M Y, H:i" }}
+          {% if forecasting_config.last_outlier_detection_run_by %}
+            {% trans "by" %} {{ forecasting_config.last_outlier_detection_run_by }}
+          {% endif %}
+          — {% trans "covering" %}
+          {{ forecasting_config.last_outlier_detection_range_start|date:"M Y" }}
+          {% trans "to" %} {{ forecasting_config.last_outlier_detection_range_end|date:"M Y" }}
+        {% else %}
+          {% trans "Never run" %}
+        {% endif %}
+      </p>
+
+      <div hx-get="{% url 'demand_ui:outlier_detection_form' client_id=client.client_id %}"
+           hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+        <!-- _detection_form.html loads here on page load -->
+      </div>
+      <div id="detection-status"></div>
+    </div>
+  </div>
+
+  {# ── Status tabs ───────────────────────────────────────────────────────── #}
+  <div class="tabs tabs-boxed w-fit mb-4">
+    <a class="tab {% if current_status == 'CANDIDATE' %}tab-active{% endif %}"
+       hx-get="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}?status=CANDIDATE"
+       hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
+       hx-push-url="true">{% trans "Candidates" %}</a>
+    <a class="tab {% if current_status == 'CONFIRMED' %}tab-active{% endif %}"
+       hx-get="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}?status=CONFIRMED"
+       hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
+       hx-push-url="true">{% trans "Confirmed" %}</a>
+    <a class="tab {% if current_status == 'REJECTED' %}tab-active{% endif %}"
+       hx-get="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}?status=REJECTED"
+       hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
+       hx-push-url="true">{% trans "Rejected" %}</a>
+  </div>
+
+  {# ── Candidate/decision table ─────────────────────────────────────────── #}
+  <div class="overflow-x-auto">
+    <table class="table table-zebra">
+      <thead>
+        <tr>
+          <th>{% trans "Item" %}</th>
+          <th>{% trans "Location" %}</th>
+          <th>{% trans "Channel" %}</th>
+          <th>{% trans "Customer" %}</th>
+          <th>{% trans "Period" %}</th>
+          <th>{% trans "Actual Qty" %}</th>
+          <th>{% trans "Suggested Outlier Qty" %}</th>
+          <th>{% trans "Suggested Outlier Value" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody id="outlier-rows">
+        {% for adjustment in adjustments %}
+          {% include "demand/outliers/partials/_row.html" %}
+        {% empty %}
+          <tr><td colspan="10" class="text-base-content/60">{% trans "No outlier adjustments found for this status." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
