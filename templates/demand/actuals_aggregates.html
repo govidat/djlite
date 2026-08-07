@@ -13,7 +13,7 @@
 
 {# ── Level selector ────────────────────────────────────────────────── #}
 <div class="tabs tabs-boxed mb-4 w-fit" id="actuals-agg-level-tabs">
-    {% for level in agg_level_choices %}
+    {% for level, label in agg_level_choices %}
     <a class="tab {% if agg_level == level %}tab-active{% endif %}"
        id="actuals-agg-tab-{{ level }}"
        hx-get="{% url 'demand_ui:actuals_aggregates' client_id=client.client_id %}?agg_level={{ level }}"
@@ -25,7 +25,7 @@
                .forEach(function(t){t.classList.remove('tab-active')});
            this.classList.add('tab-active');
        ">
-        {{ level|capfirst }}
+        {{ label }}
     </a>
     {% endfor %}
 </div>

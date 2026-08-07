@@ -6,10 +6,10 @@
                 <th class="whitespace-nowrap">{% trans "Period" %}</th>
 
                 {# Friendly column header per level #}
-                {% if agg_level == 'location' %}
-                <th class="whitespace-nowrap">{% trans "Location" %}</th>
-                {% elif agg_level == 'item' %}
-                <th class="whitespace-nowrap">{% trans "Item" %}</th>
+                {% if agg_level == 'sales' %}
+                <th class="whitespace-nowrap">{% trans "Sales Node" %}</th>
+                {% elif agg_level == 'item_hierarchy' %}
+                <th class="whitespace-nowrap">{% trans "Item Category" %}</th>
                 {% elif agg_level == 'customer' %}
                 <th class="whitespace-nowrap">{% trans "Customer" %}</th>
                 {% endif %}
@@ -29,6 +29,11 @@
                 {% if agg_level != 'total' %}
                 <td class="font-mono text-xs whitespace-nowrap">
                     {{ agg.display_key }}
+                    {% if agg.display_hierarchy %}
+                    <div class="font-normal text-[11px] text-base-content/50">
+                        {{ agg.display_hierarchy }}
+                    </div>
+                    {% endif %}
                 </td>
                 {% endif %}
 
@@ -62,11 +67,7 @@
                     </span>
                 </td>
                 <td class="text-right font-medium">
-                    {% if single_item %}
-                        {{ page_total.total_qty|floatformat:0 }}
-                    {% else %}
-                        —
-                    {% endif %}
+                    {{ page_total.total_qty|floatformat:0 }}
                 </td>
                 <td class="text-right font-medium">
                     ₹{{ page_total.total_revenue|floatformat:0 }}
@@ -78,21 +79,13 @@
                         font-bold text-sm">
                 <td colspan="{% if agg_level == 'total' %}1{% else %}2{% endif %}"
                     class="text-right pr-2 whitespace-nowrap">
-                    {% if single_item %}
-                        {% trans "Item total" %}
-                    {% else %}
-                        {% trans "Grand total" %}
-                    {% endif %}
+                    {% trans "Grand total" %}
                     <span class="text-xs font-normal text-base-content/50 ml-1">
                         ({{ page_obj.paginator.count }} {% trans "rows" %})
                     </span>
                 </td>
                 <td class="text-right">
-                    {% if single_item %}
-                        {{ grand_total.total_qty|floatformat:0 }}
-                    {% else %}
-                        —
-                    {% endif %}
+                    {{ grand_total.total_qty|floatformat:0 }}
                 </td>
                 <td class="text-right">
                     ₹{{ grand_total.total_revenue|floatformat:0 }}
@@ -105,140 +98,12 @@
 
 {% if page_obj.has_other_pages %}
 <div class="flex justify-center gap-2 mt-4">
-    {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&location_code={{ filters.location_code }}&item_id={{ filters.item_id }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&exclude_outliers={{ filters.exclude_outliers|yesno:"1,0" }}"
-       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
-    {% endif %}
+    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}&exclude_outliers={{ filters.exclude_outliers|yesno:'1,0' }}"
+       class="btn btn-sm btn-ghost {% if not page_obj.has_previous %}btn-disabled{% endif %}">← {% trans "Previous" %}</a>
     <span class="btn btn-sm btn-disabled">
         {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
     </span>
-    {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&location_code={{ filters.location_code }}&item_id={{ filters.item_id }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&exclude_outliers={{ filters.exclude_outliers|yesno:"1,0" }}"
-       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
-    {% endif %}
+    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}&exclude_outliers={{ filters.exclude_outliers|yesno:'1,0' }}"
+       class="btn btn-sm btn-ghost {% if not page_obj.has_next %}btn-disabled{% endif %}">{% trans "Next" %} →</a>
 </div>
 {% endif %}
-
-{% comment "" %}
-
-{% load i18n %}
-<div class="overflow-x-auto">
-    <table class="table table-zebra table-sm w-full">
-        <thead>
-            <tr>
-                <th class="whitespace-nowrap">{% trans "Period" %}</th>
-
-                {# Friendly column header per level #}
-                {% if agg_level == 'location' %}
-                <th class="whitespace-nowrap">{% trans "Location" %}</th>
-                {% elif agg_level == 'item' %}
-                <th class="whitespace-nowrap">{% trans "Item" %}</th>
-                {% elif agg_level == 'customer' %}
-                <th class="whitespace-nowrap">{% trans "Customer" %}</th>
-                {% endif %}
-
-                <th class="text-right whitespace-nowrap">{% trans "Qty" %}</th>
-                <th class="text-right whitespace-nowrap">{% trans "Revenue (₹)" %}</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for agg in aggregates %}
-            <tr class="hover">
-                <td class="whitespace-nowrap">
-                    {{ agg.period_start|date:"M Y" }}
-                </td>
-
-                {# Key column — only for non-total levels #}
-                {% if agg_level != 'total' %}
-                <td class="font-mono text-xs whitespace-nowrap">
-                    {{ agg.display_key }}
-                </td>
-                {% endif %}
-
-                <td class="text-right font-medium">
-                    {{ agg.total_qty|floatformat:0 }}
-                </td>
-                <td class="text-right font-medium">
-                    ₹{{ agg.total_revenue|floatformat:0 }}
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="{% if agg_level == 'total' %}3{% else %}4{% endif %}"
-                    class="text-center py-8 text-base-content/50">
-                    {% trans "No actuals found." %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-
-        {# ── Totals footer ──────────────────────────────────────── #}
-        {% if aggregates %}
-        <tfoot>
-            {% if is_multipage %}
-            <tr class="border-t border-base-300 text-sm">
-                <td colspan="{% if agg_level == 'total' %}1{% else %}2{% endif %}"
-                    class="text-right text-base-content/60 pr-2 whitespace-nowrap">
-                    {% trans "Page total" %}
-                    <span class="text-xs text-base-content/40 ml-1">
-                        ({{ page_obj.object_list|length }} {% trans "rows" %})
-                    </span>
-                </td>
-                <td class="text-right font-medium">
-                    {% if single_item %}
-                        {{ page_total.total_qty|floatformat:0 }}
-                    {% else %}
-                        —
-                    {% endif %}
-                </td>
-                <td class="text-right font-medium">
-                    ₹{{ page_total.total_revenue|floatformat:0 }}
-                </td>
-            </tr>
-            {% endif %}
-
-            <tr class="border-t-2 border-base-content/20 bg-base-200
-                        font-bold text-sm">
-                <td colspan="{% if agg_level == 'total' %}1{% else %}2{% endif %}"
-                    class="text-right pr-2 whitespace-nowrap">
-                    {% if single_item %}
-                        {% trans "Item total" %}
-                    {% else %}
-                        {% trans "Grand total" %}
-                    {% endif %}
-                    <span class="text-xs font-normal text-base-content/50 ml-1">
-                        ({{ page_obj.paginator.count }} {% trans "rows" %})
-                    </span>
-                </td>
-                <td class="text-right">
-                    {% if single_item %}
-                        {{ grand_total.total_qty|floatformat:0 }}
-                    {% else %}
-                        —
-                    {% endif %}
-                </td>
-                <td class="text-right">
-                    ₹{{ grand_total.total_revenue|floatformat:0 }}
-                </td>
-            </tr>
-        </tfoot>
-        {% endif %}
-    </table>
-</div>
-
-{% if page_obj.has_other_pages %}
-<div class="flex justify-center gap-2 mt-4">
-    {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&location_code={{ filters.location_code }}&item_id={{ filters.item_id }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}"
-       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
-    {% endif %}
-    <span class="btn btn-sm btn-disabled">
-        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-    </span>
-    {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&location_code={{ filters.location_code }}&item_id={{ filters.item_id }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}"
-       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
-    {% endif %}
-</div>
-{% endif %}
-{% endcomment %}

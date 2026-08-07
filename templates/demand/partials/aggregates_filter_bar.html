@@ -2,7 +2,7 @@
 <div class="bg-base-200 rounded-box p-4 mb-4" id="aggregates-filter-bar">
 
     {# ── Active filter badges ──────────────────────────────────────── #}
-    {% if filters.period_start or filters.location_code or filters.item_id or filters.customer_code or filters.final_value_min or filters.final_value_max or filters.final_qty_min or filters.final_qty_max or filters.taxonomy_node_ids %}
+    {% if filters.period_start or filters.customer_code or filters.final_value_min or filters.final_value_max or filters.sales_node_id or filters.taxonomy_node_id %}
     <div class="flex flex-wrap gap-2 mb-3">
         <span class="text-xs text-base-content/50 self-center">
             {% trans "Active filters:" %}
@@ -11,20 +11,6 @@
         <span class="badge badge-neutral gap-1">
             {% trans "Period" %}: {{ filters.period_start }}
             <button onclick="clearAggFilter('period_start')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.location_code %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Location" %}: {{ filters.location_code }}
-            <button onclick="clearAggFilter('location_code')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.item_id %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Item" %}: {{ filters.item_id }}
-            <button onclick="clearAggFilter('item_id')"
                     class="ml-1 font-bold">×</button>
         </span>
         {% endif %}
@@ -43,18 +29,16 @@
                     class="ml-1 font-bold">×</button>
         </span>
         {% endif %}
-        {% if filters.final_qty_min or filters.final_qty_max %}
+        {% if filters.sales_node_id %}
         <span class="badge badge-neutral gap-1">
-            {% trans "Qty" %} {{ filters.final_qty_min|default:'0' }}
-            — {{ filters.final_qty_max|default:'∞' }}
-            <button onclick="clearAggFilter('qty_range')"
+            {% trans "Sales org" %}: {{ filters.sales_node_id }}
+            <button onclick="clearAggFilter('sales_node')"
                     class="ml-1 font-bold">×</button>
         </span>
         {% endif %}
-        {% if filters.taxonomy_node_ids %}
+        {% if filters.taxonomy_node_id %}
         <span class="badge badge-neutral gap-1">
-            {% trans "Category" %}: {{ filters.taxonomy_node_count }}
-            {% trans "selected" %}
+            {% trans "Item category" %}: {{ filters.taxonomy_node_id }}
             <button onclick="clearAggFilter('taxonomy_node')"
                     class="ml-1 font-bold">×</button>
         </span>
@@ -89,950 +73,41 @@
                value="{{ filters.period_start }}">
         {% endif %}
 
-        {# ── Location hierarchy — location level only ────────────────── #}
-        {% if agg_level == 'location' and location_hierarchy_choices %}
+        {# ── Sales hierarchy — sales level only ─────────────────────── #}
+        {% if agg_level == 'sales' and sales_node_choices %}
         <div class="form-control">
             <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Filter by region/zone" %}</span>
+                <span class="label-text text-xs">{% trans "Drill into sales org" %}</span>
             </label>
-            <select id="agg-hierarchy-location"
-                    class="select select-bordered select-sm">
-                <option value="">{% trans "All regions" %}</option>
-                {% for loc in location_hierarchy_choices %}
-                <option value="{{ loc.id }}"
-                        {% if filters.hierarchy_location_id == loc.id|stringformat:'s' %}
+            <select id="agg-sales-node" class="select select-bordered select-sm">
+                <option value="">{% trans "Whole sales org" %}</option>
+                {% for node in sales_node_choices %}
+                <option value="{{ node.id }}"
+                        {% if filters.sales_node_id == node.id|stringformat:'s' %}
                         selected{% endif %}>
-                    {{ loc.level_label }}: {{ loc.code }} — {{ loc.name }}
+                    {{ node.level_label }}: {{ node.code }} — {{ node.name }}
                 </option>
                 {% endfor %}
             </select>
         </div>
         {% endif %}
 
-        {# ── Location — location level only ───────────────────────── #}
-        {% if agg_level == 'location' and location_choices|length > 1 %}
+        {# ── Item hierarchy — item_hierarchy level only ─────────────── #}
+        {% if agg_level == 'item_hierarchy' and taxonomy_node_choices %}
         <div class="form-control">
             <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Location" %}</span>
+                <span class="label-text text-xs">{% trans "Drill into item category" %}</span>
             </label>
-            <select id="agg-location" class="select select-bordered select-sm">
-                <option value="">{% trans "All locations" %}</option>
-                {% for code, name in location_choices %}
-                <option value="{{ code }}"
-                        {% if filters.location_code == code %}selected{% endif %}>
-                    {{ code }} — {{ name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Taxonomy tree — item level only ─────────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control dropdown">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Category / taxonomy" %}</span>
-            </label>
-            <label tabindex="0" class="btn btn-sm btn-outline">
-                {% if filters.taxonomy_node_count %}
-                    {{ filters.taxonomy_node_count }} {% trans "selected" %}
-                {% else %}
-                    {% trans "All categories" %}
-                {% endif %}
-            </label>
-            <div tabindex="0"
-                 class="dropdown-content z-50 bg-base-100 border border-base-300
-                        rounded-box shadow-lg p-3 mt-1 max-h-80 overflow-y-auto
-                        min-w-[280px]">
-                <div id="tx-tree-container"
-                     hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_id=client.client_id %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}"
-                     hx-trigger="load"
-                     hx-target="this">
-                    {% trans "Loading categories…" %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        {# ── Item search — item level only ────────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control min-w-[200px]" id="agg-item-wrapper">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Item" %}</span>
-            </label>
-            <div class="relative">
-                <input type="text" id="agg-item-search"
-                       class="input input-bordered input-sm w-full"
-                       placeholder="{% trans 'Type 2+ chars…' %}"
-                       autocomplete="off"
-                       value="{{ filters.item_id }}">
-                <input type="hidden" id="agg-item-id"
-                       value="{{ filters.item_id }}">
-                <ul id="agg-item-results"
-                    class="hidden absolute z-50 bg-base-100 border
-                           border-base-300 rounded-box shadow-lg mt-1
-                           max-h-48 overflow-y-auto w-full min-w-[240px]">
-                </ul>
-            </div>
-        </div>
-        {% endif %}
-
-        {# ── Customer — customer level only ───────────────────────── #}
-        {% if agg_level == 'customer' and customer_choices|length > 1 %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Customer" %}</span>
-            </label>
-            <select id="agg-customer" class="select select-bordered select-sm">
-                <option value="">{% trans "All customers" %}</option>
-                {% for code, name in customer_choices %}
-                <option value="{{ code }}"
-                        {% if filters.customer_code == code %}selected{% endif %}>
-                    {{ code }} — {{ name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Final value range — location, item, customer ─────────── #}
-        {% if agg_level != 'total' %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">
-                    {% trans "Final Value (₹) min" %}
-                </span>
-            </label>
-            <input type="number" id="agg-value-min"
-                   class="input input-bordered input-sm w-28"
-                   placeholder="0"
-                   value="{{ filters.final_value_min }}">
-        </div>
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">
-                    {% trans "max" %}
-                </span>
-            </label>
-            <input type="number" id="agg-value-max"
-                   class="input input-bordered input-sm w-28"
-                   placeholder="∞"
-                   value="{{ filters.final_value_max }}">
-        </div>
-        {% endif %}
-
-        {# ── Final qty range — item level only ────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">
-                    {% trans "Final Qty min" %}
-                </span>
-            </label>
-            <input type="number" id="agg-qty-min"
-                   class="input input-bordered input-sm w-24"
-                   placeholder="0"
-                   value="{{ filters.final_qty_min }}">
-        </div>
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "max" %}</span>
-            </label>
-            <input type="number" id="agg-qty-max"
-                   class="input input-bordered input-sm w-24"
-                   placeholder="∞"
-                   value="{{ filters.final_qty_max }}">
-        </div>
-        {% endif %}
-
-    </div>
-</div>
-
-<script>
-(function() {
-    var baseUrl   = '{% url "demand_ui:version_aggregates" client_id=client.client_id pk=version.pk %}';
-    var searchUrl = '{% url "demand_ui:item_search" client_id=client.client_id pk=version.pk %}';
-    var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    var searchTimer = null;
-    var currentAggLevel = '{{ agg_level }}';
-
-    function getVal(id) {
-        var el = document.getElementById(id);
-        return el ? el.value : '';
-    }
-
-    function applyFilters() {
-        var params = new URLSearchParams();
-        params.set('agg_level', currentAggLevel);
-
-        var period    = getVal('agg-period');
-        var location  = getVal('agg-location');
-        var itemId    = getVal('agg-item-id');
-        var customer  = getVal('agg-customer');
-        var valMin    = getVal('agg-value-min');
-        var valMax    = getVal('agg-value-max');
-        var qtyMin    = getVal('agg-qty-min');
-        var qtyMax    = getVal('agg-qty-max');
-        var hierarchyLoc = getVal('agg-hierarchy-location');
-        var taxonomyNodeIds = Array.from(
-            document.querySelectorAll('input[name="taxonomy_node_ids"]:checked')
-        ).map(function(el) { return el.value; });
-
-        if (period)   params.set('period_start', period);
-        if (location) params.set('location_code', location);
-        if (itemId)   params.set('item_id', itemId);
-        if (customer) params.set('customer_code', customer);
-        if (valMin)   params.set('final_value_min', valMin);
-        if (valMax)   params.set('final_value_max', valMax);
-        if (qtyMin)   params.set('final_qty_min', qtyMin);
-        if (qtyMax)   params.set('final_qty_max', qtyMax);
-        if (hierarchyLoc) params.set('hierarchy_location_id', hierarchyLoc);
-        taxonomyNodeIds.forEach(function(id) {
-            params.append('taxonomy_node_ids', id);
-        });
-
-        htmx.ajax('GET', baseUrl + '?' + params.toString(), {
-            target:  '#aggregates-container',
-            swap:    'innerHTML',
-            headers: {'HX-Request': 'true'},
-        });
-    }
-
-    window.clearAggFilter = function(name) {
-        if (name === 'taxonomy_node') {
-            document.querySelectorAll('input[name="taxonomy_node_ids"]:checked')
-                .forEach(function(el) { el.checked = false; });
-            applyFilters();
-            return;
-        }
-        var map = {
-            'period_start':  ['agg-period'],
-            'location_code': ['agg-location'],
-            'item_id':       ['agg-item-search', 'agg-item-id'],
-            'customer_code': ['agg-customer'],
-            'value_range':   ['agg-value-min', 'agg-value-max'],
-            'qty_range':     ['agg-qty-min', 'agg-qty-max'],
-            'hierarchy_location': ['agg-hierarchy-location'],
-        };
-        (map[name] || []).forEach(function(id) {
-            var el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        applyFilters();
-    };
-
-    var clearAll = document.getElementById('agg-clear-all');
-    if (clearAll) {
-        clearAll.addEventListener('click', function() {
-            ['agg-period', 'agg-location', 'agg-item-search', 'agg-item-id',
-             'agg-customer', 'agg-value-min', 'agg-value-max',
-             'agg-qty-min', 'agg-qty-max', 'agg-hierarchy-location'].forEach(function(id) {
-                var el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-            document.querySelectorAll('input[name="taxonomy_node_ids"]:checked')
-                .forEach(function(el) { el.checked = false; });
-            applyFilters();
-        });
-    }
-
-    // Dropdown change listeners
-    ['agg-period', 'agg-location', 'agg-customer', 'agg-hierarchy-location'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('change', applyFilters);
-    });
-
-    // Taxonomy tree checkboxes — delegated, since the tree (including
-    // lazily-loaded children added later via htmx) can add new checkboxes
-    // to the DOM after this script runs. Binding directly by id/element
-    // wouldn't catch those; delegation on a stable ancestor does.
-    //
-    // IMPORTANT: this whole <script> block re-executes every time htmx
-    // swaps #aggregates-container (every filter change, every level-tab
-    // click), because htmx runs inline <script> tags found in swapped
-    // content. A plain `document.addEventListener` here would therefore
-    // attach one MORE permanent listener on every single swap, and none
-    // of them are ever removed. Worse than just duplicate requests: the
-    // very FIRST listener (registered on initial page load, when
-    // agg_level defaults to 'total') keeps firing forever with that
-    // stale agg_level baked into its closure — racing against every
-    // later, correct request and sometimes winning, which is what caused
-    // a correctly filtered result to flash and then get overwritten by
-    // an unfiltered/wrong-level one.
-    //
-    // Fix: bind the actual document-level listener exactly ONCE, ever,
-    // and have it always call through a `window.__agg*` function
-    // reference that gets reassigned (cheap, harmless) on every render —
-    // so behavior is always current without the listener count growing.
-    window.__aggFilterBar_onChange = function(e) {
-        if (e.target.matches && e.target.matches('input[name="taxonomy_node_ids"]')) {
-            applyFilters();
-        }
-    };
-
-    // Range inputs — fire on blur to avoid too many requests
-    ['agg-value-min', 'agg-value-max',
-     'agg-qty-min', 'agg-qty-max'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('change', applyFilters);
-    });
-
-    // Item autocomplete
-    var searchInput = document.getElementById('agg-item-search');
-    var valueInput  = document.getElementById('agg-item-id');
-    var resultsList = document.getElementById('agg-item-results');
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            var q = this.value.trim();
-            if (valueInput) valueInput.value = q;
-            clearTimeout(searchTimer);
-            if (q.length < 2) { hideResults(); return; }
-            searchTimer = setTimeout(function() {
-                fetch(searchUrl + '?q=' + encodeURIComponent(q), {
-                    headers: {'X-CSRFToken': csrfToken}
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(data) { renderResults(data.results); });
-            }, 300);
-        });
-        searchInput.addEventListener('change', applyFilters);
-        // Same accumulation risk as the taxonomy change listener above —
-        // resolved the same way, via a reassignable window-level function
-        // called by a single, once-ever-bound document listener.
-        window.__aggFilterBar_onDocClick = function(e) {
-            if (!e.target.closest('#agg-item-wrapper')) hideResults();
-        };
-    }
-
-    if (!window.__aggFilterBarDelegatesBound) {
-        window.__aggFilterBarDelegatesBound = true;
-        document.addEventListener('change', function(e) {
-            if (window.__aggFilterBar_onChange) window.__aggFilterBar_onChange(e);
-        });
-        document.addEventListener('click', function(e) {
-            if (window.__aggFilterBar_onDocClick) window.__aggFilterBar_onDocClick(e);
-        });
-    }
-
-    function renderResults(results) {
-        if (!resultsList) return;
-        resultsList.innerHTML = '';
-        if (!results.length) {
-            resultsList.innerHTML =
-                '<li class="px-4 py-2 text-sm text-base-content/50">' +
-                '{% trans "No items found" %}</li>';
-            resultsList.classList.remove('hidden');
-            return;
-        }
-        results.forEach(function(item) {
-            var li = document.createElement('li');
-            li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
-            li.textContent = item.item_id + ' — ' + item.name;
-            li.addEventListener('click', function() {
-                if (searchInput) searchInput.value = item.item_id;
-                if (valueInput)  valueInput.value  = item.item_id;
-                hideResults();
-                applyFilters();
-            });
-            resultsList.appendChild(li);
-        });
-        resultsList.classList.remove('hidden');
-    }
-
-    function hideResults() {
-        if (!resultsList) return;
-        resultsList.classList.add('hidden');
-        resultsList.innerHTML = '';
-    }
-})();
-</script>
-{% comment "" %}
-{% load i18n %}
-<div class="bg-base-200 rounded-box p-4 mb-4" id="aggregates-filter-bar">
-
-    {# ── Active filter badges ──────────────────────────────────────── #}
-    {% if filters.period_start or filters.location_code or filters.item_id or filters.customer_code or filters.final_value_min or filters.final_value_max or filters.final_qty_min or filters.final_qty_max or filters.taxonomy_node_ids %}
-    <div class="flex flex-wrap gap-2 mb-3">
-        <span class="text-xs text-base-content/50 self-center">
-            {% trans "Active filters:" %}
-        </span>
-        {% if filters.period_start %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Period" %}: {{ filters.period_start }}
-            <button onclick="clearAggFilter('period_start')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.location_code %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Location" %}: {{ filters.location_code }}
-            <button onclick="clearAggFilter('location_code')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.item_id %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Item" %}: {{ filters.item_id }}
-            <button onclick="clearAggFilter('item_id')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.customer_code %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Customer" %}: {{ filters.customer_code }}
-            <button onclick="clearAggFilter('customer_code')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.final_value_min or filters.final_value_max %}
-        <span class="badge badge-neutral gap-1">
-            ₹ {{ filters.final_value_min|default:'0' }}
-            — {{ filters.final_value_max|default:'∞' }}
-            <button onclick="clearAggFilter('value_range')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.final_qty_min or filters.final_qty_max %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Qty" %} {{ filters.final_qty_min|default:'0' }}
-            — {{ filters.final_qty_max|default:'∞' }}
-            <button onclick="clearAggFilter('qty_range')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.taxonomy_node_ids %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Category" %}: {{ filters.taxonomy_node_count }}
-            {% trans "selected" %}
-            <button onclick="clearAggFilter('taxonomy_node')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        <button id="agg-clear-all" class="badge badge-error gap-1">
-            {% trans "Clear all" %}
-        </button>
-    </div>
-    {% endif %}
-
-    <div class="flex flex-wrap gap-3 items-end">
-
-        {# ── Period — all levels ───────────────────────────────────── #}
-        {% if periods|length > 1 %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Period" %}</span>
-            </label>
-            <select id="agg-period" class="select select-bordered select-sm">
-                <option value="">{% trans "All periods" %}</option>
-                {% for period in periods %}
-                <option value="{{ period|date:'Y-m-d' }}"
-                        {% if filters.period_start == period|date:'Y-m-d' %}
-                        selected{% endif %}>
-                    {{ period|date:"M Y" }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% else %}
-        <input type="hidden" id="agg-period"
-               value="{{ filters.period_start }}">
-        {% endif %}
-
-        {# ── Location hierarchy — location level only ────────────────── #}
-        {% if agg_level == 'location' and location_hierarchy_choices %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Filter by region/zone" %}</span>
-            </label>
-            <select id="agg-hierarchy-location"
-                    class="select select-bordered select-sm">
-                <option value="">{% trans "All regions" %}</option>
-                {% for loc in location_hierarchy_choices %}
-                <option value="{{ loc.id }}"
-                        {% if filters.hierarchy_location_id == loc.id|stringformat:'s' %}
-                        selected{% endif %}>
-                    {{ loc.level_label }}: {{ loc.code }} — {{ loc.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Location — location level only ───────────────────────── #}
-        {% if agg_level == 'location' and location_choices|length > 1 %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Location" %}</span>
-            </label>
-            <select id="agg-location" class="select select-bordered select-sm">
-                <option value="">{% trans "All locations" %}</option>
-                {% for code, name in location_choices %}
-                <option value="{{ code }}"
-                        {% if filters.location_code == code %}selected{% endif %}>
-                    {{ code }} — {{ name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Taxonomy tree — item level only ─────────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control dropdown">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Category / taxonomy" %}</span>
-            </label>
-            <label tabindex="0" class="btn btn-sm btn-outline">
-                {% if filters.taxonomy_node_count %}
-                    {{ filters.taxonomy_node_count }} {% trans "selected" %}
-                {% else %}
-                    {% trans "All categories" %}
-                {% endif %}
-            </label>
-            <div tabindex="0"
-                 class="dropdown-content z-50 bg-base-100 border border-base-300
-                        rounded-box shadow-lg p-3 mt-1 max-h-80 overflow-y-auto
-                        min-w-[280px]">
-                <div id="tx-tree-container"
-                     hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_id=client.client_id %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}"
-                     hx-trigger="load"
-                     hx-target="this">
-                    {% trans "Loading categories…" %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        {# ── Item search — item level only ────────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control min-w-[200px]" id="agg-item-wrapper">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Item" %}</span>
-            </label>
-            <div class="relative">
-                <input type="text" id="agg-item-search"
-                       class="input input-bordered input-sm w-full"
-                       placeholder="{% trans 'Type 2+ chars…' %}"
-                       autocomplete="off"
-                       value="{{ filters.item_id }}">
-                <input type="hidden" id="agg-item-id"
-                       value="{{ filters.item_id }}">
-                <ul id="agg-item-results"
-                    class="hidden absolute z-50 bg-base-100 border
-                           border-base-300 rounded-box shadow-lg mt-1
-                           max-h-48 overflow-y-auto w-full min-w-[240px]">
-                </ul>
-            </div>
-        </div>
-        {% endif %}
-
-        {# ── Customer — customer level only ───────────────────────── #}
-        {% if agg_level == 'customer' and customer_choices|length > 1 %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Customer" %}</span>
-            </label>
-            <select id="agg-customer" class="select select-bordered select-sm">
-                <option value="">{% trans "All customers" %}</option>
-                {% for code, name in customer_choices %}
-                <option value="{{ code }}"
-                        {% if filters.customer_code == code %}selected{% endif %}>
-                    {{ code }} — {{ name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Final value range — location, item, customer ─────────── #}
-        {% if agg_level != 'total' %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">
-                    {% trans "Final Value (₹) min" %}
-                </span>
-            </label>
-            <input type="number" id="agg-value-min"
-                   class="input input-bordered input-sm w-28"
-                   placeholder="0"
-                   value="{{ filters.final_value_min }}">
-        </div>
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">
-                    {% trans "max" %}
-                </span>
-            </label>
-            <input type="number" id="agg-value-max"
-                   class="input input-bordered input-sm w-28"
-                   placeholder="∞"
-                   value="{{ filters.final_value_max }}">
-        </div>
-        {% endif %}
-
-        {# ── Final qty range — item level only ────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">
-                    {% trans "Final Qty min" %}
-                </span>
-            </label>
-            <input type="number" id="agg-qty-min"
-                   class="input input-bordered input-sm w-24"
-                   placeholder="0"
-                   value="{{ filters.final_qty_min }}">
-        </div>
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "max" %}</span>
-            </label>
-            <input type="number" id="agg-qty-max"
-                   class="input input-bordered input-sm w-24"
-                   placeholder="∞"
-                   value="{{ filters.final_qty_max }}">
-        </div>
-        {% endif %}
-
-    </div>
-</div>
-
-<script>
-(function() {
-    var baseUrl   = '{% url "demand_ui:version_aggregates" client_id=client.client_id pk=version.pk %}';
-    var searchUrl = '{% url "demand_ui:item_search" client_id=client.client_id pk=version.pk %}';
-    var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    var searchTimer = null;
-    var currentAggLevel = '{{ agg_level }}';
-
-    function getVal(id) {
-        var el = document.getElementById(id);
-        return el ? el.value : '';
-    }
-
-    function applyFilters() {
-        var params = new URLSearchParams();
-        params.set('agg_level', currentAggLevel);
-
-        var period    = getVal('agg-period');
-        var location  = getVal('agg-location');
-        var itemId    = getVal('agg-item-id');
-        var customer  = getVal('agg-customer');
-        var valMin    = getVal('agg-value-min');
-        var valMax    = getVal('agg-value-max');
-        var qtyMin    = getVal('agg-qty-min');
-        var qtyMax    = getVal('agg-qty-max');
-        var hierarchyLoc = getVal('agg-hierarchy-location');
-        var taxonomyNodeIds = Array.from(
-            document.querySelectorAll('input[name="taxonomy_node_ids"]:checked')
-        ).map(function(el) { return el.value; });
-
-        if (period)   params.set('period_start', period);
-        if (location) params.set('location_code', location);
-        if (itemId)   params.set('item_id', itemId);
-        if (customer) params.set('customer_code', customer);
-        if (valMin)   params.set('final_value_min', valMin);
-        if (valMax)   params.set('final_value_max', valMax);
-        if (qtyMin)   params.set('final_qty_min', qtyMin);
-        if (qtyMax)   params.set('final_qty_max', qtyMax);
-        if (hierarchyLoc) params.set('hierarchy_location_id', hierarchyLoc);
-        taxonomyNodeIds.forEach(function(id) {
-            params.append('taxonomy_node_ids', id);
-        });
-
-        htmx.ajax('GET', baseUrl + '?' + params.toString(), {
-            target:  '#aggregates-container',
-            swap:    'innerHTML',
-            headers: {'HX-Request': 'true'},
-        });
-    }
-
-    window.clearAggFilter = function(name) {
-        if (name === 'taxonomy_node') {
-            document.querySelectorAll('input[name="taxonomy_node_ids"]:checked')
-                .forEach(function(el) { el.checked = false; });
-            applyFilters();
-            return;
-        }
-        var map = {
-            'period_start':  ['agg-period'],
-            'location_code': ['agg-location'],
-            'item_id':       ['agg-item-search', 'agg-item-id'],
-            'customer_code': ['agg-customer'],
-            'value_range':   ['agg-value-min', 'agg-value-max'],
-            'qty_range':     ['agg-qty-min', 'agg-qty-max'],
-            'hierarchy_location': ['agg-hierarchy-location'],
-        };
-        (map[name] || []).forEach(function(id) {
-            var el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        applyFilters();
-    };
-
-    var clearAll = document.getElementById('agg-clear-all');
-    if (clearAll) {
-        clearAll.addEventListener('click', function() {
-            ['agg-period', 'agg-location', 'agg-item-search', 'agg-item-id',
-             'agg-customer', 'agg-value-min', 'agg-value-max',
-             'agg-qty-min', 'agg-qty-max', 'agg-hierarchy-location'].forEach(function(id) {
-                var el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-            document.querySelectorAll('input[name="taxonomy_node_ids"]:checked')
-                .forEach(function(el) { el.checked = false; });
-            applyFilters();
-        });
-    }
-
-    // Dropdown change listeners
-    ['agg-period', 'agg-location', 'agg-customer', 'agg-hierarchy-location'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('change', applyFilters);
-    });
-
-    // Taxonomy tree checkboxes — delegated, since the tree (including
-    // lazily-loaded children added later via htmx) can add new checkboxes
-    // to the DOM after this script runs. Binding directly by id/element
-    // wouldn't catch those; delegation on a stable ancestor does.
-    document.addEventListener('change', function(e) {
-        if (e.target.matches && e.target.matches('input[name="taxonomy_node_ids"]')) {
-            applyFilters();
-        }
-    });
-
-    // Range inputs — fire on blur to avoid too many requests
-    ['agg-value-min', 'agg-value-max',
-     'agg-qty-min', 'agg-qty-max'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('change', applyFilters);
-    });
-
-    // Item autocomplete
-    var searchInput = document.getElementById('agg-item-search');
-    var valueInput  = document.getElementById('agg-item-id');
-    var resultsList = document.getElementById('agg-item-results');
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            var q = this.value.trim();
-            if (valueInput) valueInput.value = q;
-            clearTimeout(searchTimer);
-            if (q.length < 2) { hideResults(); return; }
-            searchTimer = setTimeout(function() {
-                fetch(searchUrl + '?q=' + encodeURIComponent(q), {
-                    headers: {'X-CSRFToken': csrfToken}
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(data) { renderResults(data.results); });
-            }, 300);
-        });
-        searchInput.addEventListener('change', applyFilters);
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#agg-item-wrapper')) hideResults();
-        });
-    }
-
-    function renderResults(results) {
-        if (!resultsList) return;
-        resultsList.innerHTML = '';
-        if (!results.length) {
-            resultsList.innerHTML =
-                '<li class="px-4 py-2 text-sm text-base-content/50">' +
-                '{% trans "No items found" %}</li>';
-            resultsList.classList.remove('hidden');
-            return;
-        }
-        results.forEach(function(item) {
-            var li = document.createElement('li');
-            li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
-            li.textContent = item.item_id + ' — ' + item.name;
-            li.addEventListener('click', function() {
-                if (searchInput) searchInput.value = item.item_id;
-                if (valueInput)  valueInput.value  = item.item_id;
-                hideResults();
-                applyFilters();
-            });
-            resultsList.appendChild(li);
-        });
-        resultsList.classList.remove('hidden');
-    }
-
-    function hideResults() {
-        if (!resultsList) return;
-        resultsList.classList.add('hidden');
-        resultsList.innerHTML = '';
-    }
-})();
-</script>
-{% endcomment %}
-{% comment %}
-
-{% load i18n %}
-<div class="bg-base-200 rounded-box p-4 mb-4" id="aggregates-filter-bar">
-
-    {# ── Active filter badges ──────────────────────────────────────── #}
-    {% if filters.period_start or filters.location_code or filters.item_id or filters.customer_code or filters.final_value_min or filters.final_value_max or filters.final_qty_min or filters.final_qty_max %}
-    <div class="flex flex-wrap gap-2 mb-3">
-        <span class="text-xs text-base-content/50 self-center">
-            {% trans "Active filters:" %}
-        </span>
-        {% if filters.period_start %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Period" %}: {{ filters.period_start }}
-            <button onclick="clearAggFilter('period_start')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.location_code %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Location" %}: {{ filters.location_code }}
-            <button onclick="clearAggFilter('location_code')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.item_id %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Item" %}: {{ filters.item_id }}
-            <button onclick="clearAggFilter('item_id')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.customer_code %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Customer" %}: {{ filters.customer_code }}
-            <button onclick="clearAggFilter('customer_code')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.final_value_min or filters.final_value_max %}
-        <span class="badge badge-neutral gap-1">
-            ₹ {{ filters.final_value_min|default:'0' }}
-            — {{ filters.final_value_max|default:'∞' }}
-            <button onclick="clearAggFilter('value_range')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        {% if filters.final_qty_min or filters.final_qty_max %}
-        <span class="badge badge-neutral gap-1">
-            {% trans "Qty" %} {{ filters.final_qty_min|default:'0' }}
-            — {{ filters.final_qty_max|default:'∞' }}
-            <button onclick="clearAggFilter('qty_range')"
-                    class="ml-1 font-bold">×</button>
-        </span>
-        {% endif %}
-        <button id="agg-clear-all" class="badge badge-error gap-1">
-            {% trans "Clear all" %}
-        </button>
-    </div>
-    {% endif %}
-
-    <div class="flex flex-wrap gap-3 items-end">
-
-        {# ── Period — all levels ───────────────────────────────────── #}
-        {% if periods|length > 1 %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Period" %}</span>
-            </label>
-            <select id="agg-period" class="select select-bordered select-sm">
-                <option value="">{% trans "All periods" %}</option>
-                {% for period in periods %}
-                <option value="{{ period|date:'Y-m-d' }}"
-                        {% if filters.period_start == period|date:'Y-m-d' %}
-                        selected{% endif %}>
-                    {{ period|date:"M Y" }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% else %}
-        <input type="hidden" id="agg-period"
-               value="{{ filters.period_start }}">
-        {% endif %}
-
-        {# ── Location hierarchy — location level only ────────────────── #}
-        {% if agg_level == 'location' and location_hierarchy_choices %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Filter by region/zone" %}</span>
-            </label>
-            <select id="agg-hierarchy-location"
-                    class="select select-bordered select-sm">
-                <option value="">{% trans "All regions" %}</option>
-                {% for loc in location_hierarchy_choices %}
-                <option value="{{ loc.id }}"
-                        {% if filters.hierarchy_location_id == loc.id|stringformat:'s' %}
-                        selected{% endif %}>
-                    {{ loc.level_label }}: {{ loc.code }} — {{ loc.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Location — location level only ───────────────────────── #}
-        {% if agg_level == 'location' and location_choices|length > 1 %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Location" %}</span>
-            </label>
-            <select id="agg-location" class="select select-bordered select-sm">
-                <option value="">{% trans "All locations" %}</option>
-                {% for code, name in location_choices %}
-                <option value="{{ code }}"
-                        {% if filters.location_code == code %}selected{% endif %}>
-                    {{ code }} — {{ name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Taxonomy node — item level only ─────────────────────────── #}
-        {% if agg_level == 'item' and taxonomy_choices %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Category / taxonomy" %}</span>
-            </label>
-            <select id="agg-taxonomy-node"
-                    class="select select-bordered select-sm">
-                <option value="">{% trans "All categories" %}</option>
-                {% for node in taxonomy_choices %}
+            <select id="agg-taxonomy-node" class="select select-bordered select-sm">
+                <option value="">{% trans "Whole item hierarchy" %}</option>
+                {% for node in taxonomy_node_choices %}
                 <option value="{{ node.id }}"
                         {% if filters.taxonomy_node_id == node.id|stringformat:'s' %}
                         selected{% endif %}>
                     {{ node.taxonomy__name }} › {{ node.name }}
-                    {% if node.depth > 0 %}
-                    <span class="text-xs">(depth {{ node.depth }})</span>
-                    {% endif %}
                 </option>
                 {% endfor %}
             </select>
-        </div>
-        {% endif %}        
-
-        {# ── Item search — item level only ────────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control min-w-[200px]" id="agg-item-wrapper">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Item" %}</span>
-            </label>
-            <div class="relative">
-                <input type="text" id="agg-item-search"
-                       class="input input-bordered input-sm w-full"
-                       placeholder="{% trans 'Type 2+ chars…' %}"
-                       autocomplete="off"
-                       value="{{ filters.item_id }}">
-                <input type="hidden" id="agg-item-id"
-                       value="{{ filters.item_id }}">
-                <ul id="agg-item-results"
-                    class="hidden absolute z-50 bg-base-100 border
-                           border-base-300 rounded-box shadow-lg mt-1
-                           max-h-48 overflow-y-auto w-full min-w-[240px]">
-                </ul>
-            </div>
         </div>
         {% endif %}
 
@@ -1054,7 +129,7 @@
         </div>
         {% endif %}
 
-        {# ── Final value range — location, item, customer ─────────── #}
+        {# ── Final value range — sales, item_hierarchy, customer ───── #}
         {% if agg_level != 'total' %}
         <div class="form-control">
             <label class="label py-0 mb-1">
@@ -1080,39 +155,12 @@
         </div>
         {% endif %}
 
-        {# ── Final qty range — item level only ────────────────────── #}
-        {% if agg_level == 'item' %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">
-                    {% trans "Final Qty min" %}
-                </span>
-            </label>
-            <input type="number" id="agg-qty-min"
-                   class="input input-bordered input-sm w-24"
-                   placeholder="0"
-                   value="{{ filters.final_qty_min }}">
-        </div>
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "max" %}</span>
-            </label>
-            <input type="number" id="agg-qty-max"
-                   class="input input-bordered input-sm w-24"
-                   placeholder="∞"
-                   value="{{ filters.final_qty_max }}">
-        </div>
-        {% endif %}
-
     </div>
 </div>
 
 <script>
 (function() {
     var baseUrl   = '{% url "demand_ui:version_aggregates" client_id=client.client_id pk=version.pk %}';
-    var searchUrl = '{% url "demand_ui:item_search" client_id=client.client_id pk=version.pk %}';
-    var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    var searchTimer = null;
     var currentAggLevel = '{{ agg_level }}';
 
     function getVal(id) {
@@ -1125,27 +173,18 @@
         params.set('agg_level', currentAggLevel);
 
         var period    = getVal('agg-period');
-        var location  = getVal('agg-location');
-        var itemId    = getVal('agg-item-id');
         var customer  = getVal('agg-customer');
         var valMin    = getVal('agg-value-min');
         var valMax    = getVal('agg-value-max');
-        var qtyMin    = getVal('agg-qty-min');
-        var qtyMax    = getVal('agg-qty-max');
-        var hierarchyLoc = getVal('agg-hierarchy-location');
-        var taxonomyNode = getVal('agg-taxonomy-node');
-
+        var salesNode = getVal('agg-sales-node');
+        var taxNode   = getVal('agg-taxonomy-node');
 
         if (period)   params.set('period_start', period);
-        if (location) params.set('location_code', location);
-        if (itemId)   params.set('item_id', itemId);
         if (customer) params.set('customer_code', customer);
         if (valMin)   params.set('final_value_min', valMin);
         if (valMax)   params.set('final_value_max', valMax);
-        if (qtyMin)   params.set('final_qty_min', qtyMin);
-        if (qtyMax)   params.set('final_qty_max', qtyMax);
-        if (hierarchyLoc) params.set('hierarchy_location_id', hierarchyLoc);
-        if (taxonomyNode) params.set('taxonomy_node_id', taxonomyNode);        
+        if (salesNode) params.set('sales_node_id', salesNode);
+        if (taxNode)   params.set('taxonomy_node_id', taxNode);
 
         htmx.ajax('GET', baseUrl + '?' + params.toString(), {
             target:  '#aggregates-container',
@@ -1156,14 +195,11 @@
 
     window.clearAggFilter = function(name) {
         var map = {
-            'period_start':  ['agg-period'],
-            'location_code': ['agg-location'],
-            'item_id':       ['agg-item-search', 'agg-item-id'],
+            'period_start': ['agg-period'],
             'customer_code': ['agg-customer'],
             'value_range':   ['agg-value-min', 'agg-value-max'],
-            'qty_range':     ['agg-qty-min', 'agg-qty-max'],
-            'hierarchy_location': ['agg-hierarchy-location'],
-            'taxonomy_node':      ['agg-taxonomy-node'],            
+            'sales_node':    ['agg-sales-node'],
+            'taxonomy_node': ['agg-taxonomy-node'],
         };
         (map[name] || []).forEach(function(id) {
             var el = document.getElementById(id);
@@ -1175,9 +211,8 @@
     var clearAll = document.getElementById('agg-clear-all');
     if (clearAll) {
         clearAll.addEventListener('click', function() {
-            ['agg-period', 'agg-location', 'agg-item-search', 'agg-item-id',
-             'agg-customer', 'agg-value-min', 'agg-value-max',
-             'agg-qty-min', 'agg-qty-max', 'agg-hierarchy-location', 'agg-taxonomy-node'].forEach(function(id) {
+            ['agg-period', 'agg-customer', 'agg-value-min', 'agg-value-max',
+             'agg-sales-node', 'agg-taxonomy-node'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.value = '';
             });
@@ -1186,73 +221,15 @@
     }
 
     // Dropdown change listeners
-    ['agg-period', 'agg-location', 'agg-customer', 'agg-hierarchy-location', 'agg-taxonomy-node'].forEach(function(id) {
+    ['agg-period', 'agg-customer', 'agg-sales-node', 'agg-taxonomy-node'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', applyFilters);
     });
 
     // Range inputs — fire on blur to avoid too many requests
-    ['agg-value-min', 'agg-value-max',
-     'agg-qty-min', 'agg-qty-max'].forEach(function(id) {
+    ['agg-value-min', 'agg-value-max'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', applyFilters);
     });
-
-    // Item autocomplete
-    var searchInput = document.getElementById('agg-item-search');
-    var valueInput  = document.getElementById('agg-item-id');
-    var resultsList = document.getElementById('agg-item-results');
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            var q = this.value.trim();
-            if (valueInput) valueInput.value = q;
-            clearTimeout(searchTimer);
-            if (q.length < 2) { hideResults(); return; }
-            searchTimer = setTimeout(function() {
-                fetch(searchUrl + '?q=' + encodeURIComponent(q), {
-                    headers: {'X-CSRFToken': csrfToken}
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(data) { renderResults(data.results); });
-            }, 300);
-        });
-        searchInput.addEventListener('change', applyFilters);
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#agg-item-wrapper')) hideResults();
-        });
-    }
-
-    function renderResults(results) {
-        if (!resultsList) return;
-        resultsList.innerHTML = '';
-        if (!results.length) {
-            resultsList.innerHTML =
-                '<li class="px-4 py-2 text-sm text-base-content/50">' +
-                '{% trans "No items found" %}</li>';
-            resultsList.classList.remove('hidden');
-            return;
-        }
-        results.forEach(function(item) {
-            var li = document.createElement('li');
-            li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
-            li.textContent = item.item_id + ' — ' + item.name;
-            li.addEventListener('click', function() {
-                if (searchInput) searchInput.value = item.item_id;
-                if (valueInput)  valueInput.value  = item.item_id;
-                hideResults();
-                applyFilters();
-            });
-            resultsList.appendChild(li);
-        });
-        resultsList.classList.remove('hidden');
-    }
-
-    function hideResults() {
-        if (!resultsList) return;
-        resultsList.classList.add('hidden');
-        resultsList.innerHTML = '';
-    }
 })();
 </script>
-{% endcomment %}

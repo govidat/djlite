@@ -1220,10 +1220,19 @@ def write_forecast_lines(
 def write_forecast_aggregates(version_id: int) -> int:
     """
     Roll up ForecastLine rows into ForecastAggregate using DuckDB.
-    Levels: total, location, customer, item, channel (NEW).
+    Levels: total, sales, item_hierarchy, customer, item, channel.
+
+    'sales' rows are grouped by the leaf SalesNode each line resolves to
+    (SalesForecastLink a→b→c, see hierarchy_utils); 'item_hierarchy' rows
+    are grouped by the primary TaxonomyNode of each line's item. Lines that
+    don't resolve get sales_node_id / taxonomy_node_id = null ("Unassigned").
     """
     from mysite.models.demand.forecast import ForecastLine, ForecastAggregate, ForecastVersion
     from mysite.models.demand.actuals import compute_period_end
+    from utils.demand.hierarchy_utils import (
+        get_sales_forecast_link_map, resolve_sales_link,
+        get_item_primary_node_map,
+    )
     import json
 
     version = ForecastVersion.objects.get(pk=version_id)
@@ -1251,6 +1260,30 @@ def write_forecast_aggregates(version_id: int) -> int:
         df_pd[col] = df_pd[col].fillna(0).astype(float)
     df_pd['customer_code'] = df_pd['planning_customer__code'].fillna('__unattr__')
 
+    # ── Resolve each line to a leaf SalesNode (a→b→c) and a primary
+    #    TaxonomyNode, once, before the DuckDB roll-ups. ──────────────────
+    sales_link_map = get_sales_forecast_link_map(version.client_id)
+    df_pd['planning_customer_id'] = df_pd['planning_customer_id'].where(
+        df_pd['planning_customer_id'].notna(), None
+    )
+    df_pd['sales_node_id'] = pd.array([
+        resolve_sales_link(
+            sales_link_map, int(loc), dc, cust
+        )
+        for loc, dc, cust in zip(
+            df_pd['planning_location_id'],
+            df_pd['distribution_channel_id'],
+            df_pd['planning_customer_id'],
+        )
+    ], dtype='Int64')
+
+    item_node_map = get_item_primary_node_map(
+        version.client_id, df_pd['item_id'].unique().tolist()
+    )
+    df_pd['taxonomy_node_id'] = (
+        df_pd['item_id'].map(item_node_map).astype('Int64')
+    )
+
     con = duckdb.connect()
     con.register('lines', df_pd)
 
@@ -1262,13 +1295,21 @@ def write_forecast_aggregates(version_id: int) -> int:
                    SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
             FROM lines GROUP BY period_type, period_start
         """,
-        'location': """
-            SELECT 'location' AS agg_level,
-                   CONCAT('{"location_code": "', "planning_location__code", '"}') AS agg_key_json,
+        'sales': """
+            SELECT 'sales' AS agg_level,
+                   CONCAT('{"sales_node_id": ', COALESCE(CAST(sales_node_id AS VARCHAR), 'null'), '}') AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
                    SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
-            FROM lines GROUP BY "planning_location__code", period_type, period_start
+            FROM lines GROUP BY sales_node_id, period_type, period_start
+        """,
+        'item_hierarchy': """
+            SELECT 'item_hierarchy' AS agg_level,
+                   CONCAT('{"taxonomy_node_id": ', COALESCE(CAST(taxonomy_node_id AS VARCHAR), 'null'), '}') AS agg_key_json,
+                   period_type, period_start,
+                   SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
+                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
+            FROM lines GROUP BY taxonomy_node_id, period_type, period_start
         """,
         'item': """
             SELECT 'item' AS agg_level, CONCAT('{"item_id": "', "item__item_id", '"}') AS agg_key_json,

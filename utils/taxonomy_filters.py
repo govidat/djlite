@@ -68,6 +68,25 @@ def _descendant_node_ids(node):
     )
 
 
+def resolve_node_subtree_ids(client, taxonomy_node_id: int) -> list[int]:
+    """
+    Node + descendant node ids for a taxonomy node, scoped to its taxonomy.
+
+    Unlike resolve_item_ids_for_taxonomy_node this returns NODE ids (for
+    reports grouped by taxonomy node) rather than the mapped item ids.
+    Raises TaxonomyFilterError if the node doesn't exist for this client.
+    """
+    from mysite.models.catalogue import TaxonomyNode
+
+    try:
+        node = TaxonomyNode.objects.get(pk=taxonomy_node_id, client=client)
+    except TaxonomyNode.DoesNotExist as exc:
+        raise TaxonomyFilterError(
+            f'taxonomy_node_id={taxonomy_node_id!r} not found for client'
+        ) from exc
+    return list(_descendant_node_ids(node))
+
+
 def resolve_item_ids_for_taxonomy_node(client, taxonomy_node_id):
     """
     item_ids for one selected node + all its descendants, scoped to its taxonomy.

@@ -69,9 +69,7 @@ from mysite.tasks.demand.run_forecast import run_forecast, compute_accuracy
 #from decimal import Decimal
 from django.db.models import Sum, Count, DecimalField
 from django.db.models.functions import Coalesce
-from utils.taxonomy_filters import (
-        resolve_item_ids_for_multiple_nodes, parse_node_ids_param, TaxonomyFilterError,
-    )
+
 
 
 from utils.feature_control import outlier_ui_visible as _outlier_ui_visible
@@ -759,9 +757,12 @@ def version_aggregates(request, pk, client_id=None):
     """
     GET /{client_id}/demand/versions/{id}/aggregates/
 
-    Query params: agg_level (total|location|item|customer)
+    Query params: agg_level (total|sales|item_hierarchy|customer)
     Shows the comprehensible single-number view per your Sprint 3B.4
     value-based design — planners see ₹ totals, not 20K SKU rows.
+    Drill dimensions are the Sales Hierarchy (SalesNode tree) and the
+    Item Hierarchy (Taxonomy tree); location is intentionally not a
+    drill dimension.
     """
 
     blocked = feature_gate(request, 'demand_planning')
@@ -771,19 +772,17 @@ def version_aggregates(request, pk, client_id=None):
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
 
     agg_level = request.GET.get('agg_level', 'total')
-    valid_levels = ['total', 'location', 'item', 'customer']
+    valid_levels = ['total', 'sales', 'item_hierarchy', 'customer']
     if agg_level not in valid_levels:
         agg_level = 'total'
 
     # ── Filters per level ─────────────────────────────────────────────────────
     period_start  = request.GET.get('period_start', '').strip()
-    location_code = request.GET.get('location_code', '').strip()
-    item_id       = request.GET.get('item_id', '').strip()
     customer_code = request.GET.get('customer_code', '').strip()
     final_value_min = request.GET.get('final_value_min', '').strip()
     final_value_max = request.GET.get('final_value_max', '').strip()
-    final_qty_min   = request.GET.get('final_qty_min', '').strip()
-    final_qty_max   = request.GET.get('final_qty_max', '').strip()
+    sales_node_id   = request.GET.get('sales_node_id', '').strip()
+    taxonomy_node_id = request.GET.get('taxonomy_node_id', '').strip()
 
     qs = (
         ForecastAggregate.objects
@@ -791,109 +790,31 @@ def version_aggregates(request, pk, client_id=None):
         .order_by('period_start', 'agg_key')
     )
 
-    # ── Location hierarchy filter for location level ──────────────────────
-    location_hierarchy_choices = []
-    if agg_level == 'location':
-        from mysite.models import PlanningLocation
-        # Get all non-leaf locations (ancestors) as hierarchy filter options
-        location_hierarchy_choices = list(
-            PlanningLocation.objects
-            .filter(client=request.client, is_leaf=False)
-            .order_by('level_label', 'code')
-            .values('id', 'code', 'name', 'level_label')
+    # ── Hierarchy subtree filters ─────────────────────────────────────────
+    # 'sales': restrict to leaf rows whose SalesNode lies under the chosen
+    # node. 'item_hierarchy': restrict to taxonomy-node rows under the
+    # chosen node. Both fail closed on a stale/bad id.
+    if agg_level == 'sales' and sales_node_id:
+        from mysite.models.demand.hierarchy import SalesNode
+        from utils.demand.hierarchy_utils import get_sales_node_subtree_ids
+        try:
+            subtree_ids = get_sales_node_subtree_ids(
+                request.client.pk, int(sales_node_id)
+            )
+            qs = qs.filter(agg_key__sales_node_id__in=subtree_ids)
+        except (SalesNode.DoesNotExist, ValueError):
+            qs = qs.none()
+
+    if agg_level == 'item_hierarchy' and taxonomy_node_id:
+        from utils.taxonomy_filters import (
+            resolve_node_subtree_ids, TaxonomyFilterError,
         )
-
-    # ── Taxonomy node filter for item level ───────────────────────────────
-    """
-    taxonomy_choices = []
-    if agg_level == 'item':
-        from mysite.models.catalogue import TaxonomyNode
-        taxonomy_choices = list(
-            TaxonomyNode.objects
-            .filter(client=request.client, is_active=True)
-            .select_related('taxonomy')
-            .order_by('depth', 'name')
-            .values('id', 'name', 'depth', 'taxonomy__name')
-        )
-    """
-    # Add to filter application:
-    hierarchy_location_id = request.GET.get('hierarchy_location_id', '').strip()
-    taxonomy_node_id      = request.GET.get('taxonomy_node_id', '').strip()
-    logger.debug(f'version_aggregates: taxonomy_node_id={taxonomy_node_id!r}')
-    
-    if agg_level == 'location' and hierarchy_location_id:
-        # Filter to locations that are descendants of this ancestor
         try:
-            ancestor = PlanningLocation.objects.get(
-                pk=hierarchy_location_id, client=request.client
+            subtree_ids = resolve_node_subtree_ids(
+                request.client, int(taxonomy_node_id)
             )
-            # Use path-based descendant lookup
-            descendant_ids = (
-                PlanningLocation.objects
-                .filter(
-                    client=request.client,
-                    path__startswith=ancestor.path,
-                    is_leaf=True,
-                )
-                .values_list('id', flat=True)
-            )
-            # agg_key contains location_id — filter aggregates
-            qs = qs.filter(
-                agg_key__location_id__in=list(descendant_ids)
-            )
-        except PlanningLocation.DoesNotExist:
-            pass
-    """
-    if agg_level == 'item' and taxonomy_node_id:
-        try:
-            from mysite.models.catalogue import TaxonomyNode, ItemTaxonomyNode
-            selected_node = TaxonomyNode.objects.get(
-                pk=taxonomy_node_id,
-                client=request.client
-            )
-            # Include selected node and all its descendants
-            descendant_node_ids = list(
-                TaxonomyNode.objects
-                .filter(
-                    client=request.client,
-                    path__startswith=selected_node.path,
-                )
-                .values_list('id', flat=True)
-            )
-            # Get item_ids mapped to these nodes
-            item_ids_in_node = list(
-                ItemTaxonomyNode.objects
-                .filter(node_id__in=descendant_node_ids)
-                .values_list('item__item_id', flat=True)
-                .distinct()
-            )
-            if item_ids_in_node:
-                qs = qs.filter(agg_key__item_id__in=item_ids_in_node)
-            else:
-                qs = qs.none()  # node exists but has no items mapped
-        except TaxonomyNode.DoesNotExist:
-            pass
-        except Exception as exc:
-            logger.warning(f'version_aggregates: taxonomy filter failed: {exc}')
-    """
-    from utils.taxonomy_filters import (
-        resolve_item_ids_for_multiple_nodes, TaxonomyFilterError,
-    )
-
-    # was: taxonomy_node_id = request.GET.get('taxonomy_node_id', '').strip()
-    #taxonomy_node_ids = request.GET.getlist('taxonomy_node_ids')
-
-   
-    taxonomy_node_ids = parse_node_ids_param(request)
-    
-
-    if agg_level == 'item' and taxonomy_node_ids:
-        try:
-            item_ids = resolve_item_ids_for_multiple_nodes(request.client, taxonomy_node_ids)
-            if item_ids is not None:
-                qs = qs.filter(agg_key__item_id__in=item_ids) if item_ids else qs.none()
-        except TaxonomyFilterError as exc:
-            logger.warning(f'version_aggregates: {exc}')
+            qs = qs.filter(agg_key__taxonomy_node_id__in=subtree_ids)
+        except (TaxonomyFilterError, ValueError):
             qs = qs.none()  # fail closed, never silently unfiltered
 
     # Period filter — common to all levels
@@ -901,10 +822,6 @@ def version_aggregates(request, pk, client_id=None):
         qs = qs.filter(period_start=period_start)
 
     # Level-specific key filters using agg_key JSONField
-    if agg_level == 'location' and location_code:
-        qs = qs.filter(agg_key__location_code=location_code)
-    if agg_level == 'item' and item_id:
-        qs = qs.filter(agg_key__item_id__icontains=item_id)
     if agg_level == 'customer' and customer_code:
         qs = qs.filter(agg_key__customer_code=customer_code)
 
@@ -920,26 +837,9 @@ def version_aggregates(request, pk, client_id=None):
         except Exception:
             pass
 
-    # Qty range filters — only relevant for item level
-    if agg_level == 'item':
-        if final_qty_min:
-            try:
-                qs = qs.filter(final_qty__gte=Decimal(final_qty_min))
-            except Exception:
-                pass
-        if final_qty_max:
-            try:
-                qs = qs.filter(final_qty__lte=Decimal(final_qty_max))
-            except Exception:
-                pass
-
-    # ── Distinct item count — drives qty visibility ───────────────────────────
+    show_qty = False   # qty is only meaningful at per-item granularity, which
+                       # is no longer a drill dimension in this report
     single_item = False
-    if agg_level == 'item':
-        show_qty = True   # qty always meaningful at item level
-    else:
-        show_qty = False
-    
 
     # ── Dropdown choices from this version's data ─────────────────────────────
     periods = list(
@@ -950,15 +850,27 @@ def version_aggregates(request, pk, client_id=None):
         .order_by('period_start')
     )
 
-    # Location choices for location level
-    location_choices = []
-    if agg_level == 'location':
-        from mysite.models import PlanningLocation
-        location_choices = list(
-            PlanningLocation.objects
-            .filter(client=request.client)
-            .order_by('code')
-            .values_list('code', 'name')
+    # Sales-node choices (non-leaf nodes) for the sales-hierarchy drill filter
+    sales_node_choices = []
+    if agg_level == 'sales':
+        from mysite.models.demand.hierarchy import SalesNode
+        sales_node_choices = list(
+            SalesNode.objects
+            .filter(client=request.client, is_active=True, children__isnull=False)
+            .order_by('path')
+            .values('id', 'code', 'name', 'level_label')
+        )
+
+    # Taxonomy-node choices (non-leaf nodes) for the item-hierarchy drill filter
+    taxonomy_node_choices = []
+    if agg_level == 'item_hierarchy':
+        from mysite.models.catalogue import TaxonomyNode
+        taxonomy_node_choices = list(
+            TaxonomyNode.objects
+            .filter(client=request.client, is_active=True, children__isnull=False)
+            .select_related('taxonomy')
+            .order_by('depth', 'name')
+            .values('id', 'name', 'depth', 'taxonomy__name')
         )
 
     # Customer choices for customer level
@@ -1019,6 +931,31 @@ def version_aggregates(request, pk, client_id=None):
     )
 
     # ── has_override and friendly key per row ─────────────────────────────────
+    # display_hierarchy holds the ancestor path so a flat table still reads
+    # as a drill-down (e.g. "NSM › Region › Rep 1" / "Cars › Sedan › Hatch").
+    sales_node_info = {}
+    taxonomy_node_info = {}
+    if agg_level == 'sales':
+        from utils.demand.hierarchy_utils import get_sales_node_info_map
+        sales_node_info = get_sales_node_info_map(request.client.pk)
+    elif agg_level == 'item_hierarchy':
+        from utils.demand.hierarchy_utils import get_product_hierarchy_ancestor_map
+        from mysite.models.catalogue import TaxonomyNode
+        node_rows = list(
+            TaxonomyNode.objects
+            .filter(client=request.client)
+            .values('id', 'name', 'taxonomy_id')
+        )
+        ancestors = get_product_hierarchy_ancestor_map(request.client.pk)
+        taxonomy_node_info = {
+            n['id']: {
+                'id': n['id'], 'name': n['name'],
+                'taxonomy_id': n['taxonomy_id'],
+                'ancestors': ancestors.get(n['id'], []),
+            }
+            for n in node_rows
+        }
+
     aggregates = list(page_obj.object_list)
     for agg in aggregates:
         stat  = agg.total_statistical_value
@@ -1031,27 +968,46 @@ def version_aggregates(request, pk, client_id=None):
         key = agg.agg_key or {}
         if agg_level == 'total':
             agg.display_key = 'All'
-        elif agg_level == 'location':
-            agg.display_key = key.get('location_code', key.get('code', '—'))
-        elif agg_level == 'item':
-            agg.display_key = key.get('item_id', '—')
+            agg.display_hierarchy = ''
+        elif agg_level == 'sales':
+            node_id = key.get('sales_node_id')
+            node = sales_node_info.get(node_id)
+            if node is None:
+                agg.display_key = 'Unassigned'
+                agg.display_hierarchy = ''
+            else:
+                agg.display_key = f'{node["code"]} — {node["name"] or node["code"]}'
+                chain = [sales_node_info[a]['code'] for a in node['ancestors'] if a in sales_node_info]
+                chain.append(node['code'])
+                agg.display_hierarchy = ' › '.join(chain)
+        elif agg_level == 'item_hierarchy':
+            node_id = key.get('taxonomy_node_id')
+            node = taxonomy_node_info.get(node_id)
+            if node is None:
+                agg.display_key = 'Unassigned'
+                agg.display_hierarchy = ''
+            else:
+                agg.display_key = node['name']
+                chain = [
+                    taxonomy_node_info[a]['name']
+                    for a in node['ancestors'] if a in taxonomy_node_info
+                ]
+                chain.append(node['name'])
+                agg.display_hierarchy = ' › '.join(chain)
         elif agg_level == 'customer':
             agg.display_key = key.get('customer_code', key.get('code', '—'))
+            agg.display_hierarchy = ''
         else:
             agg.display_key = str(key)
+            agg.display_hierarchy = ''
 
     filters = {
         'period_start':    period_start,
-        'location_code':   location_code,
-        'item_id':         item_id,
         'customer_code':   customer_code,
         'final_value_min': final_value_min,
         'final_value_max': final_value_max,
-        'final_qty_min':   final_qty_min,
-        'final_qty_max':   final_qty_max,
-        'hierarchy_location_id': hierarchy_location_id,
-        'taxonomy_node_ids': ','.join(taxonomy_node_ids),   # was: 'taxonomy_node_id': taxonomy_node_id
-        'taxonomy_node_count': len(taxonomy_node_ids),
+        'sales_node_id':   sales_node_id,
+        'taxonomy_node_id': taxonomy_node_id,
     }
 
     context = {
@@ -1059,7 +1015,12 @@ def version_aggregates(request, pk, client_id=None):
         'aggregates':       aggregates,
         'page_obj':         page_obj,
         'agg_level':        agg_level,
-        'agg_level_choices': valid_levels,
+        'agg_level_choices': [
+            ('total', 'Total'),
+            ('sales', 'Sales Hierarchy'),
+            ('item_hierarchy', 'Item Hierarchy'),
+            ('customer', 'Customer'),
+        ],
         'grand_total':      grand_total,
         'page_total':       page_total,
         'show_qty':         show_qty,
@@ -1067,11 +1028,10 @@ def version_aggregates(request, pk, client_id=None):
         'is_multipage':     page_obj.has_other_pages(),
         'filters':          filters,
         'periods':          periods,
-        'location_choices': location_choices,
+        'sales_node_choices': sales_node_choices,
+        'taxonomy_node_choices': taxonomy_node_choices,
         'customer_choices': customer_choices,
         'active_nav': 'versions',
-        'location_hierarchy_choices': location_hierarchy_choices,
-        #'taxonomy_choices': taxonomy_choices,
     }
 
     if _is_htmx(request):
@@ -1757,33 +1717,40 @@ def actuals_list(request, client_id=None):
 def actuals_aggregates(request, client_id=None):
     """
     GET /{client_id}/demand/actuals/aggregates/
- 
-    Query params: agg_level (total|location|item|customer),
+
+    Query params: agg_level (total|sales|item_hierarchy|customer),
+    sales_node_id / taxonomy_node_id (subtree drill filters),
     exclude_outliers (1|0, only meaningful when outlier management is
     active for this client).
+
+    Drill dimensions are the Sales Hierarchy (SalesNode tree) and the Item
+    Hierarchy (Taxonomy tree); location is intentionally not a drill
+    dimension. Sales rows are bucketed by SalesForecastLink a→b→c
+    resolution (unresolved rows → "Unassigned"); item-hierarchy rows by each
+    item's primary TaxonomyNode.
     """
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
- 
+
     agg_level = request.GET.get('agg_level', 'total')
-    valid_levels = ['total', 'location', 'item', 'customer']
+    valid_levels = ['total', 'sales', 'item_hierarchy', 'customer']
     if agg_level not in valid_levels:
         agg_level = 'total'
- 
+
     # ── Filters ────────────────────────────────────────────────────────────
-    period_start  = request.GET.get('period_start', '').strip()
-    location_code = request.GET.get('location_code', '').strip()
-    item_id       = request.GET.get('item_id', '').strip()
-    customer_code = request.GET.get('customer_code', '').strip()
-    qty_min       = request.GET.get('qty_min', '').strip()
-    qty_max       = request.GET.get('qty_max', '').strip()
-    revenue_min   = request.GET.get('revenue_min', '').strip()
-    revenue_max   = request.GET.get('revenue_max', '').strip()
- 
+    period_start     = request.GET.get('period_start', '').strip()
+    customer_code    = request.GET.get('customer_code', '').strip()
+    qty_min          = request.GET.get('qty_min', '').strip()
+    qty_max          = request.GET.get('qty_max', '').strip()
+    revenue_min      = request.GET.get('revenue_min', '').strip()
+    revenue_max      = request.GET.get('revenue_max', '').strip()
+    sales_node_id    = request.GET.get('sales_node_id', '').strip()
+    taxonomy_node_id = request.GET.get('taxonomy_node_id', '').strip()
+
     # ── Outlier include/exclude toggle ──────────────────────────────────────
     outlier_ui_visible_flag = _outlier_ui_visible(request.client)
- 
+
     exclude_outliers = False
     if outlier_ui_visible_flag:
         exclude_outliers_param = request.GET.get('exclude_outliers')
@@ -1797,7 +1764,7 @@ def actuals_aggregates(request, client_id=None):
             exclude_outliers = bool(
                 forecasting_config and forecasting_config.reporting_uses_net_actuals
             )
- 
+
     if exclude_outliers:
         base_qs = actuals_queryset_with_net(request.client, use_net=True)
         qty_field = 'net_qty'
@@ -1806,38 +1773,104 @@ def actuals_aggregates(request, client_id=None):
         base_qs = ActualSale.objects.filter(client=request.client)
         qty_field = 'qty'
         revenue_field = 'revenue'
- 
+
     # Row-level filters — applied before grouping
     qs = base_qs
     if period_start:
         qs = qs.filter(period_start=period_start)
-    if agg_level == 'location' and location_code:
-        qs = qs.filter(planning_location__code=location_code)
-    if agg_level == 'item' and item_id:
-        qs = qs.filter(item__item_id__icontains=item_id)
     if agg_level == 'customer' and customer_code:
         qs = qs.filter(planning_customer__code=customer_code)
- 
-    # ── Group by level ─────────────────────────────────────────────────────
-    group_fields = ['period_start']
-    if agg_level == 'location':
-        group_fields.append('planning_location__code')
-    elif agg_level == 'item':
-        group_fields.append('item__item_id')
-    elif agg_level == 'customer':
-        group_fields.append('planning_customer__code')
- 
-    grouped = (
-        qs.values(*group_fields)
-        .annotate(
-            total_qty=Coalesce(Sum(qty_field), Decimal('0'), output_field=DecimalField()),
-            total_revenue=Coalesce(Sum(revenue_field), Decimal('0'), output_field=DecimalField()),
+
+    # ── Hierarchy subtree drill filters (fail closed on a stale id) ────────
+    sales_subtree_ids = None
+    if agg_level == 'sales' and sales_node_id:
+        from mysite.models.demand.hierarchy import SalesNode
+        from utils.demand.hierarchy_utils import get_sales_node_subtree_ids
+        try:
+            sales_subtree_ids = get_sales_node_subtree_ids(
+                request.client.pk, int(sales_node_id)
+            )
+        except (SalesNode.DoesNotExist, ValueError):
+            sales_subtree_ids = []
+
+    taxonomy_subtree_ids = None
+    if agg_level == 'item_hierarchy' and taxonomy_node_id:
+        from utils.taxonomy_filters import (
+            resolve_node_subtree_ids, TaxonomyFilterError,
         )
-        .order_by(*group_fields)
-    )
- 
-    rows = list(grouped)
- 
+        try:
+            taxonomy_subtree_ids = resolve_node_subtree_ids(
+                request.client, int(taxonomy_node_id)
+            )
+        except (TaxonomyFilterError, ValueError):
+            taxonomy_subtree_ids = []
+
+    # ── Group by level ─────────────────────────────────────────────────────
+    if agg_level in ('total', 'customer'):
+        group_fields = ['period_start']
+        if agg_level == 'customer':
+            group_fields.append('planning_customer__code')
+
+        grouped = (
+            qs.values(*group_fields)
+            .annotate(
+                total_qty=Coalesce(Sum(qty_field), Decimal('0'), output_field=DecimalField()),
+                total_revenue=Coalesce(Sum(revenue_field), Decimal('0'), output_field=DecimalField()),
+            )
+            .order_by(*group_fields)
+        )
+        rows = list(grouped)
+    else:
+        # sales / item_hierarchy — resolve each row to a hierarchy node and
+        # aggregate in Python (the mapping lives in the DB hierarchy tables,
+        # not on the ActualSale row, so it can't be done in the ORM GROUP BY).
+        from utils.demand.hierarchy_utils import (
+            get_sales_forecast_link_map, resolve_sales_link,
+            get_item_primary_node_map,
+        )
+
+        sales_link_map = get_sales_forecast_link_map(request.client.pk)
+        item_node_map = get_item_primary_node_map(request.client.pk)
+
+        data = qs.values(
+            'period_start', 'planning_location_id', 'distribution_channel_id',
+            'planning_customer_id', 'item_id', qty_field, revenue_field,
+        )
+
+        agg: dict[tuple, list] = {}
+        for r in data:
+            if agg_level == 'sales':
+                node_id = resolve_sales_link(
+                    sales_link_map,
+                    r['planning_location_id'],
+                    r['distribution_channel_id'],
+                    r['planning_customer_id'],
+                )
+                if sales_subtree_ids is not None and node_id not in sales_subtree_ids:
+                    continue
+            else:
+                node_id = item_node_map.get(r['item_id'])
+                if taxonomy_subtree_ids is not None and node_id not in taxonomy_subtree_ids:
+                    continue
+            key = (r['period_start'], node_id)
+            qty = r[qty_field] or 0
+            rev = r[revenue_field] or 0
+            if key in agg:
+                agg[key][0] += qty
+                agg[key][1] += rev
+            else:
+                agg[key] = [qty, rev]
+
+        rows = [
+            {
+                'period_start': k[0],
+                'hierarchy_node_id': k[1],
+                'total_qty': v[0],
+                'total_revenue': v[1],
+            }
+            for k, v in agg.items()
+        ]
+
     # Post-aggregation (HAVING-style) range filters — done in Python since
     # these apply to the summed values, not the raw row values.
     def _to_decimal(raw):
@@ -1845,7 +1878,7 @@ def actuals_aggregates(request, client_id=None):
             return Decimal(raw)
         except Exception:
             return None
- 
+
     if qty_min and (d := _to_decimal(qty_min)) is not None:
         rows = [r for r in rows if r['total_qty'] >= d]
     if qty_max and (d := _to_decimal(qty_max)) is not None:
@@ -1854,39 +1887,96 @@ def actuals_aggregates(request, client_id=None):
         rows = [r for r in rows if r['total_revenue'] >= d]
     if revenue_max and (d := _to_decimal(revenue_max)) is not None:
         rows = [r for r in rows if r['total_revenue'] <= d]
- 
-    # ── Friendly display key per row ──────────────────────────────────────
+
+    # ── Friendly display key + hierarchy path per row ──────────────────────
+    sales_node_info = {}
+    taxonomy_node_info = {}
+    if agg_level == 'sales':
+        from utils.demand.hierarchy_utils import get_sales_node_info_map
+        sales_node_info = get_sales_node_info_map(request.client.pk)
+    elif agg_level == 'item_hierarchy':
+        from utils.demand.hierarchy_utils import get_product_hierarchy_ancestor_map
+        from mysite.models.catalogue import TaxonomyNode
+        node_rows = list(
+            TaxonomyNode.objects
+            .filter(client=request.client)
+            .values('id', 'name', 'taxonomy_id')
+        )
+        ancestors = get_product_hierarchy_ancestor_map(request.client.pk)
+        taxonomy_node_info = {
+            n['id']: {
+                'id': n['id'], 'name': n['name'],
+                'taxonomy_id': n['taxonomy_id'],
+                'ancestors': ancestors.get(n['id'], []),
+            }
+            for n in node_rows
+        }
+
     for row in rows:
         if agg_level == 'total':
             row['display_key'] = 'All'
-        elif agg_level == 'location':
-            row['display_key'] = row.get('planning_location__code') or '—'
-        elif agg_level == 'item':
-            row['display_key'] = row.get('item__item_id') or '—'
+            row['display_hierarchy'] = ''
+        elif agg_level == 'sales':
+            node_id = row.get('hierarchy_node_id')
+            node = sales_node_info.get(node_id)
+            if node is None:
+                row['display_key'] = 'Unassigned'
+                row['display_hierarchy'] = ''
+            else:
+                row['display_key'] = f'{node["code"]} — {node["name"] or node["code"]}'
+                chain = [sales_node_info[a]['code'] for a in node['ancestors'] if a in sales_node_info]
+                chain.append(node['code'])
+                row['display_hierarchy'] = ' › '.join(chain)
+        elif agg_level == 'item_hierarchy':
+            node_id = row.get('hierarchy_node_id')
+            node = taxonomy_node_info.get(node_id)
+            if node is None:
+                row['display_key'] = 'Unassigned'
+                row['display_hierarchy'] = ''
+            else:
+                row['display_key'] = node['name']
+                chain = [
+                    taxonomy_node_info[a]['name']
+                    for a in node['ancestors'] if a in taxonomy_node_info
+                ]
+                chain.append(node['name'])
+                row['display_hierarchy'] = ' › '.join(chain)
         elif agg_level == 'customer':
             row['display_key'] = row.get('planning_customer__code') or '—'
- 
-    # ── Distinct item count — drives "Item total" vs "Grand total" label ──
-    single_item = False
-    if agg_level == 'item':
-        distinct_items = len({r['item__item_id'] for r in rows})
-        single_item = distinct_items == 1
- 
+            row['display_hierarchy'] = ''
+        else:
+            row['display_key'] = '—'
+            row['display_hierarchy'] = ''
+
+    single_item = False   # per-SKU granularity is no longer a drill dimension
+
     # ── Dropdown choices — from this client's full actuals, not the
     #    level-filtered qs, independent of the currently applied filter.
     #    Uses base_qs (net-or-raw) purely for consistent client scoping —
-    #    period_start/location_code/customer_code values themselves don't
-    #    depend on qty/revenue, so this is unaffected by the toggle. ──────
+    #    period_start/customer_code values themselves don't depend on
+    #    qty/revenue, so this is unaffected by the toggle. ────────────────
     periods = list(
         base_qs.values_list('period_start', flat=True)
         .distinct().order_by('period_start')
     )
-    location_choices = []
-    if agg_level == 'location':
-        location_choices = list(
-            base_qs.exclude(planning_location__isnull=True)
-            .values_list('planning_location__code', 'planning_location__name')
-            .distinct().order_by('planning_location__code')
+    sales_node_choices = []
+    if agg_level == 'sales':
+        from mysite.models.demand.hierarchy import SalesNode
+        sales_node_choices = list(
+            SalesNode.objects
+            .filter(client=request.client, is_active=True, children__isnull=False)
+            .order_by('path')
+            .values('id', 'code', 'name', 'level_label')
+        )
+    taxonomy_node_choices = []
+    if agg_level == 'item_hierarchy':
+        from mysite.models.catalogue import TaxonomyNode
+        taxonomy_node_choices = list(
+            TaxonomyNode.objects
+            .filter(client=request.client, is_active=True, children__isnull=False)
+            .select_related('taxonomy')
+            .order_by('depth', 'name')
+            .values('id', 'name', 'depth', 'taxonomy__name')
         )
     customer_choices = []
     if agg_level == 'customer':
@@ -1895,16 +1985,16 @@ def actuals_aggregates(request, client_id=None):
             .values_list('planning_customer__code', 'planning_customer__name')
             .distinct().order_by('planning_customer__code')
         )
- 
+
     # ── Grand total — across every row matching filters (pre-pagination) ──
     grand_total = {
         'total_qty':     sum((r['total_qty'] for r in rows), Decimal('0')),
         'total_revenue': sum((r['total_revenue'] for r in rows), Decimal('0')),
     }
- 
+
     paginator = Paginator(rows, 50)
     page_obj  = paginator.get_page(request.GET.get('page', 1))
- 
+
     page_total = {
         'total_qty': sum(
             (r['total_qty'] for r in page_obj.object_list), Decimal('0')
@@ -1913,36 +2003,42 @@ def actuals_aggregates(request, client_id=None):
             (r['total_revenue'] for r in page_obj.object_list), Decimal('0')
         ),
     }
- 
+
     filters = {
         'period_start':      period_start,
-        'location_code':     location_code,
-        'item_id':           item_id,
         'customer_code':     customer_code,
         'qty_min':           qty_min,
         'qty_max':           qty_max,
         'revenue_min':       revenue_min,
         'revenue_max':       revenue_max,
+        'sales_node_id':     sales_node_id,
+        'taxonomy_node_id':  taxonomy_node_id,
         'exclude_outliers':  exclude_outliers,
     }
- 
+
     context = {
         'aggregates':                page_obj.object_list,
         'page_obj':                  page_obj,
         'agg_level':                 agg_level,
-        'agg_level_choices':         valid_levels,
+        'agg_level_choices': [
+            ('total', 'Total'),
+            ('sales', 'Sales Hierarchy'),
+            ('item_hierarchy', 'Item Hierarchy'),
+            ('customer', 'Customer'),
+        ],
         'grand_total':               grand_total,
         'page_total':                page_total,
         'single_item':               single_item,
         'is_multipage':              page_obj.has_other_pages(),
         'filters':                   filters,
         'periods':                   periods,
-        'location_choices':          location_choices,
+        'sales_node_choices':        sales_node_choices,
+        'taxonomy_node_choices':     taxonomy_node_choices,
         'customer_choices':          customer_choices,
         'active_nav':                'actuals',
         'outlier_ui_visible': outlier_ui_visible_flag,
     }
- 
+
     if _is_htmx(request):
         from django.template.loader import render_to_string
         html = (
@@ -1956,7 +2052,7 @@ def actuals_aggregates(request, client_id=None):
             )
         )
         return HttpResponse(html)
- 
+
     return render(request, 'demand/actuals_aggregates.html', context)
 
 

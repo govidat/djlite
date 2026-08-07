@@ -161,6 +161,123 @@ def get_sales_hierarchy_ancestor_map(client_id: int) -> dict[int, list[int]]:
     return result
  
  
+def get_sales_forecast_link_map(
+    client_id: int,
+    as_of=None,
+) -> dict[tuple, int | None]:
+    """
+    Bulk resolution of (leaf_location, distribution_channel, planning_customer)
+    → leaf SalesNode id, replicating resolve_sales_forecast_link's a→b→c
+    precedence for EVERY location in ONE query (instead of one query per row).
+
+    Keys are (planning_location_id, distribution_channel_code or None,
+    planning_customer_id or None). The stored value is the resolved leaf
+    SalesNode id, or None when no link is active for that key (callers bucket
+    those under "Unassigned"). Within a precedence class the lowest-pk link
+    wins, matching the .first() behaviour of resolve_sales_forecast_link.
+    """
+    from django.utils import timezone
+    from mysite.models.demand.hierarchy import SalesForecastLink
+
+    as_of = as_of or timezone.now().date()
+
+    links = list(
+        SalesForecastLink.objects
+        .filter(client_id=client_id, valid_from__lte=as_of)
+        .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=as_of))
+        .order_by('id')
+        .values_list(
+            'planning_location_id', 'distribution_channel_id',
+            'planning_customer_id', 'sales_node_id',
+        )
+    )
+
+    by_loc: dict[int, list[tuple]] = defaultdict(list)
+    for loc_id, dc_code, cust_id, node_id in links:
+        by_loc[loc_id].append((dc_code, cust_id, node_id))
+
+    result: dict[tuple, int | None] = {}
+    for loc_id, entries in by_loc.items():
+        for dc_code, cust_id, node_id in entries:
+            # shape a: exact (dc + customer)
+            if dc_code and cust_id:
+                result.setdefault((loc_id, dc_code, cust_id), node_id)
+            # shape b: dc only (customer NULL)
+            elif dc_code:
+                result.setdefault((loc_id, dc_code, None), node_id)
+            # shape c: location only (channel & customer NULL)
+            else:
+                result.setdefault((loc_id, None, None), node_id)
+    return result
+
+
+def resolve_sales_link(
+    sales_link_map: dict[tuple, int | None],
+    leaf_location_id: int,
+    distribution_channel_code: str | None,
+    planning_customer_id: int | None,
+) -> int | None:
+    """
+    Look up one (location, dc, customer) key against a map built by
+    get_sales_forecast_link_map, applying a→b→c precedence.
+    """
+    if planning_customer_id is not None and distribution_channel_code:
+        for key in (
+            (leaf_location_id, distribution_channel_code, planning_customer_id),
+            (leaf_location_id, distribution_channel_code, None),
+            (leaf_location_id, None, None),
+        ):
+            if key in sales_link_map:
+                return sales_link_map[key]
+        return None
+    if distribution_channel_code:
+        for key in (
+            (leaf_location_id, distribution_channel_code, None),
+            (leaf_location_id, None, None),
+        ):
+            if key in sales_link_map:
+                return sales_link_map[key]
+        return None
+    return sales_link_map.get((leaf_location_id, None, None))
+
+
+def get_sales_node_info_map(client_id: int) -> dict[int, dict]:
+    """
+    {sales_node_id -> {id, code, name, level_label, depth, ancestors}}
+    ancestors = [root, ..., parent] ids (for breadcrumb labels). One query
+    over the active sales org, reusing get_sales_hierarchy_ancestor_map.
+    """
+    from mysite.models.demand.hierarchy import SalesNode
+
+    nodes = list(
+        SalesNode.objects.filter(client_id=client_id, is_active=True)
+        .values('id', 'code', 'name', 'level_label', 'path')
+    )
+    ancestors = get_sales_hierarchy_ancestor_map(client_id)
+    return {
+        n['id']: {
+            'id': n['id'],
+            'code': n['code'],
+            'name': n['name'],
+            'level_label': n['level_label'],
+            'depth': n['path'].count('/') - 1,
+            'ancestors': ancestors.get(n['id'], []),
+        }
+        for n in nodes
+    }
+
+
+def get_sales_node_subtree_ids(client_id: int, node_id: int) -> list[int]:
+    """All sales-node ids under `node_id` (the node itself + descendants)."""
+    from mysite.models.demand.hierarchy import SalesNode
+
+    node = SalesNode.objects.get(pk=node_id, client_id=client_id)
+    qs = SalesNode.objects.filter(client_id=client_id, is_active=True)
+    if node.path:
+        qs = qs.filter(path__startswith=node.path)
+    return list(qs.values_list('id', flat=True))
+
+
 def get_sales_hierarchy_levels(client_id: int) -> list[dict]:
     """
     Same shape as get_location_levels(): depth 0 = virtual 'Top' (whole
