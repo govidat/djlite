@@ -4,17 +4,19 @@
     <table class="table table-zebra table-sm w-full min-w-max">
         <thead>
             <tr>
-                <th class="whitespace-nowrap">{% trans "Item" %}</th>
-                {% if display_mode != 'item_client' %}
                 <th class="whitespace-nowrap">
-                    {% if display_mode == 'item_location' %}
-                        {% trans "Location" %}
-                        <span class="text-xs font-normal text-base-content/50 ml-1">
-                            ({{ selected_abc_level }})
-                        </span>
+                    {% if grain_category == 'taxon' %}{% trans "Item (Category)" %}{% else %}{% trans "Item" %}{% endif %}
+                </th>
+                {% if show_location_column %}
+                <th class="whitespace-nowrap">
+                    {% if display_mode == 'sales_node' %}
+                        {% trans "Sales Node" %}
                     {% else %}
                         {% trans "Location" %}
                     {% endif %}
+                    <span class="text-xs font-normal text-base-content/50 ml-1">
+                        ({{ selected_abc_level }})
+                    </span>
                 </th>
                 {% endif %}
                 {% if display_mode == 'atomic' %}
@@ -44,18 +46,23 @@
                     </span>
                 </td>
 
-                {% if display_mode != 'item_client' %}
+                {% if show_location_column %}
                 <td class="font-mono text-xs">
                     {% if display_mode == 'item_location' %}
-                        {# Show ancestor location, not the leaf #}
                         {% if profile.ancestor_location %}
                             {{ profile.ancestor_location.code }}
                             <span class="block text-base-content/50 text-xs font-normal">
                                 {{ profile.ancestor_location.name }}
                             </span>
                         {% else %}—{% endif %}
+                    {% elif display_mode == 'sales_node' %}
+                        {% if profile.ancestor_sales_node %}
+                            {{ profile.ancestor_sales_node.code }}
+                            <span class="block text-base-content/50 text-xs font-normal">
+                                {{ profile.ancestor_sales_node.name }}
+                            </span>
+                        {% else %}—{% endif %}
                     {% else %}
-                        {# Atomic — show leaf location #}
                         {{ profile.planning_location.code }}
                     {% endif %}
                 </td>
@@ -111,15 +118,13 @@
                 </td>
 
                 <td>
-                    {% if display_mode == 'atomic' %}
                     <a href="{% url 'demand_ui:series_profile_detail' client_id=client.client_id pk=profile.pk %}"
                        class="btn btn-ghost btn-xs">{% trans "View" %}</a>
-                    {% endif %}
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="{% if show_channel and display_mode == 'atomic' %}11{% else %}10{% endif %}" class="text-center py-8 text-base-content/50">
+                <td colspan="11" class="text-center py-8 text-base-content/50">
                     {% trans "No series profiles found. Run the forecast to generate profiles." %}
                 </td>
             </tr>
@@ -143,101 +148,3 @@
     {% endif %}
 </div>
 {% endif %}
-
-{% comment %}
-
-{% load i18n %}
-<div class="w-full overflow-x-auto">
-    <table class="table table-zebra table-sm w-full min-w-max">
-        <thead>
-            <tr>
-                <th class="whitespace-nowrap">{% trans "Item" %}</th>
-                <th class="whitespace-nowrap">{% trans "Location" %}</th>
-                <th class="whitespace-nowrap">{% trans "Customer" %}</th>
-                <th class="whitespace-nowrap">{% trans "Demand class" %}</th>
-                <th class="whitespace-nowrap">
-                    {% trans "ABC" %}
-                    {% if selected_abc_level != 'atomic' %}
-                    <span class="badge badge-info badge-xs ml-1">
-                        {{ selected_abc_level }}
-                    </span>
-                    {% endif %}
-                </th>
-                <th class="whitespace-nowrap">{% trans "Value share %" %}</th>
-                <th class="whitespace-nowrap">{% trans "Chosen grain" %}</th>
-                <th class="whitespace-nowrap">{% trans "Strategy" %}</th>
-                <th class="whitespace-nowrap">{% trans "Manual?" %}</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for profile in page_obj %}
-            <tr class="hover">
-                <td class="font-mono text-xs">{{ profile.item.item_id }}</td>
-                <td class="font-mono text-xs">{{ profile.planning_location.code }}</td>
-                <td class="text-xs">
-                    {{ profile.planning_customer.code|default:"—" }}
-                </td>
-                <td>
-                    <span class="badge badge-ghost badge-sm">
-                        {{ profile.demand_class_atomic }}
-                    </span>
-                </td>
-                <td>
-                    {% with abc=profile.abc_at_level.abc_class %}
-                    <span class="badge badge-sm
-                        {% if abc == 'A' %}badge-success
-                        {% elif abc == 'B' %}badge-warning
-                        {% else %}badge-ghost{% endif %}">
-                        {{ abc|default:"—" }}
-                    </span>
-                    {% endwith %}
-                </td>
-                <td class="text-right text-xs text-base-content/60">
-                    {% if profile.abc_at_level.value_share_pct %}
-                        {{ profile.abc_at_level.value_share_pct|floatformat:2 }}%
-                    {% else %}—{% endif %}
-                </td>
-                <td class="text-xs font-mono">
-                    {{ profile.chosen_grain|default:"—" }}
-                </td>
-                <td class="text-xs">{{ profile.chosen_strategy }}</td>
-                <td>
-                    {% if profile.chosen_strategy == 'MANUAL' %}
-                    <span class="badge badge-warning badge-sm">
-                        {% trans "Manual" %}
-                    </span>
-                    {% endif %}
-                </td>
-                <td>
-                    <a href="{% url 'demand_ui:series_profile_detail' client_id=client.client_id pk=profile.pk %}"
-                       class="btn btn-ghost btn-xs">{% trans "View" %}</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="10" class="text-center py-8 text-base-content/50">
-                    {% trans "No series profiles found. Run the forecast to generate profiles." %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-{% if page_obj.has_other_pages %}
-<div class="flex justify-center gap-2 mt-4">
-    {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}&item_id={{ filters.item_id }}&demand_class={{ filters.demand_class }}&abc_class={{ filters.abc_class }}&abc_level={{ filters.abc_level }}&location_code={{ filters.location_code }}&is_manual={{ filters.is_manual }}"
-       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
-    {% endif %}
-    <span class="btn btn-sm btn-disabled">
-        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-    </span>
-    {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&item_id={{ filters.item_id }}&demand_class={{ filters.demand_class }}&abc_class={{ filters.abc_class }}&abc_level={{ filters.abc_level }}&location_code={{ filters.location_code }}&is_manual={{ filters.is_manual }}"
-       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
-    {% endif %}
-</div>
-{% endif %}
-{% endcomment %}

@@ -22,6 +22,15 @@
                 ↻ {% trans "Recompute Profiles" %}
             </button>
         </form>
+        {% if last_recompute.at %}
+        <span class="text-xs text-base-content/50">
+            {% trans "Last recompute" %}: {{ last_recompute.at|date:"d M Y, H:i" }}
+            {% if last_window.analysis_from %}
+            · {% trans "Window" %}: {{ last_window.analysis_from|date:"d M Y" }} – {{ last_window.analysis_to|date:"d M Y" }}
+            {% endif %}
+            · {% trans "Periods" %}: {{ last_period_types|join:", " }}
+        </span>
+        {% endif %}
     </div>
     {% comment %}
     <div class="flex gap-2 items-center">

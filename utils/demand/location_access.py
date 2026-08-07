@@ -5,7 +5,7 @@ object-level permissions assigned directly to PlanningLocation nodes.
 
 Design
 ──────
-- guardian permission 'demand.override_at_location' is assigned to a user
+- guardian permission 'mysite.override_at_location' is assigned to a user
   on SPECIFIC PlanningLocation rows (could be a leaf branch, a region, or
   the client root node).
 - Access to a node IMPLIES access to all its descendants, computed via the
@@ -137,10 +137,14 @@ def get_authorized_location_ids(user, client, perm: str = OVERRIDE_PERM) -> set[
     if user.is_superuser:
         return None
 
+    # Pass the model class (not a client-filtered queryset) to
+    # get_objects_for_user: with django-guardian 3.3.x + Django 5,
+    # passing a QuerySet hits a values() regression ("in' lookup must
+    # have 1 selected fields"). We scope to the client afterwards.
     direct_nodes = get_objects_for_user(
-        user, f'demand.{perm}',
-        klass=PlanningLocation.objects.filter(client=client),
-    )
+        user, f'mysite.{perm}',
+        klass=PlanningLocation,
+    ).filter(client=client)
 
     if not direct_nodes.exists():
         return set()
@@ -170,7 +174,7 @@ def user_can_act_at_location(user, location: PlanningLocation, perm: str = OVERR
         return True
 
     # Direct permission on this exact node
-    if user.has_perm(f'demand.{perm}', location):
+    if user.has_perm(f'mysite.{perm}', location):
         return True
 
     # Permission on any ancestor implies permission here too
@@ -180,7 +184,7 @@ def user_can_act_at_location(user, location: PlanningLocation, perm: str = OVERR
 
     ancestors = PlanningLocation.objects.filter(pk__in=ancestor_ids)
     for ancestor in ancestors:
-        if user.has_perm(f'demand.{perm}', ancestor):
+        if user.has_perm(f'mysite.{perm}', ancestor):
             return True
     return False
 

@@ -93,6 +93,17 @@ def compute_series_profiles(self, client_id: int, period_type: str):
     try:
         run_output = run_for_client(client_id, period_type, earliest, latest)
         persist_results(client_id, period_type, earliest, latest, run_output)
+        from mysite.models.demand.forecast import ForecastingConfig
+        from django.utils.timezone import now
+        cfg = ForecastingConfig.get_for_client_id(client_id)
+        cfg.profiles_last_computed_at = now()
+        cfg.profiles_last_window_start = earliest
+        cfg.profiles_last_window_end = latest
+        cfg.save(update_fields=[
+            'profiles_last_computed_at',
+            'profiles_last_window_start',
+            'profiles_last_window_end',
+        ])
     except Exception as exc:
         logger.exception(
             f'compute_series_profiles failed for client_id={client_id}, '

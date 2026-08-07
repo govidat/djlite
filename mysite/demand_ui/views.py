@@ -36,7 +36,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
-from django.db.models import Count, Min
+from django.db.models import Count, Min, Max
 from django.views.decorators.http import require_POST
 
 from mysite.models.demand.forecast import (
@@ -48,13 +48,15 @@ from mysite.models.demand.actuals import (
     ActualSale, ActualSaleOutlierAdjustment, ActualSaleImport, PERIOD_TYPE_CHOICES,
 )
 from mysite.models.demand.hierarchy import (
-    PlanningLocation
+    PlanningLocation, SalesNode, SalesForecastLink
 )
 #from utils.feature_control import is_demand_feature_disabled
 from utils.mixins import feature_gate, _is_htmx, _client_url_kwargs
 import logging
 logger = logging.getLogger(__name__)
 
+import re
+from collections import defaultdict
 from django.db.models import ExpressionWrapper, BooleanField, Q
 from django.db.models.functions import Abs
 import datetime
@@ -74,9 +76,33 @@ from utils.taxonomy_filters import (
 
 from utils.feature_control import outlier_ui_visible as _outlier_ui_visible
 from utils.demand.actuals_net import actuals_queryset_with_net
+from utils.demand.hierarchy_utils import get_sales_hierarchy_ancestor_map
 
 from mysite.tasks.demand.detect_outliers import flag_stale_forecast_versions
  
+
+# ── Grain pattern helpers ─────────────────────────────────────────────────
+
+_GRAIN_PATTERN_RE = re.compile(r'^(item|taxon)_(\d+)_(.*)$')
+_GRAIN_SALESNODE_RE = re.compile(r'_salesnode_\d+')
+
+
+def _grain_pattern(grain: str) -> str:
+    s = _GRAIN_PATTERN_RE.sub(r'\1_\3', grain)
+    return _GRAIN_SALESNODE_RE.sub('_salesnode', s)
+
+
+def _pattern_to_grain_q(pattern: str) -> Q:
+    m = re.match(r'^(item|taxon)_(.+)$', pattern)
+    if not m:
+        return Q(grain=pattern)
+    prefix, suffix = m.group(1), m.group(2)
+    if suffix == 'salesnode':
+        return Q(grain__regex=rf'^{prefix}_\d+_salesnode_\d+$')
+    if suffix.startswith('top_'):
+        period = suffix[4:]
+        return Q(grain__regex=rf'^{prefix}_\d+_top_{period}$')
+    return Q(grain__regex=rf'^{prefix}(?:_\d+_|_){suffix}$')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -478,6 +504,40 @@ def version_approve(request, pk, client_id=None):
         )
         return response
     return redirect('demand_ui:version_detail', client_id=request.client.client_id, pk=pk)
+
+
+@login_required
+@require_http_methods(['POST'])
+def version_delete(request, pk, client_id=None):
+    """POST /{client_id}/demand/versions/{id}/delete/ — delete a DRAFT version."""
+    blocked = feature_gate(request, 'demand_planning')
+    if blocked:
+        return blocked
+
+    if not (request.user.is_superuser or request.user.groups.filter(
+        name__in=['demand_client_admin', 'demand_client_planner']
+    ).exists()):
+        messages.error(request, 'You do not have permission to delete versions.')
+        return redirect('demand_ui:version_list', client_id=request.client.client_id)
+
+    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+
+    if version.status != ForecastVersion.Status.DRAFT:
+        messages.error(request, 'Only DRAFT versions can be deleted.')
+        return redirect('demand_ui:version_list', client_id=request.client.client_id)
+
+    label = version.version_label
+    version.delete()
+    messages.success(request, f'Version "{label}" has been deleted.')
+
+    if _is_htmx(request):
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse(
+            'demand_ui:version_list',
+            kwargs={**_client_url_kwargs(request)},
+        )
+        return response
+    return redirect('demand_ui:version_list', client_id=request.client.client_id)
 
 
 @login_required
@@ -1767,6 +1827,34 @@ def actuals_upload(request, client_id=None):
                 ctx,
             )
 
+        if action == 'overlap' and pending_file:
+            # Re-render the overlap panel from a stored (still-pending) file —
+            # used by the "Go back" button on the delete reconfirmation panel.
+            overlap_dates = []
+            for s in request.POST.getlist('overlap_periods'):
+                try:
+                    overlap_dates.append(datetime.date.fromisoformat(s))
+                except ValueError:
+                    pass
+            ctx = _actuals_summary()
+            ctx.update({
+                'period_choices':      PERIOD_TYPE_CHOICES,
+                'overlap_periods':     sorted(overlap_dates),
+                'overlap_count':       len(overlap_dates),
+                'overlap_outlier_count': ActualSaleOutlierAdjustment.objects.filter(
+                    actual_sale__client=request.client,
+                    actual_sale__period_type=effective_period_type,
+                    actual_sale__period_start__in=overlap_dates,
+                ).count(),
+                'pending_file':        pending_file,
+                'pending_period_type': effective_period_type,
+            })
+            return render(
+                request,
+                'demand/partials/actuals_upload_overlap.html',
+                ctx,
+            )
+
         if action == 'delete_and_upload' and pending_file:
             overlap_dates = []
             for s in request.POST.getlist('overlap_periods'):
@@ -1774,6 +1862,39 @@ def actuals_upload(request, client_id=None):
                     overlap_dates.append(datetime.date.fromisoformat(s))
                 except ValueError:
                     pass
+            # ── Reconfirmation guard: deleting actuals cascades to their 1:1
+            # ── ActualSaleOutlierAdjustment rows. If any exist for the
+            # ── overlapping periods, force an explicit second confirmation.
+            if overlap_dates and not request.POST.get('confirmed'):
+                outlier_qs = ActualSaleOutlierAdjustment.objects.filter(
+                    actual_sale__client=request.client,
+                    actual_sale__period_type=effective_period_type,
+                    actual_sale__period_start__in=overlap_dates,
+                )
+                outlier_count = outlier_qs.count()
+                if outlier_count:
+                    outlier_status_counts = (
+                        outlier_qs.order_by()
+                        .values('status')
+                        .annotate(cnt=Count('id'))
+                        .order_by('status')
+                    )
+                    ctx = _actuals_summary()
+                    ctx.update({
+                        'period_choices':       PERIOD_TYPE_CHOICES,
+                        'overlap_periods':      sorted(overlap_dates),
+                        'overlap_count':        len(overlap_dates),
+                        'overlap_outlier_count': outlier_count,
+                        'outlier_count':        outlier_count,
+                        'outlier_status_counts': outlier_status_counts,
+                        'pending_file':         pending_file,
+                        'pending_period_type':  effective_period_type,
+                    })
+                    return render(
+                        request,
+                        'demand/partials/actuals_upload_overlap_confirm.html',
+                        ctx,
+                    )
             if overlap_dates:
                 deleted, _ = ActualSale.objects.filter(
                     client=request.client,
@@ -1893,6 +2014,11 @@ def actuals_upload(request, client_id=None):
                             'period_choices':      PERIOD_TYPE_CHOICES,
                             'overlap_periods':     sorted(existing_periods),
                             'overlap_count':       len(existing_periods),
+                            'overlap_outlier_count': ActualSaleOutlierAdjustment.objects.filter(
+                                actual_sale__client=request.client,
+                                actual_sale__period_type=period_type,
+                                actual_sale__period_start__in=existing_periods,
+                            ).count(),
                             'pending_file':        save_path,
                             'pending_period_type': period_type,
                         })
@@ -2002,75 +2128,118 @@ def series_profile_list(request, client_id=None):
     abc_level     = p.get('abc_level', '')
 
     # ── Available grains from actual evaluations ──────────────────────────────
-    available_grains = list(
+    raw_grains = list(
         SeriesLevelEvaluation.objects
         .filter(client=request.client)
-        .order_by()
         .values_list('grain', flat=True)
         .distinct()
         .order_by('grain')
     )
 
-    GRAIN_LABELS = {
-        'item_cust_location': 'Item × Location × Customer',
-        'item_loc':           'Item × Leaf Location',
-        'item_client':        'Item × Client Total',
+    # Group by pattern so each ABC level appears once in the dropdown
+    seen_patterns: set[str] = set()
+    patterned_grains: list[str] = []
+    for g in raw_grains:
+        pat = _grain_pattern(g)
+        if pat not in seen_patterns:
+            seen_patterns.add(pat)
+            patterned_grains.append(g)
+
+    GRAIN_LABELS: dict[str, str] = {
+        # ── item-prefix patterns ───────────────────────────────────────────
+        'item_cust_location':    'Item × Location × Customer',
+        'item_loc_dc_cust':      'Item × Location × Channel × Customer',
+        'item_loc_dc':           'Item × Location × Channel',
+        'item_loc':              'Item × Leaf Location',
+        'item_salesnode':        'Item × Sales Node',
+        'item_top_week':         'Item × Top Node (Week)',
+        'item_top_fortnight':    'Item × Top Node (Fortnight)',
+        'item_top_month':        'Item × Top Node (Month)',
+        'item_top_quarter':      'Item × Top Node (Quarter)',
+        'item_top_halfyear':     'Item × Top Node (Half-Year)',
+        'item_top_year':         'Item × Top Node (Year)',
+        'item_client':           'Item × Client Total',
+        'item_client_week':      'Item × Client (Week)',
+        'item_client_fortnight': 'Item × Client (Fortnight)',
+        'item_client_month':     'Item × Client (Month)',
+        'item_client_quarter':   'Item × Client (Quarter)',
+        'item_client_halfyear':  'Item × Client (Half-Year)',
+        'item_client_year':      'Item × Client (Year)',
+        # ── taxon-prefix patterns ──────────────────────────────────────────
+        'taxon_cust_location':    'Category × Location × Customer',
+        'taxon_loc_dc_cust':      'Category × Location × Channel × Customer',
+        'taxon_loc_dc':           'Category × Location × Channel',
+        'taxon_loc':              'Category × Leaf Location',
+        'taxon_salesnode':        'Category × Sales Node',
+        'taxon_top_week':         'Category × Top Node (Week)',
+        'taxon_top_fortnight':    'Category × Top Node (Fortnight)',
+        'taxon_top_month':        'Category × Top Node (Month)',
+        'taxon_top_quarter':      'Category × Top Node (Quarter)',
+        'taxon_top_halfyear':     'Category × Top Node (Half-Year)',
+        'taxon_top_year':         'Category × Top Node (Year)',
+        'taxon_client':           'Category × Client Total',
+        'taxon_client_week':      'Category × Client (Week)',
+        'taxon_client_fortnight': 'Category × Client (Fortnight)',
+        'taxon_client_month':     'Category × Client (Month)',
+        'taxon_client_quarter':   'Category × Client (Quarter)',
+        'taxon_client_halfyear':  'Category × Client (Half-Year)',
+        'taxon_client_year':      'Category × Client (Year)',
     }
-    for g in available_grains:
-        if g not in GRAIN_LABELS:
-            if 'loc_depth' in g:
-                try:
-                    depth = int(g.rsplit('_', 1)[-1])
-                    GRAIN_LABELS[g] = f'Item × Location (Depth {depth})'
-                except ValueError:
-                    GRAIN_LABELS[g] = g.replace('_', ' ').title()
-            elif g.startswith('item_client_'):
-                horizon = g.replace('item_client_', '')
-                GRAIN_LABELS[g] = f'Item × Client ({horizon.title()})'
-            else:
-                GRAIN_LABELS[g] = g.replace('_', ' ').title()
+    for pat in seen_patterns:
+        if pat in GRAIN_LABELS:
+            continue
+        if '_loc_depth_' in pat:
+            try:
+                depth = int(pat.rsplit('_', 1)[-1])
+                GRAIN_LABELS[pat] = f'Item × Location (Depth {depth})'
+            except ValueError:
+                GRAIN_LABELS[pat] = pat.replace('_', ' ').title()
+        else:
+            GRAIN_LABELS[pat] = pat.replace('_', ' ').title()
 
     abc_level_choices = [
-        (g, GRAIN_LABELS.get(g, g)) for g in available_grains
+        (g, GRAIN_LABELS.get(_grain_pattern(g), g)) for g in patterned_grains
     ]
 
-    # Default to most granular grain
-    if not abc_level or abc_level not in available_grains:
-        abc_level = available_grains[0] if available_grains else 'item_cust_location'
+    # Default to first available grain
+    if not abc_level or abc_level not in raw_grains:
+        abc_level = patterned_grains[0] if patterned_grains else 'item_cust_location'
 
-    # ── Determine display mode from selected grain ────────────────────────────
-    if abc_level == 'item_client' or abc_level.startswith('item_client_'):
-        display_mode = 'item_client'
-    elif abc_level == 'item_loc' or (
-        'loc_depth' in abc_level and not abc_level.startswith('item_client')
-    ):
+    # ── Determine display mode + grain category from selected grain ───────────
+    pattern = _grain_pattern(abc_level)
+    grain_category = 'taxon' if pattern.startswith('taxon_') else 'item'
+
+    if pattern.endswith('_cust_location') or pattern.endswith('_loc_dc_cust'):
+        display_mode = 'atomic'
+    elif pattern.endswith('_loc_dc') or pattern.endswith('_loc') or '_loc_depth_' in pattern:
         display_mode = 'item_location'
+    elif '_salesnode' in pattern:
+        display_mode = 'sales_node'
+    elif '_top_' in pattern:
+        display_mode = 'top'
     else:
-        display_mode = 'atomic'  # item_cust_location
+        display_mode = 'item_client'
 
     # ── Extract depth for loc_depth grains ───────────────────────────────────
     loc_depth = None
-    if display_mode == 'item_location' and 'loc_depth' in abc_level:
+    if display_mode == 'item_location' and '_loc_depth_' in pattern:
         try:
-            loc_depth = int(abc_level.rsplit('_', 1)[-1])
+            loc_depth = int(pattern.rsplit('_', 1)[-1])
         except ValueError:
             loc_depth = None
 
     # ── Build leaf → ancestor map for depth grains ────────────────────────────
-    # Needed to match profile.planning_location_id (leaf) to
-    # evaluation_key.location_id (ancestor at depth N)
-    leaf_to_ancestor = {}
+    leaf_to_ancestor: dict[int, int | None] = {}
     if loc_depth is not None:
-        def _ancestor_from_path(path, target_depth):
-            parts = [p for p in path.split('/') if p]
-            idx = target_depth - 1
-            return int(parts[idx]) if idx < len(parts) else None
-
-        leaf_to_ancestor = {
-            loc['id']: _ancestor_from_path(loc['path'], loc_depth)
+        location_paths = {
+            loc['id']: [p for p in loc['path'].split('/') if p]
             for loc in PlanningLocation.objects
                 .filter(client=request.client)
                 .values('id', 'path')
+        }
+        leaf_to_ancestor = {
+            loc_id: int(parts[loc_depth - 1]) if loc_depth <= len(parts) else None
+            for loc_id, parts in location_paths.items()
         }
 
     # ── Base queryset ─────────────────────────────────────────────────────────
@@ -2097,15 +2266,13 @@ def series_profile_list(request, client_id=None):
     if item_id:
         qs = qs.filter(item__item_id__icontains=item_id)
 
-    # Filter by ABC class at the selected grain level
+    # Filter by ABC class at the selected grain level (by pattern, not exact grain)
     if abc_class:
-        matching_items = (
+        abc_class_filter = _pattern_to_grain_q(pattern) & Q(abc_class=abc_class.upper())
+        matching_items = list(
             SeriesLevelEvaluation.objects
-            .filter(
-                client=request.client,
-                grain=abc_level,
-                abc_class=abc_class.upper(),
-            )
+            .filter(client=request.client)
+            .filter(abc_class_filter)
             .values_list('item_id', flat=True)
             .distinct()
         )
@@ -2117,9 +2284,11 @@ def series_profile_list(request, client_id=None):
         .values_list('demand_class_atomic', flat=True)
         .distinct().order_by('demand_class_atomic')
     )
+    abc_class_filter = _pattern_to_grain_q(pattern)
     abc_classes_available = list(
         SeriesLevelEvaluation.objects
-        .filter(client=request.client, grain=abc_level)
+        .filter(client=request.client)
+        .filter(abc_class_filter)
         .exclude(abc_class='')
         .values_list('abc_class', flat=True)
         .distinct().order_by('abc_class')
@@ -2137,26 +2306,24 @@ def series_profile_list(request, client_id=None):
 
     # ── Fetch evaluations for page items ──────────────────────────────────────
     page_item_ids = list({prof.item_id for prof in page_obj.object_list})
+    eval_grain_filter = _pattern_to_grain_q(pattern)
 
     evals = list(
         SeriesLevelEvaluation.objects
-        .filter(
-            client=request.client,
-            grain=abc_level,
-            item_id__in=page_item_ids,
-        )
+        .filter(client=request.client)
+        .filter(eval_grain_filter)
+        .filter(item_id__in=page_item_ids)
         .values(
             'item_id',
             'abc_class',
             'value_share_pct_at_level',
-            'evaluation_key',       # contains location_id for loc grains
-            'planning_customer_id', # FK, None for __NULL__ customers
+            'evaluation_key',
+            'planning_customer_id',
         )
     )
 
     # ── Build abc_lookup and dedup_key based on display mode ──────────────────
     if display_mode == 'item_client':
-        # One eval per item — key by item_id only
         abc_lookup = {
             e['item_id']: {
                 'abc_class':       e['abc_class'],
@@ -2172,8 +2339,6 @@ def series_profile_list(request, client_id=None):
             return profile.item_id
 
     elif display_mode == 'item_location':
-        # evaluation_key contains 'location_id' (ancestor at this depth)
-        # profile.planning_location_id is leaf — use leaf_to_ancestor to match
         abc_lookup = {}
         for e in evals:
             loc_id = e['evaluation_key'].get('location_id')
@@ -2185,10 +2350,8 @@ def series_profile_list(request, client_id=None):
 
         def get_abc(profile):
             if leaf_to_ancestor:
-                # depth grain — map leaf → ancestor
                 anc_id = leaf_to_ancestor.get(profile.planning_location_id)
             else:
-                # item_loc grain — location_id IS the leaf location
                 anc_id = profile.planning_location_id
             if anc_id is None:
                 return {}
@@ -2201,14 +2364,52 @@ def series_profile_list(request, client_id=None):
                 anc_id = profile.planning_location_id
             return (profile.item_id, anc_id)
 
+    elif display_mode == 'sales_node':
+        abc_lookup = {}
+        for e in evals:
+            sn_id = e['evaluation_key'].get('sales_node_id')
+            if sn_id is not None:
+                abc_lookup[(e['item_id'], int(sn_id))] = {
+                    'abc_class':       e['abc_class'],
+                    'value_share_pct': e['value_share_pct_at_level'],
+                }
+
+        # Build leaf → sales ancestors map once
+        sales_ancestor_map: dict[int, set[int]] = defaultdict(set)
+        page_location_ids = {prof.planning_location_id for prof in page_obj.object_list if prof.planning_location_id}
+        if page_location_ids:
+            ancestor_map_raw = get_sales_hierarchy_ancestor_map(request.client.id)
+            links_qs = SalesForecastLink.objects.filter(
+                client=request.client,
+                planning_location_id__in=page_location_ids,
+            ).values('planning_location_id', 'sales_node_id')
+            for link in links_qs:
+                ancestors = ancestor_map_raw.get(link['sales_node_id'], [])
+                sales_ancestor_map[link['planning_location_id']].add(link['sales_node_id'])
+                sales_ancestor_map[link['planning_location_id']].update(ancestors)
+
+        def get_abc(profile):
+            anc_ids = sales_ancestor_map.get(profile.planning_location_id, set())
+            for anc_id in anc_ids:
+                result = abc_lookup.get((profile.item_id, anc_id))
+                if result:
+                    return result
+            return {}
+
+        def dedup_key(profile):
+            # Find the first matching ancestor for dedup
+            anc_ids = sales_ancestor_map.get(profile.planning_location_id, set())
+            for anc_id in anc_ids:
+                if (profile.item_id, anc_id) in abc_lookup:
+                    return (profile.item_id, anc_id)
+            return (profile.item_id, profile.planning_location_id)
+
     else:
-        # atomic — item_cust_location
-        # evaluation_key has 'location_id' and 'customer_code'
-        # use planning_customer_id (model FK) to match profiles
+        # atomic — item_cust_location / item_loc_dc_cust
         abc_lookup = {}
         for e in evals:
             loc_id  = e['evaluation_key'].get('location_id')
-            cust_id = e['planning_customer_id']  # None for __NULL__ rows
+            cust_id = e['planning_customer_id']
             if loc_id is not None:
                 abc_lookup[(e['item_id'], int(loc_id), cust_id)] = {
                     'abc_class':       e['abc_class'],
@@ -2237,52 +2438,87 @@ def series_profile_list(request, client_id=None):
     seen     = set()
     profiles = []
 
-    # Pre-fetch ancestor location details for item_location display
-    # evaluation_key already has location_id and level_label
-    ancestor_location_map = {}  # ancestor_loc_id → {code, label}
-    if display_mode == 'item_location':
+    ancestor_location_map: dict[int, dict] = {}
+    if display_mode in ('item_location',):
         for e in evals:
             loc_id     = e['evaluation_key'].get('location_id')
             level_label = e['evaluation_key'].get('level_label', '')
             if loc_id is not None:
                 ancestor_location_map[int(loc_id)] = {
-                    'location_id':  int(loc_id),
-                    'level_label':  level_label,
+                    'location_id': int(loc_id),
+                    'level_label': level_label,
                 }
-        # Fetch location codes and names in one query
         if ancestor_location_map:
-            ancestor_locs = (
+            for loc in (
                 PlanningLocation.objects
-                .filter(
-                    client=request.client,
-                    id__in=ancestor_location_map.keys()
-                )
+                .filter(client=request.client, id__in=ancestor_location_map.keys())
                 .values('id', 'code', 'name')
-            )
-            for loc in ancestor_locs:
+            ):
                 ancestor_location_map[loc['id']].update({
                     'code': loc['code'],
                     'name': loc['name'],
                 })
 
+    ancestor_sales_node_map: dict[int, dict] = {}
+    if display_mode == 'sales_node':
+        for e in evals:
+            sn_id = e['evaluation_key'].get('sales_node_id')
+            if sn_id is not None:
+                ancestor_sales_node_map[int(sn_id)] = {'sales_node_id': int(sn_id)}
+        if ancestor_sales_node_map:
+            for sn in (
+                SalesNode.objects
+                .filter(client=request.client, id__in=ancestor_sales_node_map.keys())
+                .values('id', 'code', 'name')
+            ):
+                ancestor_sales_node_map[sn['id']].update({
+                    'code': sn['code'],
+                    'name': sn['name'],
+                })
+
     for profile in page_obj.object_list:
-        profile.abc_at_level = get_abc(profile)
         key = dedup_key(profile)
+        if key in seen:
+            continue
+        seen.add(key)
 
-        if key not in seen:
-            seen.add(key)
+        profile.abc_at_level = get_abc(profile)
+        profile.ancestor_location = {}
+        profile.ancestor_sales_node = {}
 
-            # Attach ancestor location info for item_location display
-            if display_mode == 'item_location':
-                if leaf_to_ancestor:
-                    anc_id = leaf_to_ancestor.get(profile.planning_location_id)
-                else:
-                    anc_id = profile.planning_location_id
-                profile.ancestor_location = ancestor_location_map.get(anc_id, {})
+        if display_mode == 'item_location':
+            if leaf_to_ancestor:
+                anc_id = leaf_to_ancestor.get(profile.planning_location_id)
             else:
-                profile.ancestor_location = {}
+                anc_id = profile.planning_location_id
+            profile.ancestor_location = ancestor_location_map.get(anc_id, {})
 
-            profiles.append(profile)
+        elif display_mode == 'sales_node':
+            try:
+                # key is (item_id, sn_id) for sales_node mode
+                sn_id = key[1]
+            except (IndexError, TypeError):
+                sn_id = None
+            profile.ancestor_sales_node = ancestor_sales_node_map.get(sn_id, {})
+
+        profiles.append(profile)
+
+    # ── Recompute tracking ─────────────────────────────────────────────────────
+    cfg = ForecastingConfig.get_for_client(request.client)
+    last_recompute = {
+        'at': cfg.profiles_last_computed_at,
+    }
+    last_window = {
+        'analysis_from': cfg.profiles_last_window_start,
+        'analysis_to':   cfg.profiles_last_window_end,
+    }
+    last_period_types = list(
+        SeriesLevelEvaluation.objects
+        .filter(client=request.client)
+        .values_list('period_type', flat=True)
+        .distinct()
+    )
+    last_period_types.sort()
 
     # ── Context ───────────────────────────────────────────────────────────────
     filters = {
@@ -2294,26 +2530,32 @@ def series_profile_list(request, client_id=None):
         'abc_level':     abc_level,
     }
 
+    show_location_modes = {'atomic', 'item_location', 'sales_node'}
     context = {
-        'page_obj':           page_obj,
-        'profiles':           profiles,
-        'filters':            filters,
-        'demand_classes':     demand_classes,
-        'abc_classes':        abc_classes_available,
-        'locations':          locations,
-        'abc_level_choices':  abc_level_choices,
-        'selected_abc_level': abc_level,
-        'display_mode':       display_mode,
-        'show_demand_class':  len(demand_classes) > 1,
-        'show_abc_class':     len(abc_classes_available) > 1,
-        'show_location':      (
-            len(locations) > 1 and display_mode != 'item_client'
+        'page_obj':            page_obj,
+        'profiles':            profiles,
+        'filters':             filters,
+        'demand_classes':      demand_classes,
+        'abc_classes':         abc_classes_available,
+        'locations':           locations,
+        'abc_level_choices':   abc_level_choices,
+        'selected_abc_level':  abc_level,
+        'display_mode':        display_mode,
+        'grain_category':      grain_category,
+        'show_location_column': display_mode in show_location_modes,
+        'show_demand_class':   len(demand_classes) > 1,
+        'show_abc_class':      len(abc_classes_available) > 1,
+        'show_location':       (
+            len(locations) > 1 and display_mode in show_location_modes
         ),
         'show_is_manual':     qs.filter(chosen_strategy='MANUAL').exists(),
         'show_item_search':   distinct_items > 1,
         'show_channel':       show_channel,
         'period_choices':     PERIOD_TYPE_CHOICES,
-        'active_nav': 'series_profiles'
+        'active_nav':         'series_profiles',
+        'last_recompute':     last_recompute,
+        'last_window':        last_window,
+        'last_period_types':  last_period_types,
     }
 
     if _is_htmx(request):
@@ -2552,6 +2794,12 @@ def trigger_outlier_detection(request, client_id):
 
 @login_required
 def outlier_queue(request, client_id):
+    return render(request, "demand/outliers/queue.html", _outlier_queue_context(request))
+
+
+def _outlier_queue_context(request):
+    """Shared context for the Outlier Review Queue page (GET and bulk-delete
+    re-renders), so both stay in sync on status filter, counts, and nav."""
     client = request.client
     qs = ActualSaleOutlierAdjustment.objects.filter(
         actual_sale__client=client
@@ -2564,7 +2812,7 @@ def outlier_queue(request, client_id):
     if status:
         qs = qs.filter(status=status)
  
-    return render(request, "demand/outliers/queue.html", {
+    return {
         "adjustments": qs.order_by("-created_at")[:200],
         "current_status": status,
         "active_nav": "outlier_queue",
@@ -2572,7 +2820,39 @@ def outlier_queue(request, client_id):
         "outlier_candidate_count": ActualSaleOutlierAdjustment.objects.filter(
             actual_sale__client=client, status="CANDIDATE"
         ).count(),
-    })
+    }
+
+
+@login_required
+@require_POST
+def outlier_bulk_delete(request, client_id):
+    """
+    Discard proposed (CANDIDATE) outlier adjustments so a future detection
+    run can re-propose them afresh. Only CANDIDATE rows are eligible —
+    CONFIRMED/REJECTED are deliberate decisions and are never touched.
+
+    mode=selected -> delete the CANDIDATE rows whose pks arrive in
+                     adjustment_ids (checkbox selection).
+    mode=all      -> delete every CANDIDATE row for this client.
+    """
+    client = request.client
+    base = ActualSaleOutlierAdjustment.objects.filter(
+        actual_sale__client=client,
+        status="CANDIDATE",
+    )
+
+    deleted = 0
+    if request.POST.get("mode") == "all":
+        deleted, _ = base.delete()
+    else:
+        ids = [pk for pk in request.POST.getlist("adjustment_ids") if pk.isdigit()]
+        if ids:
+            deleted, _ = base.filter(pk__in=ids).delete()
+
+    ctx = _outlier_queue_context(request)
+    if deleted:
+        ctx["notice"] = f"{deleted} proposed outlier(s) discarded."
+    return render(request, "demand/outliers/queue.html", ctx)
  
 
 

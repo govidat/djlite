@@ -1,6 +1,12 @@
 {% load i18n %}
 {# One row in the Outlier Review Queue. Re-rendered in place after confirm/reject via HTMX. #}
 <tr id="outlier-row-{{ adjustment.pk }}">
+  <td>
+    {% if current_status == "CANDIDATE" %}
+      <input type="checkbox" name="outlier_ids" value="{{ adjustment.pk }}"
+             class="checkbox checkbox-xs checkbox-primary">
+    {% endif %}
+  </td>
   <td>{{ adjustment.actual_sale.item }}</td>
   <td>{{ adjustment.actual_sale.planning_location }}</td>
   <td>{{ adjustment.actual_sale.distribution_channel }}</td>

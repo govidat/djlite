@@ -33,6 +33,7 @@ urlpatterns = [
     path('versions/<int:pk>/run/', views.version_run, name='version_run'),
     path('versions/<int:pk>/run-status/', views.version_run_status, name='version_run_status'),
     path('versions/<int:pk>/approve/', views.version_approve, name='version_approve'),
+    path('versions/<int:pk>/delete/', views.version_delete, name='version_delete'),
     path('versions/<int:pk>/copy/', views.version_copy, name='version_copy'),
 
     # ── Forecast Lines (grid) ────────────────────────────────────────────────
@@ -102,6 +103,7 @@ urlpatterns = [
     path("outliers/run-detection/", views.trigger_outlier_detection, name="trigger_outlier_detection"),
     path("outliers/decisions/", views.outlier_decisions_report, name="outlier_decisions_report"),
     path("outliers/decisions/<int:pk>/revise/", views.outlier_revise, name="outlier_revise"),    
+    path("outliers/bulk-delete/", views.outlier_bulk_delete, name="outlier_bulk_delete"),
  
 
 ]

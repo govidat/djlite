@@ -18,6 +18,21 @@
         </div>
     </div>
 
+    {% if overlap_outlier_count %}
+    <div class="alert alert-error">
+        <div>
+            <p class="font-bold">{% trans "Outlier adjustments will be deleted" %}</p>
+            <p class="text-sm mt-1">
+                {% blocktrans with count=overlap_outlier_count %}
+                {{ count }} outlier adjustment record(s) exist against the actuals
+                in the overlapping period(s). Deleting those actuals will also
+                permanently delete these outlier adjustments.
+                {% endblocktrans %}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+
     <p class="text-sm text-base-content/70">
         {% trans "How would you like to proceed?" %}
     </p>
@@ -59,7 +74,7 @@
     <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
           hx-target="#actuals-upload-panel"
           hx-swap="outerHTML"
-          hx-confirm="{% trans 'Delete all existing actuals for the overlapping periods and replace with this file?' %}">
+          {% if not overlap_outlier_count %}hx-confirm="{% trans 'Delete all existing actuals for the overlapping periods and replace with this file?' %}"{% endif %}>
         {% csrf_token %}
         <input type="hidden" name="action" value="delete_and_upload">
         <input type="hidden" name="pending_file" value="{{ pending_file }}">
@@ -69,7 +84,11 @@
         <input type="hidden" name="overlap_periods" value="{{ period|date:'Y-m-d' }}">
         {% endfor %}
         <button type="submit" class="btn btn-error btn-sm w-full">
+            {% if overlap_outlier_count %}
+            🗑 {% trans "Review impact of delete, then upload fresh" %}
+            {% else %}
             🗑 {% trans "Delete existing data for these periods, then upload fresh" %}
+            {% endif %}
         </button>
     </form>
 

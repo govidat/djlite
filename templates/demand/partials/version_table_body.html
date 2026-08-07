@@ -27,9 +27,19 @@
     {% endif %}
   </td>
   <td class="text-sm text-base-content/60">{{ version.created_at|date:"d M Y" }}</td>
-  <td>
+  <td class="flex gap-1">
     <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
        class="btn btn-ghost btn-xs">{% trans "Open" %} →</a>
+    {% if version.status == 'DRAFT' %}
+      {% if demand_ui_role == 'admin' or demand_ui_role == 'planner' %}
+    <form method="post"
+          action="{% url 'demand_ui:version_delete' client_id=client.client_id pk=version.pk %}"
+          onsubmit="return confirm('{% trans "Delete this version? This cannot be undone." %}');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost btn-xs text-error">{% trans "Delete" %}</button>
+    </form>
+      {% endif %}
+    {% endif %}
   </td>
 </tr>
 {% empty %}

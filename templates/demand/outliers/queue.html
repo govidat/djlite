@@ -21,6 +21,12 @@ templates/
 
 <div id="outlier-queue">
 
+  {% if notice %}
+  <div class="alert alert-success py-2 text-sm mb-4">
+    <span>{{ notice }}</span>
+  </div>
+  {% endif %}
+
   {# ── Detection trigger + last-run status ─────────────────────────────── #}
   <div class="card bg-base-200 mb-6">
     <div class="card-body">
@@ -63,11 +69,46 @@ templates/
        hx-push-url="true">{% trans "Rejected" %}</a>
   </div>
 
+  {# ── Bulk discard bar — CANDIDATE tab only ───────────────────────────── #}
+  {% if current_status == "CANDIDATE" and outlier_candidate_count %}
+  <div class="flex flex-wrap items-center gap-2 mb-3">
+    <span class="text-sm text-base-content/70">
+      {% trans "Discard unconfirmed proposals so the next detection run can propose afresh." %}
+    </span>
+    <div class="ms-auto flex gap-2">
+      <form hx-post="{% url 'demand_ui:outlier_bulk_delete' client_id=client.client_id %}"
+            hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
+            hx-include="[name='outlier_ids']"
+            hx-confirm="{% trans 'Discard the selected proposed outlier(s)? They will be re-proposed by the next detection run.' %}">
+        {% csrf_token %}
+        <input type="hidden" name="mode" value="selected">
+        <button type="submit" class="btn btn-error btn-xs">{% trans "Discard selected" %}</button>
+      </form>
+      <form hx-post="{% url 'demand_ui:outlier_bulk_delete' client_id=client.client_id %}"
+            hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
+            hx-confirm="{% blocktrans with count=outlier_candidate_count %}Discard ALL {{ count }} proposed outlier(s) for this client?{% endblocktrans %}">
+        {% csrf_token %}
+        <input type="hidden" name="mode" value="all">
+        <button type="submit" class="btn btn-error btn-xs">
+          {% blocktrans with count=outlier_candidate_count %}Discard all candidates ({{ count }}){% endblocktrans %}
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
   {# ── Candidate/decision table ─────────────────────────────────────────── #}
   <div class="overflow-x-auto">
     <table class="table table-zebra">
       <thead>
         <tr>
+          <th class="w-8">
+            {% if current_status == "CANDIDATE" %}
+              <input type="checkbox" id="select-all-outliers"
+                     class="checkbox checkbox-xs checkbox-primary"
+                     title="{% trans 'Select all on page' %}">
+            {% endif %}
+          </th>
           <th>{% trans "Item" %}</th>
           <th>{% trans "Location" %}</th>
           <th>{% trans "Channel" %}</th>
@@ -84,10 +125,21 @@ templates/
         {% for adjustment in adjustments %}
           {% include "demand/outliers/partials/_row.html" %}
         {% empty %}
-          <tr><td colspan="10" class="text-base-content/60">{% trans "No outlier adjustments found for this status." %}</td></tr>
+          <tr><td colspan="11" class="text-base-content/60">{% trans "No outlier adjustments found for this status." %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+<script>
+(function() {
+    var selectAll = document.getElementById('select-all-outliers');
+    if (!selectAll) return;
+    selectAll.addEventListener('change', function() {
+        document.querySelectorAll('input[name="outlier_ids"]').forEach(function(cb) {
+            cb.checked = selectAll.checked;
+        });
+    });
+})();
+</script>
 {% endblock %}

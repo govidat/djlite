@@ -409,6 +409,43 @@ class ActualSaleAdmin(admin.ModelAdmin):
 
     admin_role_only = True  # your existing mixin flag
 
+    # ── Deletion guard: warn when deleting actuals drops outlier adjustments ──
+    def _warn_if_outlier_adjustments(self, request, actual_sales):
+        from django.contrib import messages
+        from mysite.models import ActualSaleOutlierAdjustment
+        if isinstance(actual_sales, list):
+            row_count = len(actual_sales)
+            pks = [s.pk for s in actual_sales]
+        else:
+            row_count = actual_sales.count()
+            pks = actual_sales.values_list('pk', flat=True)
+        outlier_count = (
+            ActualSaleOutlierAdjustment.objects
+            .filter(actual_sale_id__in=pks)
+            .count()
+        )
+        if outlier_count:
+            messages.warning(
+                request,
+                _(
+                    "Deleting %(rows)s actual sale row(s) will also permanently "
+                    "delete %(outliers)s outlier adjustment record(s) linked to them."
+                ) % {
+                    'rows': row_count,
+                    'outliers': outlier_count,
+                },
+            )
+
+    def delete_view(self, request, object_id, extra_context=None):
+        obj = self.get_object(request, object_id)
+        if obj is not None:
+            self._warn_if_outlier_adjustments(request, [obj])
+        return super().delete_view(request, object_id, extra_context)
+
+    def delete_queryset(self, request, queryset):
+        self._warn_if_outlier_adjustments(request, queryset)
+        return super().delete_queryset(request, queryset)
+
 
 
 # ═════════════════════════════════════════════════════════════════════════════

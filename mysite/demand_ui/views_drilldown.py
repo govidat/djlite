@@ -152,9 +152,9 @@ def drilldown(request, pk, location_id=None, client_id=None):
         else:
             from guardian.shortcuts import get_objects_for_user
             granted_roots = get_objects_for_user(
-                request.user, f'demand.{VIEW_PERM}',
-                klass=PlanningLocation.objects.filter(client=request.client),
-            )
+                request.user, f'mysite.{VIEW_PERM}',
+                klass=PlanningLocation,
+            ).filter(client=request.client)
             current_location = granted_roots.order_by('path').first()
 
     # ── Build the aggregate for current_location ────────────────────────────

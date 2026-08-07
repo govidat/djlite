@@ -1466,6 +1466,22 @@ class ForecastingConfig(models.Model):
     last_outlier_detection_range_start = models.DateField(null=True, blank=True)
     last_outlier_detection_range_end = models.DateField(null=True, blank=True)
     
+    profiles_last_computed_at = models.DateTimeField(
+        _('profiles last computed at'),
+        null=True, blank=True, editable=False,
+        help_text=_('Set by the Celery task after each successful recompute.'),
+    )
+    profiles_last_window_start = models.DateField(
+        _('profiles last window start'),
+        null=True, blank=True, editable=False,
+        help_text=_('Analysis window start from the last recompute run.'),
+    )
+    profiles_last_window_end = models.DateField(
+        _('profiles last window end'),
+        null=True, blank=True, editable=False,
+        help_text=_('Analysis window end from the last recompute run.'),
+    )
+    
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

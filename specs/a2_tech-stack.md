@@ -420,240 +420,264 @@ When `Item.inherit_global_media=True` and `GlobalItem` is set:
 | `prophet` | latest stable (Meta) | Optional per-series model for series with strong seasonality + holidays; used when AutoETS/AutoARIMA underperform |
 | `celery` | 5.x | Already in Phase 3A. Forecast jobs run as long-running Celery tasks |
 | `redis` | latest | Already in Phase 3A. Celery broker |
-| `djmoney` | latest | Already in Phase 3A. `MoneyField` on `ActualSale.revenue`, `ActualSaleLocation.total_revenue` |
+| `djmoney` | not used in 3B | Revenue is stored as plain `DecimalField` on `ActualSale` / `ActualSaleLocation` (nullable) — no `MoneyField` |
 | `openpyxl` | latest | Excel import/export for actuals upload and forecast download (planners live in Excel) |
 | `pandas` | latest | Required by `statsforecast` and `hierarchicalforecast` internally; also used in import pipeline for CSV/Excel parsing |
  
 ### Demand Planning Model Package Layout
- 
+
 ```
 mysite/models/
     demand/
         __init__.py
-        hierarchy.py         # SalesNode, SalesForecastLink
-        actuals.py            # ActualSale, ActualSaleImport
-        outliers.py           # ActualSaleOutlierAdjustment ← NEW
-        forecast.py           # ForecastVersion, ForecastLine, ForecastAggregate,
-                              #   ForecastOverride, OverrideSplitWeight, ForecastAccuracy
+        hierarchy.py         # PlanningLocation, PlanningCustomer, SalesNode,
+                             #   SalesForecastLink, ZZCustomerSalesAssignment (deprecated)
+        actuals.py           # ActualSale, ActualSaleLocation, ActualSaleImport,
+                             #   ActualSaleOutlierAdjustment, ItemPlanningProfile
+        forecast.py          # ForecastVersion, ForecastLine, ForecastAggregate,
+                             #   ForecastOverride, OverrideSplitWeight, ForecastAccuracy,
+                             #   AbcClassDefinition, ForecastingConfig,
+                             #   SeriesLevelEvaluation, SeriesProfile
 ```
+
+`DistributionChannel` (code PK, label, is_active) lives in `mysite/models/global_config.py`, and
+`Client.allowed_distribution_channels` / `ClientFeatureControl` in `mysite/models/client.py`.
  
 ### Key Model Relationships (Phase 3B)
- 
+
 ```
 Client
-  ├── ClientLocation (existing; gains parent→self + materialized path)
-  │     └── SalesNode (client, name, level_label, parent→self, location FK nullable)
-  │           └── SalesForecastLink (planning_location, planning_customer, distribution_channel, sales_node, valid_from, valid_to)
-  ├── ActualSale (item, variant, customer, location, year, month, qty, revenue)
-  ├── ActualSaleOutlierAdjustment
-  ├── ActualSaleLocation (location, year, month, total_qty, total_revenue)
-  ├── ActualSaleImport (job tracking)
-  └── ForecastVersion (version_label, base_period_end, horizon_months, engine_config, status)
-        ├── ForecastLine (item, customer, location, year, month,
-        │                 statistical_qty, override_qty, final_qty)
-        ├── ForecastAggregate (agg_level, agg_key JSONField, year, month,
+  ├── PlanningLocation (client, parent→self, materialized path)
+  ├── PlanningCustomer (client, parent→self, materialized path)
+  ├── SalesNode (client, name, level_label, parent→self)
+  │     └── SalesForecastLink (planning_location, distribution_channel, planning_customer,
+  │                            sales_node, valid_from, valid_to)
+  │           shapes: loc+channel+customer / loc+channel / loc-only (nullable dims)
+  ├── DistributionChannel (code '00'=Common, label, is_active)      [global_config.py]
+  │     └── Client.allowed_distribution_channels (JSONField; NULL = channel-less client,
+  │           everything defaults to '00'/Common — NOT "any channel allowed")
+  ├── ActualSale (planning_location, item, planning_customer [nullable],
+  │     distribution_channel [default '00'], period_type, period_start, qty, revenue [Decimal,
+  │     nullable]; period_end auto-computed)
+  │     └── ActualSaleOutlierAdjustment (OneToOne → ActualSale; qty_adjustment,
+  │           revenue_adjustment, status CANDIDATE/CONFIRMED/REJECTED, detected_by, notes)
+  ├── ActualSaleLocation (planning_location, period_type, period_start, total_qty, total_revenue)
+  ├── ActualSaleImport (import_batch on every ActualSale row; status, errors JSONField)
+  └── ForecastVersion (version_label, period_type, base_period_end, horizon_periods,
+        engine_config, status DRAFT→IN_REVIEW→APPROVED→LOCKED, run_status, stale_actuals,
+        created_by, approved_by, copied_from)
+        ├── ForecastLine (item, planning_customer [nullable], planning_location,
+        │                 distribution_channel, period_type, period_start,
+        │                 statistical_qty, override_qty, final_qty, forecast_level,
+        │                 model_used, price_used)
+        ├── ForecastAggregate (agg_level, agg_key JSONField, period_start,
         │                      statistical_qty, override_qty, final_qty)
-        ├── ForecastOverride (override_level, override_key JSONField, year, month,
+        ├── ForecastOverride (override_level, override_key JSONField, period_start,
         │                     override_qty, override_pct, override_note, created_by)
         │     └── OverrideSplitWeight (child_key, weight)
-        └── ForecastAccuracy (item, customer, location, year, month,
-                              actual_qty, forecast_qty, mape, bias)
+        ├── ForecastAccuracy (item, planning_customer, planning_location,
+        │                     distribution_channel, period_start,
+        │                     actual_qty, forecast_qty, mape, bias)
+        ├── ForecastingConfig (mad_threshold, persistence_periods, min_history_periods,
+        │     forecast_uses_net_actuals / reporting_uses_net_actuals /
+        │     abc_classification_uses_net_actuals [default True],
+        │     last_outlier_detection_run_at/by/range_start/range_end)
+        ├── SeriesProfile (grain encoding, model selection per series)
+        └── SeriesLevelEvaluation (per-series evaluation record)
 ```
  
 ### Forecasting Engine Architecture
- 
+
 #### Celery Task: `run_forecast(version_id)`
- 
-├── tasks/
-│   ├── demand/
-│   │   ├── run_forecast.py
-│   │   ├── import_actuals.py
-│   │   ├── detect_outliers.py     # detect_outlier_candidates, flag_stale_forecast_versions  ← NEW
-│   │   └── compute_series_profiles.py
 
-├── utils/
-│   ├── demand/
-│   │   ├── forecast_engine.py
-│   │   ├── override_engine.py
-│   │   └── actuals_net.py         # actuals_queryset_with_net()  ← NEW
-
-├── templates/
-│   ├── demand_ui/
-│   │   ├── actuals_dashboard.html
-│   │   ├── outliers/
-│   │   │   ├── queue.html               # full-page candidate queue  ← NEW
-│   │   │   ├── _row.html                # HTMX row fragment (confirm/reject re-render target)  ← NEW
-│   │   │   └── _raise_exception_form.html  # HTMX form fragment  ← NEW
 ```
-1. Load actuals from PostgreSQL:
-   DuckDB in-process query over ActualSale for client + period window,
-   LEFT JOIN ActualSaleOutlierAdjustment (status='CONFIRMED') and using
-   net_qty/net_revenue when Client.forecast_uses_net_actuals is enabled,
-   else the raw qty/revenue columns.
+mysite/tasks/demand/
+  ├── run_forecast.py              # run_forecast(version_id), apply_overrides(version_id),
+  │                                #   compute_accuracy(client_id)
+  ├── import_actuals.py            # process_actuals_import(import_id),
+  │                                #   process_summary_actuals_import(import_id)
+  ├── detect_outliers.py           # run_outlier_detection(client_id, target_period_start,
+  │                                #   target_period_end, triggered_by_user_id),
+  │                                #   flag_stale_forecast_versions(actual_sale_id)
+  ├── compute_series_profiles.py   # compute_series_profiles(client_id, period_type)
+  └── notifications.py             # send_forecast_status_email (status-change digest)
 
-   (Deprecated DuckDB in-process query over ActualSale for client + period window)
-   → Polars DataFrame (columns: unique_id, ds, y)
-   where unique_id = f"{item_id}|{customer_id}|{location_id}" TBD
- 
+utils/demand/
+  ├── actuals_net.py               # actuals_queryset_with_net() — CONFIRMED-adjustment netting
+  ├── outlier_detection.py         # statistical candidate detection engine
+  ├── compute_series_profiles.py   # grain-encoding + profile computation engine
+  ├── forecast_engine.py           # statistical forecast engine (Polars + StatsForecast)
+  ├── hierarchy_utils.py           # hierarchy walk / summing-matrix helpers
+  ├── location_access.py           # planner location scoping
+  └── periods.py                   # period arithmetic (compute_period_end etc.)
+```
+1. Load actuals from PostgreSQL for client + base window. When
+   `ForecastingConfig.forecast_uses_net_actuals` is enabled, the queryset is built via
+   `actuals_queryset_with_net()` (LEFT JOIN to `ActualSaleOutlierAdjustment` with
+   `status='CONFIRMED'`, yielding net_qty/net_revenue); else raw qty/revenue columns.
+   DuckDB is used in-process for fast OLAP rollups on the aggregates / accuracy paths.
+   → Polars DataFrame (columns: unique_id, ds, y) where unique_id is the grain encoding
+   (e.g. `item_loc_dc_cust`, `item_loc_dc`, `item_loc`, `item_salesnode_{node_id}`,
+   `taxon_{node_id}_*`, `manual`) produced by `compute_series_profiles`.
 2. Build hierarchy summing matrix S:
-   Walk TaxonomyNode tree (product_planning slug)
-   Walk ClientLocation parent tree
-   Walk SalesNode tree
-   Construct S matrix as a numpy array (Nixtla HierarchicalForecast format)
- 
+   Walk PlanningLocation tree, SalesNode tree, and the product TaxonomyNode tree
+   (`product_planning` slug). Construct S as a numpy array (Nixtla HierarchicalForecast format).
 3. Run StatsForecast:
-   models = [AutoETS(), AutoARIMA(), CrostonSBA()]  # CrostonSBA for intermittent
-   sf = StatsForecast(models=models, freq='MS', n_jobs=-1)
-   forecasts_df = sf.forecast(df=actuals_df, h=horizon_months)
- 
+   models from `engine_config.models` (default `["AutoETS", "AutoARIMA"]`; CrostonSBA used for
+   intermittent series), `season_length` from config. Pick best model per series by
+   cross-validation MAPE.
 4. Run HierarchicalForecast reconciliation:
-   hrec = HierarchicalReconciliation(reconcilers=[MinTrace(method='ols')])
-   reconciled_df = hrec.reconcile(Y_hat_df=forecasts_df, Y_df=actuals_df, S=S, tags=tags)
- 
-5. Write ForecastLine records (bulk_create, batch 5000)
-6. Write ForecastAggregate records for each agg_level
-7. Update ForecastVersion.status = 'READY'
-8. Notify requesting user via Django message / email
+   hrec = HierarchicalReconciliation(reconcilers=[MinTrace(method='ols')]) — method from
+   `engine_config.reconciliation` (BottomUp / MinTrace_ols / MinTrace_wls_struct).
+5. Write ForecastLine records (bulk_create, batch 5000), one per evaluated grain; each row
+   carries `forecast_level` + `model_used` (suppressed by `store_all_level_forecasts=false`).
+6. Write ForecastAggregate records for each agg_level.
+7. Update ForecastVersion.run_status through QUEUED → PROFILING → RUNNING → RECONCILING →
+   AGGREGATING → COMPLETE (or FAILED with run_error traceback); version workflow status is
+   unchanged (DRAFT until a planner submits for review).
+8. Notify requesting user via `send_forecast_status_email`.
+
+#### Celery Task: `apply_overrides(version_id)`
+
 ```
- 
-#### Celery Task: `propagate_override(override_id)`
- 
-```
-1. Load ForecastOverride record
-2. Identify leaf ForecastLine records within override_key subtree
+1. Load all ForecastOverride records for the version
+2. Resolve each override's subtree (override_key) to leaf ForecastLine records
 3. Determine disaggregation method (PROPORTIONAL / EQUAL / CUSTOM)
-4. For PROPORTIONAL: compute shares from ActualSale for same period last year - uses the same net-or-raw query helper
-5. Update ForecastLine.override_qty for each leaf
+4. For PROPORTIONAL: compute shares from the net actuals query helper for the same period last year
+5. Update ForecastLine.override_qty for each leaf (final_qty = override_qty when set)
 6. Recompute ForecastAggregate roll-ups for affected keys
-7. If subtree < 500 leaves: run synchronously; else submit Celery task
+7. If subtree < 500 leaves: run synchronously; else submit as Celery task
 ```
- 
-#### Celery Task: `compute_forecast_accuracy(version_id, period_year, period_month)`
- 
+
+#### Celery Task: `compute_accuracy(client_id)` — nightly
+
 ```
-1. Load approved ForecastLine for version + period
-2. Load ActualSale for same period
-3. Join on (item, customer, location)
+1. Load APPROVED/LOCKED ForecastVersion records for the client
+2. Load net ActualSale (via actuals_queryset_with_net) for each version's horizon window
+3. Join on (item, planning_customer, planning_location, distribution_channel, period_start)
 4. Compute MAPE, Bias, WMAPE per leaf and per aggregate level
 5. Write ForecastAccuracy records
 ```
- 
+
 ### Data Import Pipeline
- 
+
 **CSV / Excel upload** (monthly actuals):
-- `ActualSaleImport` job created on upload
+- `ActualSaleImport` job created on upload (HTMX form at `actuals_upload`; overlaps with CONFIRMED adjustments require explicit confirmation via `actuals_upload_overlap` guard)
 - Celery task `process_actuals_import(import_id)`:
   - Reads file with `pandas.read_excel` / `pandas.read_csv`
-  - Validates: item exists, customer exists, location exists, year/month valid
-  - `INSERT ... ON CONFLICT DO UPDATE` on `ActualSale` (idempotent)
-  - Writes errors to `ActualSaleImport.errors` JSONField
-  - Updates status: `PENDING → PROCESSING → COMPLETE / FAILED`
-detect_outlier_candidates(client_id, import_batch_id)
-  Triggered by: post-save on ActualSaleImport.status → COMPLETE
-  1. Load OutlierDetectionConfig for client (lazily create with system defaults if absent)
-  2. Pull newly-imported ActualSale rows for the client/period window
-  3. Run residual-based detection (MAD / STL-residual) per series using config.mad_threshold
+  - Validates: item exists, planning_location exists, planning_customer exists, distribution_channel exists, period valid
+  - Bulk upsert (`ON CONFLICT DO UPDATE`) on `ActualSale` natural key (idempotent)
+  - Writes errors to `ActualSaleImport.error_log`
+  - Updates status: `pending → processing → done / failed`
+
+run_outlier_detection(client_id, target_period_start, target_period_end, triggered_by_user_id=None)
+  Triggered by: planner submission of the Outlier Detection range form (HTMX), NOT import completion
+  1. Load ForecastingConfig for client (lazily create with system defaults if absent)
+  2. Pull ActualSale rows for the client within [target_period_start, target_period_end]
+  3. Run residual-based detection (MAD threshold) per series using config.mad_threshold
   4. Skip series with fewer than config.min_history_periods periods of history
   5. Distinguish transient spike vs sustained level shift using config.persistence_periods
   6. bulk_create ActualSaleOutlierAdjustment rows (status='CANDIDATE', detected_by='SYSTEM'),
-     one per flagged ActualSale row (OneToOneField — skip rows that already have an adjustment)
+     one per flagged ActualSale row (OneToOneField — skip rows that already have an adjustment;
+     a row with any adjustment is never re-proposed, so re-running is idempotent)
   7. Notify planner(s) of new candidates via Django message / email digest
+  8. Record last_outlier_detection_run_at/by/range_start/range_end on ForecastingConfig
 
 flag_stale_forecast_versions(actual_sale_id)
-  Triggered by: post-save on ActualSaleOutlierAdjustment.status change to/from CONFIRMED
+  Triggered by: post-save on ActualSaleOutlierAdjustment status changes
   1. Find DRAFT ForecastVersions whose base_period_end / horizon window covers the
      actual_sale's period_start
-  2. Mark them with a `stale_actuals=True` flag (does not auto-rerun; surfaced in the SPA
-     as "actuals changed since this draft was generated — rerun recommended")
+  2. Mark them with a `stale_actuals=True` flag (does not auto-rerun; surfaced in the HTMX
+     UI as "actuals changed since this draft was generated — rerun recommended")
 
-**Summary-level upload** (location × month totals):
+**Summary-level upload** (location × period totals):
 - Same pipeline writes to `ActualSaleLocation`
-- Used as cross-check against SKU-level rollups; discrepancy > 5% flagged
+- Used as cross-check against item-level rollups; discrepancy > 5% flagged
 ### Database Indexes (Phase 3B)
  
 Add via `RunSQL` in migration:
  
 ```sql
--- Fast actuals matrix pull for forecast runs
-CREATE INDEX ix_actualsale_client_period
-    ON mysite_actualsale (client_id, year, month);
- 
-CREATE INDEX ix_actualsale_item_customer
-    ON mysite_actualsale (item_id, customer_id, location_id);
- 
--- ForecastLine lookups by version
-CREATE INDEX ix_forecastline_version
-    ON mysite_forecastline (version_id, year, month);
- 
--- ForecastAggregate lookups
-CREATE INDEX ix_forecastaggregate_version_level
-    ON mysite_forecastaggregate (version_id, agg_level, year, month);
- 
--- SalesNode materialized path
-CREATE INDEX ix_salesnode_path
-    ON mysite_salesnode USING btree (path text_pattern_ops);
- 
--- ClientLocation parent tree (already has id PK; add path)
-CREATE INDEX ix_clientlocation_path
-    ON mysite_clientlocation USING btree (path text_pattern_ops);
+-- ActualSale period-filtered lookups (migration 0048)
+CREATE INDEX ix_actualsale_loc_period     ON mysite_actualsale (client_id, planning_location_id, period_type, period_start);
+CREATE INDEX ix_actualsale_item_period    ON mysite_actualsale (client_id, item_id, period_type, period_start);
+CREATE INDEX ix_actualsale_cust_period    ON mysite_actualsale (client_id, planning_customer_id, period_type, period_start);
+CREATE INDEX ix_actualsale_period_range   ON mysite_actualsale (client_id, period_type, period_start, period_end);
 
--- Outlier candidate queue lookups (status filter is the hot path for the review queue)
-CREATE INDEX ix_outlieradj_status
-    ON mysite_actualsaleoutlieradjustment (status);
+-- ActualSale natural-grain engine lookups (migration 0063)
+CREATE INDEX ix_actualsale_grain_lookup   ON mysite_actualsale (client_id, planning_location_id, distribution_channel_id, planning_customer_id, period_type, period_start);
 
+-- ActualSaleLocation (migration 0054)
+CREATE INDEX ix_actualsaleloc_period      ON mysite_actualsalelocation (client_id, planning_location_id, period_type, period_start);
+
+-- SalesForecastLink lookups (migrations 0065 / 0066)
+CREATE INDEX ix_sfl_client_loc            ON mysite_salesforecastlink (client_id, planning_location_id);
+CREATE INDEX ix_sfl_loc_from              ON mysite_salesforecastlink (client_id, planning_location_id, valid_from);
+
+-- Outlier candidate queue lookups (status filter is the hot path for the review queue, migration 0066)
+CREATE INDEX ix_outlieradj_status         ON mysite_actualsaleoutlieradjustment (status);
 ```
+
+Hierarchy nodes (PlanningLocation / PlanningCustomer / SalesNode) use the `MaterializedPathMixin` pattern (materialized `path` + text_pattern_ops B-tree) inherited from Phase 2's `TaxonomyNode`.
  
 ### Frontend (Phase 3B)
- 
-The demand planning UI is a **separate React SPA** served under `/{client_id}/planning/`. It communicates with Django via DRF REST endpoints. It is **not** part of the cotton/DaisyUI Django template system.
- 
-| Component | Library | Purpose |
-|-----------|---------|---------|
-| Grid / pivot override table | AG Grid (Community) | Spreadsheet-like consensus grid; planners edit override_qty cells inline |
-| Time series charts | Apache ECharts | Forecast vs actuals line chart with drill-down |
-| Hierarchy navigator | React Tree component | Navigate product / geography / sales hierarchy |
-| State management | Zustand | Lightweight; no Redux needed at this scale |
-| API client | axios + React Query | Forecast version polling; override submission |
- 
-**Key UI views:**
-1. **Actuals Dashboard** — Location × Month heatmap; SKU-level drill-down.
-2. **Forecast Run** — Trigger new forecast run; monitor Celery task progress via polling.
-3. **Consensus Override Grid** — AG Grid showing `ForecastVersion` lines; editable `override_qty` cells; save submits `ForecastOverride` records.
-4. **Version Comparison** — Two forecast versions side-by-side at any aggregate level.
-5. **Accuracy Report** — MAPE / Bias / WMAPE by product group / geography / sales node.
+
+The demand planning UI is **Django Templates + Tailwind + HTMX**, served under `/{client_id}/planning/` via the `mysite/demand_ui/` app — the same stack as Phase 1/2/3A. It is **not** a React SPA. Planners drive the workflow through server-rendered pages whose interactive parts (filters, run progress, outlier confirm/reject/revise/undo, bulk discard, overlap confirmations) are HTMX fragments returned as partials. A **DRF JSON API** (`mysite/api/demand/`) coexists for programmatic access (hierarchy trees, actuals queries, forecast version CRUD/run/approve) — see the endpoint table below.
+
+**Key UI views (`mysite/demand_ui/views.py`, templates under `templates/demand/`):**
+1. **Actuals Dashboard** — actuals list + aggregates, filter bar with an `exclude_outliers` toggle (net vs raw).
+2. **Actuals Upload** — HTMX form + polling upload status; overlap-with-CONFIRMED-adjustments guard requires explicit confirmation.
+3. **Outlier Queue** — filterable by CANDIDATE / CONFIRMED / REJECTED; confirm / reject / revise / undo per row; bulk discard of selected or all candidates; out-of-band update of the nav-badge candidate count.
+4. **Outlier Detection** — range-picker form (`_detection_form.html`) that triggers `run_outlier_detection` and shows the triggered result (`_detection_triggered.html`); decisions report view.
+5. **Forecast Run** — create a version, trigger run, poll `run_status` via HTMX partials.
+6. **Consensus Override Grid** — version lines grid with override value/qty/% editors, custom split weights, affected-lines preview, propagation status.
+7. **Version detail / accuracy** — lines, aggregates, accuracy by category/location/period/item, xlsx export.
+
 ### REST API Endpoints (Phase 3B, under `mysite/api/demand/`)
- 
+
 | Endpoint | Method | Notes |
 |----------|--------|-------|
+| `/location-hierarchy/` | GET | PlanningLocation tree for client |
+| `/sales-hierarchy/` | GET | SalesNode tree for client |
+| `/sales-forecast-links/` | GET, POST | List / create SalesForecastLink |
+| `/sales-forecast-links/{id}/` | GET, DELETE | Detail / delete link |
 | `/actuals/upload/` | POST | Multipart file upload; creates `ActualSaleImport` job |
 | `/actuals/upload/{id}/` | GET | Poll import job status |
-| `/actuals/` | GET | Filtered actuals query (item, customer, location, year, month range) |
-| `/forecast-versions/` | GET, POST | List versions; trigger new run |
+| `/actuals/` | GET | Filtered actuals query (item, planning_location, planning_customer, distribution_channel, period range) |
+| `/actuals/template/` | GET | Download upload template xlsx |
+| `/forecast-versions/` | GET, POST | List versions; create + trigger run |
 | `/forecast-versions/{id}/` | GET | Version detail + status |
 | `/forecast-versions/{id}/lines/` | GET | Leaf-level lines (paginated, filterable) |
 | `/forecast-versions/{id}/aggregates/` | GET | Roll-up data by agg_level |
 | `/forecast-versions/{id}/overrides/` | GET, POST | List / create overrides |
+| `/forecast-versions/{id}/overrides/{oid}/` | GET, DELETE | Override detail / delete |
+| `/forecast-versions/{id}/overrides/{oid}/affected-lines/` | GET | Which lines an override touched |
+| `/forecast-versions/{id}/overrides/{oid}/split-weights/` | GET, POST | Custom split weights |
+| `/forecast-versions/{id}/run/` | POST | Trigger forecast run |
+| `/forecast-versions/{id}/run-status/` | GET | Poll run progress |
 | `/forecast-versions/{id}/approve/` | POST | Transition status to APPROVED |
+| `/forecast-versions/{id}/export/` | GET | xlsx export |
 | `/forecast-versions/{id}/accuracy/` | GET | Accuracy metrics for version |
-| `/sales-hierarchy/` | GET | Full SalesNode tree for client |
-| `/location-hierarchy/` | GET | ClientLocation tree for client |
+| `/series-profiles/`, `/series-profiles/{id}/`, `/series-profiles/{id}/evaluations/` | GET | Series profile / evaluation read APIs |
+| `/forecasting-config/` | GET | ForecastingConfig (net-usage flags, thresholds, last detection run) |
 
-/api/demand/outliers/	GET	List candidates + confirmed/rejected, filterable by status, item, planning_location, planning_customer, distribution_channel, period range
-/api/demand/outliers/{id}/confirm/	POST	Planner confirms a candidate (or a self-raised exception); no downstream recompute needed beyond flag_stale_forecast_versions
-/api/demand/outliers/{id}/reject/	POST	Planner rejects a candidate
-/api/demand/actuals/{actual_sale_id}/outlier/	POST	Planner raises a new exception directly against a specific ActualSale row
+Outlier interactions (confirm / reject / revise / undo / bulk discard / detection trigger) are **HTMX-only** via `mysite/demand_ui/` routes (`outlier_queue`, `outlier_confirm`, `outlier_reject`, `outlier_revise`, `outlier_undo_decision`, `outlier_bulk_delete`, `outlier_detection_form`, `trigger_outlier_detection`, `outlier_decisions_report`) — there are no `/api/demand/outliers/` REST endpoints.
 
 ### Caching (Phase 3B additions)
- 
-| Cache key | Content | TTL | Invalidated by |
-|-----------|---------|-----|----------------|
-| `sales_hierarchy:{client_id}` | SalesNode tree | 1 hour | post_save on SalesNode |
-| `location_hierarchy:{client_id}` | ClientLocation tree | 1 hour | post_save on ClientLocation |
-| `forecast_aggregates:{version_id}:{agg_level}` | Pre-computed aggregates | Until version status changes | ForecastVersion status post_save |
- 
+
+The demand module reads directly from PostgreSQL — no dedicated cache keys are implemented. Hierarchy
+trees are resolved via the `MaterializedPathMixin` path columns (`path LIKE 'x/%'` subtree queries);
+aggregates are pre-computed `ForecastAggregate` rows rather than cached roll-ups. (A `sales_hierarchy`
+/ `location_hierarchy` / `forecast_aggregates` cache layer was considered in the plan but not built.)
+
 ### `ClientFeatureControl` Keys Added (Phase 3B)
- 
-`demand_planning`, `actuals_upload`, `forecast_run`, `consensus_override`, `forecast_approval`.
+
+`demand_planning`, `actuals_upload`, `outlier_management`, `forecast_run`, `consensus_override`, `forecast_approval`.
+
+`Client.allowed_distribution_channels` (JSONField, default NULL) sits alongside: `NULL` means a
+channel-less client whose every `ActualSale`/`ForecastLine` defaults to `'00'` (Common) — it does **not**
+mean "any channel allowed". The helpers `is_distribution_channel_enabled()` and
+`get_allowed_distribution_channel_codes()` on `Client` drive the drop-downs and the `'00'` default.
 
 ## Phase 3C — Inventory Decision Engine Stack
 
@@ -669,11 +693,11 @@ The demand planning UI is a **separate React SPA** served under `/{client_id}/pl
 | `duckdb` | already in 3B | Reused — in-process OLAP for propagation/netting joins over PostgreSQL tables |
 | `celery` / `redis` | already present | Reused — netting runs, recommendation generation, materialization jobs |
 
-**No new frontend framework.** Unlike Phase 3B's React SPA, the IDE frontend is **Django Templates +
-Tailwind + DaisyUI + HTMX** — same stack as Phase 1/2/3A. This is a deliberate divergence from 3B:
-planner workbenches are exception-review UIs (filtered tables, drill-down, approve/reject actions),
-which fit the server-rendered + HTMX pattern better than a data-grid SPA. If a future workbench needs
-AG-Grid-style bulk editing at scale, revisit per-workbench rather than defaulting the whole module to
+**No new frontend framework.** The IDE frontend is **Django Templates + Tailwind + DaisyUI + HTMX** —
+same stack as Phase 1/2/3A/3B. This is deliberate: planner workbenches are exception-review UIs
+(filtered tables, drill-down, approve/reject actions), which fit the server-rendered + HTMX pattern
+better than a data-grid SPA. If a future workbench needs AG-Grid-style bulk editing at scale, revisit
+per-workbench rather than defaulting the whole module to
 SPA.
 
 ---
@@ -934,8 +958,8 @@ CREATE INDEX ix_resolvedvendorscheme_item_vendor
 | `/recommendations/` | GET | Filtered `ReplenishmentRecommendation` queue for a workbench |
 | `/recommendations/{id}/decide/` | POST | Records `PlannerDecision` (approve/reject/modify) |
 
-Authentication: DRF Session Auth, consistent with server-rendered HTMX frontend (no separate SPA auth
-concern here, unlike Phase 3B's React SPA).
+Authentication: DRF Session Auth, consistent with the server-rendered HTMX frontend (no separate SPA auth
+concern, as in Phase 3B).
 
 ---
 
