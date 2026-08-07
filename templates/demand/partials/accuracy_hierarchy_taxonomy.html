@@ -1,0 +1,82 @@
+{% load i18n %}
+<div class="overflow-x-auto">
+  <div class="flex items-center gap-2 text-sm mb-2 flex-wrap">
+    <span class="font-medium">{% trans "Taxonomy" %}</span>
+    {% for crumb in breadcrumb %}
+      <span>/</span>
+      {% if forloop.last %}
+        <span class="font-semibold">{{ crumb.label }}</span>
+      {% else %}
+        <a class="link link-hover"
+           hx-get="{% url 'demand_ui:accuracy_hierarchy_taxonomy' client_id=client.client_id pk=version.pk %}?node_path={{ crumb.node_path }}"
+           hx-target="#accuracy-hierarchy-taxonomy-container" hx-swap="innerHTML">
+          {{ crumb.label }}
+        </a>
+      {% endif %}
+    {% endfor %}
+    {% if node_path %}
+      <a class="link link-hover text-xs"
+         hx-get="{% url 'demand_ui:accuracy_hierarchy_taxonomy' client_id=client.client_id pk=version.pk %}"
+         hx-target="#accuracy-hierarchy-taxonomy-container" hx-swap="innerHTML">
+        ({% trans "top" %})
+      </a>
+    {% endif %}
+  </div>
+
+  {% if rows %}
+  <table class="table table-zebra table-sm">
+    <thead>
+      <tr>
+        <th>{% trans "Name" %}</th>
+        <th class="text-right">{% trans "Rows" %}</th>
+        <th class="text-right">{% trans "Actual" %}</th>
+        <th class="text-right">{% trans "Forecast" %}</th>
+        <th class="text-right">{% trans "WMAPE %" %}</th>
+        <th class="text-right">{% trans "Bias %" %}</th>
+        <th class="text-right">{% trans "Value MAPE %" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="hover">
+        <td>
+          {% if row.type == 'taxon' %}
+            {% if row.has_children %}
+            <a class="link link-hover font-medium"
+               hx-get="{% url 'demand_ui:accuracy_hierarchy_taxonomy' client_id=client.client_id pk=version.pk %}?node_path={{ row.node_path }}"
+               hx-target="#accuracy-hierarchy-taxonomy-container" hx-swap="innerHTML">
+              {{ row.label }} →
+            </a>
+            {% else %}
+            <a class="link link-hover"
+               hx-get="{% url 'demand_ui:accuracy_hierarchy_taxonomy' client_id=client.client_id pk=version.pk %}?node_path={{ row.node_path }}&items=1"
+               hx-target="#accuracy-hierarchy-taxonomy-container" hx-swap="innerHTML">
+              {{ row.label }} ({% trans "items" %})
+            </a>
+            {% endif %}
+          {% else %}
+            <span class="font-mono text-xs">{{ row.label }}</span>
+          {% endif %}
+        </td>
+        <td class="text-right">{{ row.graded_count|default:0 }}</td>
+        <td class="text-right">{{ row.sum_actual|default:"—" }}</td>
+        <td class="text-right">{{ row.sum_forecast|default:"—" }}</td>
+        <td class="text-right">
+          {% if row.wmape is not None %}
+          <span class="{% if row.wmape > 50 %}text-error{% elif row.wmape > 25 %}text-warning{% else %}text-success{% endif %}">
+            {{ row.wmape }}%
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="text-right">{% if row.wbias is not None %}{{ row.wbias }}%{% else %}—{% endif %}</td>
+        <td class="text-right">{% if row.value_mape is not None %}{{ row.value_mape }}%{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-sm text-base-content/40 py-6 text-center">
+    {% trans "No accuracy data under this taxonomy branch." %}
+  </p>
+  {% endif %}
+</div>

@@ -2104,13 +2104,17 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
         'location'  — grouped by PlanningLocation.code
         'period'    — grouped by period_start (time series of accuracy)
         'item'      — per-item MAPE/Bias (for detailed drilldown)
+
+    Every group (and the overall row) also carries weighted metrics
+    (wmape/wbias/value_mape/value_bias) computed numerator-first, which are
+    the numbers to report on. mean_mape/mean_bias remain for back-compat.
     """
 
     def get(self, request, pk):
         import datetime
-        import duckdb
         import pandas as pd
         from mysite.models.demand.forecast import ForecastAccuracy
+        from utils.demand.accuracy_report import compute_metrics
 
         version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
 
@@ -2149,6 +2153,8 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
                 'period_start',
                 'actual_qty',
                 'forecast_qty',
+                'actual_value',
+                'forecast_value',
                 'mape',
                 'bias',
             )
@@ -2170,77 +2176,68 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
                 pass
 
         df = pd.DataFrame(list(qs))
-        # Rename columns for DuckDB readability
         df.columns = [c.replace('__', '_') for c in df.columns]
-        # Ensure numeric types
-        for col in ('mape', 'bias', 'actual_qty', 'forecast_qty'):
+        for col in ('mape', 'bias', 'actual_qty', 'forecast_qty',
+                    'actual_value', 'forecast_value'):
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-        con = duckdb.connect()
-        con.register('acc', df)
-
-        # ── Group-by SQL ──────────────────────────────────────────────────────
-        group_col_map = {
-            'category': 'item_item_id, item_name',     # group by both# no category field — group by item instead
-            'location': 'planning_location_code',
-            'period':   'period_start',
-            'item':     'item_item_id, item_name',     # group by both
+        group_cols_map = {
+            'category': ['item_item_id', 'item_name'],
+            'location': ['planning_location_code'],
+            'period':   ['period_start'],
+            'item':     ['item_item_id', 'item_name'],
         }
-        group_col = group_col_map[group_by]
+        group_cols = group_cols_map[group_by]
 
-        group_label_map = {
-            'category': "item_item_id || ' — ' || item_name AS group_key",
-            'location': 'planning_location_code AS group_key',
-            'period':   "CAST(period_start AS VARCHAR) AS group_key",
-            'item':     "item_item_id || ' — ' || item_name AS group_key",
-        }
-        group_label = group_label_map[group_by]
+        def _group_label(row):
+            if group_by == 'location':
+                return str(row['planning_location_code'])
+            if group_by == 'period':
+                return str(row['period_start'])
+            return f"{row['item_item_id']} — {row['item_name']}"
 
-        grouped = con.execute(f"""
-            SELECT
-                {group_label},
-                AVG(mape)              AS mean_mape,
-                AVG(bias)              AS mean_bias,
-                MIN(mape)              AS min_mape,
-                MAX(mape)              AS max_mape,
-                COUNT(*)               AS record_count,
-                -- % of periods that are over-forecast (bias > 0)
-                100.0 * SUM(CASE WHEN bias > 0 THEN 1 ELSE 0 END)
-                    / NULLIF(COUNT(*), 0) AS over_forecast_pct
-            FROM acc
-            WHERE mape IS NOT NULL
-            GROUP BY {group_col}
-            ORDER BY mean_mape ASC NULLS LAST
-        """).df()
-
-        overall = con.execute("""
-            SELECT
-                AVG(mape)  AS mean_mape,
-                AVG(bias)  AS mean_bias,
-                COUNT(*)   AS record_count
-            FROM acc
-            WHERE mape IS NOT NULL
-        """).fetchone()
-
-        con.close()
-
-        def _fmt(val):
-            if val is None or pd.isna(val):
-                return None
-            return f'{float(val):.2f}'
-
-        results = [
-            {
-                'group_key':         row['group_key'],
-                'mean_mape':         _fmt(row['mean_mape']),
-                'mean_bias':         _fmt(row['mean_bias']),
-                'min_mape':          _fmt(row['min_mape']),
-                'max_mape':          _fmt(row['max_mape']),
-                'record_count':      int(row['record_count']),
-                'over_forecast_pct': _fmt(row['over_forecast_pct']),
+        def _mean_metrics(sub):
+            mapes = sub['mape'].dropna()
+            biases = sub['bias'].dropna()
+            return {
+                'mean_mape': round(float(mapes.mean()), 2) if len(mapes) else None,
+                'mean_bias': round(float(biases.mean()), 2) if len(biases) else None,
+                'min_mape':  round(float(mapes.min()), 2) if len(mapes) else None,
+                'max_mape':  round(float(mapes.max()), 2) if len(mapes) else None,
             }
-            for _, row in grouped.iterrows()
-        ]
+
+        def _fmt(v):
+            if v is None or pd.isna(v):
+                return None
+            return f'{float(v):.2f}'
+
+        results = []
+        if not df.empty:
+            for _, group in df.groupby(group_cols, dropna=False):
+                weighted = compute_metrics(group)
+                results.append({
+                    'group_key':     _group_label(group.iloc[0]),
+                    'record_count':  weighted['record_count'],
+                    'graded_count':  weighted['graded_count'],
+                    'mean_mape':     _fmt(_mean_metrics(group)['mean_mape']),
+                    'mean_bias':     _fmt(_mean_metrics(group)['mean_bias']),
+                    'min_mape':      _fmt(_mean_metrics(group)['min_mape']),
+                    'max_mape':      _fmt(_mean_metrics(group)['max_mape']),
+                    'over_forecast_pct': _fmt(weighted['over_forecast_pct']),
+                    'sum_actual':    _fmt(weighted['sum_actual']),
+                    'sum_forecast':  _fmt(weighted['sum_forecast']),
+                    'wmape':         _fmt(weighted['wmape']),
+                    'wbias':         _fmt(weighted['wbias']),
+                    'value_count':   weighted['value_count'],
+                    'sum_value_actual':   _fmt(weighted['sum_value_actual']),
+                    'sum_value_forecast': _fmt(weighted['sum_value_forecast']),
+                    'value_mape':    _fmt(weighted['value_mape']),
+                    'value_bias':    _fmt(weighted['value_bias']),
+                })
+            results.sort(key=lambda r: (r['wmape'] is None, r['wmape'] or 0))
+
+        overall = compute_metrics(df)
+        mean_overall = _mean_metrics(df)
 
         return Response({
             'version_id':    version.pk,
@@ -2248,9 +2245,103 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
             'group_by':      group_by,
             'count':         len(results),
             'overall': {
-                'mean_mape':    _fmt(overall[0]) if overall else None,
-                'mean_bias':    _fmt(overall[1]) if overall else None,
-                'record_count': int(overall[2])  if overall else 0,
+                'record_count':  overall['record_count'],
+                'graded_count':  overall['graded_count'],
+                'mean_mape':     _fmt(mean_overall['mean_mape']),
+                'mean_bias':     _fmt(mean_overall['mean_bias']),
+                'over_forecast_pct': _fmt(overall['over_forecast_pct']),
+                'sum_actual':    _fmt(overall['sum_actual']),
+                'sum_forecast':  _fmt(overall['sum_forecast']),
+                'wmape':         _fmt(overall['wmape']),
+                'wbias':         _fmt(overall['wbias']),
+                'value_count':   overall['value_count'],
+                'sum_value_actual':   _fmt(overall['sum_value_actual']),
+                'sum_value_forecast': _fmt(overall['sum_value_forecast']),
+                'value_mape':    _fmt(overall['value_mape']),
+                'value_bias':    _fmt(overall['value_bias']),
             },
             'results': results,
+        })
+
+class ForecastVersionAccuracyHierarchyLocationsView(DemandFeatureMixin, APIView):
+    """
+    GET /api/demand/forecast-versions/{id}/accuracy/hierarchy/locations/
+
+    Weighted accuracy drill down the PlanningLocation tree.
+    Query params:
+        location_id  — drill into a location's children (absent = top level).
+        items        — "1" to show item-level rows at the given location.
+    """
+
+    def get(self, request, pk):
+        from mysite.models.demand.forecast import ForecastVersion
+        from utils.demand.accuracy_report import location_children, location_items
+
+        version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+        location_id = request.query_params.get('location_id')
+        show_items = request.query_params.get('items') in ('1', 'true', 'True')
+
+        try:
+            if location_id is not None:
+                location_id = int(location_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'location_id must be an integer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if show_items and location_id is not None:
+            rows, current, breadcrumb = location_items(version, location_id)
+            level = 'items'
+        else:
+            rows, current, breadcrumb = location_children(version, location_id)
+            level = 'locations'
+
+        return Response({
+            'version_id':    version.pk,
+            'version_label': version.version_label,
+            'level':         level,
+            'current':       {'location_id': current.pk,
+                              'label': current.name or current.code} if current else None,
+            'breadcrumb':    breadcrumb,
+            'count':         len(rows),
+            'results':       rows,
+        })
+
+
+class ForecastVersionAccuracyHierarchyTaxonomyView(DemandFeatureMixin, APIView):
+    """
+    GET /api/demand/forecast-versions/{id}/accuracy/hierarchy/taxonomy/
+
+    Weighted accuracy drill down the product Taxonomy tree (Segment →
+    Family → Class → Brick → items). Driven by the materialized paths of
+    items' primary taxonomy nodes, so empty levels are skipped.
+    Query params:
+        node_path  — materialized path to drill into (absent = top level).
+        items      — "1" to show item-level rows under the given node.
+    """
+
+    def get(self, request, pk):
+        from mysite.models.demand.forecast import ForecastVersion
+        from utils.demand.accuracy_report import taxonomy_children, taxonomy_items
+
+        version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+        node_path = request.query_params.get('node_path') or None
+        show_items = request.query_params.get('items') in ('1', 'true', 'True')
+
+        if show_items and node_path:
+            rows, breadcrumb = taxonomy_items(version, node_path)
+            level = 'items'
+        else:
+            rows, current_path, breadcrumb = taxonomy_children(version, node_path)
+            level = 'taxonomy'
+
+        return Response({
+            'version_id':    version.pk,
+            'version_label': version.version_label,
+            'level':         level,
+            'current_path':  node_path,
+            'breadcrumb':    breadcrumb,
+            'count':         len(rows),
+            'results':       rows,
         })

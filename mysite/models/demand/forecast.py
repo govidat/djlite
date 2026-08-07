@@ -5,12 +5,14 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models import Max
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 
 from mysite.models.demand.actuals import (
     PERIOD_TYPE_CHOICES,
+    ActualSale,
     compute_period_end,
     validate_period_start,
 )
@@ -337,6 +339,72 @@ class ForecastVersion(models.Model):
         blank=True,
         help_text=_('Traceback if run_status=FAILED.'),
     )    
+    # ── Accuracy run tracking ────────────────────────────────────────────────
+    # Set by compute_accuracy (manual trigger in the version list / nightly).
+    # FAILED runs never update last_accuracy_run_at, so they are retry-able.
+    class AccuracyRunStatus(models.TextChoices):
+        NONE     = '',        _('Not started')
+        QUEUED   = 'QUEUED',   _('Queued')
+        RUNNING  = 'RUNNING',  _('Running')
+        COMPLETE = 'COMPLETE', _('Complete')
+        FAILED   = 'FAILED',   _('Failed')
+
+    accuracy_run_status = models.CharField(
+        _('accuracy run status'),
+        max_length=16,
+        blank=True,
+        default='',
+        choices=AccuracyRunStatus.choices,
+        help_text=_(
+            'Progress of the compute_accuracy task for this version. '
+            'FAILED runs do not advance last_accuracy_run_at and can be retried.'
+        ),
+    )
+    accuracy_run_error = models.TextField(
+        _('accuracy run error'),
+        blank=True,
+        help_text=_('Traceback if accuracy_run_status=FAILED.'),
+    )
+    last_accuracy_run_at = models.DateTimeField(
+        _('last accuracy run at'),
+        null=True, blank=True,
+        help_text=_(
+            'Set on success only. Accuracy is stale when actuals or confirmed '
+            'outlier adjustments changed after this timestamp.'
+        ),
+    )
+    last_accuracy_rows = models.PositiveIntegerField(
+        _('last accuracy rows'),
+        null=True, blank=True,
+        help_text=_('Number of ForecastAccuracy rows written by the last run.'),
+    )
+    last_accuracy_wmape = models.DecimalField(
+        _('last accuracy WMAPE'),
+        max_digits=8, decimal_places=2,
+        null=True, blank=True,
+        help_text=_(
+            'Qty-weighted MAPE (Σ|forecast−actual| / Σactual × 100) at the '
+            'last run. Null when no actual > 0.'
+        ),
+    )
+    last_accuracy_wbias = models.DecimalField(
+        _('last accuracy weighted bias'),
+        max_digits=8, decimal_places=2,
+        null=True, blank=True,
+        help_text=_(
+            'Weighted bias (Σ(forecast−actual) / Σactual × 100) at the last '
+            'run. Positive = over-forecast.'
+        ),
+    )
+    last_accuracy_value_mape = models.DecimalField(
+        _('last accuracy value MAPE'),
+        max_digits=8, decimal_places=2,
+        null=True, blank=True,
+        help_text=_(
+            'Value-weighted MAPE (Σ|forecast_value−actual_value| / '
+            'Σactual_value × 100) at the last run. Null when no value data.'
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -462,6 +530,106 @@ class ForecastVersion(models.Model):
         ForecastLine.objects.bulk_create(cloned_lines, batch_size=500)
 
         return new_version
+
+    # ── Accuracy enablement helpers ───────────────────────────────────────────
+
+    def forecast_period_starts(self) -> list:
+        """
+        Distinct period_start values covered by this version's forecast lines.
+        """
+        return list(
+            self.lines.values_list('period_start', flat=True).distinct()
+        )
+
+    def has_actuals_for_forecast_periods(self) -> bool:
+        """
+        True when every forecast period has at least one ActualSale row.
+        """
+        periods = self.forecast_period_starts()
+        if not periods:
+            return False
+        covered = set(
+            ActualSale.objects
+            .filter(
+                client=self.client,
+                period_type=self.period_type,
+                period_start__in=periods,
+            )
+            .values_list('period_start', flat=True)
+            .distinct()
+        )
+        return set(periods) <= covered
+
+    def actuals_modified_at(self):
+        """
+        Latest modification signal across the actuals (and their confirmed
+        outlier adjustments) covered by this version's forecast periods.
+
+        Returns a datetime, or None when there are no actuals at all. Rows
+        whose updated_at is null (e.g. imported before the column existed)
+        count as epoch, so a fresh accuracy run is always offered.
+        """
+        from datetime import datetime, timezone as dt_timezone
+        from django.db.models.functions import Coalesce
+        from mysite.models.demand.actuals import ActualSaleOutlierAdjustment
+
+        periods = self.forecast_period_starts()
+        if not periods:
+            return None
+
+        epoch = datetime(1970, 1, 1, tzinfo=dt_timezone.utc)
+        actuals = (
+            ActualSale.objects
+            .filter(
+                client=self.client,
+                period_type=self.period_type,
+                period_start__in=periods,
+            )
+            .annotate(ts=Coalesce('updated_at', epoch))
+            .aggregate(max_ts=Max('ts'))['max_ts']
+        )
+        adj = (
+            ActualSaleOutlierAdjustment.objects
+            .filter(
+                actual_sale__client=self.client,
+                actual_sale__period_type=self.period_type,
+                actual_sale__period_start__in=periods,
+            )
+            .aggregate(max_ts=Max('updated_at'))['max_ts']
+        )
+
+        candidates = [ts for ts in (actuals, adj) if ts is not None]
+        return max(candidates) if candidates else None
+
+    def accuracy_button_enabled(self, role) -> bool:
+        """Server-side version of the "Run Accuracy" enable rule."""
+        return self.accuracy_button_state(role)[0]
+
+    def accuracy_button_state(self, role):
+        """
+        Returns (enabled: bool, reason: str) for the manual accuracy trigger.
+
+        Rule: role ∈ {admin, planner} AND status ∈ {APPROVED, LOCKED} AND
+        actuals available AND (never run OR actuals modified since last run).
+        """
+        if role not in ('admin', 'planner'):
+            return (False, 'Viewer role cannot trigger accuracy runs.')
+        if self.status not in (
+            ForecastVersion.Status.APPROVED,
+            ForecastVersion.Status.LOCKED,
+        ):
+            return (False, 'Only APPROVED or LOCKED versions can be graded.')
+        if not self.has_actuals_for_forecast_periods():
+            return (
+                False,
+                'Actuals have not landed for every forecast period yet.',
+            )
+        if self.last_accuracy_run_at is None:
+            return (True, '')
+        modified = self.actuals_modified_at()
+        if modified is not None and modified > self.last_accuracy_run_at:
+            return (True, '')
+        return (False, 'Accuracy is up to date with the actuals.')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1151,6 +1319,23 @@ class ForecastAccuracy(models.Model):
     forecast_qty = models.DecimalField(
         _('forecast qty'), max_digits=14, decimal_places=3,
         help_text=_('final_qty from ForecastLine at time of accuracy computation.'),
+    )
+    actual_value = models.DecimalField(
+        _('actual value'), max_digits=18, decimal_places=2,
+        null=True, blank=True,
+        help_text=_(
+            'Value basis for weighted (value) roll-ups. Net revenue when '
+            'maintained; else net_qty × price (ForecastLine.price_used, '
+            'falling back to ItemPlanningProfile.standard_price).'
+        ),
+    )
+    forecast_value = models.DecimalField(
+        _('forecast value'), max_digits=18, decimal_places=2,
+        null=True, blank=True,
+        help_text=_(
+            'final_value from ForecastLine when priced; else final_qty × '
+            'price (same price chain as actual_value).'
+        ),
     )
     mape = models.DecimalField(
         _('MAPE (%)'), max_digits=8, decimal_places=4,

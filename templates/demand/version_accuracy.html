@@ -7,26 +7,79 @@
         <h2 class="text-xl font-bold">{% trans "Forecast Accuracy" %}</h2>
         <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
     </div>
-    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
-       class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
+    <div class="flex items-center gap-2">
+        <div>
+            {% include "demand/partials/accuracy_run_status.html" %}
+        </div>
+        <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+           class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
+    </div>
 </div>
 
-{% if avg_mape is not None %}
+{% if weighted.wmape is not None or avg_mape is not None %}
 <div class="stats shadow mb-6">
     <div class="stat">
+        <div class="stat-title">{% trans "Weighted MAPE (WMAPE)" %}</div>
+        <div class="stat-value text-2xl">
+            {% if weighted.wmape is not None %}{{ weighted.wmape }}%{% else %}—{% endif %}
+        </div>
+        <div class="stat-desc">
+            {% if weighted.graded_count is not None %}{{ weighted.graded_count }}{% else %}0{% endif %}
+            {% trans "series" %} · {% trans "actual" %} {{ weighted.sum_actual|default:"0" }}
+        </div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">{% trans "Weighted Bias" %}</div>
+        <div class="stat-value text-2xl">
+            {% if weighted.wbias is not None %}{{ weighted.wbias }}%{% else %}—{% endif %}
+        </div>
+        <div class="stat-desc">
+            {% if weighted.over_forecast_pct is not None %}{{ weighted.over_forecast_pct }}%{% else %}—{% endif %}
+            {% trans "over-forecast" %}
+        </div>
+    </div>
+    <div class="stat">
+        <div class="stat-title">{% trans "Value MAPE" %}</div>
+        <div class="stat-value text-2xl">
+            {% if weighted.value_mape is not None %}{{ weighted.value_mape }}%{% else %}—{% endif %}
+        </div>
+        <div class="stat-desc">
+            {% if weighted.value_count is not None %}{{ weighted.value_count }}{% else %}0{% endif %}
+            {% trans "value series" %}
+        </div>
+    </div>
+    <div class="stat">
         <div class="stat-title">{% trans "Avg MAPE" %}</div>
-        <div class="stat-value text-2xl">{{ avg_mape|floatformat:1 }}%</div>
-    </div>
-    <div class="stat">
-        <div class="stat-title">{% trans "Avg Bias" %}</div>
-        <div class="stat-value text-2xl">{{ avg_bias|floatformat:1 }}%</div>
-    </div>
-    <div class="stat">
-        <div class="stat-title">{% trans "Series evaluated" %}</div>
-        <div class="stat-value text-2xl">{{ total_rows }}</div>
+        <div class="stat-value text-2xl">
+            {% if avg_mape is not None %}{{ avg_mape|floatformat:1 }}%{% else %}—{% endif %}
+        </div>
+        <div class="stat-desc">{% trans "unweighted per-row" %}</div>
     </div>
 </div>
 {% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="card bg-base-200">
+        <div class="card-body">
+            <h3 class="card-title text-base">{% trans "Location drill-down" %}</h3>
+            <div id="accuracy-hierarchy-locations-container">
+                {% with rows=drill_location_rows current=None breadcrumb=location_breadcrumb %}
+                {% include "demand/partials/accuracy_hierarchy_locations.html" %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+    <div class="card bg-base-200">
+        <div class="card-body">
+            <h3 class="card-title text-base">{% trans "Taxonomy drill-down" %}</h3>
+            <div id="accuracy-hierarchy-taxonomy-container">
+                {% with rows=drill_taxonomy_rows node_path=None breadcrumb=taxonomy_breadcrumb %}
+                {% include "demand/partials/accuracy_hierarchy_taxonomy.html" %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+</div>
 
 <div id="accuracy-table-container">
     {% include "demand/partials/accuracy_table_body.html" %}

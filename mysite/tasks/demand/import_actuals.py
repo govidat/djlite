@@ -35,6 +35,7 @@ from decimal import Decimal, InvalidOperation
 import pandas as pd
 from celery import shared_task
 from django.db import transaction
+from django.utils import timezone
 
 from mysite.models.demand.actuals import (
     ActualSale, ActualSaleImport,
@@ -273,6 +274,7 @@ def _run_import(job: ActualSaleImport):
                 qty                  = qty,
                 revenue              = revenue,
                 import_batch         = job,
+                updated_at           = timezone.now(),
             )
         )
 
@@ -280,7 +282,7 @@ def _run_import(job: ActualSaleImport):
     # update_conflicts=True makes this idempotent:
     # re-uploading the same file updates qty/revenue rather than failing
     # on the unique_together constraint.
-    update_fields = ['qty', 'revenue', 'distribution_channel', 'import_batch']
+    update_fields = ['qty', 'revenue', 'distribution_channel', 'import_batch', 'updated_at']
     unique_fields = [
         'client', 'planning_location', 'distribution_channel',
         'item', 'planning_customer', 'period_type', 'period_start',

@@ -64,7 +64,7 @@ import calendar
 from django.db.models import Min, Max, Count
 from celery import chain
 from mysite.tasks.demand.compute_series_profiles import compute_series_profiles
-from mysite.tasks.demand.run_forecast import run_forecast
+from mysite.tasks.demand.run_forecast import run_forecast, compute_accuracy
 
 #from decimal import Decimal
 from django.db.models import Sum, Count, DecimalField
@@ -126,6 +126,23 @@ def _feature_gate(request, feature: str):
 def _client_url_kwargs(request) -> dict:
     return {'client_id': request.client.client_id}
 """
+
+
+def _demand_ui_role(request) -> str | None:
+    """
+    Server-side mirror of the demand_ui_role context processor: 'admin' |
+    'planner' | None. Used to gate the manual accuracy trigger.
+    """
+    if not request.user.is_authenticated:
+        return None
+    if request.user.is_superuser:
+        return 'admin'
+    groups = set(request.user.groups.values_list('name', flat=True))
+    if 'demand_client_admin' in groups:
+        return 'admin'
+    if 'demand_client_planner' in groups:
+        return 'planner'
+    return None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dashboard
@@ -201,8 +218,13 @@ def version_list(request, client_id=None):
     if status_filter:
         qs = qs.filter(status=status_filter)
 
+    role = _demand_ui_role(request)
+    versions = list(qs)
+    for v in versions:
+        v.can_run_accuracy, v.accuracy_button_reason = v.accuracy_button_state(role)
+
     context = {
-        'versions': qs,
+        'versions': versions,
         'status_filter': status_filter,
         'status_choices': ForecastVersion.Status.choices,
         'active_nav': 'versions',
@@ -1362,6 +1384,9 @@ def version_accuracy(request, pk, client_id=None):
         return blocked
 
     from mysite.models.demand.forecast import ForecastAccuracy
+    from utils.demand.accuracy_report import (
+        compute_metrics, location_children, taxonomy_children,
+    )
 
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
     qs = (
@@ -1377,26 +1402,198 @@ def version_accuracy(request, pk, client_id=None):
     else:
         show_channel = False
 
-    avg_mape = None
-    avg_bias = None
     rows = list(qs)
     mapes = [float(r.mape) for r in rows if r.mape is not None]
     biases = [float(r.bias) for r in rows if r.bias is not None]
-    if mapes:
-        avg_mape = sum(mapes) / len(mapes)
-    if biases:
-        avg_bias = sum(biases) / len(biases)
+    avg_mape = (sum(mapes) / len(mapes)) if mapes else None
+    avg_bias = (sum(biases) / len(biases)) if biases else None
+
+    # Weighted metrics from the leaf rows (single DB pass).
+    import pandas as pd
+    df = pd.DataFrame(list(ForecastAccuracy.objects.filter(version=version).values(
+        'actual_qty', 'forecast_qty', 'actual_value', 'forecast_value',
+    )))
+    weighted = compute_metrics(df)
+
+    drill_location_rows, _, location_breadcrumb = location_children(version)
+    drill_taxonomy_rows, _, taxonomy_breadcrumb = taxonomy_children(version)
+
+    role = _demand_ui_role(request)
 
     context = {
         'version': version, 'accuracy_rows': rows[:200],
         'avg_mape': avg_mape, 'avg_bias': avg_bias,
+        'weighted': weighted,
+        'drill_location_rows': drill_location_rows,
+        'drill_taxonomy_rows': drill_taxonomy_rows,
+        'location_breadcrumb': location_breadcrumb,
+        'taxonomy_breadcrumb': taxonomy_breadcrumb,
         'total_rows': len(rows),
         'show_channel': show_channel,
+        'can_run_accuracy': version.accuracy_button_enabled(role),
+        'accuracy_run_active': version.accuracy_run_status in (
+            ForecastVersion.AccuracyRunStatus.QUEUED,
+            ForecastVersion.AccuracyRunStatus.RUNNING,
+        ),
         'active_nav': 'versions',
     }
     if _is_htmx(request):
         return render(request, 'demand/partials/accuracy_table_body.html', context)
     return render(request, 'demand/version_accuracy.html', context)
+
+
+@login_required
+@require_http_methods(['POST'])
+def version_accuracy_run(request, pk, client_id=None):
+    """
+    POST /{client_id}/demand/versions/{id}/accuracy/run/
+
+    Triggers compute_accuracy for this single version via Celery.
+    Enforce the same enable rule server-side (role + status + actuals).
+    Returns the accuracy-run-status partial, which polls itself via HTMX.
+    """
+    blocked = feature_gate(request, 'demand_planning')
+    if blocked:
+        return blocked
+
+    role = _demand_ui_role(request)
+
+    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+
+    if not version.accuracy_button_enabled(role):
+        messages.error(request, 'Accuracy run not permitted for this version.')
+        return render(
+            request, 'demand/partials/accuracy_run_status.html',
+            {'version': version},
+        )
+
+    if version.accuracy_run_status in (
+        ForecastVersion.AccuracyRunStatus.QUEUED,
+        ForecastVersion.AccuracyRunStatus.RUNNING,
+    ):
+        messages.warning(request, 'An accuracy run is already in progress.')
+        return render(
+            request, 'demand/partials/accuracy_run_status.html',
+            {'version': version},
+        )
+
+    try:
+        async_result = compute_accuracy.delay(version.client.pk, version.pk)
+        task_id = async_result.id
+    except Exception:
+        logger.exception(
+            'version_accuracy_run: apply_async failed for version pk=%s '
+            '(Celery may be down).', pk,
+        )
+        task_id = ''
+
+    ForecastVersion.objects.filter(pk=pk).update(
+        accuracy_run_status='QUEUED',
+        accuracy_run_error='',
+        celery_task_id=task_id or '',
+    )
+    version.refresh_from_db()
+
+    return render(
+        request, 'demand/partials/accuracy_run_status.html',
+        {
+            'version': version,
+            'can_run_accuracy': version.accuracy_button_enabled(role),
+        },
+    )
+
+
+@login_required
+def version_accuracy_run_status(request, pk, client_id=None):
+    """
+    GET /{client_id}/demand/versions/{id}/accuracy/run-status/
+
+    Polled by HTMX while an accuracy run is in progress. Returns the same
+    partial; the partial stops polling once COMPLETE or FAILED.
+    """
+    role = _demand_ui_role(request)
+    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+    return render(
+        request, 'demand/partials/accuracy_run_status.html',
+        {
+            'version': version,
+            'can_run_accuracy': version.accuracy_button_enabled(role),
+        },
+    )
+
+
+@login_required
+def accuracy_hierarchy_locations(request, pk, client_id=None):
+    """
+    GET /{client_id}/demand/versions/{id}/accuracy/hierarchy-locations/
+    Query params: location_id (drill into a location), items=1 (item rows).
+    HTMX partial: swaps itself into #accuracy-hierarchy-locations-container.
+    """
+    blocked = feature_gate(request, 'demand_planning')
+    if blocked:
+        return blocked
+
+    from utils.demand.accuracy_report import location_children, location_items
+
+    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+
+    location_id = request.GET.get('location_id')
+    try:
+        location_id = int(location_id) if location_id else None
+    except (TypeError, ValueError):
+        location_id = None
+    items = request.GET.get('items') in ('1', 'true', 'True')
+
+    if items and location_id:
+        rows, current, breadcrumb = location_items(version, location_id)
+    else:
+        rows, current, breadcrumb = location_children(version, location_id)
+
+    return render(
+        request, 'demand/partials/accuracy_hierarchy_locations.html',
+        {
+            'version': version,
+            'rows': rows,
+            'current': current,
+            'breadcrumb': breadcrumb,
+            'items': items,
+        },
+    )
+
+
+@login_required
+def accuracy_hierarchy_taxonomy(request, pk, client_id=None):
+    """
+    GET /{client_id}/demand/versions/{id}/accuracy/hierarchy-taxonomy/
+    Query params: node_path (materialized path to drill into), items=1.
+    HTMX partial: swaps itself into #accuracy-hierarchy-taxonomy-container.
+    """
+    blocked = feature_gate(request, 'demand_planning')
+    if blocked:
+        return blocked
+
+    from utils.demand.accuracy_report import taxonomy_children, taxonomy_items
+
+    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+
+    node_path = request.GET.get('node_path') or None
+    items = request.GET.get('items') in ('1', 'true', 'True')
+
+    if items and node_path:
+        rows, breadcrumb = taxonomy_items(version, node_path)
+    else:
+        rows, _, breadcrumb = taxonomy_children(version, node_path)
+
+    return render(
+        request, 'demand/partials/accuracy_hierarchy_taxonomy.html',
+        {
+            'version': version,
+            'rows': rows,
+            'node_path': node_path,
+            'breadcrumb': breadcrumb,
+            'items': items,
+        },
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

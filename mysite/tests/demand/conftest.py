@@ -183,6 +183,13 @@ def api_client(db, planner_user, client_obj, settings):
 
     _client_obj = client_obj
 
+    # Grant the planner a staff profile so DRF IsClientMember passes.
+    from mysite.models import ClientUserProfile
+    ClientUserProfile.objects.get_or_create(
+        user=planner_user,
+        defaults={'client': client_obj},
+    )
+
     # Patch get_object_or_404 at module level (covers direct calls in views)
     def _patched_404(klass, *args, **kwargs):
         if 'client' in kwargs and kwargs['client'] is None:

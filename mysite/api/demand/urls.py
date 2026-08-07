@@ -146,5 +146,15 @@ urlpatterns = [
         views.ForecastVersionAccuracyView.as_view(),
         name='demand-forecast-version-accuracy',
     ),
+    path(
+        'forecast-versions/<int:pk>/accuracy/hierarchy/locations/',
+        views.ForecastVersionAccuracyHierarchyLocationsView.as_view(),
+        name='demand-forecast-version-accuracy-hierarchy-locations',
+    ),
+    path(
+        'forecast-versions/<int:pk>/accuracy/hierarchy/taxonomy/',
+        views.ForecastVersionAccuracyHierarchyTaxonomyView.as_view(),
+        name='demand-forecast-version-accuracy-hierarchy-taxonomy',
+    ),
 
 ]

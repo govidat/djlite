@@ -26,6 +26,35 @@
       <span class="text-base-content/40 text-sm">—</span>
     {% endif %}
   </td>
+  <td>
+    <div id="accuracy-cell-{{ version.pk }}" class="flex flex-wrap items-center gap-2">
+      {% if version.accuracy_run_status == 'QUEUED' or version.accuracy_run_status == 'RUNNING' %}
+        {% include "demand/partials/accuracy_run_status.html" with can_run_accuracy=version.can_run_accuracy %}
+      {% elif version.accuracy_run_status == 'COMPLETE' %}
+        <span class="badge badge-success badge-outline">✓ {% trans "Done" %}</span>
+        <a href="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}"
+           class="text-xs text-base-content/60 link link-hover">
+          {{ version.last_accuracy_run_at|date:"d M" }} ·
+          {{ version.last_accuracy_rows|default:0 }} {% trans "rows" %} ·
+          {% trans "WMAPE" %} {{ version.last_accuracy_wmape|default:"—" }}%
+        </a>
+      {% elif version.accuracy_run_status == 'FAILED' %}
+        {% include "demand/partials/accuracy_run_status.html" with can_run_accuracy=version.can_run_accuracy %}
+      {% else %}
+        {% if version.can_run_accuracy %}
+        <button class="btn btn-xs btn-primary"
+                hx-post="{% url 'demand_ui:version_accuracy_run' client_id=client.client_id pk=version.pk %}"
+                hx-target="#accuracy-cell-{{ version.pk }}" hx-swap="outerHTML">
+          ⚡ {% trans "Run Accuracy" %}
+        </button>
+        {% endif %}
+        {% if version.last_accuracy_run_at %}
+        <a href="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}"
+           class="text-xs text-base-content/40">{% trans "View" %}</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  </td>
   <td class="text-sm text-base-content/60">{{ version.created_at|date:"d M Y" }}</td>
   <td class="flex gap-1">
     <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
@@ -44,7 +73,7 @@
 </tr>
 {% empty %}
 <tr>
-  <td colspan="6" class="text-center text-base-content/60 py-8">
+  <td colspan="7" class="text-center text-base-content/60 py-8">
     {% trans "No forecast versions match this filter." %}
   </td>
 </tr>

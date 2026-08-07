@@ -390,6 +390,17 @@ class ActualSale(models.Model):
         on_delete=models.SET_NULL,
         related_name="actual_sales",
     )
+    # ── Modification signal ───────────────────────────────────────────────────
+    updated_at = models.DateTimeField(
+        _("updated at"),
+        null=True,
+        blank=True,
+        editable=False,
+        help_text=_(
+            "Last modified at. Used by accuracy freshness checks to detect "
+            "actuals that changed after the last accuracy run."
+        ),
+    )
 
     class Meta:
         app_label = "mysite"
@@ -432,6 +443,7 @@ class ActualSale(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        from django.utils import timezone
         # If this client doesn't use Distribution Channel, force '00' silently —
         # never surface the field or reject a write over it. clean() below still
         # protects direct/admin saves that bypass this, but the normal path is:
@@ -441,6 +453,12 @@ class ActualSale(models.Model):
         # Auto-compute period_end before every save
         if self.period_type and self.period_start:
             self.period_end = compute_period_end(self.period_start, self.period_type)
+        # Every ORM save is a modification signal for accuracy freshness, even
+        # when the caller narrows the write with update_fields.
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'updated_at' not in update_fields:
+            kwargs['update_fields'] = list(update_fields) + ['updated_at']
+        self.updated_at = timezone.now()
         super().save(*args, **kwargs)
 
     def __str__(self):
