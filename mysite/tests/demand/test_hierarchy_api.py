@@ -26,11 +26,12 @@ class TestPlanningLocationHierarchyAPI:
     def test_returns_nested_tree(
         self,
         api_client,
+        client_obj,
         root_location,
         leaf_location,
     ):
         client, user = api_client
-        url = reverse("demand-location-hierarchy")
+        url = reverse("demand-location-hierarchy", kwargs={"client_id": client_obj.client_id})
         response = client.get(url)
     #def test_returns_nested_tree(self, client_obj, root_location, leaf_location, django_user_model):
         
@@ -59,11 +60,12 @@ class TestPlanningLocationHierarchyAPI:
     def test_leaves_only_param_returns_flat_list(
         self,
         api_client,
+        client_obj,
         root_location,
         leaf_location,
     ):
         client, user = api_client
-        url = reverse("demand-location-hierarchy")
+        url = reverse("demand-location-hierarchy", kwargs={"client_id": client_obj.client_id})
         response = client.get(
             url,
             {"leaves_only": "true"}
@@ -147,9 +149,9 @@ class TestPathMaterialization:
 @pytest.mark.django_db
 class TestSalesForecastLinkAPI:
 
-    def test_create_shape_c_link(self, api_client, leaf_location, sales_leaf):
+    def test_create_shape_c_link(self, api_client, client_obj, leaf_location, sales_leaf):
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': leaf_location.pk,
             'sales_node': sales_leaf.pk,
@@ -163,11 +165,11 @@ class TestSalesForecastLinkAPI:
         assert data['customer_code'] is None
         assert data['is_active'] is True
 
-    def test_create_defaults_valid_from_to_today(self, api_client, leaf_location, sales_leaf):
+    def test_create_defaults_valid_from_to_today(self, api_client, client_obj, leaf_location, sales_leaf):
         """valid_from is optional in the request — the view defaults it to today."""
         import datetime
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': leaf_location.pk,
             'sales_node': sales_leaf.pk,
@@ -176,11 +178,11 @@ class TestSalesForecastLinkAPI:
         assert response.json()['valid_from'] == datetime.date.today().isoformat()
 
     def test_create_shape_a_link(
-        self, api_client, leaf_location, sales_leaf,
+        self, api_client, client_obj, leaf_location, sales_leaf,
         distribution_channel_common, planning_customer,
     ):
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': leaf_location.pk,
             'sales_node': sales_leaf.pk,
@@ -195,12 +197,12 @@ class TestSalesForecastLinkAPI:
         assert data['channel_code'] == '00'
 
     def test_customer_without_channel_rejected(
-        self, api_client, leaf_location, sales_leaf, planning_customer,
+        self, api_client, client_obj, leaf_location, sales_leaf, planning_customer,
     ):
         """Shape must be a (loc+dc+cust), b (loc+dc), or c (loc) —
         loc+cust with no channel isn't a valid shape."""
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': leaf_location.pk,
             'sales_node': sales_leaf.pk,
@@ -209,9 +211,9 @@ class TestSalesForecastLinkAPI:
         })
         assert response.status_code == 400
 
-    def test_non_leaf_location_rejected(self, api_client, root_location, sales_leaf):
+    def test_non_leaf_location_rejected(self, api_client, client_obj, root_location, sales_leaf):
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': root_location.pk,
             'sales_node': sales_leaf.pk,
@@ -219,10 +221,10 @@ class TestSalesForecastLinkAPI:
         })
         assert response.status_code == 400
 
-    def test_non_leaf_sales_node_rejected(self, api_client, leaf_location, sales_root, sales_leaf):
+    def test_non_leaf_sales_node_rejected(self, api_client, client_obj, leaf_location, sales_root, sales_leaf):
         """sales_leaf is a child of sales_root, so sales_root is not a leaf."""
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': leaf_location.pk,
             'sales_node': sales_root.pk,
@@ -230,9 +232,9 @@ class TestSalesForecastLinkAPI:
         })
         assert response.status_code == 400
 
-    def test_valid_to_before_valid_from_rejected(self, api_client, leaf_location, sales_leaf):
+    def test_valid_to_before_valid_from_rejected(self, api_client, client_obj, leaf_location, sales_leaf):
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': leaf_location.pk,
             'sales_node': sales_leaf.pk,
@@ -241,12 +243,12 @@ class TestSalesForecastLinkAPI:
         })
         assert response.status_code == 400
 
-    def test_overlapping_open_link_rejected(self, api_client, sales_forecast_link_shape_c,
+    def test_overlapping_open_link_rejected(self, api_client, client_obj, sales_forecast_link_shape_c,
                                              leaf_location, sales_leaf):
         """Ported from the old CustomerSalesAssignment overlap test: two
         open (valid_to=NULL) rows for the same key must be rejected."""
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.post(url, {
             'planning_location': leaf_location.pk,
             'sales_node': sales_leaf.pk,
@@ -255,22 +257,22 @@ class TestSalesForecastLinkAPI:
         assert response.status_code == 400
 
     def test_list_filters_by_link_type(
-        self, api_client, sales_forecast_link_shape_c, sales_forecast_link_shape_a,
+        self, api_client, client_obj, sales_forecast_link_shape_c, sales_forecast_link_shape_a,
     ):
         client, user = api_client
-        url = reverse('demand-sales-forecast-links')
+        url = reverse('demand-sales-forecast-links', kwargs={'client_id': client_obj.client_id})
         response = client.get(url, {'link_type': 'a'})
         assert response.status_code == 200
         data = response.json()
         assert data['count'] == 1
         assert data['results'][0]['link_type'] == 'a'
 
-    def test_delete_closes_active_link(self, api_client, sales_forecast_link_shape_c):
+    def test_delete_closes_active_link(self, api_client, client_obj, sales_forecast_link_shape_c):
         """DELETE on an active link closes it (sets valid_to=today) rather
         than hard-deleting, to preserve history."""
         import datetime
         client, user = api_client
-        url = reverse('demand-sales-forecast-link-detail', args=[sales_forecast_link_shape_c.pk])
+        url = reverse('demand-sales-forecast-link-detail', kwargs={'client_id': client_obj.client_id, 'pk': sales_forecast_link_shape_c.pk})
         response = client.delete(url)
         assert response.status_code == 200
         assert response.json()['valid_to'] == datetime.date.today().isoformat()
@@ -278,7 +280,7 @@ class TestSalesForecastLinkAPI:
         sales_forecast_link_shape_c.refresh_from_db()
         assert sales_forecast_link_shape_c.valid_to == datetime.date.today()
 
-    def test_delete_hard_deletes_never_active_link(self, api_client, leaf_location, sales_leaf):
+    def test_delete_hard_deletes_never_active_link(self, api_client, client_obj, leaf_location, sales_leaf):
         """A link whose valid_from is in the future has no history to
         preserve — DELETE removes it outright."""
         import datetime
@@ -289,16 +291,16 @@ class TestSalesForecastLinkAPI:
             valid_from=datetime.date.today() + datetime.timedelta(days=30),
         )
         client, user = api_client
-        url = reverse('demand-sales-forecast-link-detail', args=[future_link.pk])
+        url = reverse('demand-sales-forecast-link-detail', kwargs={'client_id': client_obj.client_id, 'pk': future_link.pk})
         response = client.delete(url)
         assert response.status_code == 204
         assert not SalesForecastLink.objects.filter(pk=future_link.pk).exists()
 
     def test_sales_hierarchy_includes_forecast_links(
-        self, api_client, sales_root, sales_leaf, sales_forecast_link_shape_c,
+        self, api_client, client_obj, sales_root, sales_leaf, sales_forecast_link_shape_c,
     ):
         client, user = api_client
-        url = reverse('demand-sales-hierarchy')
+        url = reverse('demand-sales-hierarchy', kwargs={'client_id': client_obj.client_id})
         response = client.get(url)
         assert response.status_code == 200
         data = response.json()

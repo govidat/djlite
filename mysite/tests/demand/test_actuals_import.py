@@ -58,16 +58,16 @@ class TestActualsImport:
             {
                 'period_start': '2024-01-01',
                 'item_id': 'item-001',
-                'location_code': 'LEAF-01',
-                'customer_code': 'CUST-01',
+                'planning_location_code': 'LEAF-01',
+                'planning_customer_code': 'CUST-01',
                 'qty': '100',
                 'revenue': '15000.00',
             },
             {
                 'period_start': '2024-02-01',
                 'item_id': 'item-001',
-                'location_code': 'LEAF-01',
-                'customer_code': 'CUST-01',
+                'planning_location_code': 'LEAF-01',
+                'planning_customer_code': 'CUST-01',
                 'qty': '120',
                 'revenue': '18000.00',
             },
@@ -87,7 +87,7 @@ class TestActualsImport:
         """Uploading the same file twice: row count stays the same."""
         rows = [{
             'period_start': '2024-01-01', 'item_id': 'item-001',
-            'location_code': 'LEAF-01', 'customer_code': 'CUST-01',
+            'planning_location_code': 'LEAF-01', 'planning_customer_code': 'CUST-01',
             'qty': '100', 'revenue': '',
         }]
         csv_content = make_csv(rows)
@@ -113,12 +113,12 @@ class TestActualsImport:
         rows = [
             {
                 'period_start': '2024-01-01', 'item_id': 'item-001',
-                'location_code': 'LEAF-01', 'customer_code': '',
+                'planning_location_code': 'LEAF-01', 'planning_customer_code': '',
                 'qty': '100', 'revenue': '',
             },
             {
                 'period_start': '2024-01-01', 'item_id': 'NONEXISTENT',
-                'location_code': 'LEAF-01', 'customer_code': '',
+                'planning_location_code': 'LEAF-01', 'planning_customer_code': '',
                 'qty': '50', 'revenue': '',
             },
         ]
@@ -135,7 +135,7 @@ class TestActualsImport:
 
     def test_missing_required_columns_fails_fast(self, client_obj):
         """File missing required columns → status=failed immediately."""
-        bad_csv = b"location_code,qty\nLEAF-01,100\n"
+        bad_csv = b"planning_location_code,qty\nLEAF-01,100\n"
         job = make_import_job(client_obj, period_type='month',
                               tmp_file_content=bad_csv, file_name='bad.csv')
         _run_import(job)
@@ -151,8 +151,8 @@ class TestActualsImport:
         """period_start=2024-01-15 for month bucket → row error, not crash."""
         rows = [{
             'period_start': '2024-01-15',    # wrong anchor — not 1st of month
-            'item_id': 'item-001', 'location_code': 'LEAF-01',
-            'customer_code': '', 'qty': '100', 'revenue': '',
+            'item_id': 'item-001', 'planning_location_code': 'LEAF-01',
+            'planning_customer_code': '', 'qty': '100', 'revenue': '',
         }]
         job = make_import_job(client_obj, period_type='month',
                               tmp_file_content=make_csv(rows))
@@ -168,7 +168,7 @@ class TestActualsImport:
         """Blank customer_code → ActualSale.planning_customer is NULL."""
         rows = [{
             'period_start': '2024-01-01', 'item_id': 'item-001',
-            'location_code': 'LEAF-01', 'customer_code': '',
+            'planning_location_code': 'LEAF-01', 'planning_customer_code': '',
             'qty': '75', 'revenue': '',
         }]
         job = make_import_job(client_obj, period_type='month',

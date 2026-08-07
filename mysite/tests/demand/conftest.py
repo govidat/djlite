@@ -32,6 +32,21 @@ def celery_eager(settings):
     settings.CELERY_TASK_EAGER_PROPAGATES = True
 
 
+@pytest.fixture(autouse=True)
+def default_distribution_channel(request):
+    """Every demand model FKs distribution_channel with default='00'."""
+    cls = getattr(request.node, 'cls', None)
+    if cls is not None:
+        from django.test import SimpleTestCase
+        if issubclass(cls, SimpleTestCase):
+            return
+    db = request.getfixturevalue('db')
+    from mysite.models import DistributionChannel
+    DistributionChannel.objects.get_or_create(
+        code='00', defaults={'label': 'Common'},
+    )
+
+
 @pytest.fixture
 def client_obj(db):
     from mysite.models import Client

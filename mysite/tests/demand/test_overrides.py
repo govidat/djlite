@@ -22,8 +22,8 @@ from mysite.models.demand.forecast import (
 @pytest.mark.django_db
 class TestCreateOverride:
 
-    def _url(self, version_id):
-        return f'/api/demand/forecast-versions/{version_id}/overrides/'
+    def _url(self, version_id, client_id='TEST01'):
+        return f'/api/{client_id}/demand/forecast-versions/{version_id}/overrides/'
     
     def test_create_qty_override_returns_202(self, api_client, draft_version_with_lines):
         client, user = api_client
@@ -130,7 +130,7 @@ class TestListOverrides:
             disagg_method  = 'PROPORTIONAL',
             created_by     = user,
         )
-        resp = client.get(f'/api/demand/forecast-versions/{version.pk}/overrides/')
+        resp = client.get(f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/')
         assert resp.status_code == 200
         assert resp.data['count'] == 1
         assert resp.data['results'][0]['override_qty'] == '120.000'
@@ -155,7 +155,7 @@ class TestListOverrides:
             is_applied=False,
         )
         resp = client.get(
-            f'/api/demand/forecast-versions/{version.pk}/overrides/?is_applied=true'
+            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/?is_applied=true'
         )
         assert resp.status_code == 200
         assert resp.data['count'] == 1
@@ -181,7 +181,7 @@ class TestDeleteOverride:
             is_applied=False,
         )
         resp = client.delete(
-            f'/api/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
+            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
         )
         assert resp.status_code == 204
         assert not ForecastOverride.objects.filter(pk=override.pk).exists()
@@ -214,7 +214,7 @@ class TestDeleteOverride:
         )
 
         resp = client.delete(
-            f'/api/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
+            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
         )
         assert resp.status_code == 204
 
@@ -238,7 +238,7 @@ class TestDeleteOverride:
         version.save(update_fields=['status'])
 
         resp = client.delete(
-            f'/api/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
+            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
         )
         assert resp.status_code == 403
 

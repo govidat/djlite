@@ -14,13 +14,13 @@ This is the core of Sprint 3B.2. The task:
 ### 4.1 Expected column headers in the upload file
 
 ```
-period_start              YYYY-MM-DD   required
-item_id                   string       required — must match Item.item_id for this client
-location_code             string       required — must match PlanningLocation.code
-customer_code             string       optional — blank = unattributed (planning_customer=NULL)
-distribution_channel_code string       optional — defaults to '00'
-qty                       decimal      required
-revenue                   decimal      optional
+period_start                  YYYY-MM-DD   required
+item_id                       string       required — must match Item.item_id for this client
+planning_location_code        string       required — must match PlanningLocation.code
+planning_customer_code        string       optional — blank = unattributed (planning_customer=NULL)
+distribution_channel_code     string       optional — defaults to '00'
+qty                           decimal      required
+revenue                       decimal      optional
 ```
 
 `period_type` is NOT a column in the file — it is specified at upload time
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 # ── Column spec ───────────────────────────────────────────────────────────────
 REQUIRED_COLUMNS = {'period_start', 'item_id', 'planning_location_code', 'qty'}
-OPTIONAL_COLUMNS = {'customer_code', 'distribution_channel_code', 'revenue'}
+OPTIONAL_COLUMNS = {'planning_customer_code', 'distribution_channel_code', 'revenue'}
 ALL_COLUMNS      = REQUIRED_COLUMNS | OPTIONAL_COLUMNS
 
 # ── Batch size for bulk_create ────────────────────────────────────────────────
@@ -174,11 +174,18 @@ def _run_import(job: ActualSaleImport):
     if client.is_distribution_channel_enabled():
         allowed_channel_codes = client.get_allowed_distribution_channel_codes()
     else:
+        # Matches ActualSale.save(): clients that don't use distribution
+        # channels always write '00' — ensure that default row exists.
         allowed_channel_codes = {'00'}
     channel_map = {
         ch.code: ch
         for ch in DistributionChannel.objects.filter(code__in=allowed_channel_codes)
     }
+    if not client.is_distribution_channel_enabled() and '00' not in channel_map:
+        channel_obj, _ = DistributionChannel.objects.get_or_create(
+            code='00', defaults={'label': 'Common'},
+        )
+        channel_map['00'] = channel_obj
 
     # ── 4. Parse and validate each row ───────────────────────────────────────
     valid_records = []

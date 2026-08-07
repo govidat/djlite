@@ -209,7 +209,7 @@ class TestLockedVersionRejectsEdits:
         draft_version.transition_to(ForecastVersion.Status.LOCKED, approver_user)
 
         test_client.force_authenticate(user=staff_user)
-        url = reverse('demand-forecast-version-approve', kwargs={'pk': draft_version.pk})
+        url = reverse('demand-forecast-version-approve', kwargs={'client_id': draft_version.client.client_id, 'pk': draft_version.pk})
         response = test_client.post(url, {'action': 'submit'}, format='json')
         assert response.status_code == 403
 
@@ -738,7 +738,7 @@ class TestSeriesProfileAPI:
         )
 
         test_client.force_authenticate(user=staff_user)
-        url = reverse('demand-series-profile-detail', kwargs={'pk': series_profile.pk})
+        url = reverse('demand-series-profile-detail', kwargs={'client_id': series_profile.client.client_id, 'pk': series_profile.pk})
         response = test_client.patch(
             url,
             {'override_grain': 'item_loc_depth_1', 'override_note': 'Manual review'},
@@ -756,7 +756,7 @@ class TestSeriesProfileAPI:
         test_client, _ = api_client
         from django.urls import reverse
         test_client.force_authenticate(user=staff_user)
-        url = reverse('demand-series-profile-detail', kwargs={'pk': series_profile.pk})
+        url = reverse('demand-series-profile-detail', kwargs={'client_id': series_profile.client.client_id, 'pk': series_profile.pk})
         response = test_client.patch(
             url,
             {'chosen_grain': 'item_client'},
@@ -771,7 +771,7 @@ class TestSeriesProfileAPI:
         test_client, _ = api_client
         from django.urls import reverse
         test_client.force_authenticate(user=staff_user)
-        url = reverse('demand-series-profile-detail', kwargs={'pk': series_profile.pk})
+        url = reverse('demand-series-profile-detail', kwargs={'client_id': series_profile.client.client_id, 'pk': series_profile.pk})
         response = test_client.patch(
             url,
             {'override_grain': 'item_loc_depth_99'},
@@ -793,7 +793,7 @@ class TestForecastingConfigAPI:
         test_client, _ = api_client
         from django.urls import reverse
         test_client.force_authenticate(user=staff_user)
-        url = reverse('demand-forecasting-config')
+        url = reverse('demand-forecasting-config', kwargs={'client_id': client_obj.client_id})
         response = test_client.get(url)
         assert response.status_code == 200
         data = response.json()
@@ -808,7 +808,7 @@ class TestForecastingConfigAPI:
         test_client, _ = api_client
         from django.urls import reverse
         test_client.force_authenticate(user=staff_user)
-        url = reverse('demand-forecasting-config')
+        url = reverse('demand-forecasting-config', kwargs={'client_id': client_obj.client_id})
         response = test_client.get(url, {'period_type': 'month'})
         data = response.json()
         assert data['derived_time_horizons'] == ['quarter', 'halfyear']
@@ -823,7 +823,7 @@ class TestForecastingConfigAPI:
             'regular', password='pw', is_staff=False
         )
         test_client.force_authenticate(user=regular_user)
-        url = reverse('demand-forecasting-config')
+        url = reverse('demand-forecasting-config', kwargs={'client_id': client_obj.client_id})
         response = test_client.patch(url, {'time_horizon_steps': 3}, format='json')
         assert response.status_code == 403
 
@@ -836,8 +836,10 @@ class TestForecastingConfigAPI:
         staff = django_user_model.objects.create_user(
             'adminstaff', password='pw', is_staff=True
         )
+        from mysite.models import ClientUserProfile
+        ClientUserProfile.objects.create(user=staff, client=client_obj)
         test_client.force_authenticate(user=staff)
-        url = reverse('demand-forecasting-config')
+        url = reverse('demand-forecasting-config', kwargs={'client_id': client_obj.client_id})
         response = test_client.patch(url, {'adi_threshold': '1.5000'}, format='json')
         assert response.status_code == 200
         assert response.json()['adi_threshold'] == '1.5000'

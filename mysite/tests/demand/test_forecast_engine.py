@@ -34,12 +34,15 @@ class TestLoadSeriesDecisions:
         """load_series_decisions returns effective_grain from SeriesProfile."""
         from utils.demand.forecast_engine import load_series_decisions
 
-        uid = f'item-001|CUST-01|LEAF-01'
+        uid = f'item-001|CUST-01|00|LEAF-01'
         decisions = load_series_decisions(
             client_id=client_obj.pk,
             period_type='month',
             unique_ids=[uid],
-            price_map={active_item.pk: Decimal('160.00')},  # actuals price overrides
+            price_result={
+                'by_channel': {},
+                'blended': {active_item.pk: Decimal('160.00')},  # actuals price overrides
+            },
         )
 
         assert uid in decisions
@@ -56,12 +59,12 @@ class TestLoadSeriesDecisions:
         """force_grain from engine_config overrides SeriesProfile.effective_grain."""
         from utils.demand.forecast_engine import load_series_decisions
 
-        uid = f'item-001|CUST-01|LEAF-01'
+        uid = f'item-001|CUST-01|00|LEAF-01'
         decisions = load_series_decisions(
             client_id=client_obj.pk,
             period_type='month',
             unique_ids=[uid],
-            price_map={},
+            price_result={'by_channel': {}, 'blended': {}},
             force_grain='item_client',
         )
         assert decisions[uid]['grain'] == 'item_client'
@@ -72,12 +75,12 @@ class TestLoadSeriesDecisions:
         """Series with no SeriesProfile defaults to item_cust_location / AUTOETS."""
         from utils.demand.forecast_engine import load_series_decisions
 
-        uid = 'UNKNOWN-ITEM|NULL|LEAF-01'
+        uid = 'UNKNOWN-ITEM|NULL|00|LEAF-01'
         decisions = load_series_decisions(
             client_id=client_obj.pk,
             period_type='month',
             unique_ids=[uid],
-            price_map={},
+            price_result={'by_channel': {}, 'blended': {}},
         )
         assert decisions[uid]['grain']    == 'item_cust_location'
         assert decisions[uid]['strategy'] == 'AUTOETS'
@@ -87,37 +90,41 @@ class TestLoadSeriesDecisions:
 # Test: disaggregate_to_atomic — value-based for product grains
 # ─────────────────────────────────────────────────────────────────────────────
 
+@pytest.mark.django_db
 class TestDisaggregateToAtomic:
 
-    def _make_decisions(self, uids: list, grain: str, prices: dict) -> dict:
+    def _make_decisions(self, uids: list, grain: str, prices: dict,
+                        item_id: int, taxon_node_id=None) -> dict:
         return {
             uid: {
                 'grain': grain, 'strategy': 'AUTOETS',
                 'eval_period': 'month', 'is_manual': False,
                 'price': prices.get(uid),
-                'item_id': None, 'location_id': None, 'customer_id': None,
+                'item_id': item_id, 'location_id': 1, 'customer_id': None,
+                'distribution_channel_id': '00',
+                'top_sales_node_id': None, 'taxon_node_id': taxon_node_id,
             }
             for uid in uids
         }
 
-    def test_location_grain_uses_qty_share(self):
-        """item_location grain disaggregates to customers by historical qty share."""
+    def test_location_grain_uses_qty_share(self, client_obj):
+        """item_client grain disaggregates to location-customer uids by qty share."""
         from utils.demand.forecast_engine import disaggregate_to_atomic
         import polars as pl
 
         # Two customers buying the same item at the same location
         # CUST-A has 2× the demand of CUST-B
-        uids = ['ITEM-A|CUST-A|LOC-1', 'ITEM-A|CUST-B|LOC-1']
+        uids = ['ITEM-A|CUST-A|00|LOC-1', 'ITEM-A|CUST-B|00|LOC-1']
         dates = pd.date_range('2022-01-01', periods=12, freq='MS')
         rows = []
         for ds in dates:
             rows += [
-                {'unique_id': 'ITEM-A|CUST-A|LOC-1', 'ds': ds, 'y': 200.0,
+                {'unique_id': 'ITEM-A|CUST-A|00|LOC-1', 'ds': ds, 'y': 200.0,
                 'item_id': 1, 'item__item_id': 'ITEM-A',
                 'planning_customer_id': 1, 'customer_code': 'CUST-A',
                 'planning_location_id': 1, 'planning_location__code': 'LOC-1',
                 'region_code': 'REG-1', 'revenue': 400.0},
-                {'unique_id': 'ITEM-A|CUST-B|LOC-1', 'ds': ds, 'y': 100.0,
+                {'unique_id': 'ITEM-A|CUST-B|00|LOC-1', 'ds': ds, 'y': 100.0,
                 'item_id': 1, 'item__item_id': 'ITEM-A',
                 'planning_customer_id': 2, 'customer_code': 'CUST-B',
                 'planning_location_id': 1, 'planning_location__code': 'LOC-1',
@@ -125,47 +132,42 @@ class TestDisaggregateToAtomic:
             ]
         actuals_pl = pl.from_pandas(pd.DataFrame(rows))
 
-        # item_location aggregate: ITEM-A at LOC-1 (strips customer → ALL_CUST)
+        # item_client aggregate forecast (300 total)
         forecast_df = pd.DataFrame([{
-            'unique_id': 'ITEM-A|ALL_CUST|LOC-1',
+            'unique_id': 'item_1_client',
             'ds': pd.Timestamp('2025-01-01'),
             'statistical_qty': 300.0,
-            'grain': 'item_location',
+            'grain': 'item_1_client',
             'model_used': 'AutoETS',
-            'forecast_level': 'item_location',
+            'forecast_level': 'item_1_client',
             'eval_period': 'month',
         }])
 
-        decisions = {
-            uid: {
-                'grain': 'item_location', 'strategy': 'AUTOETS',
-                'eval_period': 'month', 'is_manual': False,
-                'price': None, 'item_id': 1,
-                'location_id': 1, 'customer_id': None,
-            }
-            for uid in uids
-        }
+        decisions = self._make_decisions(uids, 'item_1_client',
+                                         {}, item_id=1)
 
         result = disaggregate_to_atomic(
             forecast_df, actuals_pl, decisions,
             period_type='month',
             base_freq='MS',
+            client_id=client_obj.pk,
+            as_of=datetime.date(2025, 1, 1),
         )
 
         # CUST-A gets 2/3 (qty share 200:100), CUST-B gets 1/3
-        item_a = result[result['unique_id'] == 'ITEM-A|CUST-A|LOC-1']
-        item_b = result[result['unique_id'] == 'ITEM-A|CUST-B|LOC-1']
+        item_a = result[result['unique_id'] == 'ITEM-A|CUST-A|00|LOC-1']
+        item_b = result[result['unique_id'] == 'ITEM-A|CUST-B|00|LOC-1']
         assert not item_a.empty
         assert not item_b.empty
         ratio = float(item_a.iloc[0]['statistical_qty']) / float(item_b.iloc[0]['statistical_qty'])
         assert abs(ratio - 2.0) < 0.1
 
-    def test_product_grain_uses_value_share(self):
+    def test_product_grain_uses_value_share(self, client_obj):
         """Product-hierarchy grain disaggregates by revenue share, not qty."""
         from utils.demand.forecast_engine import disaggregate_to_atomic
         import polars as pl
 
-        uids = ['ITEM-X|NULL|LOC-1', 'ITEM-Y|NULL|LOC-1']
+        uids = ['ITEM-X|NULL|00|LOC-1', 'ITEM-Y|NULL|00|LOC-1']
         # ITEM-X: qty=100, revenue=1000 (price=10)
         # ITEM-Y: qty=100, revenue=500  (price=5)
         # Equal qty but unequal revenue — value-share should split 2:1
@@ -173,12 +175,12 @@ class TestDisaggregateToAtomic:
         rows = []
         for ds in dates:
             rows += [
-                {'unique_id': 'ITEM-X|NULL|LOC-1', 'ds': ds, 'y': 100.0,
+                {'unique_id': 'ITEM-X|NULL|00|LOC-1', 'ds': ds, 'y': 100.0,
                  'item_id': 10, 'item__item_id': 'ITEM-X',
                  'planning_customer_id': None, 'customer_code': 'NULL',
                  'planning_location_id': 1, 'planning_location__code': 'LOC-1',
                  'region_code': 'REG-1', 'revenue': 1000.0},
-                {'unique_id': 'ITEM-Y|NULL|LOC-1', 'ds': ds, 'y': 100.0,
+                {'unique_id': 'ITEM-Y|NULL|00|LOC-1', 'ds': ds, 'y': 100.0,
                  'item_id': 11, 'item__item_id': 'ITEM-Y',
                  'planning_customer_id': None, 'customer_code': 'NULL',
                  'planning_location_id': 1, 'planning_location__code': 'LOC-1',
@@ -188,7 +190,7 @@ class TestDisaggregateToAtomic:
 
         # Product-group forecast: taxon grain, y = revenue (1500 total)
         forecast_df = pd.DataFrame([{
-            'unique_id': 'taxon_5_ALL_LOC',
+            'unique_id': 'taxon_5_client',
             'ds': pd.Timestamp('2025-01-01'),
             'statistical_qty': 1500.0,   # this is REVENUE for product grains
             'grain': 'taxon_5_client',
@@ -200,16 +202,18 @@ class TestDisaggregateToAtomic:
         decisions = self._make_decisions(
             uids, 'taxon_5_client',
             # ITEM-X: price=10, ITEM-Y: price=5
-            {'ITEM-X|NULL|LOC-1': Decimal('10'), 'ITEM-Y|NULL|LOC-1': Decimal('5')},
+            {'ITEM-X|NULL|00|LOC-1': Decimal('10'), 'ITEM-Y|NULL|00|LOC-1': Decimal('5')},
+            item_id=10, taxon_node_id=5,
         )
-        #result = disaggregate_to_atomic(forecast_df, actuals_pl, decisions)
         result = disaggregate_to_atomic(
             forecast_df, actuals_pl, decisions,
             period_type='month',
             base_freq='MS',
+            client_id=client_obj.pk,
+            as_of=datetime.date(2025, 1, 1),
         )
-        item_x = result[result['unique_id'] == 'ITEM-X|NULL|LOC-1']
-        item_y = result[result['unique_id'] == 'ITEM-Y|NULL|LOC-1']
+        item_x = result[result['unique_id'] == 'ITEM-X|NULL|00|LOC-1']
+        item_y = result[result['unique_id'] == 'ITEM-Y|NULL|00|LOC-1']
 
         if not item_x.empty and not item_y.empty:
             # ITEM-X gets 2/3 of revenue = 1000. qty = 1000/10 = 100
@@ -220,12 +224,12 @@ class TestDisaggregateToAtomic:
             assert abs(qty_x - 100) < 1
             assert abs(qty_y - 100) < 1
 
-    def test_retain_lower_does_not_overwrite_atomic(self):
+    def test_retain_lower_does_not_overwrite_atomic(self, client_obj):
         """disagg_conflict='retain_lower': atomic forecast is not overwritten."""
         from utils.demand.forecast_engine import disaggregate_to_atomic
         import polars as pl
 
-        uid = 'ITEM-A|NULL|LOC-1'
+        uid = 'ITEM-A|NULL|00|LOC-1'
         rows = [{'unique_id': uid, 'ds': pd.Timestamp('2022-01-01'),
                  'y': 100.0, 'item_id': 1, 'item__item_id': 'ITEM-A',
                  'planning_customer_id': None, 'customer_code': 'NULL',
@@ -233,44 +237,41 @@ class TestDisaggregateToAtomic:
                  'region_code': 'REG-1', 'revenue': 500.0}]
         actuals_pl = pl.from_pandas(pd.DataFrame(rows))
 
-        # Atomic forecast already exists
+        # Atomic forecast already exists (leaf loc_dc_cust grain)
         atomic_df = pd.DataFrame([{
             'unique_id': uid, 'ds': pd.Timestamp('2025-01-01'),
             'statistical_qty': 999.0,   # sentinel value
-            'grain': 'item_cust_location',
+            'grain': 'item_1_loc_dc_cust',
             'model_used': 'AutoETS',
-            'forecast_level': 'item_cust_location',
+            'forecast_level': 'item_1_loc_dc_cust',
         }])
-        # Product-grain forecast also exists
-        product_df = pd.DataFrame([{
-            'unique_id': 'ITEM-A|ALL_CUST|ALL_LOC',
+        # Client-level forecast also exists
+        client_df = pd.DataFrame([{
+            'unique_id': 'item_1_client',
             'ds': pd.Timestamp('2025-01-01'),
             'statistical_qty': 1200.0,
-            'grain': 'item_client',
+            'grain': 'item_1_client',
             'model_used': 'AutoETS',
-            'forecast_level': 'item_client',
+            'forecast_level': 'item_1_client',
         }])
-        combined_df = pd.concat([atomic_df, product_df], ignore_index=True)
+        combined_df = pd.concat([atomic_df, client_df], ignore_index=True)
 
-        decisions = {uid: {
-            'grain': 'item_client', 'strategy': 'AUTOETS',
-            'eval_period': 'month', 'is_manual': False,
-            'price': Decimal('5'), 'item_id': 1,
-            'location_id': 1, 'customer_id': None,
-        }}
+        decisions = self._make_decisions(
+            [uid], 'item_1_loc_dc_cust',
+            {'ITEM-A|NULL|00|LOC-1': Decimal('5')}, item_id=1,
+        )
         result = disaggregate_to_atomic(
             combined_df, actuals_pl, decisions,
             period_type='month',
             base_freq='MS',
+            client_id=client_obj.pk,
+            as_of=datetime.date(2025, 1, 1),
             disagg_conflict='retain_lower',
         )
-        #result = disaggregate_to_atomic(
-        #    combined_df, actuals_pl, decisions, disagg_conflict='retain_lower'
-        #)
 
         atomic_row = result[
             (result['unique_id'] == uid) &
-            (result['grain'] == 'item_cust_location')
+            (result['grain'] == 'item_1_loc_dc_cust')
         ]
         assert not atomic_row.empty
         # The original atomic 999 is retained
@@ -292,12 +293,12 @@ class TestWriteForecastLines:
         from mysite.models.demand.forecast import ForecastLine
 
         forecast_df = pd.DataFrame([
-            {'unique_id': 'item-001|CUST-01|LEAF-01',
+            {'unique_id': 'item-001|CUST-01|00|LEAF-01',
              'ds': pd.Timestamp('2025-01-01'),
              'statistical_qty': 480.0, 'model_used': 'AutoETS',
              'grain': 'item_cust_location',
              'forecast_level': 'item_cust_location'},
-            {'unique_id': 'item-001|CUST-01|LEAF-01',
+            {'unique_id': 'item-001|CUST-01|00|LEAF-01',
              'ds': pd.Timestamp('2025-02-01'),
              'statistical_qty': 520.0, 'model_used': 'AutoETS',
              'grain': 'item_cust_location',
@@ -307,7 +308,7 @@ class TestWriteForecastLines:
         from mysite.models import Item
         from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
         decisions = {
-            'item-001|CUST-01|LEAF-01': {
+            'item-001|CUST-01|00|LEAF-01': {
                 'grain': 'item_cust_location', 'strategy': 'AUTOETS',
                 'eval_period': 'month', 'is_manual': False,
                 'price': Decimal('150.00'),
@@ -332,7 +333,7 @@ class TestWriteForecastLines:
         from mysite.models.demand.forecast import ForecastLine
 
         forecast_df = pd.DataFrame([{
-            'unique_id': 'item-001|NULL|LEAF-01',    # ← lowercase
+            'unique_id': 'item-001|NULL|00|LEAF-01',    # ← lowercase
             'ds': pd.Timestamp('2025-01-01'),
             'statistical_qty': 100.0,
             'model_used': 'AutoETS',
@@ -342,7 +343,7 @@ class TestWriteForecastLines:
 
 
         decisions = {
-            'item-001|NULL|LEAF-01': {
+            'item-001|NULL|00|LEAF-01': {
                 'grain': 'item_cust_location', 'strategy': 'AUTOETS',
                 'eval_period': 'month', 'is_manual': False,
                 'price': Decimal('250.00'),

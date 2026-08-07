@@ -1684,6 +1684,11 @@ class ForecastingConfig(models.Model):
     def get_for_client(cls, client) -> 'ForecastingConfig':
         config, _ = cls.objects.get_or_create(client=client)
         return config
+
+    @classmethod
+    def get_for_client_id(cls, client_id: int) -> 'ForecastingConfig':
+        from mysite.models import Client
+        return cls.get_for_client(Client.objects.get(pk=client_id))
     
 
 class SeriesLevelEvaluation(models.Model):
