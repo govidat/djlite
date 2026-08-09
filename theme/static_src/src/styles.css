@@ -8,6 +8,9 @@
   themes: false;  /* a value of "all" will bring the default daisy themes */
 }
 
+@layer components {
+  .badge { white-space: nowrap; }
+}
 @plugin "daisyui/theme" {
   name: "clienttheme";
   default: true; /* set as default */
@@ -145,14 +148,14 @@
 }
 */
 
-/**
+/*
 @plugin "daisyui";
   * A catch-all path to Django template files, JavaScript, and Python files
   * that contain Tailwind CSS classes and will be scanned by Tailwind to generate the final CSS file.
   *
   * If your final CSS file is not being updated after code changes, you may want to broaden or narrow
   * the scope of this path.
-  */
+*/
 /* Safelist — PageContent HTML blobs in DB are not scanned by Tailwind */
 @source inline("{bg,text,border}-{primary,secondary,accent,neutral,base-100,base-200,base-300,base-content,primary-content,secondary-content,accent-content,neutral-content}");
 @source inline("{py,px,my,mx,gap,p,m}-{0,1,2,3,4,5,6,8,10,12,16,20,24}");

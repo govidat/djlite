@@ -28,12 +28,20 @@
     <thead>
       <tr>
         <th>{% trans "Name" %}</th>
-        <th class="text-right">{% trans "Rows" %}</th>
+        {% if items %}
+        <th class="text-right">{% trans "Series" %}</th>
         <th class="text-right">{% trans "Actual" %}</th>
         <th class="text-right">{% trans "Forecast" %}</th>
-        <th class="text-right">{% trans "WMAPE %" %}</th>
+        <th class="text-right">{% trans "MAPE %" %}</th>
         <th class="text-right">{% trans "Bias %" %}</th>
+        {% else %}
+        <th class="text-right">{% trans "Items" %}</th>
+        <th class="text-right">{% trans "Series" %}</th>
+        <th class="text-right">{% trans "Value Actual (₹)" %}</th>
+        <th class="text-right">{% trans "Value Forecast (₹)" %}</th>
         <th class="text-right">{% trans "Value MAPE %" %}</th>
+        <th class="text-right">{% trans "Value Bias %" %}</th>
+        {% endif %}
       </tr>
     </thead>
     <tbody>
@@ -58,6 +66,7 @@
             <span class="font-mono text-xs">{{ row.label }}</span>
           {% endif %}
         </td>
+        {% if items %}
         <td class="text-right">{{ row.graded_count|default:0 }}</td>
         <td class="text-right">{{ row.sum_actual|default:"—" }}</td>
         <td class="text-right">{{ row.sum_forecast|default:"—" }}</td>
@@ -69,7 +78,20 @@
           {% else %}—{% endif %}
         </td>
         <td class="text-right">{% if row.wbias is not None %}{{ row.wbias }}%{% else %}—{% endif %}</td>
-        <td class="text-right">{% if row.value_mape is not None %}{{ row.value_mape }}%{% else %}—{% endif %}</td>
+        {% else %}
+        <td class="text-right">{{ row.n_items|default:0 }}</td>
+        <td class="text-right">{{ row.graded_count|default:0 }}</td>
+        <td class="text-right">₹{{ row.sum_value_actual|floatformat:0|default:"—" }}</td>
+        <td class="text-right">₹{{ row.sum_value_forecast|floatformat:0|default:"—" }}</td>
+        <td class="text-right">
+          {% if row.value_mape is not None %}
+          <span class="{% if row.value_mape > 50 %}text-error{% elif row.value_mape > 25 %}text-warning{% else %}text-success{% endif %}">
+            {{ row.value_mape }}%
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="text-right">{% if row.value_bias is not None %}{{ row.value_bias }}%{% else %}—{% endif %}</td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>

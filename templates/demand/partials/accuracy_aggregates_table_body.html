@@ -1,0 +1,131 @@
+{% load i18n %}
+<div class="overflow-x-auto">
+    <table class="table table-zebra table-sm w-full">
+        <thead>
+            <tr>
+                <th class="whitespace-nowrap">{% trans "Period" %}</th>
+
+                {# Friendly column header per level #}
+                {% if agg_level == 'sales' %}
+                <th class="whitespace-nowrap">{% trans "Sales Node" %}</th>
+                {% elif agg_level == 'item_hierarchy' %}
+                <th class="whitespace-nowrap">{% trans "Item Category" %}</th>
+                {% elif agg_level == 'customer' %}
+                <th class="whitespace-nowrap">{% trans "Customer" %}</th>
+                {% endif %}
+
+                <th class="text-right whitespace-nowrap">{% trans "Items" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Series" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Value Actual (₹)" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Value Forecast (₹)" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Value MAPE %" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Value Bias %" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for agg in aggregates %}
+            <tr class="hover">
+                <td class="whitespace-nowrap">
+                    {{ agg.period_start|date:"M Y" }}
+                </td>
+
+                {# Key column — only for non-total levels #}
+                {% if agg_level != 'total' %}
+                <td class="font-mono text-xs whitespace-nowrap">
+                    {{ agg.display_key }}
+                    {% if agg.display_hierarchy %}
+                    <div class="font-normal text-[11px] text-base-content/50">
+                        {{ agg.display_hierarchy }}
+                    </div>
+                    {% endif %}
+                </td>
+                {% endif %}
+
+                <td class="text-right">{{ agg.n_items|default:0 }}</td>
+                <td class="text-right text-base-content/60">{{ agg.graded_count|default:0 }}</td>
+                <td class="text-right">₹{{ agg.sum_value_actual|floatformat:0|default:"—" }}</td>
+                <td class="text-right text-base-content/60">₹{{ agg.sum_value_forecast|floatformat:0|default:"—" }}</td>
+                <td class="text-right">
+                    {% if agg.value_mape is not None %}
+                    <span class="{% if agg.value_mape > 50 %}text-error{% elif agg.value_mape > 25 %}text-warning{% else %}text-success{% endif %}">
+                        {{ agg.value_mape }}%
+                    </span>
+                    {% else %}—{% endif %}
+                </td>
+                <td class="text-right">{% if agg.value_bias is not None %}{{ agg.value_bias }}%{% else %}—{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="{% if agg_level == 'total' %}7{% else %}8{% endif %}"
+                    class="text-center py-8 text-base-content/50">
+                    {% trans "No accuracy data. Run accuracy against actuals first." %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+        {# ── Totals footer ──────────────────────────────────────── #}
+        {% if aggregates %}
+        <tfoot>
+            {% if is_multipage %}
+            <tr class="border-t border-base-300 text-sm">
+                <td colspan="{% if agg_level == 'total' %}2{% else %}3{% endif %}"
+                    class="text-right text-base-content/60 pr-2 whitespace-nowrap">
+                    {% trans "Page total" %}
+                    <span class="text-xs text-base-content/40 ml-1">
+                        ({{ page_obj.object_list|length }} {% trans "rows" %})
+                    </span>
+                </td>
+                <td class="text-right">{{ page_total.n_items }}</td>
+                <td class="text-right">{{ page_total.graded_count }}</td>
+                <td class="text-right font-medium">
+                    ₹{{ page_total.sum_value_actual|floatformat:0 }}
+                </td>
+                <td class="text-right">₹{{ page_total.sum_value_forecast|floatformat:0 }}</td>
+                <td></td>
+                <td></td>
+            </tr>
+            {% endif %}
+
+            <tr class="border-t-2 border-base-content/20 bg-base-200
+                        font-bold text-sm">
+                <td colspan="{% if agg_level == 'total' %}2{% else %}3{% endif %}"
+                    class="text-right pr-2 whitespace-nowrap">
+                    {% trans "Grand total" %}
+                    <span class="text-xs font-normal text-base-content/50 ml-1">
+                        ({{ page_obj.paginator.count }} {% trans "rows" %})
+                    </span>
+                </td>
+                <td class="text-right">{{ grand_total.n_items|default:0 }}</td>
+                <td class="text-right">{{ grand_total.graded_count|default:0 }}</td>
+                <td class="text-right">
+                    ₹{{ grand_total.sum_value_actual|floatformat:0|default:"—" }}
+                </td>
+                <td class="text-right">₹{{ grand_total.sum_value_forecast|floatformat:0|default:"—" }}</td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center gap-2 mt-4">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&value_min={{ filters.value_min }}&value_max={{ filters.value_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}"
+       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
+    {% else %}
+    <span class="btn btn-sm btn-disabled">← {% trans "Previous" %}</span>
+    {% endif %}
+    <span class="btn btn-sm btn-disabled">
+        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&value_min={{ filters.value_min }}&value_max={{ filters.value_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}"
+       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
+    {% else %}
+    <span class="btn btn-sm btn-disabled">{% trans "Next" %} →</span>
+    {% endif %}
+</div>
+{% endif %}

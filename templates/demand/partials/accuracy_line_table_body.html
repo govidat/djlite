@@ -1,0 +1,69 @@
+{% load i18n %}
+<div class="card bg-base-200 mt-8">
+    <div class="card-body py-4">
+        <h3 class="card-title text-base">{% trans "Line item detail" %}</h3>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm w-full">
+                <thead>
+                    <tr>
+                        <th class="whitespace-nowrap">{% trans "Item" %}</th>
+                        <th class="whitespace-nowrap">{% trans "Location" %}</th>
+                        <th class="whitespace-nowrap">{% trans "Customer" %}</th>
+                        {% if show_channel %}<th class="whitespace-nowrap">{% trans "Channel" %}</th>{% endif %}
+                        <th class="text-right whitespace-nowrap">{% trans "Actual Qty" %}</th>
+                        <th class="text-right whitespace-nowrap">{% trans "Forecast Qty" %}</th>
+                        <th class="text-right whitespace-nowrap">{% trans "Qty MAPE %" %}</th>
+                        <th class="text-right whitespace-nowrap">{% trans "Bias %" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in accuracy_rows %}
+                    <tr class="hover">
+                        <td class="font-mono text-xs">{{ row.item.item_id }}</td>
+                        <td class="font-mono text-xs">{{ row.planning_location.code }}</td>
+                        <td>{{ row.planning_customer.code|default:"—" }}</td>
+                        {% if show_channel %}<td>{{ row.distribution_channel.code|default:"—" }}</td>{% endif %}
+                        <td class="text-right">{{ row.actual_qty|floatformat:0 }}</td>
+                        <td class="text-right text-base-content/60">{{ row.forecast_qty|floatformat:0 }}</td>
+                        <td class="text-right">
+                            {% if row.mape is not None %}
+                                <span class="{% if row.mape > 50 %}text-error{% elif row.mape > 25 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ row.mape|floatformat:1 }}%
+                                </span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-right">
+                            {% if row.bias is not None %}{{ row.bias|floatformat:1 }}%{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if show_channel %}8{% else %}7{% endif %}" class="text-center py-8 text-base-content/50">
+                            {% trans "No accuracy data. Run the forecast against actuals first." %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if line_page_obj.has_other_pages %}
+        <div class="flex justify-center gap-2 mt-4">
+            {% if line_page_obj.has_previous %}
+            <a href="?line_page={{ line_page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&value_min={{ filters.value_min }}&value_max={{ filters.value_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}"
+               class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
+            {% else %}
+            <span class="btn btn-sm btn-disabled">← {% trans "Previous" %}</span>
+            {% endif %}
+            <span class="btn btn-sm btn-disabled">
+                {{ line_page_obj.number }} / {{ line_page_obj.paginator.num_pages }}
+            </span>
+            {% if line_page_obj.has_next %}
+            <a href="?line_page={{ line_page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&value_min={{ filters.value_min }}&value_max={{ filters.value_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}"
+               class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
+            {% else %}
+            <span class="btn btn-sm btn-disabled">{% trans "Next" %} →</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>

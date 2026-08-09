@@ -27,7 +27,7 @@
 from __future__ import annotations
 
 import json
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import pandas as pd
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse, FileResponse
@@ -1336,59 +1336,198 @@ def version_export(request, pk, client_id=None):
 # Accuracy
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _int_or_none(raw):
+    if raw in (None, '',):
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _decimal_or_none(raw):
+    if raw in (None, '',):
+        return None
+    try:
+        return Decimal(raw)
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _accuracy_agg_totals(rows):
+    """Sum of value columns + row counts over a slice of aggregate rows."""
+    totals = {
+        'sum_value_actual': Decimal('0'),
+        'sum_value_forecast': Decimal('0'),
+        'n_items': 0,
+        'graded_count': 0,
+        'rows': len(rows),
+    }
+    for r in rows:
+        va = r.get('sum_value_actual')
+        vf = r.get('sum_value_forecast')
+        if va is not None:
+            totals['sum_value_actual'] += Decimal(str(va))
+        if vf is not None:
+            totals['sum_value_forecast'] += Decimal(str(vf))
+        totals['n_items'] += int(r.get('n_items') or 0)
+        totals['graded_count'] += int(r.get('graded_count') or 0)
+    return totals
+
+
 @login_required
 def version_accuracy(request, pk, client_id=None):
-    """GET /{client_id}/demand/versions/{id}/accuracy/"""
+    """
+    GET /{client_id}/demand/versions/{id}/accuracy/
+
+    Mirrors the Value Summary / Actuals Summary layout: level tabs
+    (total|sales|item_hierarchy|customer), a filter bar (period, sales-org
+    drill, item-category drill, customer, value range), one value-based
+    aggregate table with a totals footer, then the line-item table below.
+    Drill dimensions are the Sales Hierarchy (SalesNode tree) and the
+    Item Hierarchy (Taxonomy tree), exactly like version_aggregates.
+    """
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
 
-    from mysite.models.demand.forecast import ForecastAccuracy
+    from mysite.models.demand.forecast import ForecastAccuracy, ForecastVersion
+    from django.db.models import Avg
     from utils.demand.accuracy_report import (
-        compute_metrics, location_children, taxonomy_children,
+        accuracy_aggregate_rows, compute_metrics,
     )
 
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
-    qs = (
-        ForecastAccuracy.objects
-        .filter(version=version)
-        .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
-        .order_by('-mape')
+
+    agg_level = request.GET.get('agg_level', 'total')
+    valid_levels = ['total', 'sales', 'item_hierarchy', 'customer']
+    if agg_level not in valid_levels:
+        agg_level = 'total'
+
+    period_start    = request.GET.get('period_start', '').strip()
+    customer_code   = request.GET.get('customer_code', '').strip()
+    value_min       = request.GET.get('value_min', '').strip()
+    value_max       = request.GET.get('value_max', '').strip()
+    sales_node_id   = request.GET.get('sales_node_id', '').strip()
+    taxonomy_node_id = request.GET.get('taxonomy_node_id', '').strip()
+
+    sales_node_id_int = _int_or_none(sales_node_id)
+    taxonomy_node_id_int = _int_or_none(taxonomy_node_id)
+    value_min_dec = _decimal_or_none(value_min)
+    value_max_dec = _decimal_or_none(value_max)
+
+    rows, grand_total = accuracy_aggregate_rows(
+        version,
+        agg_level=agg_level,
+        period_start=period_start or None,
+        customer_code=customer_code or None,
+        sales_node_id=sales_node_id_int,
+        taxonomy_node_id=taxonomy_node_id_int,
+        value_min=value_min_dec,
+        value_max=value_max_dec,
     )
 
-    if version.client.is_distribution_channel_enabled():
-        channel_count = qs.values('distribution_channel').distinct().count()
-        show_channel = channel_count > 1
-    else:
-        show_channel = False
+    paginator = Paginator(rows, 50)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    page_total = _accuracy_agg_totals(page_obj.object_list)
 
-    rows = list(qs)
-    mapes = [float(r.mape) for r in rows if r.mape is not None]
-    biases = [float(r.bias) for r in rows if r.bias is not None]
-    avg_mape = (sum(mapes) / len(mapes)) if mapes else None
-    avg_bias = (sum(biases) / len(biases)) if biases else None
+    # ── Dropdown choices from this version's data ──────────────────────────
+    acc_qs = ForecastAccuracy.objects.filter(version=version)
+    periods = list(
+        acc_qs.values_list('period_start', flat=True)
+        .distinct().order_by('period_start')
+    )
 
-    # Weighted metrics from the leaf rows (single DB pass).
+    sales_node_choices = []
+    if agg_level == 'sales':
+        from mysite.models.demand.hierarchy import SalesNode
+        sales_node_choices = list(
+            SalesNode.objects
+            .filter(client=request.client, is_active=True, children__isnull=False)
+            .order_by('path')
+            .values('id', 'code', 'name', 'level_label')
+        )
+
+    taxonomy_node_choices = []
+    if agg_level == 'item_hierarchy':
+        from mysite.models.catalogue import TaxonomyNode
+        taxonomy_node_choices = list(
+            TaxonomyNode.objects
+            .filter(client=request.client, is_active=True, children__isnull=False)
+            .select_related('taxonomy')
+            .order_by('depth', 'name')
+            .values('id', 'name', 'depth', 'taxonomy__name')
+        )
+
+    customer_choices = list(
+        acc_qs.filter(planning_customer__isnull=False)
+        .order_by('planning_customer__code')
+        .values_list('planning_customer__code', 'planning_customer__name')
+        .distinct()
+    )
+
+    # ── Headline stats (whole version, unfiltered) ─────────────────────────
     import pandas as pd
-    df = pd.DataFrame(list(ForecastAccuracy.objects.filter(version=version).values(
-        'actual_qty', 'forecast_qty', 'actual_value', 'forecast_value',
+    df = pd.DataFrame(list(acc_qs.values(
+        'item_id', 'actual_qty', 'forecast_qty',
+        'actual_value', 'forecast_value',
     )))
     weighted = compute_metrics(df)
+    avg = acc_qs.aggregate(avg_mape=Avg('mape'), avg_bias=Avg('bias'))
 
-    drill_location_rows, _, location_breadcrumb = location_children(version)
-    drill_taxonomy_rows, _, taxonomy_breadcrumb = taxonomy_children(version)
+    # ── Line-item detail table (paginated separately from the aggregate) ───
+    line_qs = (
+        acc_qs
+        .select_related('item', 'planning_location', 'planning_customer',
+                        'distribution_channel')
+        .order_by('-mape')
+    )
+    if period_start:
+        line_qs = line_qs.filter(period_start=period_start)
+
+    show_channel = False
+    if version.client.is_distribution_channel_enabled():
+        channel_count = acc_qs.values('distribution_channel').distinct().count()
+        show_channel = channel_count > 1
+
+    line_paginator = Paginator(line_qs, 50)
+    line_page = line_paginator.get_page(request.GET.get('line_page', 1))
 
     role = _demand_ui_role(request)
+    filters = {
+        'period_start': period_start,
+        'customer_code': customer_code,
+        'value_min': value_min,
+        'value_max': value_max,
+        'sales_node_id': sales_node_id,
+        'taxonomy_node_id': taxonomy_node_id,
+    }
 
     context = {
-        'version': version, 'accuracy_rows': rows[:200],
-        'avg_mape': avg_mape, 'avg_bias': avg_bias,
+        'version': version,
+        'accuracy_rows': line_page.object_list,
+        'line_page_obj': line_page,
+        'page_obj': page_obj,
+        'aggregates': page_obj.object_list,
+        'grand_total': grand_total,
+        'page_total': page_total,
+        'is_multipage': page_obj.has_other_pages(),
+        'agg_level': agg_level,
+        'agg_level_choices': [
+            ('total', 'Total'),
+            ('sales', 'Sales Hierarchy'),
+            ('item_hierarchy', 'Item Hierarchy'),
+            ('customer', 'Customer'),
+        ],
+        'filters': filters,
+        'periods': periods,
+        'sales_node_choices': sales_node_choices,
+        'taxonomy_node_choices': taxonomy_node_choices,
+        'customer_choices': customer_choices,
+        'avg_mape': avg['avg_mape'],
+        'avg_bias': avg['avg_bias'],
         'weighted': weighted,
-        'drill_location_rows': drill_location_rows,
-        'drill_taxonomy_rows': drill_taxonomy_rows,
-        'location_breadcrumb': location_breadcrumb,
-        'taxonomy_breadcrumb': taxonomy_breadcrumb,
-        'total_rows': len(rows),
+        'total_rows': line_paginator.count,
         'show_channel': show_channel,
         'can_run_accuracy': version.accuracy_button_enabled(role),
         'accuracy_run_active': version.accuracy_run_status in (
@@ -1397,8 +1536,24 @@ def version_accuracy(request, pk, client_id=None):
         ),
         'active_nav': 'versions',
     }
+
     if _is_htmx(request):
-        return render(request, 'demand/partials/accuracy_table_body.html', context)
+        from django.template.loader import render_to_string
+        html = (
+            render_to_string(
+                'demand/partials/accuracy_aggregates_filter_bar.html',
+                context, request
+            ) +
+            render_to_string(
+                'demand/partials/accuracy_aggregates_table_body.html',
+                context, request
+            ) +
+            render_to_string(
+                'demand/partials/accuracy_line_table_body.html',
+                context, request
+            )
+        )
+        return HttpResponse(html)
     return render(request, 'demand/version_accuracy.html', context)
 
 

@@ -109,6 +109,26 @@ class TestComputeMetrics:
         assert m['wmape'] is None
         assert m['wbias'] is None
 
+    def test_reports_distinct_item_count_when_present(self):
+        df = pd.DataFrame([
+            {'item_id': 1, 'actual_qty': 100, 'forecast_qty': 120,
+             'actual_value': 1000, 'forecast_value': 1200},
+            {'item_id': 1, 'actual_qty': 50, 'forecast_qty': 40,
+             'actual_value': 500, 'forecast_value': 400},
+            {'item_id': 2, 'actual_qty': 10, 'forecast_qty': 20,
+             'actual_value': 100, 'forecast_value': 200},
+        ])
+        m = compute_metrics(df)
+        assert m['n_items'] == 2
+
+    def test_item_count_zero_without_item_column(self):
+        df = pd.DataFrame([
+            {'actual_qty': 100, 'forecast_qty': 120,
+             'actual_value': 1000, 'forecast_value': 1200},
+        ])
+        m = compute_metrics(df)
+        assert m['n_items'] == 0
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Location drill
@@ -141,6 +161,9 @@ class TestLocationDrill:
         assert by_code['A']['wmape'] == 20.0
         assert by_code['B']['graded_count'] == 1
         assert by_code['B']['wmape'] == 50.0
+        # Aggregate rows report distinct item count and value metrics.
+        assert by_code['A']['n_items'] == 1
+        assert by_code['A']['value_mape'] == 20.0
 
     def test_drill_into_leaf_shows_items(self, report_version, report_locations,
                                          active_item, distribution_channel_common):
@@ -157,6 +180,7 @@ class TestLocationDrill:
         assert len(rows) == 2
         assert rows[0]['wmape'] == 20.0    # item1, best first
         assert rows[1]['wmape'] == 50.0    # item2
+        assert rows[0]['n_items'] == 1     # item rows cover a single SKU
         assert breadcrumb[-1]['label'] == (leaf_a.name or leaf_a.code)
 
 

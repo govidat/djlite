@@ -1,0 +1,235 @@
+{% load i18n %}
+<div class="bg-base-200 rounded-box p-4 mb-4" id="accuracy-agg-filter-bar">
+
+    {# ── Active filter badges ──────────────────────────────────────── #}
+    {% if filters.period_start or filters.customer_code or filters.value_min or filters.value_max or filters.sales_node_id or filters.taxonomy_node_id %}
+    <div class="flex flex-wrap gap-2 mb-3">
+        <span class="text-xs text-base-content/50 self-center">
+            {% trans "Active filters:" %}
+        </span>
+        {% if filters.period_start %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Period" %}: {{ filters.period_start }}
+            <button onclick="clearAccuracyAggFilter('period_start')"
+                    class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.customer_code %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Customer" %}: {{ filters.customer_code }}
+            <button onclick="clearAccuracyAggFilter('customer_code')"
+                    class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.value_min or filters.value_max %}
+        <span class="badge badge-neutral gap-1">
+            ₹ {{ filters.value_min|default:'0' }}
+            — {{ filters.value_max|default:'∞' }}
+            <button onclick="clearAccuracyAggFilter('value_range')"
+                    class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.sales_node_id %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Sales org" %}: {{ filters.sales_node_id }}
+            <button onclick="clearAccuracyAggFilter('sales_node')"
+                    class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        {% if filters.taxonomy_node_id %}
+        <span class="badge badge-neutral gap-1">
+            {% trans "Item category" %}: {{ filters.taxonomy_node_id }}
+            <button onclick="clearAccuracyAggFilter('taxonomy_node')"
+                    class="ml-1 font-bold">×</button>
+        </span>
+        {% endif %}
+        <button id="accuracy-agg-clear-all" class="badge badge-error gap-1">
+            {% trans "Clear all" %}
+        </button>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap gap-3 items-end">
+
+        {# ── Period — all levels ───────────────────────────────────── #}
+        {% if periods|length > 1 %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Period" %}</span>
+            </label>
+            <select id="accuracy-agg-period" class="select select-bordered select-sm">
+                <option value="">{% trans "All periods" %}</option>
+                {% for period in periods %}
+                <option value="{{ period|date:'Y-m-d' }}"
+                        {% if filters.period_start == period|date:'Y-m-d' %}
+                        selected{% endif %}>
+                    {{ period|date:"M Y" }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% else %}
+        <input type="hidden" id="accuracy-agg-period"
+               value="{{ filters.period_start }}">
+        {% endif %}
+
+        {# ── Sales hierarchy — sales level only ─────────────────────── #}
+        {% if agg_level == 'sales' and sales_node_choices %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Drill into sales org" %}</span>
+            </label>
+            <select id="accuracy-agg-sales-node" class="select select-bordered select-sm">
+                <option value="">{% trans "Whole sales org" %}</option>
+                {% for node in sales_node_choices %}
+                <option value="{{ node.id }}"
+                        {% if filters.sales_node_id == node.id|stringformat:'s' %}
+                        selected{% endif %}>
+                    {{ node.level_label }}: {{ node.code }} — {{ node.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {# ── Item hierarchy — item_hierarchy level only ─────────────── #}
+        {% if agg_level == 'item_hierarchy' and taxonomy_node_choices %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Drill into item category" %}</span>
+            </label>
+            <select id="accuracy-agg-taxonomy-node" class="select select-bordered select-sm">
+                <option value="">{% trans "Whole item hierarchy" %}</option>
+                {% for node in taxonomy_node_choices %}
+                <option value="{{ node.id }}"
+                        {% if filters.taxonomy_node_id == node.id|stringformat:'s' %}
+                        selected{% endif %}>
+                    {{ node.taxonomy__name }} › {{ node.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {# ── Customer — customer level only ───────────────────────── #}
+        {% if agg_level == 'customer' and customer_choices|length > 1 %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Customer" %}</span>
+            </label>
+            <select id="accuracy-agg-customer" class="select select-bordered select-sm">
+                <option value="">{% trans "All customers" %}</option>
+                {% for code, name in customer_choices %}
+                <option value="{{ code }}"
+                        {% if filters.customer_code == code %}selected{% endif %}>
+                    {{ code }} — {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {# ── Value actual range — all non-total levels ──────────────── #}
+        {% if agg_level != 'total' %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">
+                    {% trans "Value Actual (₹) min" %}
+                </span>
+            </label>
+            <input type="number" id="accuracy-agg-value-min"
+                   class="input input-bordered input-sm w-28"
+                   placeholder="0"
+                   value="{{ filters.value_min }}">
+        </div>
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "max" %}</span>
+            </label>
+            <input type="number" id="accuracy-agg-value-max"
+                   class="input input-bordered input-sm w-28"
+                   placeholder="∞"
+                   value="{{ filters.value_max }}">
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<script>
+(function() {
+    var baseUrl   = '{% url "demand_ui:version_accuracy" client_id=client.client_id pk=version.pk %}';
+    var currentAggLevel = '{{ agg_level }}';
+
+    function getVal(id) {
+        var el = document.getElementById(id);
+        return el ? el.value : '';
+    }
+
+    function applyFilters() {
+        var params = new URLSearchParams();
+        params.set('agg_level', currentAggLevel);
+
+        var period    = getVal('accuracy-agg-period');
+        var customer  = getVal('accuracy-agg-customer');
+        var valMin    = getVal('accuracy-agg-value-min');
+        var valMax    = getVal('accuracy-agg-value-max');
+        var salesNode = getVal('accuracy-agg-sales-node');
+        var taxNode   = getVal('accuracy-agg-taxonomy-node');
+
+        if (period)   params.set('period_start', period);
+        if (customer) params.set('customer_code', customer);
+        if (valMin)   params.set('value_min', valMin);
+        if (valMax)   params.set('value_max', valMax);
+        if (salesNode) params.set('sales_node_id', salesNode);
+        if (taxNode)   params.set('taxonomy_node_id', taxNode);
+
+        htmx.ajax('GET', baseUrl + '?' + params.toString(), {
+            target:  '#accuracy-container',
+            swap:    'innerHTML',
+            headers: {'HX-Request': 'true'},
+        });
+    }
+
+    window.clearAccuracyAggFilter = function(name) {
+        var map = {
+            'period_start':  ['accuracy-agg-period'],
+            'customer_code': ['accuracy-agg-customer'],
+            'value_range':   ['accuracy-agg-value-min', 'accuracy-agg-value-max'],
+            'sales_node':    ['accuracy-agg-sales-node'],
+            'taxonomy_node': ['accuracy-agg-taxonomy-node'],
+        };
+        (map[name] || []).forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        applyFilters();
+    };
+
+    var clearAll = document.getElementById('accuracy-agg-clear-all');
+    if (clearAll) {
+        clearAll.addEventListener('click', function() {
+            ['accuracy-agg-period', 'accuracy-agg-customer',
+             'accuracy-agg-value-min', 'accuracy-agg-value-max',
+             'accuracy-agg-sales-node', 'accuracy-agg-taxonomy-node'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            applyFilters();
+        });
+    }
+
+    // Dropdown change listeners
+    ['accuracy-agg-period', 'accuracy-agg-customer',
+     'accuracy-agg-sales-node', 'accuracy-agg-taxonomy-node'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', applyFilters);
+    });
+
+    // Range inputs — fire on change to avoid too many requests
+    ['accuracy-agg-value-min', 'accuracy-agg-value-max'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', applyFilters);
+    });
+})();
+</script>

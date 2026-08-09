@@ -340,10 +340,13 @@ class TestAccuracyViews:
         assert resp.status_code == 200
         body = resp.content.decode()
         assert 'Forecast Accuracy' in body
-        assert 'Weighted MAPE' in body
-        assert '25.0' in body              # WMAPE stat card
-        assert 'Location drill-down' in body
-        assert 'Taxonomy drill-down' in body
+        assert 'Value MAPE' in body        # value-first headline stat
+        assert 'Avg MAPE' in body
+        assert '25.0' in body              # per-row avg MAPE stat card
+        assert 'Sales Hierarchy' in body   # aggregate level tabs
+        assert 'Item Hierarchy' in body
+        assert 'Value Actual (₹)' in body  # aggregate table column
+        assert 'How to read this report' in body   # help link present
 
     def test_accuracy_page_disallows_anonymous(self, approved_version):
         from django.test import Client

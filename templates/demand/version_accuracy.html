@@ -16,36 +16,30 @@
     </div>
 </div>
 
-{% if weighted.wmape is not None or avg_mape is not None %}
+{% if weighted.value_mape is not None or avg_mape is not None %}
 <div class="stats shadow mb-6">
     <div class="stat">
-        <div class="stat-title">{% trans "Weighted MAPE (WMAPE)" %}</div>
+        <div class="stat-title">{% trans "Value MAPE" %}</div>
         <div class="stat-value text-2xl">
-            {% if weighted.wmape is not None %}{{ weighted.wmape }}%{% else %}—{% endif %}
+            {% if weighted.value_mape is not None %}
+            <span class="{% if weighted.value_mape > 50 %}text-error{% elif weighted.value_mape > 25 %}text-warning{% else %}text-success{% endif %}">
+                {{ weighted.value_mape }}%
+            </span>
+            {% else %}—{% endif %}
         </div>
         <div class="stat-desc">
-            {% if weighted.graded_count is not None %}{{ weighted.graded_count }}{% else %}0{% endif %}
-            {% trans "series" %} · {% trans "actual" %} {{ weighted.sum_actual|default:"0" }}
+            {% if weighted.value_count is not None %}{{ weighted.value_count }}{% else %}0{% endif %}
+            {% trans "value series" %} · {% trans "actual" %} ₹{{ weighted.sum_value_actual|default:"0" }}
         </div>
     </div>
     <div class="stat">
-        <div class="stat-title">{% trans "Weighted Bias" %}</div>
+        <div class="stat-title">{% trans "Value Bias" %}</div>
         <div class="stat-value text-2xl">
-            {% if weighted.wbias is not None %}{{ weighted.wbias }}%{% else %}—{% endif %}
+            {% if weighted.value_bias is not None %}{{ weighted.value_bias }}%{% else %}—{% endif %}
         </div>
         <div class="stat-desc">
             {% if weighted.over_forecast_pct is not None %}{{ weighted.over_forecast_pct }}%{% else %}—{% endif %}
             {% trans "over-forecast" %}
-        </div>
-    </div>
-    <div class="stat">
-        <div class="stat-title">{% trans "Value MAPE" %}</div>
-        <div class="stat-value text-2xl">
-            {% if weighted.value_mape is not None %}{{ weighted.value_mape }}%{% else %}—{% endif %}
-        </div>
-        <div class="stat-desc">
-            {% if weighted.value_count is not None %}{{ weighted.value_count }}{% else %}0{% endif %}
-            {% trans "value series" %}
         </div>
     </div>
     <div class="stat">
@@ -55,33 +49,134 @@
         </div>
         <div class="stat-desc">{% trans "unweighted per-row" %}</div>
     </div>
+    <div class="stat">
+        <div class="stat-title">{% trans "Items" %}</div>
+        <div class="stat-value text-2xl">{{ weighted.n_items|default:0 }}</div>
+        <div class="stat-desc">
+            {% if weighted.graded_count is not None %}{{ weighted.graded_count }}{% else %}0{% endif %}
+            {% trans "series graded" %}
+        </div>
+    </div>
 </div>
 {% endif %}
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-    <div class="card bg-base-200">
-        <div class="card-body">
-            <h3 class="card-title text-base">{% trans "Location drill-down" %}</h3>
-            <div id="accuracy-hierarchy-locations-container">
-                {% with rows=drill_location_rows current=None breadcrumb=location_breadcrumb %}
-                {% include "demand/partials/accuracy_hierarchy_locations.html" %}
-                {% endwith %}
-            </div>
-        </div>
-    </div>
-    <div class="card bg-base-200">
-        <div class="card-body">
-            <h3 class="card-title text-base">{% trans "Taxonomy drill-down" %}</h3>
-            <div id="accuracy-hierarchy-taxonomy-container">
-                {% with rows=drill_taxonomy_rows node_path=None breadcrumb=taxonomy_breadcrumb %}
-                {% include "demand/partials/accuracy_hierarchy_taxonomy.html" %}
-                {% endwith %}
-            </div>
-        </div>
-    </div>
+<div class="flex justify-end mb-3">
+    <button class="btn btn-outline btn-xs"
+            onclick="document.getElementById('accuracy-help-modal').showModal()">
+        ? {% trans "How to read this report" %}
+    </button>
 </div>
 
-<div id="accuracy-table-container">
-    {% include "demand/partials/accuracy_table_body.html" %}
+<dialog id="accuracy-help-modal" class="modal">
+    <div class="modal-box max-w-3xl">
+        <h3 class="text-lg font-bold mb-3">{% trans "How to read this report" %}</h3>
+        <div class="text-sm space-y-4">
+            <p>
+                {% blocktrans %}
+                Accuracy compares the version's forecast against the actuals for the
+                same periods. At the <strong>aggregate</strong> level (the headline stats and
+                the drill rows) the report uses <strong>value-based</strong> accuracy:
+                quantities of different products cannot be added together, so a qty MAPE
+                across several items is meaningless. Value (₹) is comparable, so Value MAPE
+                is the headline accuracy measure. Per-item/line rows still show qty MAPE,
+                which is meaningful for a single SKU.
+                {% endblocktrans %}
+            </p>
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>{% trans "Measure" %}</th>
+                            <th>{% trans "Definition" %}</th>
+                            <th>{% trans "Meaning" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="font-medium">{% trans "MAPE %" %}</td>
+                            <td>|forecast − actual| ÷ actual × 100, per series</td>
+                            <td>{% trans "How far the forecast deviates from actuals, ignoring direction. Lower is better; 0% = perfect." %}</td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">{% trans "Value MAPE %" %}</td>
+                            <td>Σ|forecast value − actual value| ÷ Σ actual value × 100</td>
+                            <td>{% trans "Same idea but value-weighted, so it can be rolled up across many items. This is the headline score for aggregate rows." %}</td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">{% trans "Bias %" %}</td>
+                            <td>(forecast − actual) ÷ actual × 100, per series</td>
+                            <td>{% trans "Direction of the error. Positive = over-forecast (plans too high); negative = under-forecast. Closer to 0 is better." %}</td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">{% trans "Value Bias %" %}</td>
+                            <td>Σ(forecast value − actual value) ÷ Σ actual value × 100</td>
+                            <td>{% trans "Value-weighted bias at aggregate level." %}</td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">{% trans "Over-forecast %" %}</td>
+                            <td>{% trans "Share of series where forecast &gt; actual" %}</td>
+                            <td>{% trans "How systematic the over-forecasting is across series." %}</td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">{% trans "Avg MAPE %" %}</td>
+                            <td>{% trans "Simple mean of the per-row MAPE values" %}</td>
+                            <td>{% trans "Unweighted average across series; every row counts equally, unlike the value-weighted headline." %}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h4 class="font-semibold mb-1">{% trans "What does the score mean?" %}</h4>
+                <ul class="list-disc list-inside space-y-1">
+                    <li class="text-success"><strong>≤ 25%</strong> — {% trans "good. Most forecasts land within a quarter of actuals." %}</li>
+                    <li class="text-warning"><strong>25 – 50%</strong> — {% trans "fair. Significant deviation; review the affected items." %}</li>
+                    <li class="text-error"><strong>&gt; 50%</strong> — {% trans "poor. Forecasts are far from actuals; re-evaluate the series." %}</li>
+                </ul>
+                <p class="mt-2">{% trans "Colours in the tables follow these same thresholds. Lower scores are always better." %}</p>
+            </div>
+            <div>
+                <h4 class="font-semibold mb-1">{% trans "Drilling down" %}</h4>
+                <p>
+                    {% blocktrans %}
+                    Use the level tabs to switch between Total, Sales Hierarchy,
+                    Item Hierarchy and Customer. At the Sales Hierarchy and Item
+                    Hierarchy levels the filter bar lets you drill into a sales
+                    org node or an item category node; rows are then restricted
+                    to that node's subtree. Filter by period, customer or a
+                    value band to focus on a slice of the data.
+                    {% endblocktrans %}
+                </p>
+            </div>
+        </div>
+        <div class="modal-action">
+            <button class="btn btn-sm" onclick="document.getElementById('accuracy-help-modal').close()">{% trans "Close" %}</button>
+        </div>
+    </div>
+</dialog>
+
+{# ── Level selector ────────────────────────────────────────────────── #}
+<div class="tabs tabs-boxed mb-4 w-fit" id="accuracy-level-tabs">
+    {% for level, label in agg_level_choices %}
+    <a class="tab {% if agg_level == level %}tab-active{% endif %}"
+       id="accuracy-tab-{{ level }}"
+       hx-get="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}?agg_level={{ level }}"
+       hx-target="#accuracy-container"
+       hx-swap="innerHTML"
+       hx-headers='{"HX-Request": "true"}'
+       hx-on:click="
+           document.querySelectorAll('#accuracy-level-tabs .tab')
+               .forEach(function(t){t.classList.remove('tab-active')});
+           this.classList.add('tab-active');
+       ">
+        {{ label }}
+    </a>
+    {% endfor %}
+</div>
+
+{# ── Filter bar + tables — all inside the swap target ──────────────── #}
+<div id="accuracy-container">
+    {% include "demand/partials/accuracy_aggregates_filter_bar.html" %}
+    {% include "demand/partials/accuracy_aggregates_table_body.html" %}
+    {% include "demand/partials/accuracy_line_table_body.html" %}
 </div>
 {% endblock %}

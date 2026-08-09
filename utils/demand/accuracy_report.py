@@ -21,6 +21,11 @@ from django.db.models import Q
 from mysite.models.demand.forecast import ForecastAccuracy, ForecastingConfig
 from mysite.models.demand.hierarchy import PlanningLocation
 from mysite.models.catalogue import TaxonomyNode, ItemTaxonomyNode
+from utils.demand.hierarchy_utils import (
+    get_sales_forecast_link_map,
+    get_sales_node_subtree_ids,
+    resolve_sales_link,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Metrics
@@ -28,6 +33,7 @@ from mysite.models.catalogue import TaxonomyNode, ItemTaxonomyNode
 
 METRIC_KEYS = (
     'record_count', 'graded_count',
+    'n_items',
     'sum_actual', 'sum_forecast', 'wmape', 'wbias', 'over_forecast_pct',
     'value_count', 'sum_value_actual', 'sum_value_forecast',
     'value_mape', 'value_bias',
@@ -36,6 +42,7 @@ METRIC_KEYS = (
 EMPTY_METRICS = dict.fromkeys(METRIC_KEYS, None)
 EMPTY_METRICS['record_count'] = 0
 EMPTY_METRICS['graded_count'] = 0
+EMPTY_METRICS['n_items'] = 0
 EMPTY_METRICS['value_count'] = 0
 
 
@@ -84,6 +91,8 @@ def compute_metrics(df: pd.DataFrame) -> dict:
     qty = df[pd.to_numeric(df['actual_qty'], errors='coerce') > 0]
     m['record_count'] = int(len(df))
     m['graded_count'] = int(len(qty))
+    if 'item_id' in df.columns:
+        m['n_items'] = int(pd.to_numeric(df['item_id'], errors='coerce').nunique())
 
     if len(qty):
         sum_act = float(pd.to_numeric(qty['actual_qty'], errors='coerce').sum())
@@ -394,6 +403,210 @@ def _taxonomy_breadcrumb(node_path):
             'label': (node.name or node.slug) if node else prefix,
         })
     return crumbs
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Aggregate drill (Value Summary / Actuals Summary style)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def accuracy_agg_records_df(version) -> pd.DataFrame:
+    """
+    Rich leaf-accuracy frame for aggregate drills: every ForecastAccuracy row
+    for the version plus the resolved Sales Hierarchy node (a→b→c via
+    SalesForecastLink), the primary Taxonomy node, the customer code, and the
+    distribution channel code.
+    """
+    from mysite.models.demand.forecast import ForecastAccuracy
+
+    df = pd.DataFrame(list(
+        ForecastAccuracy.objects
+        .filter(version=version)
+        .values(
+            'pk', 'item_id',
+            'planning_location_id', 'planning_customer_id',
+            'planning_customer__code', 'distribution_channel__code',
+            'period_start',
+            'actual_qty', 'forecast_qty', 'actual_value', 'forecast_value',
+        )
+    ))
+    for col in ('sales_node_id', 'taxonomy_node_id', 'taxonomy_path'):
+        df[col] = None
+    if df.empty:
+        return df
+    for col in ('actual_qty', 'forecast_qty', 'actual_value', 'forecast_value'):
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # Sales hierarchy: resolve each row to its leaf SalesNode via a→b→c.
+    link_map = get_sales_forecast_link_map(version.client_id)
+    df['sales_node_id'] = [
+        resolve_sales_link(link_map, loc, dc, cust)
+        for loc, dc, cust in zip(
+            df['planning_location_id'],
+            df['distribution_channel__code'],
+            df['planning_customer_id'],
+        )
+    ]
+
+    # Item hierarchy: primary taxonomy node per item.
+    item_map = _mapped_nodes(version, set(df['item_id']))
+    df['taxonomy_node_id'] = df['item_id'].map(
+        lambda iid: item_map[iid].pk if iid in item_map else None)
+    df['taxonomy_path'] = df['item_id'].map(
+        lambda iid: item_map[iid].path if iid in item_map else None)
+    return df
+
+
+def _agg_dim_isna(v) -> bool:
+    try:
+        return v is None or pd.isna(v)
+    except (TypeError, ValueError):
+        return False
+
+
+def accuracy_aggregate_rows(
+    version,
+    agg_level='total',
+    period_start=None,
+    customer_code=None,
+    sales_node_id=None,
+    taxonomy_node_id=None,
+    value_min=None,
+    value_max=None,
+):
+    """
+    Value-based accuracy rows grouped by (period, dimension key) at the
+    requested level — the accuracy equivalent of ForecastAggregate rows, so the
+    Accuracy page can reuse the Value Summary / Actuals Summary layout.
+
+    agg_level ∈ {'total', 'sales', 'item_hierarchy', 'customer'}.
+
+    Returns (rows, grand_metrics). Each row carries the compute_metrics dict
+    plus 'period_start', 'dim', 'display_key', 'display_hierarchy'.
+    """
+    valid = {'total', 'sales', 'item_hierarchy', 'customer'}
+    if agg_level not in valid:
+        raise ValueError(f'agg_level must be one of: {sorted(valid)}.')
+
+    df = accuracy_agg_records_df(version)
+    grand = compute_metrics(df)
+    if df.empty:
+        return [], grand
+
+    # ── Filters (applied to leaf rows, before grouping) ──────────────────
+    if period_start:
+        df = df[df['period_start'] == period_start]
+    if customer_code:
+        df = df[df['planning_customer__code'] == customer_code]
+    if sales_node_id is not None:
+        subtree = set(get_sales_node_subtree_ids(version.client_id, sales_node_id))
+        df = df[df['sales_node_id'].isin(subtree)]
+    if taxonomy_node_id is not None:
+        from utils.taxonomy_filters import resolve_node_subtree_ids
+        try:
+            subtree = set(resolve_node_subtree_ids(version.client, taxonomy_node_id))
+        except Exception:
+            subtree = set()
+        df = df[df['taxonomy_node_id'].isin(subtree)]
+
+    grand = compute_metrics(df)
+    if df.empty:
+        return [], grand
+
+    # ── Dimension column per level ────────────────────────────────────────
+    if agg_level == 'total':
+        df = df.copy()
+        df['dim'] = 0
+    elif agg_level == 'sales':
+        df = df.copy()
+        df['dim'] = df['sales_node_id']
+    elif agg_level == 'item_hierarchy':
+        df = df.copy()
+        df['dim'] = df['taxonomy_node_id']
+    else:  # customer
+        df = df.copy()
+        df['dim'] = df['planning_customer__code']
+
+    rows = []
+    for (period, dim), group in df.groupby(['period_start', 'dim'], dropna=False):
+        m = compute_metrics(group)
+        if value_min is not None or value_max is not None:
+            va = m['sum_value_actual']
+            if va is None:
+                continue
+            if value_min is not None and va < float(value_min):
+                continue
+            if value_max is not None and va > float(value_max):
+                continue
+        rows.append({
+            'period_start': period,
+            'dim': dim,
+            **m,
+        })
+
+    _attach_agg_display(version, agg_level, rows)
+    rows.sort(key=lambda r: (r['period_start'], r['display_key']))
+    return rows, grand
+
+
+def _attach_agg_display(version, agg_level, rows):
+    """Fill display_key / display_hierarchy for each aggregate row."""
+    if agg_level == 'total':
+        for r in rows:
+            r['display_key'] = 'All'
+            r['display_hierarchy'] = ''
+        return
+
+    if agg_level == 'sales':
+        from utils.demand.hierarchy_utils import get_sales_node_info_map
+        info = get_sales_node_info_map(version.client_id)
+        for r in rows:
+            nid = None if _agg_dim_isna(r['dim']) else int(r['dim'])
+            node = info.get(nid)
+            if node is None:
+                r['display_key'] = 'Unassigned'
+                r['display_hierarchy'] = ''
+            else:
+                r['display_key'] = f'{node["code"]} — {node["name"] or node["code"]}'
+                chain = [info[a]['code'] for a in node['ancestors'] if a in info]
+                chain.append(node['code'])
+                r['display_hierarchy'] = ' › '.join(chain)
+        return
+
+    if agg_level == 'item_hierarchy':
+        from mysite.models.catalogue import TaxonomyNode
+        from utils.demand.hierarchy_utils import get_product_hierarchy_ancestor_map
+        node_rows = list(
+            TaxonomyNode.objects.filter(client=version.client)
+            .values('id', 'name', 'taxonomy_id')
+        )
+        ancestors = get_product_hierarchy_ancestor_map(version.client_id)
+        info = {
+            n['id']: {
+                'name': n['name'],
+                'ancestors': ancestors.get(n['id'], []),
+            }
+            for n in node_rows
+        }
+        for r in rows:
+            nid = None if _agg_dim_isna(r['dim']) else int(r['dim'])
+            node = info.get(nid)
+            if node is None:
+                r['display_key'] = 'Unassigned'
+                r['display_hierarchy'] = ''
+            else:
+                r['display_key'] = node['name']
+                chain = [info[a]['name'] for a in node['ancestors'] if a in info]
+                chain.append(node['name'])
+                r['display_hierarchy'] = ' › '.join(chain)
+        return
+
+    # customer
+    for r in rows:
+        if _agg_dim_isna(r['dim']):
+            r['display_key'] = 'Unassigned'
+        else:
+            r['display_key'] = str(r['dim'])
+        r['display_hierarchy'] = ''
 
 
 # ─────────────────────────────────────────────────────────────────────────────
