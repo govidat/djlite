@@ -1,0 +1,37 @@
+{% load i18n %}
+{% with disc=form_data|default:None %}
+<h3 class="font-bold text-lg mb-4">
+  {% if discontinuation %}{% trans "Edit Discontinuation" %}{% else %}{% trans "New Discontinuation" %}{% endif %}
+</h3>
+
+{% if errors.__all__ %}
+<div class="alert alert-error mb-4"><span>{{ errors.__all__ }}</span></div>
+{% endif %}
+
+<form hx-post="{% if discontinuation %}{% url 'demand_ui:item_discontinuation_edit' client_id=client.client_id pk=discontinuation.pk %}{% else %}{% url 'demand_ui:item_discontinuation_create' client_id=client.client_id %}{% endif %}"
+      hx-target="#modal-content"
+      hx-swap="innerHTML">
+  {% csrf_token %}
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Item ID" %}</span></label>
+    <input type="text" name="item" value="{{ disc.item_id|default:'' }}" class="input input-bordered w-full {% if errors.item %}input-error{% endif %}" required />
+    {% if errors.item %}<span class="text-error text-sm">{{ errors.item }}</span>{% endif %}
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Effective From" %}</span></label>
+    <input type="date" name="effective_from" value="{{ disc.effective_from|default:'' }}" class="input input-bordered w-full" />
+    <span class="label-text-alt text-base-content/50">{% trans "Null = nil forecast immediately." %}</span>
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Notes" %}</span></label>
+    <textarea name="notes" class="textarea textarea-bordered w-full" rows="2">{{ disc.notes|default:'' }}</textarea>
+  </div>
+
+  <div class="modal-action">
+    <button type="submit" class="btn btn-primary">{% trans "Save" %}</button>
+  </div>
+</form>
+{% endwith %}

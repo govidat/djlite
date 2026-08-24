@@ -3,7 +3,7 @@
 **App label:** `mysite`  
 **Stack:** Django 5.2 · DRF · Celery · Redis · PostgreSQL · DaisyUI · HTMX  
 **Document status:** Living document — updated after each sprint  
-**Last updated:** Sprint 3B.3 complete + SeriesProfile addition  
+**Last updated:** Sprint 3B.3 complete + Item Lifecycle (3B.2d) complete  
 
 ---
 
@@ -171,6 +171,27 @@ All new Demand Planning models use `gettext_lazy as _` for verbose names, help t
 - `celery_demand_feature_guard(client, feature)` — Celery task guard returning skip-dict or None
 - `bust_feature_cache(sender, instance)` — `post_save` signal handler for cache invalidation
 
+### 2.9 Item Lifecycle Management (planned Sprint 3B.2d)
+
+Items pass through lifecycle events a naive "one item, one series" model cannot represent. Three events are
+supported under one umbrella — one `ForecastingConfig.use_item_lifecycle` flag (default `True`), one
+`item_lifecycle` `ClientFeatureControl` key, one HTMX/admin UI — but each lands in a **different layer**:
+
+| Event | Scenario | Layer | Where it runs |
+|---|---|---|---|
+| `ItemSubstitution` | retired code → successor, qty conversion (`2 old = 1 new`) | baseline re-key | inside `actuals_queryset_with_net()` after scheme + outlier netting |
+| `ItemDiscontinuation` | item withdrawn from an effective date | forecast-output filter | `write_forecast_lines` (nil on/after `effective_from`) |
+| `ItemIntroduction` | new item with no history borrows a reference forecast × `ratio` | forecast-output copy | `write_forecast_lines` (window-bounded, stops at enough own history) |
+
+**One lifecycle directive per item:** event-subject roles (substitution `old_item`/`new_item`, discontinued
+item, introduction `new_item`) are pairwise exclusive — validated in each model's `clean()` via a shared
+`_assert_subject_role_free()` helper (chains and cycles impossible). Direct mapping only for substitution.
+Discontinuation keeps the item's history (still feeds reporting/ABC/accuracy); it is a forecast-output
+filter, not a data mutation. Introduction copies the **reference item's statistical line** (reference is not
+retired), tags borrowed lines with `borrowed_from_item` / `borrowed_ratio` on `ForecastLine`, and stops at
+the earlier of `copy_to` and `min_history_periods` own periods. Nothing is materialized at save time — the
+substitution layer is a live re-key JOIN, and the output layers read the models at write time.
+
 ---
 
 ## 3. Package Registry
@@ -242,7 +263,7 @@ All models live under `mysite/models/demand/`.
 | Model | Key fields | Notes |
 |---|---|---|
 | `ForecastVersion` | `client`, `version_label`, `period_type`, `base_period_end`, `horizon_periods`, `engine_config JSONField`, `status`, `created_by`, `approved_by nullable`, `approved_at nullable`, `locked_at nullable`, `copied_from→self nullable` | State machine via `transition_to()`. `copy()` clones to new DRAFT. |
-| `ForecastLine` | `version`, `item→mysite.Item`, `planning_customer nullable`, `planning_location`, `period_type`, `period_start`, `period_end`, `statistical_qty`, `override_qty nullable`, `final_qty`, `forecast_level`, `model_used` | `final_qty` = `override_qty` if set else `statistical_qty`. Auto-computed in `save()`. |
+| `ForecastLine` | `version`, `item→mysite.Item`, `planning_customer nullable`, `planning_location`, `period_type`, `period_start`, `period_end`, `statistical_qty`, `override_qty nullable`, `final_qty`, `forecast_level`, `model_used`, `borrowed_from_item→mysite.Item nullable`, `borrowed_ratio nullable` | `final_qty` = `override_qty` if set else `statistical_qty`. Auto-computed in `save()`. `borrowed_from_item`/`borrowed_ratio` tag lines copied from a reference item by `ItemIntroduction` (Sprint 3B.2d). |
 | `ForecastAggregate` | `version`, `agg_level`, `agg_key JSONField`, `period_type`, `period_start`, `period_end`, `statistical_qty`, `override_qty nullable`, `final_qty` | Pre-rolled aggregates. Read-only from API. Populated by Celery. |
 | `ForecastOverride` | `version`, `override_level`, `override_key JSONField`, `period_type`, `period_start`, `override_qty nullable`, `override_pct nullable`, `disagg_method`, `override_note`, `created_by`, `is_applied` | Exactly one of `override_qty` / `override_pct` must be set. DRAFT only. |
 | `OverrideSplitWeight` | `override`, `child_key JSONField`, `weight` | Only for `disagg_method=CUSTOM`. Weights should sum to 1.0. |
@@ -256,6 +277,19 @@ All models live under `mysite/models/demand/`.
 **`SeriesProfile.ForecastStrategy` choices:** `AUTOETS`, `AUTOARIMA`, `CROSTON`, `AGG_LOCATION`, `AGG_ITEM`, `AGG_TOTAL`, `MOVING_AVG`, `MANUAL`
 
 **`SeriesProfile.classify(qty_series, adi_threshold, cv2_threshold, min_nonzero)`** — classmethod, pure function, returns dict with all metrics and classification. No DB access.
+
+### 4.5 `lifecycle.py` (Sprint 3B.2d — Item Lifecycle Management)
+
+| Model | Key fields | Notes |
+|---|---|---|
+| `ItemSubstitution` | `client`, `old_item`, `new_item`, `conversion_factor`, `effective_from nullable`, `notes` | Scenario 3 — retired code → successor. `unique (client, old_item)`; `conversion_factor > 0`; **direct mapping only** (an item may never be both predecessor and successor → no chains/cycles). Old-item rows with `period_start < effective_from` (NULL = whole history) re-key to the successor, scaled by `conversion_factor` on qty **and** revenue (per-unit price preserved); exclusive cutoff so converted history and the successor's own actuals never overlap. Applied as a live re-key layer in `actuals_queryset_with_net()` after scheme + outlier netting. The retired old item's own forecast is nil on/after `effective_from`. |
+| `ItemDiscontinuation` | `client`, `item`, `effective_from nullable`, `notes` | Scenario 1 — item withdrawn. `unique (client, item)`. Forecast-output **filter** at `write_forecast_lines`: no `ForecastLine` for horizon periods `>= effective_from` (NULL = nil immediately); pre-cutoff periods forecast normally from the item's own history. History kept for reporting/ABC/accuracy — not a data mutation, not an `Item` status change. |
+| `ItemIntroduction` | `client`, `new_item`, `reference_item`, `ratio`, `copy_from nullable`, `copy_to nullable`, `notes` | Scenario 2 — new item with no history. `unique (client, new_item)`; `ratio > 0`; `copy_to >= copy_from`; no reference chains. Forecast-output **copy** at `write_forecast_lines`: the new item's line = reference statistical line × `ratio`, tagged `borrowed_from_item`/`borrowed_ratio`; borrow bounded by `[copy_from, copy_to]` (NULL bounds) and stops at the earlier of `copy_to` and `min_history_periods` own periods. Reference item not retired. |
+
+All three share the `_assert_subject_role_free(client_id, item_id, exclude_model, exclude_pk)` helper that
+enforces **one lifecycle directive per item** (subject roles pairwise exclusive across the three models).
+No data signals are needed — the substitution layer is a live JOIN and the output layers read the models at
+write time.
 
 ### 4.4 Index name reference
 
@@ -287,6 +321,11 @@ All index names follow the convention `ix_{abbreviated_model}_{abbreviated_field
 | `ix_fcastacc_ver_period` | `mysite_forecastaccuracy` | `version`, `period_start` |
 | `ix_seriespro_client_cls` | `mysite_seriesprofile` | `client`, `demand_class` |
 | `ix_seriespro_client_strat` | `mysite_seriesprofile` | `client`, `recommended_strategy` |
+| `ix_itemsubst_old` | `mysite_itemsubstitution` | `client`, `old_item` |
+| `ix_itemsubst_new` | `mysite_itemsubstitution` | `client`, `new_item` |
+| `ix_itemdisc_item` | `mysite_itemdiscontinuation` | `client`, `item` |
+| `ix_itemintro_new` | `mysite_itemintroduction` | `client`, `new_item` |
+| `ix_itemintro_ref` | `mysite_itemintroduction` | `client`, `reference_item` |
 
 ---
 
@@ -373,13 +412,15 @@ The `_run_*` inner function is always separated from the Celery wrapper so tests
 mysite/
 ├── models/
 │   └── demand/
-│       ├── __init__.py          ← exports all 11 models
+│       ├── __init__.py          ← exports all 14 models
 │       ├── hierarchy.py         ← PlanningLocation, PlanningCustomer,
 │       │                           SalesNode, CustomerSalesAssignment
 │       ├── actuals.py           ← ActualSale, ActualSaleImport,
 │       │                           ActualSaleLocation,
 │       │                           PERIOD_TYPE_CHOICES, PERIOD_FREQ_MAP,
 │       │                           compute_period_end, validate_period_start
+│       ├── lifecycle.py         ← ItemSubstitution, ItemDiscontinuation,
+│       │                           ItemIntroduction + _assert_subject_role_free
 │       └── forecast.py          ← ForecastVersion, ForecastLine,
 │                                   ForecastAggregate, ForecastOverride,
 │                                   OverrideSplitWeight, ForecastAccuracy,
@@ -400,13 +441,17 @@ mysite/
 │   └── commands/
 │       └── generate_actuals_template.py
 ├── admin/
-│   └── demand_forecast.py       ← ForecastVersionAdmin, ForecastLineAdmin,
-│                                   ForecastAccuracyAdmin, SeriesProfileAdmin
+│   ├── demand_forecast.py       ← ForecastVersionAdmin, ForecastLineAdmin,
+│   │                               ForecastAccuracyAdmin, SeriesProfileAdmin
+│   └── demand_lifecycle.py      ← ItemSubstitutionAdmin, ItemDiscontinuationAdmin,
+│                                   ItemIntroductionAdmin (Sprint 3B.2d)
 ├── migrations/
 │   ├── XXXX_demand_planning_foundation.py   ← Sprint 3B.0
 │   ├── XXXX_clientfeaturecontrol_choices.py ← Sprint 3B.0
 │   ├── XXXX_forecast_models.py              ← Sprint 3B.3
-│   └── XXXX_series_profile.py               ← Sprint 3B.3 (SeriesProfile delta)
+│   ├── XXXX_series_profile.py               ← Sprint 3B.3 (SeriesProfile delta)
+│   ├── XXXX_item_lifecycle.py               ← Sprint 3B.2d (3 lifecycle models)
+│   └── XXXX_borrowed_forecast_columns.py    ← Sprint 3B.2d (ForecastLine delta)
 ├── tests/
 │   └── demand/
 │       ├── __init__.py
@@ -435,6 +480,7 @@ Managed via `ClientFeatureControl` model (`FEATURE_CHOICES`). Null client = appl
 | `forecast_run` | `POST /forecast-versions/` + `run_forecast` task | Disabled | Forecast engine is wired (Sprint 3B.4 done) |
 | `consensus_override` | `POST /forecast-versions/{id}/approve/` override actions + `SeriesProfile PATCH` | Disabled | Override UI is ready (Sprint 3B.3+) |
 | `forecast_approval` | `POST /forecast-versions/{id}/approve/` submit/approve/lock actions | Disabled | Approval workflow is ready (Sprint 3B.3 done) |
+| `item_lifecycle` | Item Substitution / Discontinuation / Introduction — re-key layer in the netting helper + output layers at `write_forecast_lines` + HTMX UI (`item_lifecycle_ui_visible()`) | Disabled | Lifecycle models are wired (Sprint 3B.2d done) |
 
 ---
 
@@ -538,6 +584,28 @@ Managed via `ClientFeatureControl` model (`FEATURE_CHOICES`). Null client = appl
 | `GET/PATCH /api/demand/series-profiles/{id}/` | ✅ |
 | Celery task: `compute_series_profiles` | ✅ |
 | Unit tests: final_qty, state machine, LOCKED → 403, version copy, override validation | ✅ |
+
+---
+
+### Sprint 3B.2d — Item Lifecycle (Substitution / Discontinuation / Introduction) ✅ COMPLETE
+**Estimated effort:** 6–9 days  
+**Dependencies:** 3B.2/3B.3 patterns (netted helper, admin, feature flags); design decision 2.9
+
+| Task | Status |
+|---|---|
+| `lifecycle.py` — `ItemSubstitution`, `ItemDiscontinuation`, `ItemIntroduction` + `_assert_subject_role_free()` (one directive per item) | ✅ 0079 |
+| Model `clean()` validations — factor/ratio > 0, same-client, old≠new / new≠reference, `copy_to >= copy_from`, duplicate subject, direct-mapping + mixed-role violations | ✅ 0079 |
+| Migration: `add_item_lifecycle` (3 models + 5 indexes + CheckConstraints); register in `demand/__init__.py` and `ADMIN_ONLY_MODELS` | ✅ 0079 |
+| `ForecastingConfig.use_item_lifecycle` (default True) + `item_lifecycle` feature key + `item_lifecycle_ui_visible()` | ✅ 0079 |
+| Admin: `ItemSubstitutionAdmin`, `ItemDiscontinuationAdmin`, `ItemIntroductionAdmin` in `demand_lifecycle.py` | ✅ |
+| Baseline re-key layer — `actuals_queryset_with_net(client, use_net, use_substitution)` (Scenario 3): correlated `Subquery` re-keys old rows to successor, scales net_qty/net_revenue by `conversion_factor` when `period_start < effective_from`; identity when flag off | ✅ |
+| Re-key consumers to `eff_item_id`/`eff_item_code` — `build_actuals_dataframe`, `update_weighted_avg_prices`, `compute_series_profiles._load_actuals` | ✅ |
+| Output layer — Discontinuation filter (Scenario 1): no `ForecastLine` for periods `>= effective_from`; retired substitution old_item also nil on/after its `effective_from` | ✅ |
+| Output layer — Introduction borrow (Scenario 2): new-item line = reference statistical line × `ratio` while inside `[copy_from, copy_to]` and below `min_history_periods` own periods; tag `borrowed_from_item`/`borrowed_ratio`; roll-ups include borrowed values | ✅ |
+| Migration: `add_borrowed_forecast_columns` (nullable `borrowed_from_item`, `borrowed_ratio` on `ForecastLine`) | ✅ 0080 |
+| Detection — `run_outlier_detection` reads successor via the composed helper; skips retired substitution old_items, keeps discontinued items; reporting/ABC share the flag | ✅ |
+| HTMX views — `item_*_list/create/edit` for all three models under `/planning/`, gated on `item_lifecycle_ui_visible` (no DRF endpoints) | ✅ |
+| Unit tests — `test_item_lifecycle.py`: model validation, helper re-key + cutoff + identity + netting composition, consumers, output layers, detection skip rules, feature gate | ✅ |
 
 ---
 

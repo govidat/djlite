@@ -98,12 +98,20 @@
 
 {% if page_obj.has_other_pages %}
 <div class="flex justify-center gap-2 mt-4">
-    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}&exclude_outliers={{ filters.exclude_outliers|yesno:'1,0' }}"
-       class="btn btn-sm btn-ghost {% if not page_obj.has_previous %}btn-disabled{% endif %}">← {% trans "Previous" %}</a>
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&sales_node_ids={{ filters.sales_node_ids }}&taxonomy_node_ids={{ filters.taxonomy_node_ids }}&exclude_outliers={{ filters.exclude_outliers|yesno:'1,0' }}"
+       class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
+    {% else %}
+    <a class="btn btn-sm btn-ghost btn-disabled">← {% trans "Previous" %}</a>
+    {% endif %}
     <span class="btn btn-sm btn-disabled">
         {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
     </span>
-    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}&exclude_outliers={{ filters.exclude_outliers|yesno:'1,0' }}"
-       class="btn btn-sm btn-ghost {% if not page_obj.has_next %}btn-disabled{% endif %}">{% trans "Next" %} →</a>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&qty_min={{ filters.qty_min }}&qty_max={{ filters.qty_max }}&revenue_min={{ filters.revenue_min }}&revenue_max={{ filters.revenue_max }}&sales_node_ids={{ filters.sales_node_ids }}&taxonomy_node_ids={{ filters.taxonomy_node_ids }}&exclude_outliers={{ filters.exclude_outliers|yesno:'1,0' }}"
+       class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
+    {% else %}
+    <a class="btn btn-sm btn-ghost btn-disabled">{% trans "Next" %} →</a>
+    {% endif %}
 </div>
 {% endif %}

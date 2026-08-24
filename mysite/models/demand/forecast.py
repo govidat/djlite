@@ -776,6 +776,54 @@ class ForecastLine(models.Model):
         ),
     )
 
+    # ── Sales promotion scheme fields ─────────────────────────────────────
+    pre_scheme_statistical_qty = models.DecimalField(
+        _('pre-scheme statistical qty'),
+        max_digits=14, decimal_places=3,
+        null=True, blank=True,
+        help_text=_('Clean statistical forecast before scheme uplift. '
+                    'NULL when no scheme touches this line.'),
+    )
+    pre_scheme_statistical_value = models.DecimalField(
+        _('pre-scheme statistical value'),
+        max_digits=18, decimal_places=2,
+        null=True, blank=True,
+        help_text=_('pre_scheme_statistical_qty × price_used.'),
+    )
+    scheme = models.ForeignKey(
+        'mysite.SalesScheme',
+        null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='forecast_lines',
+        verbose_name=_('sales scheme'),
+        help_text=_('NULL = no scheme for this line.'),
+    )
+    scheme_qty = models.DecimalField(
+        _('scheme qty'),
+        max_digits=14, decimal_places=3,
+        null=True, blank=True,
+        help_text=_('Expected uplift delta from scheme. NULL when no scheme.'),
+    )
+    scheme_value = models.DecimalField(
+        _('scheme value'),
+        max_digits=18, decimal_places=2,
+        null=True, blank=True,
+        help_text=_('scheme_value = pre_scheme_statistical_value × value_uplift_pct. '
+                    'NULL when no scheme.'),
+    )
+
+    # ── Item lifecycle borrowed-line columns ─────────────────────────────
+    borrowed_from_item = models.ForeignKey(
+        'mysite.Item', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='+',
+        help_text=_('Reference item whose forecast was copied '
+                    'onto this line (ItemIntroduction).'),
+    )
+    borrowed_ratio = models.DecimalField(
+        _('borrowed ratio'), max_digits=14, decimal_places=6,
+        null=True, blank=True,
+        help_text=_('Ratio applied to the reference forecast (qty and value).'),
+    )
+
     class Meta:
         app_label = 'mysite'
         unique_together = [
@@ -959,6 +1007,19 @@ class ForecastAggregate(models.Model):
             'engine computes: implied_qty = override_value / weighted_avg_price, '
             'then disaggregates the qty delta proportionally.'
         ),
+    )
+
+    # ── Sales promotion scheme fields ─────────────────────────────────────
+    pre_scheme_statistical_qty = models.DecimalField(
+        _('pre-scheme statistical qty'), max_digits=16, decimal_places=3,
+        null=True, blank=True,
+        help_text=_('Sum of ForecastLine.pre_scheme_statistical_qty. '
+                    'Clean baseline before scheme uplift.'),
+    )
+    pre_scheme_statistical_value = models.DecimalField(
+        _('pre-scheme statistical value'), max_digits=20, decimal_places=2,
+        null=True, blank=True,
+        help_text=_('Sum of ForecastLine.pre_scheme_statistical_value.'),
     )
 
     class Meta:
@@ -1666,7 +1727,51 @@ class ForecastingConfig(models.Model):
         null=True, blank=True, editable=False,
         help_text=_('Analysis window end from the last recompute run.'),
     )
-    
+
+    # ── Sales promotion scheme configuration ──────────────────────────────
+    scheme_net_actuals = models.BooleanField(
+        _("scheme net actuals"), default=True,
+        help_text=_("When True, baseline = actuals − scheme impact − outlier. "
+                    "Scheme netting runs first. Outlier detection runs on scheme-netted series."),
+    )
+    scheme_apply_forecast_uplift = models.BooleanField(
+        _("scheme apply forecast uplift"), default=True,
+        help_text=_("When True, expected uplift re-applies to the forecast horizon."),
+    )
+    brand_taxonomy = models.CharField(
+        _("brand taxonomy slug"), max_length=64, blank=True, default="",
+        help_text=_("Taxonomy slug containing the Brand nodes used for brand-level scheme scoping. "
+                    "Empty = brand scoping not available."),
+    )
+    last_scheme_detection_run_at = models.DateTimeField(
+        _("last scheme detection run at"), null=True, blank=True,
+        help_text=_("When the most recent completed scheme-detection run finished."),
+    )
+    last_scheme_detection_run_by = models.ForeignKey(
+        "auth.User", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="+",
+        verbose_name=_("last scheme detection run by"),
+    )
+    last_scheme_detection_run_from = models.DateField(
+        _("last scheme detection run from"), null=True, blank=True,
+    )
+    last_scheme_detection_run_to = models.DateField(
+        _("last scheme detection run to"), null=True, blank=True,
+    )
+
+    # ── Item lifecycle (substitution / discontinuation / introduction) ─────
+    # Re-key retired items' netted actuals to their successor, nil withdrawn
+    # items' forecast after their effective date, and copy a reference item's
+    # forecast onto a newly introduced item until it has enough own history.
+    # One flag for all consumers (forecast, profiles, price, detection,
+    # reporting, line-write).
+    use_item_lifecycle = models.BooleanField(
+        _("use item lifecycle"), default=True,
+        help_text=_("Apply item lifecycle events (substitution re-key, "
+                    "discontinuation nil, introduction borrow) when building "
+                    "series and writing forecast lines."),
+    )
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

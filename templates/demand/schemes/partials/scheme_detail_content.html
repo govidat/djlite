@@ -1,0 +1,188 @@
+{% load i18n %}
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">
+      <span class="font-mono">{{ scheme.scheme_code }}</span> — {{ scheme.name }}
+    </h1>
+    <p class="text-sm text-base-content/60 mt-1">
+      {% trans "Created by" %} {{ scheme.created_by|default:"—" }}
+      {% trans "on" %} {{ scheme.created_at|date:"d M Y, H:i" }}
+    </p>
+  </div>
+  <div class="flex gap-2">
+    {% if scheme.status == 'DRAFT' %}
+      <button class="btn btn-success btn-sm"
+              hx-post="{% url 'demand_ui:scheme_activate' client_id=client.client_id pk=scheme.pk %}"
+              hx-confirm="{% trans 'Activate this scheme? Scope resolution will be triggered.' %}"
+              hx-target="#scheme-detail" hx-swap="innerHTML">
+        {% trans "Activate" %}
+      </button>
+      <a href="{% url 'demand_ui:scheme_edit' client_id=client.client_id pk=scheme.pk %}"
+         class="btn btn-outline btn-sm">{% trans "Edit" %}</a>
+      <button class="btn btn-error btn-sm"
+              hx-post="{% url 'demand_ui:scheme_delete' client_id=client.client_id pk=scheme.pk %}"
+              hx-confirm="{% trans 'Delete this DRAFT scheme?' %}"
+              hx-target="#scheme-detail" hx-swap="outerHTML">
+        {% trans "Delete" %}
+      </button>
+    {% endif %}
+    {% if scheme.status == 'ACTIVE' %}
+      <button class="btn btn-warning btn-sm"
+              hx-post="{% url 'demand_ui:scheme_archive' client_id=client.client_id pk=scheme.pk %}"
+              hx-confirm="{% trans 'Archive this ACTIVE scheme?' %}"
+              hx-target="#scheme-detail" hx-swap="innerHTML">
+        {% trans "Archive" %}
+      </button>
+    {% endif %}
+    {% if scheme.occurrences.exists %}
+      <a href="{% url 'demand_ui:scheme_occurrences' client_id=client.client_id pk=scheme.pk %}"
+         class="btn btn-outline btn-sm">{% trans "Occurrences" %}</a>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Status badge ──────────────────────────────────────────────────────── #}
+<div class="mb-4">
+  {% if scheme.status == 'ACTIVE' %}
+    <span class="badge badge-success">{% trans "Active" %}</span>
+  {% elif scheme.status == 'DRAFT' %}
+    <span class="badge badge-warning">{% trans "Draft" %}</span>
+  {% elif scheme.status == 'ARCHIVED' %}
+    <span class="badge badge-ghost">{% trans "Archived" %}</span>
+  {% endif %}
+</div>
+
+{# ── Scheme details grid ───────────────────────────────────────────────── #}
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="stat bg-base-200 rounded-box p-4">
+    <div class="stat-title text-xs">{% trans "Qty Uplift %" %}</div>
+    <div class="stat-value text-lg">{{ scheme.expected_qty_uplift_pct }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box p-4">
+    <div class="stat-title text-xs">{% trans "Value Uplift %" %}</div>
+    <div class="stat-value text-lg">{{ scheme.expected_value_uplift_pct }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box p-4">
+    <div class="stat-title text-xs">{% trans "Shadow Periods" %}</div>
+    <div class="stat-value text-lg">{{ scheme.shadow_periods }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box p-4">
+    <div class="stat-title text-xs">{% trans "Pull-forward %" %}</div>
+    <div class="stat-value text-lg">{{ scheme.pull_forward_pct }}</div>
+  </div>
+</div>
+
+{% if scheme.discount_pct %}
+<p class="text-sm text-base-content/60 mb-4">{% trans "Discount %" %}: {{ scheme.discount_pct }}</p>
+{% endif %}
+
+{# ── Scopes ────────────────────────────────────────────────────────────── #}
+<div class="divider">{% trans "Scope" %}</div>
+<div class="overflow-x-auto mb-4">
+  <table class="table table-zebra table-sm">
+    <thead>
+      <tr>
+        <th>{% trans "Type" %}</th>
+        <th>{% trans "Taxonomy Node" %}</th>
+        <th>{% trans "Item" %}</th>
+        <th>{% trans "Location" %}</th>
+        <th>{% trans "Channel" %}</th>
+        <th>{% trans "Customer" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for scope in scopes %}
+      <tr>
+        <td><span class="badge badge-outline badge-sm">{{ scope.scope_type }}</span></td>
+        <td>{{ scope.taxonomy_node|default:"—" }}</td>
+        <td>{{ scope.item|default:"—" }}</td>
+        <td>{{ scope.planning_location|default:"—" }}</td>
+        <td>{{ scope.distribution_channel|default:"—" }}</td>
+        <td>{{ scope.planning_customer|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-base-content/60">{% trans "No scope lines." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# ── Periods ───────────────────────────────────────────────────────────── #}
+<div class="divider">{% trans "Periods" %}</div>
+<div class="overflow-x-auto mb-4">
+  <table class="table table-zebra table-sm">
+    <thead>
+      <tr>
+        <th>{% trans "Type" %}</th>
+        <th>{% trans "Start" %}</th>
+        <th>{% trans "End" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for period in periods %}
+      <tr>
+        <td>{{ period.get_period_type_display }}</td>
+        <td>{{ period.period_start|date:"d M Y" }}</td>
+        <td>{{ period.period_end|date:"d M Y" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="text-base-content/60">{% trans "No periods." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# ── Resolved rows summary ─────────────────────────────────────────────── #}
+{% if scheme.status == 'ACTIVE' %}
+<div class="divider">{% trans "Resolved Coverage" %}</div>
+<div class="flex gap-4 mb-4">
+  <div class="stat bg-base-200 rounded-box p-3">
+    <div class="stat-title text-xs">{% trans "Total rows" %}</div>
+    <div class="stat-value text-lg">{{ resolved_count }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box p-3">
+    <div class="stat-title text-xs">{% trans "Window rows" %}</div>
+    <div class="stat-value text-lg">{{ window_count }}</div>
+  </div>
+  <div class="stat bg-base-200 rounded-box p-3">
+    <div class="stat-title text-xs">{% trans "Shadow rows" %}</div>
+    <div class="stat-value text-lg">{{ shadow_count }}</div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Occurrences ───────────────────────────────────────────────────────── #}
+{% if occurrences %}
+<div class="divider">{% trans "Occurrences" %}</div>
+<div class="overflow-x-auto">
+  <table class="table table-zebra table-sm">
+    <thead>
+      <tr>
+        <th>{% trans "Period" %}</th>
+        <th>{% trans "Actual Qty Uplift" %}</th>
+        <th>{% trans "Actual Value Uplift" %}</th>
+        <th>{% trans "Pull-forward" %}</th>
+        <th>{% trans "Closed at" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for occ in occurrences %}
+      <tr>
+        <td>{{ occ.period_start|date:"d M Y" }}</td>
+        <td>{{ occ.actual_qty_uplift_pct|default:"—" }}</td>
+        <td>{{ occ.actual_value_uplift_pct|default:"—" }}</td>
+        <td>{{ occ.actual_pull_forward_pct|default:"—" }}</td>
+        <td>{{ occ.closed_at|date:"d M Y, H:i"|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Back link ─────────────────────────────────────────────────────────── #}
+<div class="mt-6">
+  <a href="{% url 'demand_ui:scheme_list' client_id=client.client_id %}"
+     class="btn btn-ghost btn-sm">{% trans "← Back to Schemes" %}</a>
+</div>

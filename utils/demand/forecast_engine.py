@@ -257,12 +257,16 @@ def update_weighted_avg_prices(
 
     cfg = ForecastingConfig.get_for_client_id(client_id)
     use_net = bool(cfg.forecast_uses_net_actuals)
+    use_scheme_net = bool(cfg.scheme_net_actuals)
+    use_sub = bool(cfg.use_item_lifecycle)
     client = Client.objects.get(pk=client_id)
 
     qs = (
-        actuals_queryset_with_net(client, use_net)
+        actuals_queryset_with_net(client, use_net, use_scheme_net=use_scheme_net,
+                                  use_substitution=use_sub)
         .filter(period_type=period_type, revenue__isnull=False)
-        .values('item_id', 'distribution_channel_id', 'net_qty', 'net_revenue', 'period_start')
+        .values('eff_item_id' if use_sub else 'item_id',
+                'distribution_channel_id', 'net_qty', 'net_revenue', 'period_start')
         .order_by('-period_start')
     )
 
@@ -270,38 +274,39 @@ def update_weighted_avg_prices(
         logger.warning(f'update_weighted_avg_prices: no revenue data for client={client_id}')
         return {'by_channel': {}, 'blended': {}}
 
+    item_key = 'eff_item_id' if use_sub else 'item_id'
     df_pd = pd.DataFrame(list(qs))
     df_pd = df_pd.rename(columns={'net_qty': 'qty', 'net_revenue': 'revenue'})
     con = duckdb.connect()
     con.register('actuals', df_pd)
 
-    n_items = df_pd['item_id'].nunique()
+    n_items = df_pd[item_key].nunique()
 
     blended_df = con.execute(f"""
         WITH recent AS (
-            SELECT DISTINCT item_id, period_start
+            SELECT DISTINCT "{item_key}", period_start
             FROM actuals ORDER BY period_start DESC LIMIT {lookback_periods * n_items}
         )
-        SELECT a.item_id,
+        SELECT a."{item_key}" AS item_id,
                SUM(CAST(a.revenue AS DOUBLE)) / NULLIF(SUM(CAST(a.qty AS DOUBLE)), 0) AS wap
         FROM actuals a
-        INNER JOIN recent r ON a.item_id = r.item_id AND a.period_start = r.period_start
-        GROUP BY a.item_id
+        INNER JOIN recent r ON a."{item_key}" = r."{item_key}" AND a.period_start = r.period_start
+        GROUP BY a."{item_key}"
         HAVING SUM(CAST(a.qty AS DOUBLE)) > 0
     """).df()
 
     by_channel_df = con.execute(f"""
         WITH recent AS (
-            SELECT DISTINCT item_id, distribution_channel_id, period_start
+            SELECT DISTINCT "{item_key}", distribution_channel_id, period_start
             FROM actuals ORDER BY period_start DESC LIMIT {lookback_periods * n_items}
         )
-        SELECT a.item_id, a.distribution_channel_id,
+        SELECT a."{item_key}" AS item_id, a.distribution_channel_id,
                SUM(CAST(a.revenue AS DOUBLE)) / NULLIF(SUM(CAST(a.qty AS DOUBLE)), 0) AS wap
         FROM actuals a
-        INNER JOIN recent r ON a.item_id = r.item_id
+        INNER JOIN recent r ON a."{item_key}" = r."{item_key}"
                             AND a.distribution_channel_id = r.distribution_channel_id
                             AND a.period_start = r.period_start
-        GROUP BY a.item_id, a.distribution_channel_id
+        GROUP BY a."{item_key}", a.distribution_channel_id
         HAVING SUM(CAST(a.qty AS DOUBLE)) > 0
     """).df()
 
@@ -375,17 +380,21 @@ def build_actuals_dataframe(
 
     cfg = ForecastingConfig.get_for_client_id(client_id)
     use_net = bool(cfg.forecast_uses_net_actuals)
+    use_scheme_net = bool(cfg.scheme_net_actuals)
+    use_sub = bool(cfg.use_item_lifecycle)
     client = Client.objects.get(pk=client_id)
 
     qs = (
-        actuals_queryset_with_net(client, use_net)
+        actuals_queryset_with_net(client, use_net, use_scheme_net=use_scheme_net,
+                                  use_substitution=use_sub)
         .filter(
             period_type=period_type,
             period_start__gte=period_start_from, period_start__lte=period_start_to,
         )
         .select_related('item', 'planning_location', 'planning_customer')
         .values(
-            'item_id', 'item__item_id',
+            'eff_item_id' if use_sub else 'item_id',
+            'item__item_id',
             'planning_location_id', 'planning_location__code',
             'planning_customer_id', 'planning_customer__code',
             'distribution_channel_id',
@@ -400,6 +409,7 @@ def build_actuals_dataframe(
             f'{period_start_from}->{period_start_to}'
         )
 
+    item_key = 'eff_item_id' if use_sub else 'item_id'
     df_pd = pd.DataFrame(rows)
     df_pd = df_pd.rename(columns={'net_qty': 'qty', 'net_revenue': 'revenue'})
     df_pd['revenue']       = df_pd['revenue'].fillna(0).astype(float)
@@ -413,7 +423,7 @@ def build_actuals_dataframe(
     )
     df_pd = (
         df_pd.groupby([
-            'unique_id', 'item_id', 'item__item_id',
+            'unique_id', item_key, 'item__item_id',
             'planning_customer_id', 'customer_code',
             'distribution_channel_id', 'dc_code',
             'planning_location_id', 'planning_location__code',
@@ -1129,7 +1139,177 @@ def run_hierarchical_reconciliation(
 
 
 # -----------------------------------------------------------------------------
-# 8. Write ForecastLine rows
+# 8a. Build scheme forecast factors
+# -----------------------------------------------------------------------------
+
+def build_scheme_forecast_factors(client_id, period_type, period_start_from, period_start_to):
+    """{(unique_id, period_start): overlay} for the forecast horizon.
+
+    Two overlay shapes (only ACTIVE schemes):
+      * WINDOW:  {'scheme_id', 'qty_factor', 'value_factor'} → uplift delta
+                 computed as pre_scheme_statistical_qty × (qty_factor − 1).
+      * SHADOW:  {'scheme_id', 'anchor_period_start', 'anchor_qty_factor',
+                  'anchor_value_factor', 'addback_qty_weight',
+                  'addback_value_weight'} → dip delta computed as
+                 −window_pre_scheme_stat_qty × (1 − 1/anchor_factor) × weight.
+    """
+    from mysite.models.demand.schemes import ResolvedSalesSchemePeriod
+    from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
+
+    loc_code_to_pk = {r['code']: r['id'] for r in
+                      PlanningLocation.objects.filter(client_id=client_id).values('id', 'code')}
+    cust_code_to_pk = {r['code']: r['id'] for r in
+                       PlanningCustomer.objects.filter(client_id=client_id).values('id', 'code')}
+    cust_code_to_pk['NULL'] = None
+
+    from mysite.models import Item
+    item_str_to_pk = {r['item_id']: r['id'] for r in
+                      Item.objects.filter(client_id=client_id).values('id', 'item_id')}
+    pk_to_item_str = {v: k for k, v in item_str_to_pk.items()}
+
+    qs = ResolvedSalesSchemePeriod.objects.filter(
+        scheme__client_id=client_id,
+        scheme__status='ACTIVE',
+        period_type=period_type,
+        period_start__gte=period_start_from,
+        period_start__lte=period_start_to,
+    ).select_related('scheme', 'item', 'planning_location', 'planning_customer')
+
+    factors = {}
+    for r in qs:
+        item_str = pk_to_item_str.get(r.item_id)
+        if item_str is None:
+            continue
+        loc_code = r.planning_location.code if r.planning_location else 'UNKNOWN'
+        cust_code = r.planning_customer.code if r.planning_customer else 'NULL'
+        uid = f"{item_str}|{cust_code}|{r.distribution_channel_id}|{loc_code}"
+        key = (uid, r.period_start)
+
+        if r.is_shadow:
+            factors[key] = {
+                'scheme_id': r.scheme_id,
+                'anchor_period_start': r.anchor_period_start,
+                'anchor_qty_factor': r.anchor_qty_factor,
+                'anchor_value_factor': r.anchor_value_factor,
+                'addback_qty_weight': r.addback_qty_weight,
+                'addback_value_weight': r.addback_value_weight,
+            }
+        else:
+            factors[key] = {
+                'scheme_id': r.scheme_id,
+                'qty_factor': r.qty_factor,
+                'value_factor': r.value_factor,
+            }
+
+    return factors
+
+
+# -----------------------------------------------------------------------------
+# 8a. Item lifecycle helpers (discontinuation + introduction)
+# -----------------------------------------------------------------------------
+
+def _load_discontinuation_cutoffs(client_id):
+    """{item_id: effective_from-or-None}; None in dict = suppress all."""
+    from mysite.models.demand.lifecycle import ItemDiscontinuation
+    return {d.item_id: d.effective_from
+            for d in ItemDiscontinuation.objects.filter(client_id=client_id)}
+
+
+def _load_substitution_cutoffs(client_id):
+    """{old_item_id: effective_from}; retired old-item forecast nil on/after date."""
+    from mysite.models.demand.lifecycle import ItemSubstitution
+    return {s.old_item_id: s.effective_from
+            for s in ItemSubstitution.objects.filter(client_id=client_id)}
+
+
+def _is_discontinued(item_id, period_start, cutoffs):
+    cutoff = cutoffs.get(item_id)
+    if cutoff is None and item_id not in cutoffs:
+        return False
+    return cutoff is None or period_start >= cutoff
+
+
+def _own_history_period_count(client_id, item_id, period_type, before_date):
+    """Number of distinct own actual periods < before_date for this item."""
+    from mysite.models.demand.actuals import ActualSale
+    return (ActualSale.objects
+            .filter(client_id=client_id, item_id=item_id, period_type=period_type,
+                    period_start__lt=before_date)
+            .values('period_start').distinct().count())
+
+
+def apply_lifecycle_output_layers(client_id, cfg, version, lines):
+    """Apply discontinuation filter + introduction borrow to ForecastLine list.
+
+    Mutates lines in-place. Returns the filtered list (discontinued lines removed,
+    borrowed lines overwritten).
+    """
+    if not cfg.use_item_lifecycle:
+        return lines
+
+    # ── Discontinuation + retired-substitution-old-item filter ───────────
+    disc_cutoffs = _load_discontinuation_cutoffs(client_id)
+    sub_cutoffs = _load_substitution_cutoffs(client_id)
+    all_cutoffs = {**sub_cutoffs, **disc_cutoffs}
+
+    if all_cutoffs:
+        lines = [ln for ln in lines
+                 if not _is_discontinued(ln.item_id, ln.period_start, all_cutoffs)]
+
+    # ── Introduction borrow ─────────────────────────────────────────────
+    from mysite.models.demand.lifecycle import ItemIntroduction
+    intros = list(ItemIntroduction.objects.filter(client_id=client_id)
+                                          .select_related("reference_item"))
+    if intros:
+        min_hist = cfg.min_history_periods
+        # Build lookup: (item_pk, period_start) -> line
+        line_map = {}
+        for ln in lines:
+            line_map.setdefault(ln.item_id, {})[ln.period_start] = ln
+
+        # Pre-fetch reference item's statistical lines for this version
+        from mysite.models.demand.forecast import ForecastLine as FL
+        ref_item_ids = {i.reference_item_id for i in intros}
+        ref_lines = (FL.objects.filter(version=version, item_id__in=ref_item_ids)
+                     .values('item_id', 'period_start', 'statistical_qty', 'statistical_value'))
+        ref_map = {}
+        for rl in ref_lines:
+            ref_map.setdefault(rl['item_id'], {})[rl['period_start']] = rl
+
+        for intro in intros:
+            new_lines = line_map.get(intro.new_item_id, {})
+            ref_lines_for_item = ref_map.get(intro.reference_item_id, {})
+            for period_start, ln in new_lines.items():
+                if intro.copy_from and period_start < intro.copy_from:
+                    continue
+                if intro.copy_to and period_start > intro.copy_to:
+                    continue
+                own = _own_history_period_count(client_id, intro.new_item_id,
+                                                ln.period_type, period_start)
+                if own >= min_hist:
+                    continue
+                ref = ref_lines_for_item.get(period_start)
+                if ref is None:
+                    continue
+                ln.statistical_qty = (Decimal(str(ref['statistical_qty'])) * intro.ratio).quantize(THREE_DP)
+                if ref['statistical_value'] is not None:
+                    ln.statistical_value = (Decimal(str(ref['statistical_value'])) * intro.ratio).quantize(TWO_DP)
+                ln.borrowed_from_item_id = intro.reference_item_id
+                ln.borrowed_ratio = intro.ratio
+                ln.model_used = "BORROWED"
+                # Re-compute final
+                price = ln.price_used
+                ln.final_qty = ln.override_qty if ln.override_qty is not None else ln.statistical_qty
+                if price is not None:
+                    ln.final_value = (ln.final_qty * price).quantize(TWO_DP)
+                    if ln.override_qty is None:
+                        ln.statistical_value = (ln.statistical_qty * price).quantize(TWO_DP)
+
+    return lines
+
+
+# -----------------------------------------------------------------------------
+# 8b. Write ForecastLine rows
 # -----------------------------------------------------------------------------
 
 def write_forecast_lines(
@@ -1138,13 +1318,19 @@ def write_forecast_lines(
     decisions: dict[str, dict],
     period_type: str,
     store_all_level_forecasts: bool = True,
+    scheme_factors: dict = None,
 ) -> int:
-    """Convert the combined forecast DataFrame into ForecastLine rows. uid parsing widened to 4 parts."""
+    """Convert the combined forecast DataFrame into ForecastLine rows.
+
+    uid parsing widened to 4 parts. When scheme_factors is provided,
+    applies scheme uplift to each line (WINDOW: uplift delta, SHADOW: dip delta).
+    """
     from mysite.models.demand.forecast import ForecastLine, ForecastVersion
     from mysite.models import Item
     from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
 
     version = ForecastVersion.objects.get(pk=version_id)
+    use_schemes = scheme_factors is not None and len(scheme_factors) > 0
 
     item_str_to_pk = {r['item_id']: r['id'] for r in Item.objects.filter(client=version.client).values('id', 'item_id')}
     loc_code_to_pk = {r['code']: r['id'] for r in PlanningLocation.objects.filter(client=version.client).values('id', 'code')}
@@ -1201,6 +1387,76 @@ def write_forecast_lines(
             line.final_value = line.statistical_value
         lines.append(line)
 
+    # ── First pass: build anchor_pre_stat_qty lookup for shadow overlays ──
+    if use_schemes:
+        anchor_pre_stat_qty = {}
+        for ln in lines:
+            anchor_pre_stat_qty[(ln.unique_id, ln.period_start)] = ln.pre_scheme_statistical_qty or ln.statistical_qty
+
+    # ── Second pass: apply scheme factors ──
+    if use_schemes:
+        for ln in lines:
+            uid = ln.unique_id
+            key = (uid, ln.period_start)
+            sf = scheme_factors.get(key)
+            if sf is None:
+                # No scheme — pre_scheme = statistical, no scheme delta
+                ln.pre_scheme_statistical_qty = ln.statistical_qty
+                ln.pre_scheme_statistical_value = ln.statistical_value
+                ln.scheme_qty = None
+                ln.scheme_value = None
+            elif 'qty_factor' in sf:
+                # WINDOW row — uplift delta
+                ln.pre_scheme_statistical_qty = ln.statistical_qty
+                ln.pre_scheme_statistical_value = ln.statistical_value
+                ln.scheme = None  # set via scheme_id if needed
+                uplift_pct = Decimal(str(sf['qty_factor'])) - Decimal('1')
+                ln.scheme_qty = (ln.pre_scheme_statistical_qty * uplift_pct).quantize(THREE_DP)
+                if price is not None:
+                    value_uplift = Decimal(str(sf['value_factor'])) - Decimal('1')
+                    ln.scheme_value = (ln.pre_scheme_statistical_value * value_uplift).quantize(TWO_DP)
+                # statistical_qty = pre_scheme + scheme_qty
+                ln.statistical_qty = (ln.pre_scheme_statistical_qty + ln.scheme_qty).quantize(THREE_DP)
+                if price is not None:
+                    ln.statistical_value = (ln.pre_scheme_statistical_value + (ln.scheme_value or Decimal('0'))).quantize(TWO_DP)
+            else:
+                # SHADOW row — dip delta anchored to the window line's pre_scheme_statistical_qty
+                anchor_key = (uid, sf['anchor_period_start'])
+                window_pre_stat_qty = anchor_pre_stat_qty.get(anchor_key)
+                if window_pre_stat_qty is None:
+                    logger.warning("scheme %s shadow at %s: anchor window %s outside horizon — skipped",
+                                   sf['scheme_id'], ln.period_start, sf['anchor_period_start'])
+                    ln.pre_scheme_statistical_qty = ln.statistical_qty
+                    ln.pre_scheme_statistical_value = ln.statistical_value
+                    ln.scheme_qty = None
+                    ln.scheme_value = None
+                    continue
+                ln.pre_scheme_statistical_qty = ln.statistical_qty
+                ln.pre_scheme_statistical_value = ln.statistical_value
+                dip_qty = (window_pre_stat_qty
+                           * (Decimal('1') - Decimal('1') / Decimal(str(sf['anchor_qty_factor'])))
+                           * Decimal(str(sf['addback_qty_weight']))).quantize(THREE_DP)
+                ln.scheme_qty = (-dip_qty).quantize(THREE_DP)  # negative = dip
+                if price is not None:
+                    dip_value = (window_pre_stat_qty
+                                 * (Decimal('1') - Decimal('1') / Decimal(str(sf['anchor_value_factor'])))
+                                 * Decimal(str(sf['addback_value_weight']))).quantize(TWO_DP)
+                    ln.scheme_value = (-dip_value).quantize(TWO_DP)
+                # statistical_qty = pre_scheme + scheme_qty
+                ln.statistical_qty = (ln.pre_scheme_statistical_qty + ln.scheme_qty).quantize(THREE_DP)
+                if price is not None:
+                    ln.statistical_value = (ln.pre_scheme_statistical_value + (ln.scheme_value or Decimal('0'))).quantize(TWO_DP)
+
+            # Re-compute final_qty/value (override system unchanged)
+            ln.final_qty = ln.override_qty if ln.override_qty is not None else ln.statistical_qty
+            if price is not None:
+                ln.final_value = (ln.final_qty * price).quantize(TWO_DP)
+
+    # ── Third pass: item lifecycle (discontinuation filter + introduction borrow) ──
+    from mysite.models.demand.forecast import ForecastingConfig
+    cfg = ForecastingConfig.get_for_client(version.client)
+    lines = apply_lifecycle_output_layers(version.client_id, cfg, version, lines)
+
     created = 0
     for i in range(0, len(lines), BATCH_SIZE_LINES):
         batch = lines[i:i + BATCH_SIZE_LINES]
@@ -1247,6 +1503,7 @@ def write_forecast_aggregates(version_id: int) -> int:
             'distribution_channel_id',
             'period_type', 'period_start',
             'statistical_qty', 'final_qty', 'statistical_value', 'final_value',
+            'pre_scheme_statistical_qty', 'pre_scheme_statistical_value',
         )
     )
     if not lines_qs.exists():
@@ -1258,6 +1515,9 @@ def write_forecast_aggregates(version_id: int) -> int:
         df_pd[col] = df_pd[col].astype(float)
     for col in ('statistical_value', 'final_value'):
         df_pd[col] = df_pd[col].fillna(0).astype(float)
+    # pre_scheme fields: nullable, fill with 0 for aggregation
+    df_pd['pre_scheme_statistical_qty'] = df_pd['pre_scheme_statistical_qty'].fillna(0).astype(float)
+    df_pd['pre_scheme_statistical_value'] = df_pd['pre_scheme_statistical_value'].fillna(0).astype(float)
     df_pd['customer_code'] = df_pd['planning_customer__code'].fillna('__unattr__')
 
     # ── Resolve each line to a leaf SalesNode (a→b→c) and a primary
@@ -1292,7 +1552,9 @@ def write_forecast_aggregates(version_id: int) -> int:
             SELECT 'total' AS agg_level, '{"level": "total"}' AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
-                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
+                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value,
+                   SUM(pre_scheme_statistical_qty) AS pre_scheme_statistical_qty,
+                   SUM(pre_scheme_statistical_value) AS pre_scheme_statistical_value
             FROM lines GROUP BY period_type, period_start
         """,
         'sales': """
@@ -1300,7 +1562,9 @@ def write_forecast_aggregates(version_id: int) -> int:
                    CONCAT('{"sales_node_id": ', COALESCE(CAST(sales_node_id AS VARCHAR), 'null'), '}') AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
-                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
+                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value,
+                   SUM(pre_scheme_statistical_qty) AS pre_scheme_statistical_qty,
+                   SUM(pre_scheme_statistical_value) AS pre_scheme_statistical_value
             FROM lines GROUP BY sales_node_id, period_type, period_start
         """,
         'item_hierarchy': """
@@ -1308,21 +1572,27 @@ def write_forecast_aggregates(version_id: int) -> int:
                    CONCAT('{"taxonomy_node_id": ', COALESCE(CAST(taxonomy_node_id AS VARCHAR), 'null'), '}') AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
-                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
+                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value,
+                   SUM(pre_scheme_statistical_qty) AS pre_scheme_statistical_qty,
+                   SUM(pre_scheme_statistical_value) AS pre_scheme_statistical_value
             FROM lines GROUP BY taxonomy_node_id, period_type, period_start
         """,
         'item': """
             SELECT 'item' AS agg_level, CONCAT('{"item_id": "', "item__item_id", '"}') AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
-                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
+                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value,
+                   SUM(pre_scheme_statistical_qty) AS pre_scheme_statistical_qty,
+                   SUM(pre_scheme_statistical_value) AS pre_scheme_statistical_value
             FROM lines GROUP BY "item__item_id", period_type, period_start
         """,
         'customer': """
             SELECT 'customer' AS agg_level, CONCAT('{"customer_code": "', customer_code, '"}') AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
-                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
+                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value,
+                   SUM(pre_scheme_statistical_qty) AS pre_scheme_statistical_qty,
+                   SUM(pre_scheme_statistical_value) AS pre_scheme_statistical_value
             FROM lines GROUP BY customer_code, period_type, period_start
         """,
         'channel': """
@@ -1330,7 +1600,9 @@ def write_forecast_aggregates(version_id: int) -> int:
                    CONCAT('{"distribution_channel_id": "', distribution_channel_id, '"}') AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
-                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value
+                   SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value,
+                   SUM(pre_scheme_statistical_qty) AS pre_scheme_statistical_qty,
+                   SUM(pre_scheme_statistical_value) AS pre_scheme_statistical_value
             FROM lines GROUP BY distribution_channel_id, period_type, period_start
         """,
     }
@@ -1354,6 +1626,8 @@ def write_forecast_aggregates(version_id: int) -> int:
             final_qty = Decimal(str(round(row['final_qty'], 3)))
             stat_val = Decimal(str(round(row['total_statistical_value'], 2)))
             final_val = Decimal(str(round(row['total_final_value'], 2)))
+            pre_stat_qty = Decimal(str(round(row['pre_scheme_statistical_qty'], 3)))
+            pre_stat_val = Decimal(str(round(row['pre_scheme_statistical_value'], 2)))
             wap = None
             if float(final_qty) > 0 and float(final_val) > 0:
                 wap = (final_val / final_qty).quantize(Decimal('0.0001'))
@@ -1363,6 +1637,8 @@ def write_forecast_aggregates(version_id: int) -> int:
                 statistical_qty=stat_qty, final_qty=final_qty,
                 total_statistical_value=stat_val, total_final_value=final_val,
                 weighted_avg_price=wap,
+                pre_scheme_statistical_qty=pre_stat_qty or None,
+                pre_scheme_statistical_value=pre_stat_val or None,
             ))
         ForecastAggregate.objects.bulk_create(agg_objects, batch_size=500)
         created += len(agg_objects)

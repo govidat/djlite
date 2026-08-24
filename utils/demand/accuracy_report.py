@@ -288,12 +288,26 @@ def _mapped_nodes(version, item_ids):
     return item_map
 
 
-def _taxonomy_branch_names(branches):
+def _mapped_taxonomy_id(item_map):
+    """
+    Single taxonomy shared by all mapped primary nodes, else None.
+    Materialized paths are only unique WITHIN a taxonomy — every
+    TaxonomyNode lookup below must be scoped (a global 'sector' tree
+    reuses paths like '001' just like any client product hierarchy).
+    """
+    tax_ids = {n.taxonomy_id for n in item_map.values()}
+    return tax_ids.pop() if len(tax_ids) == 1 else None
+
+
+def _taxonomy_branch_names(branches, taxonomy_id=None):
     """Map materialized path → (node_id, name) via the TaxonomyNode table."""
     names = {}
-    for node in TaxonomyNode.objects.filter(path__in=branches).only(
+    qs = TaxonomyNode.objects.filter(path__in=branches).only(
         'pk', 'path', 'name', 'slug'
-    ):
+    )
+    if taxonomy_id is not None:
+        qs = qs.filter(taxonomy_id=taxonomy_id)
+    for node in qs:
         names[node.path] = (node.pk, node.name or node.slug)
     for bp in branches:
         names.setdefault(bp, (None, bp))
@@ -332,7 +346,7 @@ def taxonomy_children(version, node_path=None):
             if len(_path_segments(p)) > depth and _path_under(p, node_path)
         })
 
-    branch_names = _taxonomy_branch_names(branches)
+    branch_names = _taxonomy_branch_names(branches, _mapped_taxonomy_id(item_map))
 
     rows = []
     for bp in branches:
@@ -359,7 +373,7 @@ def taxonomy_children(version, node_path=None):
 
     rows.sort(key=lambda r: (r['wmape'] is None, r['wmape'] if r['wmape'] is not None else 0))
 
-    return rows, node_path, _taxonomy_breadcrumb(node_path)
+    return rows, node_path, _taxonomy_breadcrumb(node_path, _mapped_taxonomy_id(item_map))
 
 
 def taxonomy_items(version, node_path):
@@ -387,17 +401,20 @@ def taxonomy_items(version, node_path):
             })
         rows.sort(key=lambda r: (r['wmape'] is None, r['wmape'] if r['wmape'] is not None else 0))
 
-    return rows, _taxonomy_breadcrumb(node_path)
+    return rows, _taxonomy_breadcrumb(node_path, _mapped_taxonomy_id(item_map))
 
 
-def _taxonomy_breadcrumb(node_path):
+def _taxonomy_breadcrumb(node_path, taxonomy_id=None):
     if not node_path:
         return []
     segments = node_path.split('.')
     crumbs = []
     for i in range(1, len(segments) + 1):
         prefix = '.'.join(segments[:i])
-        node = TaxonomyNode.objects.filter(path=prefix).first()
+        qs = TaxonomyNode.objects.filter(path=prefix)
+        if taxonomy_id is not None:
+            qs = qs.filter(taxonomy_id=taxonomy_id)
+        node = qs.first()
         crumbs.append({
             'node_path': prefix,
             'label': (node.name or node.slug) if node else prefix,

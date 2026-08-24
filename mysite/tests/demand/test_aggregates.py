@@ -365,6 +365,60 @@ class TestVersionAggregatesView:
         assert resp.status_code == 200
         assert 'No aggregates found.' in resp.content.decode()
 
+    def test_sales_multi_select_union(
+        self, draft_version, client_obj, active_item, item2, unmapped_item,
+        leaf_location, second_leaf_location, unmapped_location,
+        sales_leaf, sales_leaf_b, mapped_items,
+    ):
+        self._seed(draft_version, client_obj, active_item, item2,
+                   unmapped_item, leaf_location, second_leaf_location,
+                   unmapped_location, sales_leaf, sales_leaf_b, mapped_items)
+        c = _admin_client()
+        resp = c.get(self._url(
+            draft_version, client_obj, agg_level='sales',
+            sales_node_ids=f'{sales_leaf.pk},{sales_leaf_b.pk}',
+        ))
+        assert resp.status_code == 200
+        body = resp.content.decode()
+        assert 'REP-01 — Rep 1' in body
+        assert 'REP-02 — Rep 2' in body
+        assert 'Unassigned' not in body
+
+    def test_item_hierarchy_multi_select_union(
+        self, draft_version, client_obj, active_item, item2, unmapped_item,
+        leaf_location, second_leaf_location, unmapped_location,
+        sales_leaf, sales_leaf_b, tax_leaf, tax_leaf_b, mapped_items,
+    ):
+        self._seed(draft_version, client_obj, active_item, item2,
+                   unmapped_item, leaf_location, second_leaf_location,
+                   unmapped_location, sales_leaf, sales_leaf_b, mapped_items)
+        c = _admin_client()
+        resp = c.get(self._url(
+            draft_version, client_obj, agg_level='item_hierarchy',
+            taxonomy_node_ids=f'{tax_leaf.pk},{tax_leaf_b.pk}',
+        ))
+        assert resp.status_code == 200
+        body = resp.content.decode()
+        assert 'Brick A' in body
+        assert 'Brick B' in body
+        assert 'Unassigned' not in body
+
+    def test_item_hierarchy_multi_select_fails_closed_on_any_bad_id(
+        self, draft_version, client_obj, active_item, item2, unmapped_item,
+        leaf_location, second_leaf_location, unmapped_location,
+        sales_leaf, sales_leaf_b, tax_leaf, tax_leaf_b, mapped_items,
+    ):
+        self._seed(draft_version, client_obj, active_item, item2,
+                   unmapped_item, leaf_location, second_leaf_location,
+                   unmapped_location, sales_leaf, sales_leaf_b, mapped_items)
+        c = _admin_client()
+        resp = c.get(self._url(
+            draft_version, client_obj, agg_level='item_hierarchy',
+            taxonomy_node_ids=f'{tax_leaf.pk},999999',
+        ))
+        assert resp.status_code == 200
+        assert 'No aggregates found.' in resp.content.decode()
+
 
 # ── actuals_aggregates view ───────────────────────────────────────────────
 
@@ -483,3 +537,63 @@ class TestActualsAggregatesView:
         assert 'Brick A' in body
         assert 'Brick B' in body
         assert 'Unassigned' in body
+
+    def test_sales_multi_select_union(
+        self, client_obj, active_item, item2, unmapped_item,
+        leaf_location, unmapped_location, planning_customer,
+        distribution_channel_common, distribution_channel_retail,
+        sales_leaf, sales_leaf_b, mapped_items,
+    ):
+        self._seed(client_obj, active_item, item2, unmapped_item,
+                   leaf_location, unmapped_location, planning_customer,
+                   distribution_channel_common, distribution_channel_retail,
+                   sales_leaf, sales_leaf_b, mapped_items)
+        c = _admin_client()
+        resp = c.get(self._url(
+            client_obj, agg_level='sales',
+            sales_node_ids=f'{sales_leaf.pk},{sales_leaf_b.pk}',
+        ))
+        assert resp.status_code == 200
+        body = resp.content.decode()
+        assert 'REP-01 — Rep 1' in body
+        assert 'REP-02 — Rep 2' in body
+        assert 'Unassigned' not in body
+
+    def test_item_hierarchy_multi_select_union(
+        self, client_obj, active_item, item2, unmapped_item,
+        leaf_location, unmapped_location, planning_customer,
+        distribution_channel_common, distribution_channel_retail,
+        sales_leaf, sales_leaf_b, tax_leaf, tax_leaf_b, mapped_items,
+    ):
+        self._seed(client_obj, active_item, item2, unmapped_item,
+                   leaf_location, unmapped_location, planning_customer,
+                   distribution_channel_common, distribution_channel_retail,
+                   sales_leaf, sales_leaf_b, mapped_items)
+        c = _admin_client()
+        resp = c.get(self._url(
+            client_obj, agg_level='item_hierarchy',
+            taxonomy_node_ids=f'{tax_leaf.pk},{tax_leaf_b.pk}',
+        ))
+        assert resp.status_code == 200
+        body = resp.content.decode()
+        assert 'Brick A' in body
+        assert 'Brick B' in body
+        assert 'Unassigned' not in body
+
+    def test_item_hierarchy_multi_select_fails_closed_on_any_bad_id(
+        self, client_obj, active_item, item2, unmapped_item,
+        leaf_location, unmapped_location, planning_customer,
+        distribution_channel_common, distribution_channel_retail,
+        sales_leaf, sales_leaf_b, tax_leaf, tax_leaf_b, mapped_items,
+    ):
+        self._seed(client_obj, active_item, item2, unmapped_item,
+                   leaf_location, unmapped_location, planning_customer,
+                   distribution_channel_common, distribution_channel_retail,
+                   sales_leaf, sales_leaf_b, mapped_items)
+        c = _admin_client()
+        resp = c.get(self._url(
+            client_obj, agg_level='item_hierarchy',
+            taxonomy_node_ids=f'{tax_leaf.pk},999999',
+        ))
+        assert resp.status_code == 200
+        assert 'No actuals found.' in resp.content.decode()

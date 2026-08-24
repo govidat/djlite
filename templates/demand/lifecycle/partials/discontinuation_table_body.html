@@ -1,0 +1,27 @@
+{% load i18n %}
+{% for disc in discontinuations %}
+<tr id="disc-row-{{ disc.pk }}">
+  <td>{{ disc.item_id }}</td>
+  <td>{{ disc.effective_from|default:"Immediate" }}</td>
+  <td>{{ disc.updated_at|date:"d M Y" }}</td>
+  <td class="whitespace-nowrap">
+    <button class="btn btn-ghost btn-xs"
+            hx-get="{% url 'demand_ui:item_discontinuation_edit' client_id=client.client_id pk=disc.pk %}"
+            hx-target="#modal-content"
+            hx-swap="innerHTML"
+            onclick="document.getElementById('lifecycle-modal').showModal()">
+      {% trans "Edit" %}
+    </button>
+    <form class="inline"
+          hx-post="{% url 'demand_ui:item_discontinuation_delete' client_id=client.client_id pk=disc.pk %}"
+          hx-target="#disc-row-{{ disc.pk }}"
+          hx-swap="outerHTML"
+          hx-confirm="{% trans 'Delete this discontinuation?' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-error btn-xs">{% trans "Delete" %}</button>
+    </form>
+  </td>
+</tr>
+{% empty %}
+<tr><td colspan="4" class="text-base-content/60">{% trans "No discontinuations configured." %}</td></tr>
+{% endfor %}

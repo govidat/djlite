@@ -116,7 +116,7 @@
 {% if page_obj.has_other_pages %}
 <div class="flex justify-center gap-2 mt-4">
     {% if page_obj.has_previous %}
-    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&final_value_min={{ filters.final_value_min }}&final_value_max={{ filters.final_value_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}"
+    <a href="?page={{ page_obj.previous_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&final_value_min={{ filters.final_value_min }}&final_value_max={{ filters.final_value_max }}&sales_node_ids={{ filters.sales_node_ids }}sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}taxonomy_node_ids={{ filters.taxonomy_node_ids }}"
        class="btn btn-sm btn-ghost">← {% trans "Previous" %}</a>
     {% else %}
     <span class="btn btn-sm btn-disabled">← {% trans "Previous" %}</span>
@@ -125,7 +125,7 @@
         {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
     </span>
     {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&final_value_min={{ filters.final_value_min }}&final_value_max={{ filters.final_value_max }}&sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}"
+    <a href="?page={{ page_obj.next_page_number }}&agg_level={{ agg_level }}&period_start={{ filters.period_start }}&customer_code={{ filters.customer_code }}&final_value_min={{ filters.final_value_min }}&final_value_max={{ filters.final_value_max }}&sales_node_ids={{ filters.sales_node_ids }}sales_node_id={{ filters.sales_node_id }}&taxonomy_node_id={{ filters.taxonomy_node_id }}taxonomy_node_ids={{ filters.taxonomy_node_ids }}"
        class="btn btn-sm btn-ghost">{% trans "Next" %} →</a>
     {% else %}
     <span class="btn btn-sm btn-disabled">{% trans "Next" %} →</span>

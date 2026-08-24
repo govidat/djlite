@@ -1,0 +1,79 @@
+{% load i18n %}
+<div class="w-full overflow-x-auto">
+    <table class="table table-zebra table-sm w-full min-w-max">
+        <thead>
+            <tr>
+                <th class="whitespace-nowrap">{% trans "Location" %}</th>
+                <th class="whitespace-nowrap">{% trans "Item ID" %}</th>
+                <th class="whitespace-nowrap">{% trans "Item" %}</th>
+                <th class="whitespace-nowrap">{% trans "Period" %}</th>
+                <th class="whitespace-nowrap">{% trans "Scheme" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Pre-Scheme Qty" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Scheme Qty" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Scheme Value" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Statistical Qty" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Override Qty" %}</th>
+                <th class="text-right whitespace-nowrap">{% trans "Final Qty" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in page_obj %}
+            {% include "demand/partials/scheme_table_row.html" with line=line %}
+            {% empty %}
+            <tr>
+                <td colspan="11" class="text-center py-8 text-base-content/50">
+                    {% trans "No scheme lines found." %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+        {% if page_obj.object_list %}
+        <tfoot>
+            {% if is_multipage %}
+            <tr class="border-t border-base-300 text-sm">
+                <td colspan="5" class="text-right text-base-content/60 pr-4 whitespace-nowrap">
+                    {% trans "Page total" %}
+                </td>
+                <td class="text-right font-medium">{{ page_total.total_pre_scheme_qty|floatformat:0 }}</td>
+                <td class="text-right font-medium">{{ page_total.total_scheme_qty|floatformat:0 }}</td>
+                <td></td>
+                <td class="text-right font-medium">{{ page_total.total_statistical_qty|floatformat:0 }}</td>
+                <td></td>
+                <td class="text-right font-medium">{{ page_total.total_final_qty|floatformat:0 }}</td>
+            </tr>
+            {% endif %}
+            <tr class="border-t-2 border-base-content/20 bg-base-200 font-bold text-sm">
+                <td colspan="5" class="text-right pr-4 whitespace-nowrap">
+                    {% trans "Grand total" %}
+                    <span class="text-xs font-normal text-base-content/50 ml-1">
+                        ({{ page_obj.paginator.count }} {% trans "rows" %})
+                    </span>
+                </td>
+                <td class="text-right">{{ grand_total.total_pre_scheme_qty|floatformat:0 }}</td>
+                <td class="text-right">{{ grand_total.total_scheme_qty|floatformat:0 }}</td>
+                <td></td>
+                <td class="text-right">{{ grand_total.total_statistical_qty|floatformat:0 }}</td>
+                <td></td>
+                <td class="text-right">{{ grand_total.total_final_qty|floatformat:0 }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="flex justify-center gap-2 mt-4">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&period_start={{ filters.period_start }}&show_all={{ filters.show_all }}"
+       class="btn btn-sm btn-ghost">&larr; {% trans "Previous" %}</a>
+    {% endif %}
+    <span class="btn btn-sm btn-disabled">
+        {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&item_id={{ filters.item_id }}&location_code={{ filters.location_code }}&period_start={{ filters.period_start }}&show_all={{ filters.show_all }}"
+       class="btn btn-sm btn-ghost">{% trans "Next" %} &rarr;</a>
+    {% endif %}
+</div>
+{% endif %}

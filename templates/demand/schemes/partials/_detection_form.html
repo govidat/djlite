@@ -1,0 +1,29 @@
+{% load i18n %}
+
+{% if no_new_data %}
+  <p class="text-sm text-base-content/60">{% trans "No new data to process since the last run." %}</p>
+{% elif error %}
+  <div class="alert alert-error py-2 text-sm mb-2">
+    <span>{{ error }}</span>
+  </div>
+{% endif %}
+
+<form hx-post="{% url 'demand_ui:trigger_scheme_detection' client_id=client.client_id %}"
+      hx-target="#detection-status" hx-swap="innerHTML"
+      class="flex flex-wrap items-end gap-3 mt-3">
+  {% csrf_token %}
+  <div class="form-control">
+    <label class="label"><span class="label-text text-xs">{% trans "Start period" %}</span></label>
+    <input type="date" name="period_start" class="input input-bordered input-sm"
+           value="{{ suggested_start|date:'Y-m-d'|default:'' }}">
+  </div>
+  <div class="form-control">
+    <label class="label"><span class="label-text text-xs">{% trans "End period" %}</span></label>
+    <input type="date" name="period_end" class="input input-bordered input-sm"
+           value="{{ suggested_end|date:'Y-m-d'|default:'' }}">
+  </div>
+  <button type="submit" class="btn btn-primary btn-sm"
+          {% if no_new_data %}disabled{% endif %}>
+    {% trans "Run Detection" %}
+  </button>
+</form>

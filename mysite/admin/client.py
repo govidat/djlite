@@ -4,7 +4,7 @@ from django.contrib import admin
 from modeltranslation.admin import TranslationBaseModelAdmin
 
 from .base import ClientScopedMixin, _user_has_admin_role, ClientLanguageMixinV2, BaseAdminInlinecss
-from mysite.models import (Client, Theme, ClientTemplate)
+from mysite.models import (Client, Theme, ClientTemplate, SectorTemplate)
 from mysite.forms import ClientForm
 
 from mysite.admin.page import PageInline, PageplusLayoutInline, PageplusPageContentInline, NavItemInline
@@ -96,7 +96,7 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
         )
         fieldsets = [
             ('General', {
-                'fields': ('client_id', 'parent', 'language_choices', 'default_language', 'distribution_channel_choices', 'nb_title_svg_pre', 'nb_title_svg_suf'),
+                'fields': ('client_id', 'parent', 'sector', 'language_choices', 'default_language', 'distribution_channel_choices', 'catalogue_taxonomy_order', 'nb_title_svg_pre', 'nb_title_svg_suf'),
                 'classes': ('collapse',),
             }),            
             ('Main Language', {
@@ -252,7 +252,49 @@ class ClientTemplatewrapperAdmin(ClientScopedMixin, nested_admin.NestedModelAdmi
     #def get_inline_instances(self, request, obj=None):
     #    if obj is None:
     #        return []
-    #    return super().get_inline_instances(request, obj)         
+    #    return super().get_inline_instances(request, obj)
+
+
+# ── SectorTemplate (sector-scoped + global-default template fragments) ─
+
+class SectorTemplateAdmin(TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
+    """
+    Standalone admin for sector-level and global-default templates.
+
+      sector_node = a node  → applies to every client under that sector
+      sector_node = empty   → GLOBAL DEFAULT (one active row per key)
+
+    Resolution order handled by render_client_template:
+      Client > deepest sector > ... ancestors > global default
+    """
+    list_display    = ('template_key', 'sector_node', 'is_active', 'updated_at')
+    list_filter     = ('template_key', 'is_active')
+    search_fields   = ('template_key',)
+    list_select_related = ('sector_node',)
+    admin_role_only = True
+
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['htmlblob'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('sector_node', 'template_key', 'is_active'),
+                'classes': ('collapse',),
+            }),
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
 
 """
 class ClientTemplateAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):

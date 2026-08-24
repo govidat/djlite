@@ -14,8 +14,9 @@ from django.urls import path
 from mysite.demand_ui import views, views_drilldown, views_htmx
 
 from mysite.views import taxonomy_tree_panel, taxonomy_tree_children
+from mysite.views import sales_tree_panel, sales_tree_children
 app_name = 'demand_ui'
- 
+  
 urlpatterns = [
     # ── Dashboard ────────────────────────────────────────────────────────────
     path('', views.dashboard, name='dashboard'),
@@ -25,6 +26,10 @@ urlpatterns = [
     # ── Taxonomy tree filter widget ──────────────────────────────────
     path('taxonomy-tree/', taxonomy_tree_panel, name='taxonomy_tree_panel'),
     path('taxonomy-tree/<int:node_id>/children/', taxonomy_tree_children, name='taxonomy_tree_children'),
+
+    # ── Sales-hierarchy tree filter widget ───────────────────────────
+    path('sales-tree/', sales_tree_panel, name='sales_tree_panel'),
+    path('sales-tree/<int:node_id>/children/', sales_tree_children, name='sales_tree_children'),
 
     # ── Forecast Versions ────────────────────────────────────────────────────
     path('versions/', views.version_list, name='version_list'),
@@ -43,6 +48,29 @@ urlpatterns = [
     # ── Forecast Lines (grid) ────────────────────────────────────────────────
     path('versions/<int:pk>/lines/', views.version_lines, name='version_lines'),
     path('versions/<int:pk>/lines/row/<int:line_id>/', views.version_line_row, name='version_line_row'),
+
+    # ── Scheme Numbers ───────────────────────────────────────────────────────
+    path('versions/<int:pk>/scheme-numbers/', views.version_scheme_numbers, name='version_scheme_numbers'),
+    path('versions/<int:pk>/scheme-numbers/<int:line_id>/update/', views.version_scheme_update, name='version_scheme_update'),
+    path('versions/<int:pk>/scheme-numbers/<int:line_id>/row/', views.version_scheme_row, name='version_scheme_row'),
+
+    # ── Scheme Suggestion (for admin form) ───────────────────────────────────
+    path('schemes/suggest/', views.scheme_suggest, name='scheme_suggest'),
+
+    # ── Scheme Management (list / create / edit / detail / actions) ─────────
+    path('schemes/', views.scheme_list, name='scheme_list'),
+    path('schemes/create/', views.scheme_create, name='scheme_create'),
+    path('schemes/<int:pk>/', views.scheme_detail, name='scheme_detail'),
+    path('schemes/<int:pk>/edit/', views.scheme_edit, name='scheme_edit'),
+    path('schemes/<int:pk>/activate/', views.scheme_activate, name='scheme_activate'),
+    path('schemes/<int:pk>/archive/', views.scheme_archive, name='scheme_archive'),
+    path('schemes/<int:pk>/delete/', views.scheme_delete, name='scheme_delete'),
+    path('schemes/<int:pk>/occurrences/', views.scheme_occurrences, name='scheme_occurrences'),
+
+    # ── Scheme Review Queue (system-detected candidates) ────────────────────
+    path('schemes/review-queue/', views.scheme_review_queue, name='scheme_review_queue'),
+    path('schemes/detection-form/', views.scheme_detection_form, name='scheme_detection_form'),
+    path('schemes/trigger-detection/', views.trigger_scheme_detection, name='trigger_scheme_detection'),
 
     # ── Aggregates (value summary) ───────────────────────────────────────────
     path('versions/<int:pk>/aggregates/', views.version_aggregates, name='version_aggregates'),
@@ -108,6 +136,19 @@ urlpatterns = [
     path("outliers/decisions/", views.outlier_decisions_report, name="outlier_decisions_report"),
     path("outliers/decisions/<int:pk>/revise/", views.outlier_revise, name="outlier_revise"),    
     path("outliers/bulk-delete/", views.outlier_bulk_delete, name="outlier_bulk_delete"),
- 
+
+    # ── Item Lifecycle ────────────────────────────────────────────────────────
+    path('lifecycle/substitutions/', views.item_substitution_list, name='item_substitution_list'),
+    path('lifecycle/substitutions/create/', views.item_substitution_create, name='item_substitution_create'),
+    path('lifecycle/substitutions/<int:pk>/edit/', views.item_substitution_edit, name='item_substitution_edit'),
+    path('lifecycle/substitutions/<int:pk>/delete/', views.item_substitution_delete, name='item_substitution_delete'),
+    path('lifecycle/discontinuations/', views.item_discontinuation_list, name='item_discontinuation_list'),
+    path('lifecycle/discontinuations/create/', views.item_discontinuation_create, name='item_discontinuation_create'),
+    path('lifecycle/discontinuations/<int:pk>/edit/', views.item_discontinuation_edit, name='item_discontinuation_edit'),
+    path('lifecycle/discontinuations/<int:pk>/delete/', views.item_discontinuation_delete, name='item_discontinuation_delete'),
+    path('lifecycle/introductions/', views.item_introduction_list, name='item_introduction_list'),
+    path('lifecycle/introductions/create/', views.item_introduction_create, name='item_introduction_create'),
+    path('lifecycle/introductions/<int:pk>/edit/', views.item_introduction_edit, name='item_introduction_edit'),
+    path('lifecycle/introductions/<int:pk>/delete/', views.item_introduction_delete, name='item_introduction_delete'),
 
 ]

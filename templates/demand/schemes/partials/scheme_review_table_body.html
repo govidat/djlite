@@ -1,0 +1,44 @@
+{% load i18n %}
+{% for scheme in schemes %}
+<tr>
+  <td>
+    <a href="{% url 'demand_ui:scheme_detail' client_id=client.client_id pk=scheme.pk %}"
+       class="link link-primary font-mono text-sm">
+      {{ scheme.scheme_code }}
+    </a>
+  </td>
+  <td>{{ scheme.name }}</td>
+  <td class="text-right">{{ scheme.expected_qty_uplift_pct }}</td>
+  <td>
+    {% for period in scheme.periods.all %}
+      <span class="badge badge-outline badge-xs">{{ period.period_start|date:"M Y" }}</span>
+    {% endfor %}
+  </td>
+  <td>
+    {% for scope in scheme.scopes.all %}
+      <span class="badge badge-outline badge-xs">{{ scope.get_scope_type_display }}</span>
+    {% endfor %}
+  </td>
+  <td>{{ scheme.created_at|date:"d M Y" }}</td>
+  <td>
+    <div class="flex gap-1">
+      <button class="btn btn-success btn-xs"
+              hx-post="{% url 'demand_ui:scheme_activate' client_id=client.client_id pk=scheme.pk %}"
+              hx-confirm="{% trans 'Activate this scheme?' %}"
+              hx-target="#scheme-review-queue" hx-swap="innerHTML">
+        {% trans "Activate" %}
+      </button>
+      <button class="btn btn-ghost btn-xs"
+              hx-post="{% url 'demand_ui:scheme_archive' client_id=client.client_id pk=scheme.pk %}"
+              hx-confirm="{% trans 'Reject (archive) this scheme?' %}"
+              hx-target="#scheme-review-queue" hx-swap="innerHTML">
+        {% trans "Reject" %}
+      </button>
+    </div>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="7" class="text-base-content/60">{% trans "No system-detected candidates. Run detection to find spikes." %}</td>
+</tr>
+{% endfor %}

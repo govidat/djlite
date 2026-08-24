@@ -1,0 +1,56 @@
+{% load i18n %}
+{% with intro=form_data|default:None %}
+<h3 class="font-bold text-lg mb-4">
+  {% if introduction %}{% trans "Edit Introduction" %}{% else %}{% trans "New Introduction" %}{% endif %}
+</h3>
+
+{% if errors.__all__ %}
+<div class="alert alert-error mb-4"><span>{{ errors.__all__ }}</span></div>
+{% endif %}
+
+<form hx-post="{% if introduction %}{% url 'demand_ui:item_introduction_edit' client_id=client.client_id pk=introduction.pk %}{% else %}{% url 'demand_ui:item_introduction_create' client_id=client.client_id %}{% endif %}"
+      hx-target="#modal-content"
+      hx-swap="innerHTML">
+  {% csrf_token %}
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "New Item ID" %}</span></label>
+    <input type="text" name="new_item" value="{{ intro.new_item_id|default:'' }}" class="input input-bordered w-full {% if errors.new_item %}input-error{% endif %}" required />
+    {% if errors.new_item %}<span class="text-error text-sm">{{ errors.new_item }}</span>{% endif %}
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Reference Item ID" %}</span></label>
+    <input type="text" name="reference_item" value="{{ intro.reference_item_id|default:'' }}" class="input input-bordered w-full {% if errors.reference_item %}input-error{% endif %}" required />
+    {% if errors.reference_item %}<span class="text-error text-sm">{{ errors.reference_item }}</span>{% endif %}
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Ratio" %}</span></label>
+    <input type="text" name="ratio" value="{{ intro.ratio|default:'1' }}" class="input input-bordered w-full {% if errors.ratio %}input-error{% endif %}" />
+    <span class="label-text-alt text-base-content/50">{% trans "new forecast = reference forecast × ratio." %}</span>
+    {% if errors.ratio %}<span class="text-error text-sm">{{ errors.ratio }}</span>{% endif %}
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Copy From" %}</span></label>
+    <input type="date" name="copy_from" value="{{ intro.copy_from|default:'' }}" class="input input-bordered w-full" />
+    <span class="label-text-alt text-base-content/50">{% trans "Null = from the new item's launch." %}</span>
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Copy To" %}</span></label>
+    <input type="date" name="copy_to" value="{{ intro.copy_to|default:'' }}" class="input input-bordered w-full" />
+    <span class="label-text-alt text-base-content/50">{% trans "Null = until enough own history." %}</span>
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Notes" %}</span></label>
+    <textarea name="notes" class="textarea textarea-bordered w-full" rows="2">{{ intro.notes|default:'' }}</textarea>
+  </div>
+
+  <div class="modal-action">
+    <button type="submit" class="btn btn-primary">{% trans "Save" %}</button>
+  </div>
+</form>
+{% endwith %}

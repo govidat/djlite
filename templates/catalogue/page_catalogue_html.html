@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
-{% load my_tags %}
+{% load my_tags static %}
 
 {% comment %}
 FILE: templates/catalogue/page_catalogue_html.html
@@ -204,6 +204,9 @@ code changes — just drop template files in their named folder.
   </div>
 
 </div>
+{# Tri-state cascade for the LHS tree (capture-phase change listener) #}
+<link rel="stylesheet" href="{% static 'admin/css/taxonomy_tree.css' %}">
+<script src="{% static 'admin/js/taxonomy_tree.js' %}"></script>
 {% endblock %}
 
 {% comment "" %}

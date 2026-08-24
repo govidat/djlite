@@ -1,0 +1,54 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<h1 class="text-2xl font-bold mb-6">{% trans "Scheme Review Queue" %}</h1>
+
+<div id="scheme-review-queue">
+
+  {# ── Detection trigger ────────────────────────────────────────────────── #}
+  <div class="card bg-base-200 mb-6">
+    <div class="card-body">
+      <p class="text-sm text-base-content/70">
+        {% trans "Last detection run" %}:
+        {% if config.last_scheme_detection_run_at %}
+          {{ config.last_scheme_detection_run_at|date:"d M Y, H:i" }}
+          {% if config.last_scheme_detection_run_by %}
+            {% trans "by" %} {{ config.last_scheme_detection_run_by }}
+          {% endif %}
+          — {% trans "covering" %}
+          {{ config.last_scheme_detection_run_from|date:"M Y" }}
+          {% trans "to" %} {{ config.last_scheme_detection_run_to|date:"M Y" }}
+        {% else %}
+          {% trans "Never run" %}
+        {% endif %}
+      </p>
+
+      <div hx-get="{% url 'demand_ui:scheme_detection_form' client_id=client.client_id %}"
+           hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+      </div>
+      <div id="detection-status"></div>
+    </div>
+  </div>
+
+  {# ── Candidates table ─────────────────────────────────────────────────── #}
+  <div class="overflow-x-auto">
+    <table class="table table-zebra">
+      <thead>
+        <tr>
+          <th>{% trans "Code" %}</th>
+          <th>{% trans "Name" %}</th>
+          <th>{% trans "Qty Uplift" %}</th>
+          <th>{% trans "Periods" %}</th>
+          <th>{% trans "Scopes" %}</th>
+          <th>{% trans "Created" %}</th>
+          <th>{% trans "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody id="scheme-review-table-body">
+        {% include "demand/schemes/partials/scheme_review_table_body.html" %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -42,19 +42,25 @@ def _load_actuals(con, client_id: int, period_type: str) -> None:
 
     cfg = ForecastingConfig.get_for_client_id(client_id)
     use_net = bool(cfg.forecast_uses_net_actuals)
+    use_scheme_net = bool(cfg.scheme_net_actuals)
+    use_sub = bool(cfg.use_item_lifecycle)
     client = Client.objects.get(pk=client_id)
 
-    qs = actuals_queryset_with_net(client, use_net).filter(period_type=period_type)
+    qs = actuals_queryset_with_net(client, use_net, use_scheme_net=use_scheme_net,
+                                    use_substitution=use_sub).filter(period_type=period_type)
+    item_key = 'eff_item_id' if use_sub else 'item_id'
     rows = qs.values(
-        'item_id', 'planning_location_id', 'distribution_channel_id',
+        item_key, 'planning_location_id', 'distribution_channel_id',
         'planning_customer_id', 'period_start', 'net_qty',
     )
     df = pd.DataFrame.from_records(rows)
     if df.empty:
         df = pd.DataFrame(columns=[
-            'item_id', 'planning_location_id', 'distribution_channel_id',
+            item_key, 'planning_location_id', 'distribution_channel_id',
             'planning_customer_id', 'period_start', 'net_qty',
         ])
+    if use_sub and item_key in df.columns and item_key != 'item_id':
+        df = df.rename(columns={item_key: 'item_id'})
     df = df.rename(columns={'net_qty': 'qty'})   # everything downstream references 'qty'
     df['qty'] = df['qty'].astype(float)
     con.register('actuals_raw', df)

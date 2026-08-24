@@ -1,6 +1,7 @@
 {% load static tailwind_tags %}
 {% load i18n %}
 {% load l10n %}
+{% load my_tags %}
 
 <!DOCTYPE html>
 
@@ -87,8 +88,8 @@
   <!-- Header -->
   <header  class="p-4 col-span-2 row-start-1 row-end-2">
     <!-- navbar -->
-
-    <c-navbar_v001></c-navbar_v001> 
+    {# DB-resolved: ClientTemplate > SectorTemplate chain > global default #}
+    {% render_client_template 'navbar' %}
 
   </header>
   <!-- Sidebar -->
@@ -111,9 +112,11 @@
     {% endblock content %}
   </main>
 
-  <!-- Footer -->    
-  {% comment %} 
-  <c-footer_v001></c-footer_v001>
+  <!-- Footer -->
+  {% comment %}
+  Re-enable footer rendering via the DB-resolved template tag:
+    {% render_client_template 'footer' %}
+  (legacy: <c-footer_v001></c-footer_v001>)
   {% endcomment %}
 
   {% comment %}

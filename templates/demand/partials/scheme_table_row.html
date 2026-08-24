@@ -1,0 +1,89 @@
+{% load i18n %}
+<tr id="scheme-row-{{ line.pk }}">
+    <td class="whitespace-nowrap">{{ line.planning_location.code|default:"—" }}</td>
+    <td class="whitespace-nowrap">{{ line.item.item_id }}</td>
+    <td class="whitespace-nowrap">{{ line.item.name|truncatechars:30 }}</td>
+    <td class="whitespace-nowrap">{{ line.period_start|date:"M Y" }}</td>
+    <td class="whitespace-nowrap">{{ line.scheme|default:"—" }}</td>
+    <td class="text-right">{{ line.pre_scheme_statistical_qty|floatformat:3|default:"—" }}</td>
+
+    {# ── scheme_qty cell ────────────────────────────────────────────── #}
+    {% if has_overrides and not edit_field %}
+    <td class="text-right text-base-content/40" title="{% trans 'Locked: version has overrides. Copy version to edit scheme.' %}">
+        {{ line.scheme_qty|floatformat:3|default:"—" }}
+        <span class="text-xs ml-1">&#128274;</span>
+    </td>
+    {% elif edit_field == "scheme_qty" %}
+    <td class="text-right p-0">
+        <form hx-post="{% url 'demand_ui:version_scheme_update' client_id=client.client_id pk=version.pk line_id=line.pk %}"
+              hx-target="#scheme-row-{{ line.pk }}"
+              hx-swap="outerHTML"
+              hx-indicator="#scheme-spinner-{{ line.pk }}"
+              class="flex items-center gap-1 justify-end px-1">
+            {% csrf_token %}
+            <input type="text" name="scheme_qty"
+                   class="input input-bordered input-xs w-24 text-right"
+                   value="{{ line.scheme_qty|floatformat:3|default:'' }}"
+                   autofocus
+                   hx-get="{% url 'demand_ui:version_scheme_row' client_id=client.client_id pk=version.pk line_id=line.pk %}"
+                   hx-target="#scheme-row-{{ line.pk }}"
+                   hx-swap="outerHTML"
+                   hx-trigger="keyup[key=='Escape']">
+            <button type="submit" class="btn btn-xs btn-success">&#10003;</button>
+            <span id="scheme-spinner-{{ line.pk }}" class="loading loading-spinner loading-xs hidden"></span>
+        </form>
+    </td>
+    {% else %}
+    <td class="text-right"
+        hx-get="{% url 'demand_ui:version_scheme_row' client_id=client.client_id pk=version.pk line_id=line.pk %}?edit=scheme_qty"
+        hx-target="#scheme-row-{{ line.pk }}"
+        hx-swap="outerHTML"
+        hx-trigger="click"
+        title="{% trans 'Click to edit scheme qty' %}"
+        style="cursor:pointer">
+        {{ line.scheme_qty|floatformat:3|default:"—" }}
+    </td>
+    {% endif %}
+
+    {# ── scheme_value cell ──────────────────────────────────────────── #}
+    {% if has_overrides and not edit_field %}
+    <td class="text-right text-base-content/40" title="{% trans 'Locked: version has overrides. Copy version to edit scheme.' %}">
+        {% if line.scheme_value is not None %}&#x20B9;{{ line.scheme_value|floatformat:2 }}{% else %}&mdash;{% endif %}
+        <span class="text-xs ml-1">&#128274;</span>
+    </td>
+    {% elif edit_field == "scheme_value" %}
+    <td class="text-right p-0">
+        <form hx-post="{% url 'demand_ui:version_scheme_update' client_id=client.client_id pk=version.pk line_id=line.pk %}"
+              hx-target="#scheme-row-{{ line.pk }}"
+              hx-swap="outerHTML"
+              hx-indicator="#scheme-spinner-{{ line.pk }}"
+              class="flex items-center gap-1 justify-end px-1">
+            {% csrf_token %}
+            <input type="text" name="scheme_value"
+                   class="input input-bordered input-xs w-24 text-right"
+                   value="{{ line.scheme_value|floatformat:2|default:'' }}"
+                   autofocus
+                   hx-get="{% url 'demand_ui:version_scheme_row' client_id=client.client_id pk=version.pk line_id=line.pk %}"
+                   hx-target="#scheme-row-{{ line.pk }}"
+                   hx-swap="outerHTML"
+                   hx-trigger="keyup[key=='Escape']">
+            <button type="submit" class="btn btn-xs btn-success">&#10003;</button>
+            <span id="scheme-spinner-{{ line.pk }}" class="loading loading-spinner loading-xs hidden"></span>
+        </form>
+    </td>
+    {% else %}
+    <td class="text-right"
+        hx-get="{% url 'demand_ui:version_scheme_row' client_id=client.client_id pk=version.pk line_id=line.pk %}?edit=scheme_value"
+        hx-target="#scheme-row-{{ line.pk }}"
+        hx-swap="outerHTML"
+        hx-trigger="click"
+        title="{% trans 'Click to edit scheme value' %}"
+        style="cursor:pointer">
+        {% if line.scheme_value is not None %}&#x20B9;{{ line.scheme_value|floatformat:2 }}{% else %}&mdash;{% endif %}
+    </td>
+    {% endif %}
+
+    <td class="text-right font-medium">{{ line.statistical_qty|floatformat:3 }}</td>
+    <td class="text-right">{{ line.override_qty|floatformat:3|default:"—" }}</td>
+    <td class="text-right font-bold">{{ line.final_qty|floatformat:3 }}</td>
+</tr>

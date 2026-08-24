@@ -8,10 +8,9 @@ def add_postgres_indexes(apps, schema_editor):
     if schema_editor.connection.vendor != 'postgresql':
         return
     indexes = [
-        # Item base table - REPLACE # in the beginning and # at the end of each line with ". So the line should read 3doubequote-Create - 3doublequote
-        """CREATE INDEX IF NOT EXISTS planloc_path_tpo_idx ON  ON mysite_planninglocation (path text_pattern_ops)""",
-        """CREATE INDEX IF NOT EXISTS plancust_path_tpo_idx ON  ON mysite_planningcustomer (path text_pattern_ops)""",
-        """CREATE INDEX IF NOT EXISTS salesnode_path_tpo_idx ON  ON mysite_salesnode (path text_pattern_ops)""",
+        """CREATE INDEX IF NOT EXISTS planloc_path_tpo_idx ON mysite_planninglocation (path text_pattern_ops)""",
+        """CREATE INDEX IF NOT EXISTS plancust_path_tpo_idx ON mysite_planningcustomer (path text_pattern_ops)""",
+        """CREATE INDEX IF NOT EXISTS salesnode_path_tpo_idx ON mysite_salesnode (path text_pattern_ops)""",
 
     ]
 

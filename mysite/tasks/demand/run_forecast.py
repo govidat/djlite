@@ -50,6 +50,7 @@ def run_forecast(self, version_id: int):
         run_hierarchical_reconciliation,
         write_forecast_lines,
         write_forecast_aggregates,
+        build_scheme_forecast_factors,
     )
     from utils.feature_control import celery_demand_feature_guard
  
@@ -291,12 +292,32 @@ def run_forecast(self, version_id: int):
  
         # ── Step 10: Write ForecastLine rows ──────────────────────────────
         _set_status('AGGREGATING')
+
+        # Build scheme forecast factors for the horizon
+        scheme_factors = {}
+        if config and config.scheme_net_actuals:
+            from mysite.models.demand.forecast import ForecastingConfig
+            cfg_fc = ForecastingConfig.get_for_client(version.client)
+            if cfg_fc.scheme_apply_forecast_uplift:
+                # Determine the period range from the forecast DataFrame
+                if not atomic_df.empty and 'ds' in atomic_df.columns:
+                    period_starts = pd.to_datetime(atomic_df['ds'])
+                    period_start_from = period_starts.min().date() if hasattr(period_starts.min(), 'date') else period_starts.min()
+                    period_start_to = period_starts.max().date() if hasattr(period_starts.max(), 'date') else period_starts.max()
+                    scheme_factors = build_scheme_forecast_factors(
+                        client_id=version.client_id,
+                        period_type=period_type,
+                        period_start_from=period_start_from,
+                        period_start_to=period_start_to,
+                    )
+
         n_lines = write_forecast_lines(
             version_id=version_id,
             forecast_df=atomic_df,
             decisions=decisions,
             period_type=period_type,
             store_all_level_forecasts=store_all_levels,
+            scheme_factors=scheme_factors or None,
         )
  
         # ── Step 11: Write ForecastAggregate rollups ──────────────────────
@@ -662,6 +683,8 @@ def compute_accuracy(self, client_id: int, version_id: int = None):
 
     cfg = ForecastingConfig.get_for_client(client)
     use_net = bool(cfg.reporting_uses_net_actuals)
+    use_scheme_net = bool(cfg.scheme_net_actuals)
+    use_sub = bool(cfg.use_item_lifecycle)
 
     # Planner-maintained planned price fallback, per item.
     fallback_prices = {
@@ -699,7 +722,8 @@ def compute_accuracy(self, client_id: int, version_id: int = None):
             lines_df = pd.DataFrame(list(lines_qs))
 
             actuals_qs = (
-                actuals_queryset_with_net(client, use_net)
+                actuals_queryset_with_net(client, use_net, use_scheme_net=use_scheme_net,
+                                          use_substitution=use_sub)
                 .filter(
                     period_type=period_type,
                     period_start__in=lines_df['period_start'].unique().tolist(),

@@ -24,10 +24,10 @@ def add_postgres_indexes(apps, schema_editor):
         """CREATE INDEX IF NOT EXISTS songitem_album_idx ON mysite_songitem (album) WHERE album != ''""",        
         ## DocumentItem
         """CREATE INDEX IF NOT EXISTS documentitem_attributes_gin_idx ON mysite_documentitem USING GIN (attributes jsonb_path_ops)""",
-        """CREATE INDEX IF NOT EXISTS documentitem_format_idx ON mysite_documentitem (format) WHERE artist != ''""",        
+        """CREATE INDEX IF NOT EXISTS documentitem_format_idx ON mysite_documentitem (format) WHERE format != ''""",        
         ## ServiceItem
         """CREATE INDEX IF NOT EXISTS serviceitem_attributes_gin_idx ON mysite_serviceitem USING GIN (attributes jsonb_path_ops)""",
-        """CREATE INDEX IF NOT EXISTS serviceitem_fulfillment_type_idx ON mysite_serviceitem (fulfillment_type) WHERE artist != ''""",        
+        """CREATE INDEX IF NOT EXISTS serviceitem_fulfillment_type_idx ON mysite_serviceitem (fulfillment_type) WHERE fulfillment_type != ''""",        
  
 
     ]

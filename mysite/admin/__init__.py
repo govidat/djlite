@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from mysite.admin.global_config import (
     ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline, DistributionChannelAdmin
 )
-from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientFeatureControlAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin #ClientTemplateAdmin
+from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientFeatureControlAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin, SectorTemplateAdmin #ClientTemplateAdmin
 
 from mysite.admin.users import (
     ClientUserProfileInline, CustomUserAdmin, ClientGroupPermissionInline, 
@@ -22,12 +22,21 @@ from mysite.admin.demand_forecast import (
     ForecastAggregateAdmin, ForecastOverrideAdmin
 )
 
+from mysite.admin.demand_schemes import (
+    SalesSchemeAdmin, ResolvedSalesSchemePeriodAdmin,
+)
+
+from mysite.admin.demand_lifecycle import (
+    ItemSubstitutionAdmin, ItemDiscontinuationAdmin, ItemIntroductionAdmin,
+)
+
 from mysite.models import (
     ThemePreset, GlobalValCat, GlobalVal, DistributionChannel,
     Client, ClientBlock, ClientFeatureControl, 
     ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper,
     Theme, ClientLocation,
     NavItem, Page, ClientTemplate,
+    SectorTemplate,
     ClientGroup, 
     Layout, Component,
     ClientUserProfile, CustomerProfile, ClientUserMembership,
@@ -38,6 +47,14 @@ from mysite.models import (
     ForecastVersion, ForecastLine, ForecastAccuracy, 
     AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile,
     ForecastAggregate, ForecastOverride
+)
+
+from mysite.models.demand.schemes import (
+    SalesScheme, ResolvedSalesSchemePeriod,
+)
+
+from mysite.models.demand.lifecycle import (
+    ItemSubstitution, ItemDiscontinuation, ItemIntroduction,
 )
 
 
@@ -59,6 +76,7 @@ admin.site.register(ClientStaff,  ClientStaffAdmin)
 admin.site.register(ClientTemplatewrapper,  ClientTemplatewrapperAdmin)
 
 #admin.site.register(ClientTemplate,  ClientTemplateAdmin)
+admin.site.register(SectorTemplate,       SectorTemplateAdmin)
 admin.site.register(ClientLocation,       ClientLocationAdmin)
 admin.site.register(ClientGroup,          ClientGroupAdmin)
 admin.site.register(User,                 CustomUserAdmin)
@@ -88,3 +106,12 @@ admin.site.register( SeriesLevelEvaluation,  SeriesLevelEvaluationAdmin)
 admin.site.register( SeriesProfile,  SeriesProfileAdmin)
 admin.site.register( ForecastAggregate,  ForecastAggregateAdmin)
 admin.site.register( ForecastOverride,  ForecastOverrideAdmin)
+
+# Sales Promotion Schemes
+admin.site.register( SalesScheme,  SalesSchemeAdmin)
+admin.site.register( ResolvedSalesSchemePeriod,  ResolvedSalesSchemePeriodAdmin)
+
+# Item Lifecycle
+admin.site.register( ItemSubstitution,  ItemSubstitutionAdmin)
+admin.site.register( ItemDiscontinuation,  ItemDiscontinuationAdmin)
+admin.site.register( ItemIntroduction,  ItemIntroductionAdmin)

@@ -242,6 +242,37 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] Superuser-only GlobalItem admin
 - [ ] ClientAdmin can select from GlobalItems but not create them
 - [ ] TaxonomyNode (client=None) admin restricted to superuser
+
+### Sprint 2.10 — Client Sector Classification & DB-Owned Template Defaults ✅ Done
+Client sites are classified by industry using a dedicated global taxonomy
+(`sector`: Industrial > Automotive > AutoComponents), reusing the existing
+`Taxonomy`/`TaxonomyNode` machinery. Template defaults (navbar, footer,
+demand sidebar nav, etc.) moved from filesystem fallbacks into the database.
+- [x] `'sector'` added to `TAXONOMY_TYPES`; global `Taxonomy` + node tree seeded via data migration (`0082_seed_sector_taxonomy`)
+- [x] `Client.sector` FK → `TaxonomyNode` (`null=True`, `SET_NULL`, limited to the sector taxonomy)
+- [x] `SectorTemplate` model: `(template_key, htmlblob*)`, nullable `sector_node`
+      (**NULL row = active global default**), `is_active` flag; conditional unique
+      constraint guarantees exactly one active default per key
+- [x] Uniform resolution for ALL template keys (incl. `navbar`, `footer`,
+      `demand_sidebar_nav`): ClientTemplate → SectorTemplate @ deepest→root
+      sector chain → SectorTemplate @ NULL global default; no filesystem fallback
+- [x] `'demand_sidebar_nav'` added to `TEMPLATE_CHOICES`
+- [x] Data migration `0083_seed_global_default_templates` seeds all 8 keys as
+      global rows (navbar wrapped as `{% include 'cotton/navbar_v001.html' %}` —
+      cotton tags only compile through the loader chain)
+- [x] `render_client_template` templatetag rewritten around DB resolution;
+      `_resolve_client_templates()` / `template_info` payload removed from `utils/catalogue_queries.py`
+- [x] Cache: `client_template:{client_id}:{key}`, `sector_chain:{client_id}`;
+      invalidated on SectorTemplate save/delete, TaxonomyNode moves, Client saves
+- [x] Admin: standalone `SectorTemplateAdmin`; `sector` field on Client admin;
+      SectorTemplate is superuser-only (`ADMIN_ONLY_MODELS`)
+- [x] Accuracy-report taxonomy lookups scoped by taxonomy id (materialized paths are only unique within a taxonomy)
+- [x] Tests: `mysite/tests/test_sector_templates.py` (12 tests incl. seed-completeness guard)
+
+> **Ops note**: template defaults are DB-owned since migration 0083. Editing a
+> default is done in Django admin (SectorTemplate), not by editing files — code
+> deploys no longer change rendered chrome.
+
 ---
  
 ## Open Decisions (Phase 2)
@@ -403,7 +434,231 @@ Wrap-up
 - [x] Tests: `test_outlier_detection.py`, `test_outlier_bulk_discard.py`, `test_actuals_upload_outlier_guard.py`, `test_actuals_net.py`, `test_flag_stale_forecast_versions.py`
 
 ---
- 
+
+### Sprint 3B.2c — Sales Promotion Scheme Management
+*Sprint 3B.2c — planned promo uplift + scheme-netted baseline, incl. pre/post pull-forward shadow.
+Ordering invariant: `baseline = Actuals − scheme impact − outlier`; scheme netting is multiplicative on
+window rows and additive on shadow rows, outlier netting stays subtractive, and outlier detection runs on
+scheme-netted (shadow-boosted) series.*
+
+Models & migrations (`mysite/models/demand/schemes.py`, registered in `demand/__init__.py`)
+- [ ] `SalesScheme(client, scheme_code, name, status DRAFT/ACTIVE/ARCHIVED, expected_qty_uplift_pct,
+      expected_value_uplift_pct [independent — 1-for-1 = qty +100%, value 0%], discount_pct [metadata
+      only, may pre-fill a default value uplift], shadow_periods [default 0 = off], pull_forward_pct
+      [default 0.5, in [0,1]])` — `clean()` rejects negative qty uplift, `value_uplift ≤ −100%`,
+      and `pull_forward_pct ∉ [0,1]`
+- [ ] `SalesSchemeScope(scheme, scope_type OVERALL/TAXONOMY/BRAND/ITEM, taxonomy_node, item,
+      planning_location / planning_customer / distribution_channel nullable)` — unique on the full dim
+      set. BRAND = Brand node in the item taxonomy (the scheme's "vendor"); `clean()` enforces the
+      `brand_taxonomy` prerequisite and that the node has item mappings
+- [ ] `SalesSchemePeriod(scheme, period_type, period_start, period_end auto-computed)` — unique
+      `(scheme, period_type, period_start)`; past buckets net history, future buckets re-add uplift
+- [ ] `ResolvedSalesSchemePeriod(scheme, item, planning_location, planning_customer,
+      distribution_channel, period_type, period_start, period_end,
+      WINDOW: qty_factor/value_factor = 1+uplift;
+      SHADOW: is_shadow, shadow_side, shadow_offset, anchor_period_start, anchor_qty_factor/
+      anchor_value_factor (copies), addback_qty_weight/addback_value_weight)` — materialized coverage
+      keyed to the ActualSale grain; unique `(scheme, item, loc, cust, dc, period_type, period_start,
+      is_shadow, shadow_side, anchor_period_start)`;
+      `ix_resolvedschemepen_grain` / `ix_resolvedschemepen_scheme` / `ix_resolvedschemepen_shadow`
+- [ ] `SalesSchemeOccurrence(scheme, period_type, period_start, period_end, actual_qty_uplift_pct,
+      actual_value_uplift_pct, actual_pull_forward_pct, qty/value/pull-forward variance, closed_at)` —
+      closed-scheme data-check + shadow calibration
+- [ ] `ForecastingConfig`: `scheme_net_actuals` / `scheme_apply_forecast_uplift` (default True),
+      `brand_taxonomy` (nullable slug naming the taxonomy carrying the Brand level — the brand→item
+      mapping prerequisite for BRAND scope),
+      `last_scheme_detection_run_at/by/range_start/range_end`
+- [ ] `ForecastLine`: `pre_scheme_statistical_qty`, `pre_scheme_statistical_value` (clean baseline),
+      `scheme_id` FK (nullable, SET_NULL), `scheme_qty`, `scheme_value` (uplift deltas); `statistical_qty`
+      now computed as `pre_scheme_statistical_qty + (scheme_qty or 0)`; override system unchanged
+- [ ] `ForecastAggregate`: `pre_scheme_statistical_qty`, `pre_scheme_statistical_value` (both-column display)
+- [ ] Add `scheme_management` key to `ClientFeatureControl`; `scheme_ui_visible()` helper in
+      `utils/feature_control.py` (mirrors `outlier_ui_visible`); update `_FEATURE_HIERARCHY`
+- [ ] Register the five scheme models in `ADMIN_ONLY_MODELS` (Guardian permission sync) + add
+      `scheme_changed` post_save receiver in `mysite/signals.py` (resolve_scheme_scope +
+      range-mode stale-flag + re-trigger outlier detection; extend
+      `flag_stale_forecast_versions` with the `(client_id, period_type, period_start)` mode)
+- [ ] Admin: `SalesSchemeAdmin` (inline scopes/periods/occurrences), `ResolvedSalesSchemePeriodAdmin`
+      (read-only) in a new `mysite/admin/demand_schemes.py` registered in `mysite/admin/__init__.py`;
+      scheme flags in `ForecastingConfigAdmin`; scheme columns in `ForecastLineAdmin`/
+      `ForecastAggregateAdmin`
+
+Scope resolution
+- [ ] Celery task `resolve_scheme_scope(scheme_id)` — materializes `ResolvedSalesSchemePeriod` on
+      ACTIVE status / scope / period edits: resolve item set per scope — tree-aware from the node's OWN
+      taxonomy (OVERALL → all client items; TAXONOMY → `_scheme_scope_item_ids` union of
+      `ItemTaxonomyNode` mappings beneath the node; BRAND → same union resolver on the brand node,
+      validated against `ForecastingConfig.brand_taxonomy`; ITEM → single item) — cross with periods and
+      dims, WINDOW rows with `qty_factor = 1 + qty_uplift`, `value_factor = 1 + value_uplift`;
+      within-scheme dedup most-specific-wins (ITEM > BRAND > TAXONOMY > OVERALL); cross-scheme overlap
+      warning (same order)
+- [ ] Shadow rows: when `shadow_periods > 0`, per WINDOW row build 2 × shadow_periods SHADOW rows
+      (PRE/POST buckets via `previous_period_start` / `next_period_start`, anchor fields copying the
+      window's factors, addback weight = `pull_forward_pct × side_share × decay^j` normalized per side,
+      decay `1/2^j`); NULL `qty_factor` on shadow rows; delete + bulk_create atomically
+- [ ] Unit tests: TAXONOMY / ITEM / OVERALL scopes materialize correct rows; BRAND scope resolves the
+      union of items beneath the brand node across multiple planning product groups; BRAND + TAXONOMY
+      overlap dedupes to one factor (most-specific-wins); unconfigured `brand_taxonomy` / node not in
+      brand taxonomy / no item mappings → `SalesSchemeScope.clean()` raises; future period lands in
+      horizon; deactivating a scheme drops resolved rows; `shadow_periods=2` → 2 PRE + 2 POST shadow
+      rows with per-side weights (4/6, 2/6) (`test_scheme_scope.py`)
+
+Composed baseline netting + outlier sequencing
+- [ ] Extend `utils/demand/actuals_net.py`: `scheme_netted_queryset()` via correlated `Subquery` +
+      `Sum` annotations — WINDOW rows DIVIDE (`qty / qty_factor`), SHADOW rows ADD BACK
+      `anchor_window_qty × (1 − 1/anchor_qty_factor) × addback_qty_weight` (window qty resolved by a
+      nested subquery at the anchor grain); `actuals_queryset_with_net(client, use_net, use_scheme_net)`
+      composes **scheme first, then outlier** — `net_qty = scheme_net_qty − outlier_adj`, same for
+      revenue
+- [ ] Switch consumers to the composed helper: `build_actuals_dataframe` (rename
+      `net_qty→qty` stays the single injection point), `update_weighted_avg_prices` (price now on
+      scheme-free revenue), `compute_series_profiles`
+- [ ] `run_outlier_detection` reads SCHEME-NETTED series via the same helper (`r.scheme_net_qty` — no
+      local factor loading), so window spikes AND pre/post dips are absent from detection; suggested
+      adjustments computed on scheme-netted values; `ActualSaleOutlierAdjustment.clean()` bound to the
+      scheme-netted qty/revenue
+- [ ] Stale-flagging: `SalesScheme` post-save activates `flag_stale_forecast_versions` for covered
+      periods (window + shadow) + re-triggers `run_outlier_detection` on the range; scheme modification
+      after overrides exist flags version as stale (planner must re-apply overrides manually)
+- [ ] Unit tests: 1-for-1 fixture → `net_qty = qty/2`, `net_revenue = revenue`; shadow fixture
+      (`shadow_periods=1`, `pull_forward_pct=0.5`) → pre/post net to `qty + 0.5 × (window_qty ×
+      (1 − 1/qty_factor))`; scheme spike AND pre/post dip NOT proposed as outliers; adjustment beyond
+      scheme-netted qty rejected; forecast with `scheme_net_actuals=True` differs from `False`
+      (`test_scheme_netting.py`, `test_actuals_net.py`)
+
+Forecast-horizon uplift (output)
+- [ ] `build_scheme_forecast_factors(client_id, period_type, horizon)` — reads resolved rows in the
+      horizon → per-(uid, ds) overlay: WINDOW `{scheme_id, qty_factor, value_factor}` (multiplicative)
+      or SHADOW `{scheme_id, anchor_period_start, anchor_qty_factor, anchor_value_factor,
+      addback_qty_weight, addback_value_weight}` (subtractive dip)
+- [ ] `write_forecast_lines` merges scheme factors inside the write path: write `pre_scheme_statistical_qty`
+      from engine output; look up scheme factors → compute `scheme_qty` (delta); compute
+      `statistical_qty = pre_scheme_statistical_qty + (scheme_qty or 0)`; set `scheme_id` FK; override
+      system continues to work on `statistical_qty` (unchanged)
+- [ ] `write_forecast_aggregates` DuckDB roll-up adds `SUM(pre_scheme_statistical_qty)` /
+      `SUM(pre_scheme_statistical_value)` alongside existing statistical sums
+- [ ] Unit tests: horizon window uplift delta correct (1-for-1 → `scheme_qty = pre_scheme_statistical_qty`,
+      `statistical_qty = 2 × pre_scheme_statistical_qty`, flat `scheme_value`);
+      horizon shadow dip delta; `statistical_qty = pre_scheme + scheme_qty`; anchor-outside-horizon
+      skip + warning; outside-scheme → NULL `scheme_qty`; aggregate roll-up with
+      `pre_scheme_statistical_qty` (`test_scheme_forecast_uplift.py`)
+
+Detection + review queue (Django Template + HTMX, `mysite/demand_ui/`)
+- [ ] Celery task `detect_scheme_candidates(client_id, target_period_start, target_period_end,
+      triggered_by_user_id=None)` — RAW product-group aggregates, MAD + persistence spike detection,
+      skip periods covered by an ACTIVE scheme (window OR shadow), implied
+      `qty_uplift = period/median(neighbours) − 1`, DRAFT candidates only; records run identity on
+      `ForecastingConfig`
+- [ ] Views: `scheme_list`, `scheme_create`/`scheme_edit` (scope lines incl. a **BRAND picker**
+      populated from `ForecastingConfig.brand_taxonomy`, gated with a "set up the brand taxonomy"
+      message when unconfigured + periods + uplift inputs +
+      shadow inputs `shadow_periods` / `pull_forward_pct`, pre-fill value uplift from discount),
+      `scheme_review_queue`, `scheme_activate` (→ ACTIVE + `resolve_scheme_scope` + stale-flag +
+      re-trigger outlier detection), `scheme_occurrences` report
+- [ ] Templates under `templates/demand/schemes/` extending `_base_demand.html`; nav link +
+      candidate-count badge gated on `scheme_ui_visible`
+- [ ] URLs under `/schemes/`; no DRF endpoints
+- [ ] Unit tests: spike not covered → candidate with sensible implied uplift; tagged period (window or
+      shadow) never re-proposed; activation re-triggers detection (`test_scheme_detection.py`)
+
+Occurrence data-checking & estimation
+- [ ] `record_scheme_occurrence(scheme_id, period_type, period_start)` at period-close — measures
+      actual qty/value uplift independently from actuals vs neighbouring baseline AND estimates
+      `actual_pull_forward_pct` (missing volume in shadow buckets vs window uplift, clamped to [0,1],
+      conservation check pulled+incremental ≈ netted-out uplift); writes `SalesSchemeOccurrence` with
+      variance
+- [ ] Re-registration pre-fills `expected_*_uplift_pct` AND `pull_forward_pct` from the **median** of
+      the last few occurrences; variance warning surfaced when a scheme missed expectation
+- [ ] Unit tests: independent actual uplift measurement; pull-forward estimation; median pre-fill incl.
+      `pull_forward_pct`; variance flag (`test_scheme_occurrences.py`)
+
+Hardening & regression
+- [ ] Overlap resolution warning path (WINDOW-vs-WINDOW; window-vs-shadow on the same period composes
+      additively and is covered by a test); edge guards (value_uplift floor, `pull_forward_pct ∈ [0,1]`,
+      NULL-revenue rows, zero-qty-uplift scheme still nets revenue, shadow with no anchor actuals adds
+      nothing)
+- [ ] Load check: `resolve_scheme_scope` across a full monthly import batch within run budget (shadow
+      rows multiply resolved count by `1 + 2 × shadow_periods`)
+- [ ] End-to-end: import → register scheme (with shadow) → resolved rows → outlier detection ignores
+      scheme window and pre/post dips → forecast baseline scheme-free with shadow re-added →
+      `pre_scheme_statistical_qty` written, `scheme_qty` computed, `statistical_qty` = scheme-adjusted
+      → horizon uplift + shadow dip applied → override system works on `statistical_qty` (unchanged) →
+      both `pre_scheme_statistical_qty` and `statistical_qty` visible in UI → scheme closes → occurrence
+      records actual pull-forward → next registration pre-fills uplift and `pull_forward_pct`
+- [ ] `makemigrations --check` clean; `manage.py check` 0 issues
+
+---
+
+### Sprint 3B.2d — Item Lifecycle (Substitution / Discontinuation / Introduction)
+*Sprint 3B.2d — three lifecycle events, three layers, one flag. Substitution (retired code's netted
+history feeds the successor with qty conversion — a re-key layer in the composed helper after scheme +
+outlier netting); Discontinuation (forecast nil on/after an effective date — an output filter);
+Introduction (a new item with no history borrows a reference item's forecast × ratio until it has
+enough own history — an output copy).*
+
+Models & config (`mysite/models/demand/lifecycle.py`, registered in `demand/__init__.py`)
+- [x] `ItemSubstitution(client, old_item, new_item, conversion_factor, effective_from, notes)`
+      `unique (client, old_item)`; `conversion_factor > 0`; same-client; **direct mapping only** —
+      `clean()` rejects an item appearing as both predecessor and successor (no chains, no cycles);
+      indexes `(client, old_item)` / `(client, new_item)`
+- [x] `ItemDiscontinuation(client, item, effective_from, notes)` — `unique (client, item)`;
+      forecast NIL on/after `effective_from` (NULL = nil immediately); history kept for
+      reporting/ABC/accuracy; index `(client, item)`
+- [x] `ItemIntroduction(client, new_item, reference_item, ratio, copy_from, copy_to, notes)` —
+      `unique (client, new_item)`; `ratio > 0`; `copy_to >= copy_from`; new_item ≠ reference_item;
+      same-client; no reference chains; indexes `(client, new_item)` / `(client, reference_item)`
+- [x] **One lifecycle directive per item** — subject roles (substitution old_item/new_item,
+      discontinued item, introduction new_item) pairwise exclusive in `clean()` (+ optional `pre_save`
+      validation receiver); an introduction's `reference_item` may overlap (ordinary forecasted item)
+- [x] `ForecastingConfig.use_item_lifecycle` (default True) — one flag for all three layers;
+      `ForecastLine` gains nullable `borrowed_from_item` / `borrowed_ratio` (introduction-copied lines)
+- [x] `item_lifecycle` key in `ClientFeatureControl` (`demand_planning` parent) +
+      `item_lifecycle_ui_visible()` in `utils/feature_control.py`
+- [x] Register all three models in `ADMIN_ONLY_MODELS` (signals.py, Guardian permission sync)
+- [x] Admin: `ItemSubstitutionAdmin`, `ItemDiscontinuationAdmin`, `ItemIntroductionAdmin`
+      (`ClientScopedMixin`) in `mysite/admin/demand_lifecycle.py` registered in
+      `mysite/admin/__init__.py`; `use_item_lifecycle` in `ForecastingConfigAdmin`
+
+Shared-helper substitution layer (Scenario 3 — baseline re-key)
+- [x] `actuals_queryset_with_net(client, use_net, use_substitution=False)` gains the re-key layer:
+      correlated `Subquery` on `ItemSubstitution` annotates `eff_item_id` / `eff_item_code` and scales
+      `net_qty`/`net_revenue` by `conversion_factor` when `(effective_from IS NULL OR
+      period_start < effective_from)` — exclusive cutoff, converted history and successor own-actuals
+      are disjoint in time; identity when flag off; the retired old item's own forecast is nil on/after
+      `effective_from`
+- [x] Re-key consumers to the effective item (grain keys → `eff_item_id`/`eff_item_code`):
+      `build_actuals_dataframe` (forecast matrix), `update_weighted_avg_prices` (successor price over
+      merged history), `compute_series_profiles._load_actuals`
+
+Forecast-output layers (Scenarios 1 & 2 — applied at `write_forecast_lines`, gated by the same flag)
+- [x] **Discontinuation** — items with an `ItemDiscontinuation` row emit no `ForecastLine` for
+      `period_start >= effective_from` (nil); pre-cutoff periods forecast normally; NULL = nil from the
+      current run
+- [x] **Introduction** — for periods inside `[copy_from, copy_to]` (NULL bounds) where the new item has
+      `< min_history_periods` own periods, the new item's line = reference statistical line × `ratio`,
+      tagged `borrowed_from_item` / `borrowed_ratio`; copy stops at the earlier of `copy_to` and enough
+      own history; reference lines untouched; `ForecastAggregate` roll-ups include borrowed qty/value
+
+Detection & reporting (Scenario 3 + 1)
+- [x] `run_outlier_detection`: successor series read via the composed helper (merged history); retired
+      items (old_item of a substitution) SKIPPED from candidate generation; **discontinued items are
+      NOT skipped** (their history is their own); reporting/ABC share the helper with the same flag
+
+HTMX UI + tests
+- [x] `item_substitution_list/create/edit`, `item_discontinuation_list/create/edit`,
+      `item_introduction_list/create/edit` HTMX views under `/planning/`, gated on
+      `item_lifecycle_ui_visible`
+- [x] Unit tests (`test_item_lifecycle.py`): model validation (factor/ratio ≤ 0, cross-client,
+      old==new / new==reference, inverted `copy_to < copy_from`, duplicate subject, direct-mapping +
+      mixed-role violations); helper (2-old=1-new fixture, effective_from cutoff, null = whole history,
+      identity when off, composes with scheme+outlier netting); consumers (B's matrix/price = merged
+      series, A's post-launch rows stay A, A's forecast nil after launch); output layers
+      (discontinuation nil on/after date; introduction borrow with window + own-history stop +
+      borrowed attribution; aggregate roll-up); detection skips retired A but keeps discontinued D;
+      feature gate
+
+---
+
 ### Sprint 3B.3 — Forecast Models and Version Management
 - [x] Create `mysite/models/demand/forecast.py`:
   - `ForecastVersion(client, version_label, period_type, base_period_end, horizon_periods, engine_config JSONField, status, run_status QUEUED→COMPLETE/FAILED, stale_actuals, created_by, approved_by nullable, approved_at nullable, copied_from, notes, celery_task_id)`
@@ -535,7 +790,13 @@ actuals drill-down, nav candidate-count badge, `stale_actuals` badge, `Forecasti
   └─▶ 3B.1 (Planning Hierarchy + Distribution Channel)
         └─▶ 3B.2 (Actuals Import)
               ├─▶ 3B.2b (Outlier Management)
-              └─▶ 3B.3 (Forecast Models)
+              │     └─▶ 3B.2c (Scheme Management)   ← scheme netting is upstream of outlier;
+              │                                       baseline = Actuals − scheme − outlier
+              │           └─▶ 3B.2d (Item Lifecycle)  ← substitution re-key on the netted
+              │                                           baseline (composed helper) +
+              │                                           discontinuation/introduction
+              │                                           output layers at line-write
+              └─▶ 3B.3 (Forecast Models)              (3B.3/3B.4 consume the composed baseline)
                     ├─▶ 3B.4 (Statistical Engine)  ─┐
                     └─▶ 3B.5 (Override Engine)      ├─▶ 3B.6 (Accuracy)
                                                      │         │
@@ -558,6 +819,8 @@ Sprint 3B.7b (React SPA) was superseded by 3B.7a — the entire UI shipped in th
 | 3B.1 Planning Hierarchy + DC | 2–3 days |
 | 3B.2 Actuals Import | 3–4 days |
 | 3B.2b Outlier Management | 4–6 days |
+| 3B.2c Scheme Management (incl. pull-forward shadow + brand/vendor scope) | 10–14 days |
+| 3B.2d Item Lifecycle (substitution + discontinuation + introduction) | 6–9 days |
 | 3B.3 Forecast Models | 3–4 days |
 | 3B.4 Statistical Engine | 5–7 days |
 | 3B.5 Override Engine | 4–5 days |
@@ -565,10 +828,12 @@ Sprint 3B.7b (React SPA) was superseded by 3B.7a — the entire UI shipped in th
 | 3B.7 HTMX demand_ui (incl. outlier queue) | 4–6 days |
 | 3B.8 Phase 3A Integration | 2–3 days |
 | 3B.9 Production Hardening | 2–3 days |
-| **Total** | **32–46 days** |
+| **Total** | **48–69 days** |
 
 Sprints 3B.4 and 3B.5 can run in parallel once 3B.3 is complete.
 Sprint 3B.7 (HTMX demand_ui) can begin in parallel with 3B.4/3B.5 once 3B.3 endpoints are stubbed.
+Sprint 3B.2c (Scheme Management) ships its scheme registration + review queue views itself (HTMX, mirroring the outlier queue) as part of the sprint.
+Sprint 3B.2d (Item Lifecycle) rides the composed netting helper, the ForecastLine write boundary, and the established admin/feature-flag patterns; it must land after 3B.2c and before it makes sense to harden 3B.9.
 Sprint 3B.7b (React SPA) is dropped — no longer in the estimate.
  
 ## Phase 3C — Inventory Decision Engine (IDE)
@@ -1031,7 +1296,7 @@ This ordering means:
 | Summing matrix construction complexity | Unit-test `S` matrix shape and column ordering independently before integrating with `HierarchicalForecast` |
 | Forecast job timeout for large clients | `CELERYD_TASK_SOFT_TIME_LIMIT=1800`; design job to checkpoint progress into `ForecastVersion` so it can resume |
 | Actuals data quality (missing FKs, wrong item codes) | Row-level error collection in `ActualSaleImport.error_log`; never fail the whole batch for a bad row |
-| Stale draft forecast trusted downstream | `stale_actuals` flag set by `flag_stale_forecast_versions` + UI badge; no auto-rerun, planner re-runs explicitly |
+| Stale draft forecast trusted downstream | `stale_actuals` flag set by `flag_stale_forecast_versions` + UI badge; no auto-rerun, planner re-runs explicitly; scheme modification after overrides exist also flags version as stale |
 | DuckDB + PostgreSQL dual-engine confusion | DuckDB is used **only inside Celery tasks / aggregates paths** for fast aggregation; all writes go to PostgreSQL only; document this boundary clearly |
  
 ---
@@ -1041,6 +1306,7 @@ This ordering means:
 - [x] Client staff can upload periodic actuals (CSV/Excel) for planning_location × item × distribution_channel × planning_customer
 - [x] Upload is idempotent (re-upload same file produces no duplicates)
 - [x] Outlier detection proposes candidates over a planner-chosen period range; confirm/reject/revise/undo/bulk-discard from the HTMX queue; confirmed adjustments net actuals everywhere by default
+- [ ] Scheme management: planner registers scheme with uplift/shadow → resolved rows materialize → outlier detection ignores scheme periods → forecast writes `pre_scheme_statistical_qty` + `scheme_qty` → `statistical_qty` = scheme-adjusted → override system works on `statistical_qty` (unchanged) → both columns visible in UI
 - [ ] Forecast run completes for 10K SKU × 200 customer × 36 month history in < 15 minutes (load test not yet run)
 - [x] Hierarchical reconciliation: top-level total of reconciled forecast equals sum of bottom-up
 - [x] Consensus override at Location level disaggregates correctly to leaf lines

@@ -1,0 +1,99 @@
+{% load i18n %}
+{% if show_item_search or show_location or show_period or filters.item_id or filters.location_code or filters.period_start %}
+<div class="bg-base-200 rounded-box p-4 mb-4" id="scheme-filter-bar">
+    <div class="flex flex-wrap gap-3 items-end">
+        {% if show_item_search %}
+        <div class="form-control min-w-[200px]">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Item" %}</span>
+            </label>
+            <input type="text" id="scheme-item-id"
+                   class="input input-bordered input-sm"
+                   placeholder="{% trans 'Filter by item…' %}"
+                   value="{{ filters.item_id }}">
+        </div>
+        {% endif %}
+
+        {% if show_location %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Location" %}</span>
+            </label>
+            <select id="scheme-location" class="select select-bordered select-sm">
+                <option value="">{% trans "All locations" %}</option>
+                {% for code, name in locations %}
+                <option value="{{ code }}"
+                        {% if filters.location_code == code %}selected{% endif %}>
+                    {{ code }} &mdash; {{ name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        {% if show_period %}
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Period" %}</span>
+            </label>
+            <select id="scheme-period" class="select select-bordered select-sm">
+                <option value="">{% trans "All periods" %}</option>
+                {% for period in periods %}
+                <option value="{{ period|date:'Y-m-d' }}"
+                        {% if filters.period_start == period|date:'Y-m-d' %}selected{% endif %}>
+                    {{ period|date:"M Y" }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <div class="form-control">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Show all lines" %}</span>
+            </label>
+            <input type="checkbox" id="scheme-show-all" class="checkbox checkbox-sm"
+                   {% if show_all %}checked{% endif %}>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+(function() {
+    var baseUrl = '{% url "demand_ui:version_scheme_numbers" client_id=client.client_id pk=version.pk %}';
+
+    function applyFilters() {
+        var params = new URLSearchParams();
+        var itemId = (document.getElementById('scheme-item-id') || {}).value || '';
+        var location = (document.getElementById('scheme-location') || {}).value || '';
+        var period = (document.getElementById('scheme-period') || {}).value || '';
+        var showAll = (document.getElementById('scheme-show-all') || {}).checked;
+
+        if (itemId)   params.set('item_id', itemId);
+        if (location) params.set('location_code', location);
+        if (period)   params.set('period_start', period);
+        if (showAll)  params.set('show_all', '1');
+
+        htmx.ajax('GET', baseUrl + '?' + params.toString(), {
+            target:  '#scheme-table-container',
+            swap:    'innerHTML',
+            headers: {'HX-Request': 'true'},
+        });
+    }
+
+    ['scheme-item-id', 'scheme-location', 'scheme-period', 'scheme-show-all'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener(el.tagName === 'INPUT' && el.type === 'checkbox'
+                ? 'change' : 'change', applyFilters);
+        }
+    });
+    var itemInput = document.getElementById('scheme-item-id');
+    if (itemInput) {
+        itemInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); applyFilters(); }
+        });
+    }
+})();
+</script>

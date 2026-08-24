@@ -29,6 +29,29 @@ class Client(models.Model):
             "this field directly."
         ),
     )
+    sector = models.ForeignKey(
+        'mysite.TaxonomyNode',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='clients',
+        limit_choices_to={'taxonomy__slug': 'sector'},
+        help_text=_(
+            "Client's finest sector node (e.g. AutoComponents) from the "
+            "global 'sector' taxonomy. Drives sector-scoped template "
+            "resolution: Client > exact sector > ancestor sectors > global."
+        ),
+    )
+    catalogue_taxonomy_slugs = models.JSONField(
+        _("catalogue taxonomy slugs"),
+        null=True, blank=True, default=None,
+        help_text=_(
+            "Ordered JSON array of taxonomy slugs to show in the catalogue "
+            'filter sidebar (LHS), e.g. ["gpc", "brand"]. Order = display '
+            "order; slugs not listed are hidden; unknown/stale slugs are "
+            "skipped at render time. NULL or empty = show ALL active "
+            "taxonomies (global + client-specific) in default order."
+        ),
+    )
    
     #mad_threshold = models.DecimalField(max_digits=6, decimal_places=2, default=3.5,
     #                                    help_text=_("For Actual Sale outlier detection. Leave it untouched if not sure."),
@@ -165,9 +188,10 @@ class ClientTemplate(models.Model):
     TEMPLATE_CHOICES = [
         ('catalogue_filter_sidebar', 'Catalogue: Filter Sidebar'),
         ('catalogue_item_card',      'Catalogue: Item Card'),
-        ('catalogue_item_detail',    'Catalogue: Item Detail'),        
+        ('catalogue_item_detail',    'Catalogue: Item Detail'),
         ('catalogue_items_list',     'Catalogue: Items List'),
         ('catalogue_pagination',     'Catalogue: Pagination'),
+        ('demand_sidebar_nav',       'Demand Planning: Sidebar Nav'),
         ('navbar',                   'Navbar'),
         ('footer',                   'Footer'),
     ]
@@ -202,6 +226,66 @@ class ClientTemplate(models.Model):
     def __str__(self):
         client_id = getattr(self.client, 'client_id', '?')
         return f"{client_id} / {self.template_key}"
+
+
+class SectorTemplate(models.Model):
+    """
+    Sector-scoped and global-default template fragments stored in DB.
+
+    Resolution tier between ClientTemplate (per-client) and the
+    (removed) filesystem defaults:
+
+        1. ClientTemplate                       (client-specific)
+        2. SectorTemplate @ client's sector     (deepest node first)
+        3. SectorTemplate @ ancestor sectors    (walk up the tree)
+        4. SectorTemplate @ sector_node = NULL  (global default)
+        5. '' + logger.warning                  (unseeded key)
+
+    sector_node = NULL means "global default" — exactly one active row
+    per template_key is enforced by a conditional UniqueConstraint.
+    Defaults for every TEMPLATE_CHOICES key are seeded by data migration;
+    from then on default content is admin-managed, not git-managed.
+    """
+    sector_node    = models.ForeignKey(
+        'mysite.TaxonomyNode',
+        null=True, blank=True,          # NULL = global default
+        on_delete=models.CASCADE,
+        related_name='templates',
+        limit_choices_to={'taxonomy__slug': 'sector'},
+        help_text="Sector node this template applies to. "
+                  "Leave empty for the GLOBAL DEFAULT template."
+    )
+    template_key   = models.CharField(
+        max_length=50, choices=ClientTemplate.TEMPLATE_CHOICES,
+        help_text="Which template this provides"
+    )
+    htmlblob       = models.TextField(
+        blank=True,
+        help_text="Django template HTML. Has access to all context variables."
+    )   # modeltranslation: expands to htmlblob_<lang>
+    is_active      = models.BooleanField(default=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sector_node', 'template_key'],
+                name='uniq_sectortemplate_sector_key',
+            ),
+            models.UniqueConstraint(
+                fields=['template_key'],
+                condition=models.Q(sector_node__isnull=True),
+                name='uniq_sectortemplate_global_default',
+            ),
+        ]
+        ordering        = ['template_key', 'sector_node']
+        verbose_name = "00-03F Sector Templates"
+        verbose_name_plural = "00-03F Sector Templates"
+
+    def __str__(self):
+        scope = getattr(self.sector_node, 'path', None) or 'GLOBAL'
+        return f"[{scope}] / {self.template_key}"
+
 
 # models/client_block.py
 
@@ -270,7 +354,9 @@ class ClientFeatureControl(models.Model):
         ('outlier_management',   'Actuals Outlier Management'),        
         ('forecast_run',         'Run Statistical Forecast'),
         ('consensus_override',   'Consensus Override'),
-        ('forecast_approval',    'Forecast Approval Workflow'),        
+        ('forecast_approval',    'Forecast Approval Workflow'),
+        ('scheme_management',    'Sales Promotion Scheme Management'),
+        ('item_lifecycle',       'Item Substitution / Discontinuation / Introduction'),
     ]
 
     client = models.ForeignKey(

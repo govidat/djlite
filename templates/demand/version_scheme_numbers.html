@@ -1,0 +1,33 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-xl font-bold">{% trans "Scheme Numbers" %}</h2>
+        <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
+    </div>
+    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+       class="btn btn-ghost btn-sm">&larr; {% trans "Back to version" %}</a>
+</div>
+
+{% if has_overrides %}
+<div class="alert alert-warning mb-4">
+    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+    </svg>
+    <div>
+        {% trans "This version has overrides. Scheme numbers are locked." %}
+        {% trans "Copy this version to edit scheme numbers." %}
+    </div>
+</div>
+{% endif %}
+
+<div id="scheme-toast" class="mb-4"></div>
+
+<div id="scheme-table-container" class="w-full overflow-hidden">
+    {% include "demand/partials/scheme_filter_bar.html" %}
+    {% include "demand/partials/scheme_table_body.html" %}
+</div>
+{% endblock %}

@@ -119,16 +119,47 @@ def run_outlier_detection(client_id, target_period_start, target_period_end, tri
         .order_by("planning_location_id", "item_id", "distribution_channel_id",
                    "planning_customer_id", "period_start")
     )
- 
+
+    # Build scheme-netted series for detection when the config flag is on
+    use_scheme_net = bool(config and config.scheme_net_actuals)
+    use_sub = bool(config and config.use_item_lifecycle)
+    if use_scheme_net:
+        from utils.demand.actuals_net import scheme_netted_queryset
+        rows = scheme_netted_queryset(client, use_scheme_net=True).filter(
+            period_start__gte=lookback_start,
+            period_start__lte=target_period_end,
+        ).select_related("outlier_adjustment").order_by(
+            "planning_location_id", "item_id", "distribution_channel_id",
+            "planning_customer_id", "period_start"
+        )
+
+    # Exclude retired old_items from candidate generation — their history
+    # is owned by the successor (detection runs on the successor's merged
+    # series instead). Do NOT skip discontinued items (their history feeds
+    # reporting/ABC/accuracy and their own spikes remain detectable).
+    retired_item_ids = set()
+    if use_sub:
+        from mysite.models.demand.lifecycle import ItemSubstitution
+        retired_item_ids = set(
+            ItemSubstitution.objects.filter(client_id=client_id)
+            .values_list("old_item_id", flat=True)
+        )
+
     series_map = {}
     for row in rows:
+        if row.item_id in retired_item_ids:
+            continue  # retired predecessor — successor owns this history
         key = (row.planning_location_id, row.item_id, row.distribution_channel_id, row.planning_customer_id)
         series_map.setdefault(key, []).append(row)
  
     to_create = []
     for key, series_rows in series_map.items():
         series_rows.sort(key=lambda r: r.period_start)
-        values = [r.qty for r in series_rows]
+        # Use scheme-netted values when available, fall back to raw qty
+        if use_scheme_net:
+            values = [r.scheme_net_qty for r in series_rows]
+        else:
+            values = [r.qty for r in series_rows]
         candidate_indices = detect_candidates(
             values,
             mad_threshold=config.mad_threshold,
@@ -142,7 +173,9 @@ def run_outlier_detection(client_id, target_period_start, target_period_end, tri
             if hasattr(row, "outlier_adjustment"):
                 continue  # 1:1 constraint — already has an adjustment, skip
             suggested_qty = _suggest_adjustment_qty(values, i)
-            suggested_revenue = _suggest_adjustment_revenue(row, suggested_qty)
+            # Use scheme-netted revenue for prorata when available
+            row_revenue = getattr(row, "scheme_net_revenue", None) or row.revenue
+            suggested_revenue = _suggest_adjustment_revenue(row, suggested_qty, row_revenue)
             to_create.append(
                 ActualSaleOutlierAdjustment(
                     actual_sale=row,
@@ -175,7 +208,7 @@ def _suggest_adjustment_qty(values, index):
     return max(excess, values[index] * 0) if excess > 0 else values[index] * 0
  
  
-def _suggest_adjustment_revenue(row, suggested_qty):
+def _suggest_adjustment_revenue(row, suggested_qty, revenue=None):
     """
     Prorata suggestion: scale the row's revenue by the same fraction as the
     suggested qty exclusion, assuming a roughly uniform unit rate across
@@ -184,14 +217,15 @@ def _suggest_adjustment_revenue(row, suggested_qty):
     unit rate than the row's average (qty_adjustment and revenue_adjustment
     are recorded independently for exactly that reason), but a prorata
     estimate is a more useful default than leaving the suggestion blank.
- 
+
     Returns None when there's nothing sensible to prorate — no revenue on
     the row at all, or a zero-qty row (which would divide by zero).
     """
-    if row.revenue is None or row.qty == 0:
+    rev = revenue if revenue is not None else row.revenue
+    if rev is None or row.qty == 0:
         return None
     fraction = suggested_qty / row.qty
-    return (row.revenue * fraction).quantize(Decimal("0.01"))
+    return (rev * fraction).quantize(Decimal("0.01"))
  
  
 def _notify_planners(client, count):
@@ -206,29 +240,52 @@ def _horizon_end(version):
  
  
 @shared_task
-def flag_stale_forecast_versions(actual_sale_id):
+def flag_stale_forecast_versions(actual_sale_id=None, client_id=None,
+                                 period_type=None, period_start=None):
     """
     When a planner confirms or rejects an outlier adjustment, any DRAFT
     ForecastVersion whose forecast horizon covers the adjusted actual's
     period should be flagged stale — its stored ForecastLine values were
     computed before this confirmation/rejection.
- 
+
+    Two modes:
+    - actual_sale_id mode (existing): flags versions covering that actual's period
+    - range mode (new): flags versions covering any period >= period_start
+      for the given client_id and period_type
+
     horizon_end isn't a stored field — it's derived per-version from
     base_period_end + horizon_periods, so this can't be done as a single
     .filter() call; it's computed in Python per DRAFT version instead.
     """
-    actual = ActualSale.objects.select_related("client").get(pk=actual_sale_id)
- 
-    draft_versions = ForecastVersion.objects.filter(
-        client_id=actual.client_id, status=ForecastVersion.Status.DRAFT,
-    )
- 
-    stale_ids = [
-        version.pk
-        for version in draft_versions
-        if version.base_period_end < actual.period_start <= _horizon_end(version)
-    ]
- 
+    if actual_sale_id is not None:
+        actual = ActualSale.objects.select_related("client").get(pk=actual_sale_id)
+        client_id = actual.client_id
+        period_start_actual = actual.period_start
+
+        draft_versions = ForecastVersion.objects.filter(
+            client_id=client_id, status=ForecastVersion.Status.DRAFT,
+        )
+
+        stale_ids = [
+            version.pk
+            for version in draft_versions
+            if version.base_period_end < period_start_actual <= _horizon_end(version)
+        ]
+    elif client_id is not None and period_type is not None and period_start is not None:
+        # Range mode: flag versions whose horizon covers any period >= period_start
+        draft_versions = ForecastVersion.objects.filter(
+            client_id=client_id, status=ForecastVersion.Status.DRAFT,
+            period_type=period_type,
+        )
+
+        stale_ids = [
+            version.pk
+            for version in draft_versions
+            if version.base_period_end < period_start <= _horizon_end(version)
+        ]
+    else:
+        return  # neither mode specified
+
     if stale_ids:
         ForecastVersion.objects.filter(pk__in=stale_ids).update(stale_actuals=True)
  

@@ -78,7 +78,7 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
 |-------|-------|
 | 1 | Multi-tenant CMS: page builder, multilingual content, theme system, user auth — **substantially complete** |
 | 2 | Generic Item Catalogue: domain-agnostic items, multi-taxonomy, HTMX faceted filters — **complete** |
-| 3B | Demand Planning: actuals ingestion, outlier detection and planner-confirmed net actuals, statistical forecasting, hierarchical reconciliation, consensus override — **substantially complete** |
+| 3B | Demand Planning: actuals ingestion, scheme management (planned promo uplift + scheme-netted baseline), item lifecycle (substitution with qty conversion, discontinuation, new-item introduction), outlier detection and planner-confirmed net actuals, statistical forecasting, hierarchical reconciliation, consensus override — **substantially complete** |
 | 3A | eCommerce: Inquiry → Quotation → Order lifecycle, SAP-style pricing engine, Beckn-aligned models — **in progress** |
 | 3C | **Inventory Decision Engine**: policy-driven replenishment, multi-echelon supply network propagation, MRP-style netting, DDMRP, vendor-scheme cost optimization, exception-driven planner workbenches — **builds after 3B; consumes `OPERATING_PLAN` forecasts only, never `SALES_CONSENSUS`; independent of 3A except for shared `Item`/`ClientLocation` master data** |
 | 4 | Beckn / ONDC network participation: BPP role, async callbacks, digital signatures, ONDC registry; probabilistic forecasting; ML demand models |
@@ -124,6 +124,15 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
 - GS1 GPC 4-level hierarchy: Segment → Family → Class → Brick
 - Attribute inheritance: TaxonomyNode attrs inherited by items, overridable at item level
 - Client can reference and derive from global items and global taxonomy nodes  
+
+### 8a. Client Sector Classification
+- Each Client is classified by industry via a dedicated global `sector`
+  taxonomy (e.g. Industrial > Automotive > AutoComponents) — reuses the same
+  `Taxonomy` / `TaxonomyNode` machinery, no new hierarchy code.
+- `Client.sector` points at the deepest matching node; ancestor walk enables
+  most-specific-wins behaviour for anything keyed by sector.
+- First consumer: `SectorTemplate` — DB-owned template defaults resolved by
+  client override → sector chain → global default (see tech-stack doc).
 
 ## Phase 3B Demand Planning Module
  
@@ -186,6 +195,152 @@ Net by default everywhere. The statistical forecast engine, financial/revenue re
 Stale forecasts. `flag_stale_forecast_versions` runs after detection/decision changes and marks any forecast version whose base actuals have moved, so downstream consumers never trust a version built over pre-adjustment data.
 Hierarchy scope. Outlier adjustments apply at the leaf ActualSale row. Hierarchy roll-ups (Product / Sales / Location) are computed programmatically off the already-net leaf rows — adjustments are never independently propagated up a hierarchy.
 
+#### Sales Promotion Scheme Management (Planned Promo Impact)
+
+Consumer products and auto components run sales promotion schemes (1-for-1, buy-2-get-1-free, %-off,
+dealer free-goods) from time to time. The observable pattern is a demand (qty) spike during the scheme,
+a dip pre/post (pull-forward / wait-for-scheme), and a revenue effect that is **independent** of the qty
+effect — a 1-for-1 scheme doubles qty while revenue stays flat. Because product-group (`taxon_*`) grains
+forecast **revenue**, and `update_weighted_avg_prices` derives price from `revenue/qty`, an unhandled
+scheme distorts the revenue level, the learned seasonality, and every qty conversion at disaggregation.
+
+Design principle — the scheme layer is **upstream of the outlier layer**, enforced as one shared baseline
+definition: `baseline = Actuals − scheme impact − outlier`. Scheme netting is **multiplicative**
+(uplift scales with demand level), outlier netting stays **subtractive**:
+
+```
+net_qty     = (qty     / (1 + expected_qty_uplift_pct))  − outlier_qty_adjustment
+net_revenue = (revenue / (1 + expected_value_uplift_pct)) − revenue_adjustment
+```
+
+Ordering is non-negotiable and enforced in code: **outlier detection runs on scheme-netted series**, so
+its median/MAD baseline is already scheme-free and a scheme spike can never be flagged as an outlier. A
+scheme is a planned, repeatable event — unlike an outlier (one-off noise) it is removed from history
+*and* re-applied to the forecast horizon.
+
+Independent value uplift. `expected_qty_uplift_pct` and `expected_value_uplift_pct` are independent
+planner-entered fields. Revenue is never derived from qty-uplift × discount, because schemes break that
+link (1-for-1 = qty +100%, value 0%). `discount_pct` is metadata only — it may pre-fill a default value
+uplift, never authoritative. Guards: `value_uplift ≤ −100%` is invalid; a zero-qty-uplift scheme (pure
+price promo) still nets revenue.
+
+Models. `SalesScheme` (client, scheme_code, status DRAFT/ACTIVE/ARCHIVED, the two uplift fields,
+ `discount_pct`, plus the pre/post shadow fields `shadow_periods` and `pull_forward_pct`);
+ `SalesSchemeScope` (OVERALL / TAXONOMY planning-group subtree / **BRAND** / ITEM, with optional
+ planning_location / planning_customer / distribution_channel filters — mirrors `VendorSchemeScope`);
+ `SalesSchemePeriod`
+ (one bucket at the forecast period_type — a period in the past nets history, a period in the horizon
+ re-adds uplift, so no separate future/historical flag is needed); `ResolvedSalesSchemePeriod`
+ (materialized scheme→actuals coverage keyed to the ActualSale grain, rebuilt on scheme activation —
+ the same "resolve on change, materialize for reads" pattern as `ResolvedVendorScheme`); and
+ `SalesSchemeOccurrence` (closed-scheme actual-vs-expected data-checking).
+
+**Brand / vendor-specific schemes.** In this domain the scheme's "vendor" **is the Brand**, and the
+ brand→item link lives in the **item taxonomy**, not the planning product hierarchy (which is
+ category-based and spans brands). A scheme that covers one vendor across many product groups is one
+ `SalesScheme` with several scope rows — e.g. a `BRAND` row per brand plus any `TAXONOMY`/`ITEM` rows.
+ `BRAND` scoping targets a Brand node in the taxonomy named by the new `ForecastingConfig.brand_taxonomy`
+ slug (the prerequisite: brand nodes with item mappings must exist); membership is the **union** of all
+ `ItemTaxonomyNode` mappings beneath the node, so items spread across multiple planning product groups
+ are all covered. Scope resolution is tree-aware (each row expands from its own node's taxonomy) and
+ overlapping rows within one scheme are deduplicated most-specific-wins
+ (`ITEM > BRAND > TAXONOMY > OVERALL`).
+
+Pre/post shadow (pull-forward) is **in scope**, on both the baseline and the horizon. A fraction of a
+scheme's netted-out uplift is pulled forward from neighbouring periods rather than incremental:
+`SalesScheme.pull_forward_pct` (default 0.50) splits uplift into pulled vs incremental, and
+`shadow_periods` (default 0 = off) sets how many buckets on each side of the window are depressed.
+The add-back (history) and the dip (horizon) are **anchor-based and symmetric**: both use
+`U = window_qty × (1 − 1/qty_factor)`, weighted by a 50/50 pre/post split and an exponential decay
+(`1/2^j`) normalized per side. Value shadow anchors to the window's `expected_value_uplift_pct`, so a
+1-for-1 (value uplift 0) has no value shadow; the residual pre/post revenue dip is documented baseline
+noise. Same-grain shadow rows from different schemes add additively.
+
+Netting is computed at query time via `actuals_queryset_with_net`, composed scheme-first-then-outlier,
+and is the single source of truth for the forecast engine, series profiles, price update, outlier
+detection, reporting, and ABC classification (gated by `ForecastingConfig.scheme_net_actuals`, default
+True — mirroring the outlier flags).
+
+Forecast output carries both numbers. `ForecastLine` stores the statistical (baseline) value unchanged
+and adds a scheme overlay for horizon periods covered by an ACTIVE scheme
+(`ForecastingConfig.scheme_apply_forecast_uplift`, default True): window periods get
+`scheme_qty = statistical_qty × (1 + qty_uplift)` and
+`scheme_value = statistical_value × (1 + value_uplift)`; shadow periods get a dip
+`scheme_qty = statistical_qty − window_statistical_qty × (1 − 1/anchor_qty_factor) × weight` anchored
+to the window line's baseline. Each overlay line carries the covering `scheme_id`. `final_qty` defaults
+to the baseline; planners can promote the scheme number. `ForecastAggregate` rolls the overlay up with
+`scheme_qty` / `total_scheme_value`.
+
+Detection and review. `detect_scheme_candidates` runs on **raw** product-group aggregates and proposes
+candidate periods not covered by a tagged scheme, with implied qty uplift
+(period demand / median of neighbours − 1). Planners register schemes (scope, periods, uplifts) and
+approve/activate them from an HTMX queue (mirroring the outlier queue). Activating a scheme materializes
+resolved rows, flags affected DRAFT forecast versions stale, and re-triggers outlier detection on the
+covered range.
+
+Data-checking and estimation. When a scheme closes, `SalesSchemeOccurrence` measures actual qty uplift,
+actual value uplift, and actual pull-forward (missing volume in the shadow buckets vs the window uplift)
+independently from actuals and compares against expectations. Future registrations with the same
+`scheme_code` pre-fill expected uplift **and** `pull_forward_pct` from the **median** of the last few
+occurrences (same median-not-mean choice as the 3C vendor-rebate accrual estimation), so the shadow
+default calibrates from real closed schemes.
+
+Feature control. `scheme_management` `ClientFeatureControl` key (parent `demand_planning`); detection
+sensitivity mirrors the outlier fields with `last_scheme_detection_run_at/by/range_start/range_end`.
+
+#### Item Lifecycle Management (Substitution / Discontinuation / Introduction)
+
+Items go through lifecycle events that a naive "one item, one series" forecast model cannot represent.
+Three events are supported under one umbrella, sharing one admin/HTMX UI, one config flag, and one
+consumer pipeline — but each lands in a different layer:
+
+1. **Substitution (replacement code — Scenario 3).** An item with past sales is superseded in the
+   future by a **new item code** (repack, reformulation, supersession); the retired code's
+   **historical actuals feed the new code's forecast** from its launch date onward, with a **quantity
+   conversion** when unit sizes change (e.g. `2 old = 1 new`). `ItemSubstitution(client, old_item,
+   new_item, conversion_factor, effective_from)` maps a retired code to exactly one successor
+   (`unique (client, old_item)`); a successor may aggregate many retired codes. `conversion_factor`
+   scales qty **and** revenue identically (per-unit price preserved): `new_qty = old_qty × factor`,
+   `new_revenue = old_revenue × factor`. **Direct mapping only (MVP)** — an item may not be both a
+   predecessor and a successor, which excludes chains and cycles by construction. This is a
+   **baseline re-key layer**: it runs inside the shared composed helper (`actuals_queryset_with_net`)
+   **after** scheme + outlier netting, re-keying each old-item row to the successor and scaling it
+   when `period_start < effective_from` (null = whole history; exclusive cutoff, so converted history
+   and the successor's own actuals are disjoint in time and never double counted). The retired old
+   item's own **forecast is nil on/after `effective_from`** — the successor owns the demand from the
+   handover date.
+
+2. **Discontinuation (Scenario 1).** An item is withdrawn with an **effective date**; even though
+   past actuals exist, **post effective date the forecast is nil** — there is no successor.
+   `ItemDiscontinuation(client, item, effective_from)` (`unique (client, item)`; NULL = nil
+   immediately). The item keeps its full history (it still feeds reporting, ABC, and accuracy) — this
+   is a **forecast-output filter** at `write_forecast_lines` (no `ForecastLine` for horizon periods
+   `>= effective_from`), not a data mutation and not an `Item` master-data status change. Periods
+   before the date forecast normally from the item's own history.
+
+3. **Introduction (Scenario 2).** A **new item** introduced from an effective date has **no history**;
+   the client names a **reference item code whose forecast is copied onto the new item**, scaled by a
+   **ratio**, and bounded by an optional **from-date / to-date** window, until the new item
+   accumulates **enough historical data** (`ForecastingConfig.min_history_periods` own periods).
+   `ItemIntroduction(client, new_item, reference_item, ratio, copy_from, copy_to)` (`unique (client,
+   new_item)`; `ratio > 0`). The copy stops at the **earlier** of `copy_to` and "enough own history".
+   The reference item is **not retired** — it keeps its own series. This is a **forecast-output copy**
+   at `write_forecast_lines`: the new item's line = reference statistical line × `ratio`, tagged with
+   `borrowed_from_item` / `borrowed_ratio` on `ForecastLine` so borrowed lines are transparent to
+   planners; qty and value scale by the same `ratio` (per-unit price preserved).
+
+**One lifecycle directive per item:** the event-subject roles (old_item / new_item of substitution,
+discontinued item, introduction new_item) are pairwise exclusive — an item holds exactly one role.
+The `reference_item` of an introduction is not an event subject (it is an ordinary forecasted item)
+and may overlap, except that an introduction's `new_item` may not itself be another introduction's
+`reference_item` (no chains).
+
+All three layers are gated by a single `ForecastingConfig.use_item_lifecycle` flag (default True) for
+every consumer — forecast matrix, series profiles, weighted-avg price, outlier detection (which skips
+retired substitution old_items but keeps discontinued items' own history detectable), forecast-line
+write, reporting and ABC. A new `item_lifecycle` `ClientFeatureControl` key + HTMX list/form +
+Django Admin complete the feature, mirroring the scheme-management patterns.
+
 #### Forecast Engine Architecture
  
 **Forecast versioning** is first-class. Every forecast run produces a `ForecastVersion` record; multiple versions coexist for the same Client and period so that statistical, consensus, and approved forecasts can be compared.
@@ -193,13 +348,13 @@ Hierarchy scope. Outlier adjustments apply at the leaf ActualSale row. Hierarchy
 | Model | Key Fields | Notes |
 |-------|-----------|-------|
 | `ForecastVersion` | client, version_label, period_type, base_period_end, horizon_periods, engine_config (JSONField), status, run_status, stale_actuals, created_by, approved_by, copied_from | One per run or consensus cycle. Lifecycle `DRAFT → IN_REVIEW → APPROVED → LOCKED`. `run_status` (QUEUED → … → COMPLETE / FAILED) tracks the Celery run separately from the workflow status; `stale_actuals` is set by `flag_stale_forecast_versions` when a confirmed adjustment lands inside the version's horizon after the run |
-| `ForecastLine` | version, item, planning_location, planning_customer (nullable), distribution_channel, period_type, period_start, statistical_qty, override_qty, final_qty, forecast_level, model_used, price_used | Leaf grain (item × location × customer × channel × period). `final_qty = override_qty if set, else statistical_qty`; `forecast_level` tags which grain the statistical forecast was computed at before disaggregation |
-| `ForecastAggregate` | version, agg_level (LOCATION/SALES_NODE/PRODUCT_GROUP/CLIENT), agg_key (JSONField), period_start, statistical_qty, override_qty, final_qty | Pre-computed roll-ups for UI performance |
+| `ForecastLine` | version, item, planning_location, planning_customer (nullable), distribution_channel, period_type, period_start, statistical_qty, override_qty, final_qty, forecast_level, model_used, price_used, scheme_id (nullable), scheme_qty, scheme_value | Leaf grain (item × location × customer × channel × period). `final_qty = override_qty if set, else statistical_qty`; `forecast_level` tags which grain the statistical forecast was computed at before disaggregation; `scheme_qty`/`scheme_value` are the scheme-uplift overlay (NULL outside scheme windows) |
+| `ForecastAggregate` | version, agg_level (LOCATION/SALES_NODE/PRODUCT_GROUP/CLIENT), agg_key (JSONField), period_start, statistical_qty, override_qty, final_qty, scheme_qty, total_scheme_value | Pre-computed roll-ups for UI performance |
 | `ForecastOverride` | version, override_level, override_key (JSONField), period_start, override_qty, override_pct, override_note, created_by (custom weights in `OverrideSplitWeight`) | Stores the user's intent; disaggregation is computed separately |
 | `ForecastAccuracy` | version, item, planning_location, planning_customer, distribution_channel, period_start, actual_qty, forecast_qty, mape, bias | Populated post-actuals for tracking accuracy |
  
 **Statistical engine** runs as a Celery task:
-1. Pull the net actuals matrix (net of CONFIRMED outlier adjustments) from PostgreSQL (DuckDB is used in-process for fast OLAP rollups on the aggregates/accuracy paths).
+1. Pull the baseline actuals matrix (net of scheme impact first, then CONFIRMED outlier adjustments) from PostgreSQL (DuckDB is used in-process for fast OLAP rollups on the aggregates/accuracy paths).
 2. Build a Polars DataFrame per hierarchy leaf.
 3. Run `StatsForecast` models (ETS, AutoARIMA, CrostonSBA for intermittent demand) per series.
 4. Run `HierarchicalForecast` MinTrace reconciliation across the three hierarchy dimensions.
@@ -233,6 +388,7 @@ After a version is generated, a Celery task joins net `ActualSale` against the v
 - No external data feeds (weather, macro indicators) — deferred.
 - No real-time point-of-sale data ingestion — batch monthly upload only.
 - No ML models (XGBoost, LightGBM) — statistical models only in Phase 3B.
+- Scheme management covers planner-entered uplift on historical (netting) and planned (horizon re-add) periods, with system-proposed candidates for review, including the pre/post pull-forward shadow (add-back on history, dip on the horizon). Bounded simplifications: value shadow anchors only to the window's `expected_value_uplift_pct` (a 1-for-1's residual pre/post revenue dip is baseline noise); a shadow whose anchor window falls outside the forecast horizon is skipped with a warning; no causal attribution of pull-forward beyond the `pull_forward_pct` + decay model, which is calibrated empirically from closed schemes.
 - Outlier handling covers statistical candidate detection and planner-confirmed exclusion from the forecast baseline (and, by default, from reporting/ABC classification) only. It is not a general data-quality / anomaly-detection product; it does not attempt to auto-correct root-cause data entry errors upstream of ActualSale.
 ### 10. Inventory Decision Engine (Phase 3C)
 

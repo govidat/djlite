@@ -1,0 +1,50 @@
+{% load i18n %}
+{% with sub=form_data|default:None %}
+<h3 class="font-bold text-lg mb-4">
+  {% if substitution %}{% trans "Edit Substitution" %}{% else %}{% trans "New Substitution" %}{% endif %}
+</h3>
+
+{% if errors.__all__ %}
+<div class="alert alert-error mb-4"><span>{{ errors.__all__ }}</span></div>
+{% endif %}
+
+<form hx-post="{% if substitution %}{% url 'demand_ui:item_substitution_edit' client_id=client.client_id pk=substitution.pk %}{% else %}{% url 'demand_ui:item_substitution_create' client_id=client.client_id %}{% endif %}"
+      hx-target="#modal-content"
+      hx-swap="innerHTML">
+  {% csrf_token %}
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Old Item ID" %}</span></label>
+    <input type="text" name="old_item" value="{{ sub.old_item_id|default:'' }}" class="input input-bordered w-full {% if errors.old_item %}input-error{% endif %}" required />
+    {% if errors.old_item %}<span class="text-error text-sm">{{ errors.old_item }}</span>{% endif %}
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "New Item ID" %}</span></label>
+    <input type="text" name="new_item" value="{{ sub.new_item_id|default:'' }}" class="input input-bordered w-full {% if errors.new_item %}input-error{% endif %}" required />
+    {% if errors.new_item %}<span class="text-error text-sm">{{ errors.new_item }}</span>{% endif %}
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Conversion Factor" %}</span></label>
+    <input type="text" name="conversion_factor" value="{{ sub.conversion_factor|default:'1' }}" class="input input-bordered w-full {% if errors.conversion_factor %}input-error{% endif %}" />
+    <span class="label-text-alt text-base-content/50">{% trans "new_qty = old_qty × factor. 2 old = 1 new → 0.5" %}</span>
+    {% if errors.conversion_factor %}<span class="text-error text-sm">{{ errors.conversion_factor }}</span>{% endif %}
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Effective From" %}</span></label>
+    <input type="date" name="effective_from" value="{{ sub.effective_from|default:'' }}" class="input input-bordered w-full" />
+    <span class="label-text-alt text-base-content/50">{% trans "Null = convert entire old history." %}</span>
+  </div>
+
+  <div class="form-control mb-3">
+    <label class="label"><span class="label-text">{% trans "Notes" %}</span></label>
+    <textarea name="notes" class="textarea textarea-bordered w-full" rows="2">{{ sub.notes|default:'' }}</textarea>
+  </div>
+
+  <div class="modal-action">
+    <button type="submit" class="btn btn-primary">{% trans "Save" %}</button>
+  </div>
+</form>
+{% endwith %}

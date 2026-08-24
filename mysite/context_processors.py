@@ -8,7 +8,7 @@ from django.conf import settings
 from utils.globalval import get_globalval
 from utils.common_functions import fetch_clientstatic
 import json # this is just for debugging the json outputs of client/ pages..
-from utils.feature_control import is_feature_disabled, demand_ui_visible, outlier_ui_visible
+from utils.feature_control import is_feature_disabled, demand_ui_visible, outlier_ui_visible, scheme_ui_visible, item_lifecycle_ui_visible
 """
 Runs on every request that renders a template. Its job is to add template-ready variables to context. 
 It calls fetch_clientstatic to get the full client dict (with pages, themes, translations etc) and resolves the active theme.
@@ -160,9 +160,26 @@ def demand_planning_nav(request):
         return {'demand_ui_visible': False, 'demand_ui_role': None}
     
     outlier_ui_visible_result = outlier_ui_visible(client)
-    
+    scheme_ui_visible_result = scheme_ui_visible(client)
+    item_lifecycle_ui_visible_result = item_lifecycle_ui_visible(client)
+    if item_lifecycle_ui_visible_result:
+        from mysite.models.demand.forecast import ForecastingConfig
+        cfg = ForecastingConfig.get_for_client(client)
+        item_lifecycle_ui_visible_result = bool(cfg and cfg.use_item_lifecycle)
+
+    scheme_draft_count = 0
+    if scheme_ui_visible_result:
+        from mysite.models.demand.schemes import SalesScheme
+        scheme_draft_count = SalesScheme.objects.filter(
+            client=client, status='DRAFT'
+        ).count()
+
     if user.is_superuser:
-        return {'demand_ui_visible': True, 'demand_ui_role': 'admin', 'outlier_ui_visible': outlier_ui_visible_result}
+        return {'demand_ui_visible': True, 'demand_ui_role': 'admin',
+                'outlier_ui_visible': outlier_ui_visible_result,
+                'scheme_ui_visible': scheme_ui_visible_result,
+                'scheme_draft_count': scheme_draft_count,
+                'item_lifecycle_ui_visible': item_lifecycle_ui_visible_result}
 
     #feature_result = is_feature_disabled(client, 'demand_planning')
     #if feature_result['disabled']:
@@ -175,9 +192,17 @@ def demand_planning_nav(request):
     group_names = set(user.groups.values_list('name', flat=True))
 
     if 'demand_client_admin' in group_names:
-        return {'demand_ui_visible': True, 'demand_ui_role': 'admin', 'outlier_ui_visible': outlier_ui_visible_result }
+        return {'demand_ui_visible': True, 'demand_ui_role': 'admin',
+                'outlier_ui_visible': outlier_ui_visible_result,
+                'scheme_ui_visible': scheme_ui_visible_result,
+                'scheme_draft_count': scheme_draft_count,
+                'item_lifecycle_ui_visible': item_lifecycle_ui_visible_result}
     if 'demand_client_planner' in group_names:
-        return {'demand_ui_visible': True, 'demand_ui_role': 'planner', 'outlier_ui_visible': outlier_ui_visible_result}
+        return {'demand_ui_visible': True, 'demand_ui_role': 'planner',
+                'outlier_ui_visible': outlier_ui_visible_result,
+                'scheme_ui_visible': scheme_ui_visible_result,
+                'scheme_draft_count': scheme_draft_count,
+                'item_lifecycle_ui_visible': item_lifecycle_ui_visible_result}
 
     return {'demand_ui_visible': False, 'demand_ui_role': None}
 

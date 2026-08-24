@@ -35,6 +35,7 @@ from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.views.decorators.http import require_http_methods
 from django.db.models import Count, Min, Max
 from django.views.decorators.http import require_POST
@@ -46,6 +47,9 @@ from mysite.models.demand.forecast import (
 )
 from mysite.models.demand.actuals import (
     ActualSale, ActualSaleOutlierAdjustment, ActualSaleImport, PERIOD_TYPE_CHOICES,
+)
+from mysite.models.demand.schemes import (
+    SalesScheme, SalesSchemeScope, SalesSchemePeriod, SCHEME_STATUS_CHOICES,
 )
 from mysite.models.demand.hierarchy import (
     PlanningLocation, SalesNode, SalesForecastLink
@@ -60,6 +64,7 @@ from collections import defaultdict
 from django.db.models import ExpressionWrapper, BooleanField, Q
 from django.db.models.functions import Abs
 import datetime
+from datetime import timedelta
 import calendar
 from django.db.models import Min, Max, Count
 from celery import chain
@@ -394,6 +399,7 @@ def version_detail(request, pk, client_id=None):
         'aggregate_count': aggregate_count,
         'override_count': override_count,
         'pending_override_count': pending_override_count,
+        'show_scheme_tab': ForecastingConfig.get_for_client(request.client).scheme_apply_forecast_uplift,
         'active_nav': 'versions',
     }
     return render(request, 'demand/version_detail.html', context)
@@ -750,6 +756,867 @@ def version_line_row(request, pk, line_id, client_id=None):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Scheme Numbers (inline-editable scheme fields per ForecastLine)
+# ─────────────────────────────────────────────────────────────────────────────
+@login_required
+def version_scheme_numbers(request, pk, client_id=None):
+    """
+    GET /{client_id}/demand/versions/{id}/scheme-numbers/
+
+    Table of ForecastLines showing scheme breakdown:
+    pre_scheme_statistical_qty, scheme_qty, scheme_value,
+    statistical_qty, override_qty, final_qty.
+    Planner can inline-edit scheme_qty / scheme_value.
+    """
+    blocked = feature_gate(request, 'demand_planning')
+    if blocked:
+        return blocked
+
+    cfg = ForecastingConfig.get_for_client(request.client)
+    if not cfg.scheme_apply_forecast_uplift:
+        from django.http import Http404
+        raise Http404
+
+    version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
+
+    qs = (
+        ForecastLine.objects
+        .filter(version=version)
+        .select_related('item', 'planning_location', 'planning_customer',
+                         'distribution_channel', 'scheme')
+        .order_by('period_start', 'planning_location__code', 'item__item_id')
+    )
+
+    # Only show lines that have scheme data (pre_scheme_statistical_qty set)
+    show_all = request.GET.get('show_all', '') == '1'
+    if not show_all:
+        qs = qs.filter(scheme__isnull=False)
+
+    # Filters
+    item_id = request.GET.get('item_id', '').strip()
+    location_code = request.GET.get('location_code', '').strip()
+    period_start = request.GET.get('period_start', '').strip()
+
+    if item_id:
+        qs = qs.filter(item__item_id__icontains=item_id)
+    if location_code:
+        qs = qs.filter(planning_location__code=location_code)
+    if period_start:
+        qs = qs.filter(period_start=period_start)
+
+    # Dropdown choices
+    locations = list(
+        qs.exclude(planning_location__isnull=True)
+        .values_list('planning_location__code', 'planning_location__name')
+        .distinct().order_by('planning_location__code')
+    )
+    periods = list(
+        qs.values_list('period_start', flat=True)
+        .distinct().order_by('period_start')
+    )
+    distinct_items = qs.values('item__item_id').distinct().count()
+
+    # Totals
+    grand_total = qs.aggregate(
+        total_pre_scheme_qty=Coalesce(Sum('pre_scheme_statistical_qty'), Decimal('0'),
+                                      output_field=DecimalField()),
+        total_scheme_qty=Coalesce(Sum('scheme_qty'), Decimal('0'),
+                                   output_field=DecimalField()),
+        total_statistical_qty=Coalesce(Sum('statistical_qty'), Decimal('0'),
+                                        output_field=DecimalField()),
+        total_final_qty=Coalesce(Sum('final_qty'), Decimal('0'),
+                                  output_field=DecimalField()),
+    )
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    page_ids = [line.pk for line in page_obj.object_list]
+    page_total = ForecastLine.objects.filter(pk__in=page_ids).aggregate(
+        total_pre_scheme_qty=Coalesce(Sum('pre_scheme_statistical_qty'), Decimal('0'),
+                                      output_field=DecimalField()),
+        total_scheme_qty=Coalesce(Sum('scheme_qty'), Decimal('0'),
+                                   output_field=DecimalField()),
+        total_statistical_qty=Coalesce(Sum('statistical_qty'), Decimal('0'),
+                                        output_field=DecimalField()),
+        total_final_qty=Coalesce(Sum('final_qty'), Decimal('0'),
+                                  output_field=DecimalField()),
+    )
+
+    filters = {
+        'item_id': item_id,
+        'location_code': location_code,
+        'period_start': period_start,
+        'show_all': show_all,
+    }
+
+    context = {
+        'version': version,
+        'page_obj': page_obj,
+        'filters': filters,
+        'locations': locations,
+        'periods': periods,
+        'grand_total': grand_total,
+        'page_total': page_total,
+        'is_multipage': page_obj.has_other_pages(),
+        'show_location': len(locations) > 1,
+        'show_period': len(periods) > 1,
+        'show_item_search': distinct_items > 1,
+        'show_all': show_all,
+        'has_overrides': ForecastOverride.objects.filter(version=version).exists(),
+        'active_nav': 'versions',
+    }
+
+    if _is_htmx(request):
+        from django.template.loader import render_to_string
+        html = (
+            render_to_string('demand/partials/scheme_filter_bar.html',
+                             context, request)
+            + render_to_string('demand/partials/scheme_table_body.html',
+                               context, request)
+        )
+        return HttpResponse(html)
+
+    return render(request, 'demand/version_scheme_numbers.html', context)
+
+
+@login_required
+def version_scheme_update(request, pk, line_id, client_id=None):
+    """
+    POST /{client_id}/demand/versions/{id}/scheme-numbers/{line_id}/update/
+
+    Updates scheme_qty (and optionally scheme_value) on a ForecastLine,
+    then recalculates statistical_qty = pre_scheme + scheme_qty,
+    and calls save() to recompute final_qty / values.
+    """
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    line = get_object_or_404(
+        ForecastLine.objects.select_related('version'),
+        pk=line_id, version_id=pk, version__client=request.client,
+    )
+
+    if line.version.status == 'approved':
+        return HttpResponse(
+            'Cannot edit an approved version.', status=403,
+        )
+
+    if ForecastOverride.objects.filter(version=line.version).exists():
+        response = HttpResponse(
+            'This version has overrides. '
+            'Editing scheme numbers would invalidate the override base. '
+            'Copy this version and edit scheme numbers on the new copy.',
+            status=409,
+        )
+        response['HX-Retarget'] = '#scheme-toast'
+        response['HX-Reswap'] = 'innerHTML'
+        return response
+
+    scheme_qty_raw = request.POST.get('scheme_qty', '').strip()
+    scheme_value_raw = request.POST.get('scheme_value', '').strip()
+
+    errors = []
+    new_scheme_qty = None
+    new_scheme_value = None
+
+    if scheme_qty_raw:
+        try:
+            new_scheme_qty = Decimal(scheme_qty_raw)
+        except (InvalidOperation, ValueError):
+            errors.append('Invalid scheme qty.')
+
+    if scheme_value_raw:
+        try:
+            new_scheme_value = Decimal(scheme_value_raw)
+        except (InvalidOperation, ValueError):
+            errors.append('Invalid scheme value.')
+
+    if errors:
+        return HttpResponse('<br>'.join(errors), status=400)
+
+    # Apply scheme_qty change → recalculate statistical_qty
+    if new_scheme_qty is not None:
+        line.scheme_qty = new_scheme_qty
+        pre = line.pre_scheme_statistical_qty or Decimal('0')
+        line.statistical_qty = pre + new_scheme_qty
+
+    if new_scheme_value is not None:
+        line.scheme_value = new_scheme_value
+
+    line.save()
+
+    # Return the refreshed row
+    show_channel = (
+        line.version.client.is_distribution_channel_enabled()
+        and ForecastLine.objects.filter(version=line.version)
+            .values('distribution_channel').distinct().count() > 1
+    )
+    from django.template.loader import render_to_string
+    html = render_to_string('demand/partials/scheme_table_row.html', {
+        'line': line, 'show_channel': show_channel,
+    }, request)
+    return HttpResponse(html, headers={
+        'HX-Trigger': 'schemeUpdated',
+    })
+
+
+@login_required
+def version_scheme_row(request, pk, line_id, client_id=None):
+    """
+    GET /{client_id}/demand/versions/{id}/scheme-numbers/{line_id}/row/?edit=scheme_qty|scheme_value
+
+    Returns a single <tr> partial. When ?edit= is set, the corresponding
+    cell is replaced with an inline form for editing.
+    """
+    line = get_object_or_404(
+        ForecastLine.objects.select_related('item', 'planning_location',
+                                            'planning_customer',
+                                            'distribution_channel', 'scheme'),
+        pk=line_id, version_id=pk, version__client=request.client,
+    )
+    show_channel = (
+        line.version.client.is_distribution_channel_enabled()
+        and ForecastLine.objects.filter(version=line.version)
+            .values('distribution_channel').distinct().count() > 1
+    )
+    edit_field = request.GET.get('edit', '')
+    return render(request, 'demand/partials/scheme_table_row.html', {
+        'line': line, 'show_channel': show_channel,
+        'edit_field': edit_field,
+    })
+
+
+@login_required
+def scheme_suggest(request, client_id=None):
+    """
+    GET /{client_id}/demand/schemes/suggest/?code=SCHEME_CODE
+
+    Returns JSON with suggested uplift values from prior occurrences.
+    Called by the admin form when the planner types a scheme_code.
+    """
+    blocked = feature_gate(request, 'demand_planning')
+    if blocked:
+        return blocked
+
+    code = request.GET.get('code', '').strip()
+    if not code:
+        return JsonResponse({'suggested': None})
+
+    from mysite.tasks.demand.record_scheme_occurrence import suggest_uplift_for_scheme
+    result = suggest_uplift_for_scheme(code, request.client.pk)
+    return JsonResponse({'suggested': result})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Scheme Management (list / create / edit / detail / actions / review / occurrences)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def scheme_list(request, client_id=None):
+    """
+    GET /{client_id}/demand/schemes/
+
+    List all schemes for the client, filterable by status.
+    HTMX requests return only the table body partial.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    qs = (
+        SalesScheme.objects
+        .filter(client=request.client)
+        .select_related('created_by')
+        .order_by('-created_at')
+    )
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    schemes = list(qs)
+    draft_count = SalesScheme.objects.filter(
+        client=request.client, status='DRAFT'
+    ).count()
+
+    context = {
+        'schemes': schemes,
+        'status_filter': status_filter,
+        'status_choices': SCHEME_STATUS_CHOICES,
+        'draft_count': draft_count,
+        'active_nav': 'schemes',
+    }
+
+    if _is_htmx(request):
+        return render(request, 'demand/schemes/partials/scheme_table_body.html', context)
+    return render(request, 'demand/schemes/scheme_list.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def scheme_create(request, client_id=None):
+    """
+    GET  renders the scheme registration form (in a modal partial).
+    POST creates a new SalesScheme + scopes + periods.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    config = ForecastingConfig.get_for_client(request.client)
+
+    if request.method == 'POST':
+        errors = {}
+        scheme_code = request.POST.get('scheme_code', '').strip()
+        name = request.POST.get('name', '').strip()
+        expected_qty_uplift_pct = request.POST.get('expected_qty_uplift_pct', '0')
+        expected_value_uplift_pct = request.POST.get('expected_value_uplift_pct', '0')
+        shadow_periods = request.POST.get('shadow_periods', '0')
+        pull_forward_pct = request.POST.get('pull_forward_pct', '0.5')
+        discount_pct = request.POST.get('discount_pct', '').strip()
+
+        if not scheme_code:
+            errors['scheme_code'] = 'Required.'
+        elif SalesScheme.objects.filter(client=request.client, scheme_code=scheme_code).exists():
+            errors['scheme_code'] = 'A scheme with this code already exists.'
+        if not name:
+            errors['name'] = 'Required.'
+
+        try:
+            qty_uplift = Decimal(expected_qty_uplift_pct)
+        except Exception:
+            errors['expected_qty_uplift_pct'] = 'Invalid decimal.'
+            qty_uplift = Decimal('0')
+
+        try:
+            value_uplift = Decimal(expected_value_uplift_pct)
+        except Exception:
+            errors['expected_value_uplift_pct'] = 'Invalid decimal.'
+            value_uplift = Decimal('0')
+
+        try:
+            shadow_p = int(shadow_periods)
+        except Exception:
+            errors['shadow_periods'] = 'Invalid integer.'
+            shadow_p = 0
+
+        try:
+            pf = Decimal(pull_forward_pct)
+        except Exception:
+            errors['pull_forward_pct'] = 'Invalid decimal.'
+            pf = Decimal('0.5')
+
+        discount = None
+        if discount_pct:
+            try:
+                discount = Decimal(discount_pct)
+            except Exception:
+                errors['discount_pct'] = 'Invalid decimal.'
+
+        # Validate scope lines
+        scope_types = request.POST.getlist('scope_type')
+        if not scope_types or all(s == '' for s in scope_types):
+            errors['scopes'] = 'At least one scope line is required.'
+
+        # Validate period lines
+        period_starts = request.POST.getlist('period_start')
+        if not period_starts or all(p == '' for p in period_starts):
+            errors['periods'] = 'At least one period is required.'
+
+        if errors:
+            ctx = {
+                'errors': errors,
+                'form_data': request.POST,
+                'config': config,
+            }
+            response = render(request, 'demand/schemes/partials/scheme_create_form.html', ctx, status=400)
+            response['HX-Retarget'] = '#scheme-form-content'
+            response['HX-Reswap'] = 'innerHTML'
+            return response
+
+        with transaction.atomic():
+            scheme = SalesScheme(
+                client=request.client,
+                scheme_code=scheme_code,
+                name=name,
+                expected_qty_uplift_pct=qty_uplift,
+                expected_value_uplift_pct=value_uplift,
+                shadow_periods=shadow_p,
+                pull_forward_pct=pf,
+                discount_pct=discount,
+                created_by=request.user,
+            )
+            scheme.full_clean()
+            scheme.save()
+
+            # Create scope lines
+            for i, scope_type in enumerate(scope_types):
+                if not scope_type:
+                    continue
+                scope = SalesSchemeScope(
+                    scheme=scheme,
+                    scope_type=scope_type,
+                )
+                if scope_type in ('TAXONOMY', 'OVERALL', 'BRAND'):
+                    node_id = request.POST.getlist('scope_taxonomy_node')[i] if i < len(request.POST.getlist('scope_taxonomy_node')) else None
+                    if node_id:
+                        scope.taxonomy_node_id = int(node_id)
+                elif scope_type == 'ITEM':
+                    item_id = request.POST.getlist('scope_item')[i] if i < len(request.POST.getlist('scope_item')) else None
+                    if item_id:
+                        scope.item_id = int(item_id)
+                # Location/channel/customer dims
+                loc_id = request.POST.getlist('scope_location')[i] if i < len(request.POST.getlist('scope_location')) else None
+                chan_id = request.POST.getlist('scope_channel')[i] if i < len(request.POST.getlist('scope_channel')) else None
+                cust_id = request.POST.getlist('scope_customer')[i] if i < len(request.POST.getlist('scope_customer')) else None
+                if loc_id:
+                    scope.planning_location_id = int(loc_id)
+                if chan_id:
+                    scope.distribution_channel_id = int(chan_id)
+                if cust_id:
+                    scope.planning_customer_id = int(cust_id)
+                scope.full_clean()
+                scope.save()
+
+            # Create period lines
+            period_types = request.POST.getlist('period_type')
+            for i, ps in enumerate(period_starts):
+                if not ps:
+                    continue
+                pt = period_types[i] if i < len(period_types) else 'MONTHLY'
+                period = SalesSchemePeriod(
+                    scheme=scheme,
+                    period_type=pt,
+                    period_start=ps,
+                )
+                period.full_clean()
+                period.save()
+
+        messages.success(request, f'Scheme "{scheme.scheme_code}" created as DRAFT.')
+
+        if _is_htmx(request):
+            # Refresh the scheme list table
+            from django.template.loader import render_to_string
+            qs = SalesScheme.objects.filter(
+                client=request.client
+            ).select_related('created_by').order_by('-created_at')
+            html = render_to_string('demand/schemes/scheme_list.html', {
+                'schemes': list(qs),
+                'status_filter': '',
+                'status_choices': SCHEME_STATUS_CHOICES,
+                'draft_count': SalesScheme.objects.filter(
+                    client=request.client, status='DRAFT').count(),
+                'active_nav': 'schemes',
+            }, request)
+            response = HttpResponse(html)
+            response['HX-Trigger'] = 'schemeCreated'
+            return response
+
+        return redirect('demand_ui:scheme_list',
+                        client_id=request.client.client_id)
+
+    # GET
+    ctx = {'config': config, 'errors': {}}
+    if _is_htmx(request):
+        return render(request, 'demand/schemes/partials/scheme_create_form.html', ctx)
+    return render(request, 'demand/schemes/scheme_create.html', ctx)
+
+
+@login_required
+def scheme_detail(request, pk, client_id=None):
+    """
+    GET /{client_id}/demand/schemes/{pk}/
+
+    Shows scheme details, scopes, periods, resolved rows, and occurrences.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    scheme = get_object_or_404(
+        SalesScheme.objects.select_related('created_by').prefetch_related(
+            'scopes__taxonomy_node', 'scopes__item',
+            'scopes__planning_location', 'scopes__distribution_channel', 'scopes__planning_customer',
+            'periods', 'occurrences', 'resolved_periods',
+        ),
+        pk=pk, client=request.client,
+    )
+
+    context = {
+        'scheme': scheme,
+        'scopes': scheme.scopes.all(),
+        'periods': scheme.periods.all().order_by('period_start'),
+        'resolved_count': scheme.resolved_periods.count(),
+        'window_count': scheme.resolved_periods.filter(is_shadow=False).count(),
+        'shadow_count': scheme.resolved_periods.filter(is_shadow=True).count(),
+        'occurrences': scheme.occurrences.all().order_by('-period_start'),
+        'active_nav': 'schemes',
+    }
+
+    if _is_htmx(request):
+        return render(request, 'demand/schemes/partials/scheme_detail_content.html', context)
+    return render(request, 'demand/schemes/scheme_detail.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def scheme_edit(request, pk, client_id=None):
+    """
+    GET  renders the edit form (only DRAFT schemes).
+    POST updates the scheme.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    scheme = get_object_or_404(SalesScheme, pk=pk, client=request.client)
+    if scheme.status != 'DRAFT':
+        msg = 'Only DRAFT schemes can be edited.'
+        if _is_htmx(request):
+            return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
+        messages.error(request, msg)
+        return redirect('demand_ui:scheme_detail', pk=pk,
+                        client_id=request.client.client_id)
+
+    if request.method == 'POST':
+        errors = {}
+        scheme_code = request.POST.get('scheme_code', '').strip()
+        name = request.POST.get('name', '').strip()
+
+        if not scheme_code:
+            errors['scheme_code'] = 'Required.'
+        elif SalesScheme.objects.filter(
+            client=request.client, scheme_code=scheme_code
+        ).exclude(pk=pk).exists():
+            errors['scheme_code'] = 'A scheme with this code already exists.'
+        if not name:
+            errors['name'] = 'Required.'
+
+        try:
+            qty_uplift = Decimal(request.POST.get('expected_qty_uplift_pct', '0'))
+        except Exception:
+            errors['expected_qty_uplift_pct'] = 'Invalid decimal.'
+            qty_uplift = scheme.expected_qty_uplift_pct
+
+        try:
+            value_uplift = Decimal(request.POST.get('expected_value_uplift_pct', '0'))
+        except Exception:
+            errors['expected_value_uplift_pct'] = 'Invalid decimal.'
+            value_uplift = scheme.expected_value_uplift_pct
+
+        try:
+            shadow_p = int(request.POST.get('shadow_periods', '0'))
+        except Exception:
+            errors['shadow_periods'] = 'Invalid integer.'
+            shadow_p = scheme.shadow_periods
+
+        try:
+            pf = Decimal(request.POST.get('pull_forward_pct', '0.5'))
+        except Exception:
+            errors['pull_forward_pct'] = 'Invalid decimal.'
+            pf = scheme.pull_forward_pct
+
+        discount = None
+        dp = request.POST.get('discount_pct', '').strip()
+        if dp:
+            try:
+                discount = Decimal(dp)
+            except Exception:
+                errors['discount_pct'] = 'Invalid decimal.'
+
+        if errors:
+            ctx = {'scheme': scheme, 'errors': errors, 'form_data': request.POST}
+            response = render(request, 'demand/schemes/partials/scheme_edit_form.html', ctx, status=400)
+            response['HX-Retarget'] = '#scheme-edit-content'
+            response['HX-Reswap'] = 'innerHTML'
+            return response
+
+        scheme.scheme_code = scheme_code
+        scheme.name = name
+        scheme.expected_qty_uplift_pct = qty_uplift
+        scheme.expected_value_uplift_pct = value_uplift
+        scheme.shadow_periods = shadow_p
+        scheme.pull_forward_pct = pf
+        scheme.discount_pct = discount
+        scheme.full_clean()
+        scheme.save()
+
+        messages.success(request, f'Scheme "{scheme.scheme_code}" updated.')
+
+        if _is_htmx(request):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = reverse(
+                'demand_ui:scheme_detail',
+                kwargs={**_client_url_kwargs(request), 'pk': pk},
+            )
+            return response
+        return redirect('demand_ui:scheme_detail', pk=pk,
+                        client_id=request.client.client_id)
+
+    # GET
+    ctx = {'scheme': scheme, 'errors': {}}
+    if _is_htmx(request):
+        return render(request, 'demand/schemes/partials/scheme_edit_form.html', ctx)
+    return render(request, 'demand/schemes/scheme_edit.html', ctx)
+
+
+@login_required
+@require_POST
+def scheme_activate(request, pk, client_id=None):
+    """
+    POST /{client_id}/demand/schemes/{pk}/activate/
+
+    Sets status to ACTIVE and triggers resolve_scheme_scope.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    scheme = get_object_or_404(SalesScheme, pk=pk, client=request.client)
+    if scheme.status not in ('DRAFT',):
+        msg = f'Cannot activate a scheme in {scheme.get_status_display()} status.'
+        if _is_htmx(request):
+            return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
+        messages.error(request, msg)
+        return redirect('demand_ui:scheme_detail', pk=pk,
+                        client_id=request.client.client_id)
+
+    scheme.status = 'ACTIVE'
+    scheme.save(update_fields=['status', 'updated_at'])
+
+    # Trigger scope resolution
+    from mysite.tasks.demand.resolve_scheme_scope import resolve_scheme_scope
+    resolve_scheme_scope.delay(scheme.pk)
+
+    messages.success(request, f'Scheme "{scheme.scheme_code}" activated. Scope resolution queued.')
+
+    if _is_htmx(request):
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse(
+            'demand_ui:scheme_detail',
+            kwargs={**_client_url_kwargs(request), 'pk': pk},
+        )
+        return response
+    return redirect('demand_ui:scheme_detail', pk=pk,
+                    client_id=request.client.client_id)
+
+
+@login_required
+@require_POST
+def scheme_archive(request, pk, client_id=None):
+    """
+    POST /{client_id}/demand/schemes/{pk}/archive/
+
+    Sets status to ARCHIVED.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    scheme = get_object_or_404(SalesScheme, pk=pk, client=request.client)
+    if scheme.status == 'ARCHIVED':
+        msg = 'Scheme is already archived.'
+        if _is_htmx(request):
+            return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
+        messages.error(request, msg)
+        return redirect('demand_ui:scheme_detail', pk=pk,
+                        client_id=request.client.client_id)
+
+    scheme.status = 'ARCHIVED'
+    scheme.save(update_fields=['status', 'updated_at'])
+
+    messages.success(request, f'Scheme "{scheme.scheme_code}" archived.')
+
+    if _is_htmx(request):
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse(
+            'demand_ui:scheme_detail',
+            kwargs={**_client_url_kwargs(request), 'pk': pk},
+        )
+        return response
+    return redirect('demand_ui:scheme_detail', pk=pk,
+                    client_id=request.client.client_id)
+
+
+@login_required
+@require_POST
+def scheme_delete(request, pk, client_id=None):
+    """
+    POST /{client_id}/demand/schemes/{pk}/delete/
+
+    Deletes a DRAFT scheme.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    scheme = get_object_or_404(SalesScheme, pk=pk, client=request.client)
+    if scheme.status != 'DRAFT':
+        msg = 'Only DRAFT schemes can be deleted.'
+        if _is_htmx(request):
+            return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
+        messages.error(request, msg)
+        return redirect('demand_ui:scheme_detail', pk=pk,
+                        client_id=request.client.client_id)
+
+    code = scheme.scheme_code
+    scheme.delete()
+    messages.success(request, f'Scheme "{code}" deleted.')
+
+    if _is_htmx(request):
+        response = HttpResponse(status=204)
+        response['HX-Redirect'] = reverse(
+            'demand_ui:scheme_list',
+            kwargs=_client_url_kwargs(request),
+        )
+        return response
+    return redirect('demand_ui:scheme_list',
+                    client_id=request.client.client_id)
+
+
+# ── Scheme Review Queue (system-detected candidates) ──────────────────────
+
+@login_required
+def scheme_review_queue(request, client_id=None):
+    """
+    GET /{client_id}/demand/schemes/review-queue/
+
+    Shows DRAFT schemes created by the detection task (scheme_code starts with 'SYS-').
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    qs = (
+        SalesScheme.objects
+        .filter(client=request.client, status='DRAFT', scheme_code__startswith='SYS-')
+        .select_related('created_by')
+        .order_by('-created_at')
+    )
+
+    schemes = list(qs)
+
+    # Detection run metadata
+    config = ForecastingConfig.get_for_client(request.client)
+
+    context = {
+        'schemes': schemes,
+        'draft_count': len(schemes),
+        'config': config,
+        'active_nav': 'scheme_review',
+    }
+
+    if _is_htmx(request):
+        return render(request, 'demand/schemes/partials/scheme_review_table_body.html', context)
+    return render(request, 'demand/schemes/scheme_review_queue.html', context)
+
+
+@login_required
+def scheme_detection_form(request, client_id=None):
+    """
+    GET renders the range-picker form fragment for scheme detection.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    config = ForecastingConfig.get_for_client(request.client)
+    actuals_bounds = ActualSale.objects.filter(
+        client=request.client
+    ).aggregate(earliest=Min('period_start'), latest=Max('period_start'))
+
+    earliest = actuals_bounds['earliest']
+    latest = actuals_bounds['latest']
+    suggested_start = None
+    suggested_end = latest
+    no_new_data = False
+
+    if config and config.last_scheme_detection_run_to:
+        suggested_start = config.last_scheme_detection_run_to + timedelta(days=1)
+    else:
+        suggested_start = earliest
+
+    if suggested_start and latest and suggested_start > latest:
+        suggested_start = None
+        suggested_end = None
+        no_new_data = True
+    elif suggested_start is None:
+        no_new_data = True
+
+    return render(request, 'demand/schemes/partials/_detection_form.html', {
+        'suggested_start': suggested_start,
+        'suggested_end': suggested_end,
+        'no_new_data': no_new_data,
+        'config': config,
+    })
+
+
+@login_required
+@require_POST
+def trigger_scheme_detection(request, client_id=None):
+    """
+    POST triggers the detect_scheme_candidates Celery task.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    period_start = request.POST.get('period_start')
+    period_end = request.POST.get('period_end')
+    if not period_start or not period_end:
+        config = ForecastingConfig.get_for_client(request.client)
+        return render(request, 'demand/schemes/partials/_detection_form.html', {
+            'error': 'Both a start and end period are required.',
+            'config': config,
+        })
+
+    from mysite.tasks.demand.detect_scheme_candidates import detect_scheme_candidates
+    detect_scheme_candidates.delay(
+        client_id=request.client.client_id,
+        target_period_start=period_start,
+        target_period_end=period_end,
+        triggered_by_user_id=request.user.id,
+    )
+
+    return render(request, 'demand/schemes/partials/_detection_triggered.html', {
+        'period_start': period_start,
+        'period_end': period_end,
+    })
+
+
+# ── Scheme Occurrences (closed-scheme report) ────────────────────────────
+
+@login_required
+def scheme_occurrences(request, pk, client_id=None):
+    """
+    GET /{client_id}/demand/schemes/{pk}/occurrences/
+
+    Shows actual-vs-expected report for a closed scheme.
+    """
+    blocked = feature_gate(request, 'scheme_management')
+    if blocked:
+        return blocked
+
+    scheme = get_object_or_404(
+        SalesScheme.objects.select_related('created_by'),
+        pk=pk, client=request.client,
+    )
+    occurrences = list(
+        scheme.occurrences.all().order_by('-period_start')
+    )
+
+    context = {
+        'scheme': scheme,
+        'occurrences': occurrences,
+        'active_nav': 'schemes',
+    }
+
+    if _is_htmx(request):
+        return render(request, 'demand/schemes/partials/scheme_occurrences_content.html', context)
+    return render(request, 'demand/schemes/scheme_occurrences.html', context)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Aggregates (value summary)
 # ─────────────────────────────────────────────────────────────────────────────
 @login_required
@@ -784,6 +1651,17 @@ def version_aggregates(request, pk, client_id=None):
     sales_node_id   = request.GET.get('sales_node_id', '').strip()
     taxonomy_node_id = request.GET.get('taxonomy_node_id', '').strip()
 
+    # Multi-select tree filters (also accept the legacy singular params)
+    from utils.taxonomy_filters import parse_node_ids_param
+    sales_node_ids    = parse_node_ids_param(request, param_name='sales_node_ids')
+    taxonomy_node_ids = parse_node_ids_param(request, param_name='taxonomy_node_ids')
+    if sales_node_id:
+        sales_node_ids.append(sales_node_id)
+    if taxonomy_node_id:
+        taxonomy_node_ids.append(taxonomy_node_id)
+    sales_node_ids    = list(dict.fromkeys(sales_node_ids))
+    taxonomy_node_ids = list(dict.fromkeys(taxonomy_node_ids))
+
     qs = (
         ForecastAggregate.objects
         .filter(version=version, agg_level=agg_level)
@@ -791,27 +1669,27 @@ def version_aggregates(request, pk, client_id=None):
     )
 
     # ── Hierarchy subtree filters ─────────────────────────────────────────
-    # 'sales': restrict to leaf rows whose SalesNode lies under the chosen
-    # node. 'item_hierarchy': restrict to taxonomy-node rows under the
+    # 'sales': restrict to leaf rows whose SalesNode lies under ANY chosen
+    # node. 'item_hierarchy': restrict to taxonomy-node rows under ANY
     # chosen node. Both fail closed on a stale/bad id.
-    if agg_level == 'sales' and sales_node_id:
+    if agg_level == 'sales' and sales_node_ids:
         from mysite.models.demand.hierarchy import SalesNode
-        from utils.demand.hierarchy_utils import get_sales_node_subtree_ids
+        from utils.demand.hierarchy_utils import get_sales_node_subtree_ids_multi
         try:
-            subtree_ids = get_sales_node_subtree_ids(
-                request.client.pk, int(sales_node_id)
+            subtree_ids = get_sales_node_subtree_ids_multi(
+                request.client.pk, sales_node_ids
             )
             qs = qs.filter(agg_key__sales_node_id__in=subtree_ids)
         except (SalesNode.DoesNotExist, ValueError):
             qs = qs.none()
 
-    if agg_level == 'item_hierarchy' and taxonomy_node_id:
+    if agg_level == 'item_hierarchy' and taxonomy_node_ids:
         from utils.taxonomy_filters import (
-            resolve_node_subtree_ids, TaxonomyFilterError,
+            resolve_node_subtree_ids_multi, TaxonomyFilterError,
         )
         try:
-            subtree_ids = resolve_node_subtree_ids(
-                request.client, int(taxonomy_node_id)
+            subtree_ids = resolve_node_subtree_ids_multi(
+                request.client, taxonomy_node_ids
             )
             qs = qs.filter(agg_key__taxonomy_node_id__in=subtree_ids)
         except (TaxonomyFilterError, ValueError):
@@ -850,28 +1728,36 @@ def version_aggregates(request, pk, client_id=None):
         .order_by('period_start')
     )
 
-    # Sales-node choices (non-leaf nodes) for the sales-hierarchy drill filter
-    sales_node_choices = []
-    if agg_level == 'sales':
+    # ── Selected hierarchy names (badges) + planning-taxonomy slug ────────
+    sales_node_names = []
+    if agg_level == 'sales' and sales_node_ids:
         from mysite.models.demand.hierarchy import SalesNode
-        sales_node_choices = list(
+        name_map = dict(
             SalesNode.objects
-            .filter(client=request.client, is_active=True, children__isnull=False)
-            .order_by('path')
-            .values('id', 'code', 'name', 'level_label')
+            .filter(client=request.client, pk__in=sales_node_ids)
+            .values_list('pk', 'code')
         )
+        sales_node_names = [
+            name_map[int(n)] for n in sales_node_ids
+            if int(n) in name_map
+        ]
 
-    # Taxonomy-node choices (non-leaf nodes) for the item-hierarchy drill filter
-    taxonomy_node_choices = []
-    if agg_level == 'item_hierarchy':
+    taxonomy_node_names = []
+    if agg_level == 'item_hierarchy' and taxonomy_node_ids:
         from mysite.models.catalogue import TaxonomyNode
-        taxonomy_node_choices = list(
+        name_map = dict(
             TaxonomyNode.objects
-            .filter(client=request.client, is_active=True, children__isnull=False)
-            .select_related('taxonomy')
-            .order_by('depth', 'name')
-            .values('id', 'name', 'depth', 'taxonomy__name')
+            .filter(client=request.client, pk__in=taxonomy_node_ids)
+            .values_list('pk', 'name')
         )
+        taxonomy_node_names = [
+            name_map[int(n)] for n in taxonomy_node_ids
+            if int(n) in name_map
+        ]
+
+    from utils.demand.hierarchy_utils import get_planning_product_hierarchy
+    planning_taxonomy = get_planning_product_hierarchy(request.client.pk)
+    planning_taxonomy_slug = planning_taxonomy.slug if planning_taxonomy else ''
 
     # Customer choices for customer level
     customer_choices = []
@@ -1008,6 +1894,10 @@ def version_aggregates(request, pk, client_id=None):
         'final_value_max': final_value_max,
         'sales_node_id':   sales_node_id,
         'taxonomy_node_id': taxonomy_node_id,
+        'sales_node_ids':    ','.join(sales_node_ids),
+        'taxonomy_node_ids': ','.join(taxonomy_node_ids),
+        'sales_node_names':  ', '.join(sales_node_names),
+        'taxonomy_node_names': ', '.join(taxonomy_node_names),
     }
 
     context = {
@@ -1028,8 +1918,7 @@ def version_aggregates(request, pk, client_id=None):
         'is_multipage':     page_obj.has_other_pages(),
         'filters':          filters,
         'periods':          periods,
-        'sales_node_choices': sales_node_choices,
-        'taxonomy_node_choices': taxonomy_node_choices,
+        'planning_taxonomy_slug': planning_taxonomy_slug,
         'customer_choices': customer_choices,
         'active_nav': 'versions',
     }
@@ -1457,6 +2346,7 @@ def version_accuracy(request, pk, client_id=None):
             .select_related('taxonomy')
             .order_by('depth', 'name')
             .values('id', 'name', 'depth', 'taxonomy__name')
+            .distinct()
         )
 
     customer_choices = list(
@@ -1900,8 +2790,19 @@ def actuals_aggregates(request, client_id=None):
     qty_max          = request.GET.get('qty_max', '').strip()
     revenue_min      = request.GET.get('revenue_min', '').strip()
     revenue_max      = request.GET.get('revenue_max', '').strip()
-    sales_node_id    = request.GET.get('sales_node_id', '').strip()
+    sales_node_id   = request.GET.get('sales_node_id', '').strip()
     taxonomy_node_id = request.GET.get('taxonomy_node_id', '').strip()
+
+    # Multi-select tree filters (also accept the legacy singular params)
+    from utils.taxonomy_filters import parse_node_ids_param
+    sales_node_ids    = parse_node_ids_param(request, param_name='sales_node_ids')
+    taxonomy_node_ids = parse_node_ids_param(request, param_name='taxonomy_node_ids')
+    if sales_node_id:
+        sales_node_ids.append(sales_node_id)
+    if taxonomy_node_id:
+        taxonomy_node_ids.append(taxonomy_node_id)
+    sales_node_ids    = list(dict.fromkeys(sales_node_ids))
+    taxonomy_node_ids = list(dict.fromkeys(taxonomy_node_ids))
 
     # ── Outlier include/exclude toggle ──────────────────────────────────────
     outlier_ui_visible_flag = _outlier_ui_visible(request.client)
@@ -1921,7 +2822,11 @@ def actuals_aggregates(request, client_id=None):
             )
 
     if exclude_outliers:
-        base_qs = actuals_queryset_with_net(request.client, use_net=True)
+        forecasting_config = getattr(request.client, 'forecasting_config', None)
+        use_scheme_net = bool(forecasting_config and forecasting_config.scheme_net_actuals)
+        use_sub = bool(forecasting_config and forecasting_config.use_item_lifecycle)
+        base_qs = actuals_queryset_with_net(request.client, use_net=True, use_scheme_net=use_scheme_net,
+                                            use_substitution=use_sub)
         qty_field = 'net_qty'
         revenue_field = 'net_revenue'
     else:
@@ -1938,25 +2843,25 @@ def actuals_aggregates(request, client_id=None):
 
     # ── Hierarchy subtree drill filters (fail closed on a stale id) ────────
     sales_subtree_ids = None
-    if agg_level == 'sales' and sales_node_id:
+    if agg_level == 'sales' and sales_node_ids:
         from mysite.models.demand.hierarchy import SalesNode
-        from utils.demand.hierarchy_utils import get_sales_node_subtree_ids
+        from utils.demand.hierarchy_utils import get_sales_node_subtree_ids_multi
         try:
-            sales_subtree_ids = get_sales_node_subtree_ids(
-                request.client.pk, int(sales_node_id)
-            )
+            sales_subtree_ids = set(get_sales_node_subtree_ids_multi(
+                request.client.pk, sales_node_ids
+            ))
         except (SalesNode.DoesNotExist, ValueError):
             sales_subtree_ids = []
 
     taxonomy_subtree_ids = None
-    if agg_level == 'item_hierarchy' and taxonomy_node_id:
+    if agg_level == 'item_hierarchy' and taxonomy_node_ids:
         from utils.taxonomy_filters import (
-            resolve_node_subtree_ids, TaxonomyFilterError,
+            resolve_node_subtree_ids_multi, TaxonomyFilterError,
         )
         try:
-            taxonomy_subtree_ids = resolve_node_subtree_ids(
-                request.client, int(taxonomy_node_id)
-            )
+            taxonomy_subtree_ids = set(resolve_node_subtree_ids_multi(
+                request.client, taxonomy_node_ids
+            ))
         except (TaxonomyFilterError, ValueError):
             taxonomy_subtree_ids = []
 
@@ -2114,25 +3019,37 @@ def actuals_aggregates(request, client_id=None):
         base_qs.values_list('period_start', flat=True)
         .distinct().order_by('period_start')
     )
-    sales_node_choices = []
-    if agg_level == 'sales':
+    # ── Selected hierarchy names (badges) + planning-taxonomy slug ────────
+    sales_node_names = []
+    if agg_level == 'sales' and sales_node_ids:
         from mysite.models.demand.hierarchy import SalesNode
-        sales_node_choices = list(
+        name_map = dict(
             SalesNode.objects
-            .filter(client=request.client, is_active=True, children__isnull=False)
-            .order_by('path')
-            .values('id', 'code', 'name', 'level_label')
+            .filter(client=request.client, pk__in=sales_node_ids)
+            .values_list('pk', 'code')
         )
-    taxonomy_node_choices = []
-    if agg_level == 'item_hierarchy':
+        sales_node_names = [
+            name_map[int(n)] for n in sales_node_ids
+            if int(n) in name_map
+        ]
+
+    taxonomy_node_names = []
+    if agg_level == 'item_hierarchy' and taxonomy_node_ids:
         from mysite.models.catalogue import TaxonomyNode
-        taxonomy_node_choices = list(
+        name_map = dict(
             TaxonomyNode.objects
-            .filter(client=request.client, is_active=True, children__isnull=False)
-            .select_related('taxonomy')
-            .order_by('depth', 'name')
-            .values('id', 'name', 'depth', 'taxonomy__name')
+            .filter(client=request.client, pk__in=taxonomy_node_ids)
+            .values_list('pk', 'name')
         )
+        taxonomy_node_names = [
+            name_map[int(n)] for n in taxonomy_node_ids
+            if int(n) in name_map
+        ]
+
+    from utils.demand.hierarchy_utils import get_planning_product_hierarchy
+    planning_taxonomy = get_planning_product_hierarchy(request.client.pk)
+    planning_taxonomy_slug = planning_taxonomy.slug if planning_taxonomy else ''
+
     customer_choices = []
     if agg_level == 'customer':
         customer_choices = list(
@@ -2168,6 +3085,10 @@ def actuals_aggregates(request, client_id=None):
         'revenue_max':       revenue_max,
         'sales_node_id':     sales_node_id,
         'taxonomy_node_id':  taxonomy_node_id,
+        'sales_node_ids':    ','.join(sales_node_ids),
+        'taxonomy_node_ids': ','.join(taxonomy_node_ids),
+        'sales_node_names':  ', '.join(sales_node_names),
+        'taxonomy_node_names': ', '.join(taxonomy_node_names),
         'exclude_outliers':  exclude_outliers,
     }
 
@@ -2187,8 +3108,7 @@ def actuals_aggregates(request, client_id=None):
         'is_multipage':              page_obj.has_other_pages(),
         'filters':                   filters,
         'periods':                   periods,
-        'sales_node_choices':        sales_node_choices,
-        'taxonomy_node_choices':     taxonomy_node_choices,
+        'planning_taxonomy_slug':    planning_taxonomy_slug,
         'customer_choices':          customer_choices,
         'active_nav':                'actuals',
         'outlier_ui_visible': outlier_ui_visible_flag,
@@ -2963,10 +3883,10 @@ def series_profile_list(request, client_id=None):
     last_period_types = list(
         SeriesLevelEvaluation.objects
         .filter(client=request.client)
+        .order_by('period_type')
         .values_list('period_type', flat=True)
         .distinct()
     )
-    last_period_types.sort()
 
     # ── Context ───────────────────────────────────────────────────────────────
     filters = {
@@ -3442,3 +4362,444 @@ def outlier_undo_decision(request, client_id, pk):
     adj.save()
     flag_stale_forecast_versions.delay(actual_sale_id=adj.actual_sale_id)
     return HttpResponse(status=200)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Item Lifecycle — Substitution / Discontinuation / Introduction
+# ═══════════════════════════════════════════════════════════════════════════
+
+from mysite.models.demand.lifecycle import (
+    ItemSubstitution, ItemDiscontinuation, ItemIntroduction,
+)
+from utils.feature_control import item_lifecycle_ui_visible as _item_lifecycle_ui_visible
+from mysite.models import Item
+
+
+def _lifecycle_gate(request):
+    """Return 403 HttpResponse if item_lifecycle feature is disabled, else None."""
+    return feature_gate(request, 'item_lifecycle')
+
+
+# ── Item Substitution ────────────────────────────────────────────────────
+
+@login_required
+def item_substitution_list(request, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    substitutions = list(
+        ItemSubstitution.objects.filter(client=request.client)
+        .select_related('old_item', 'new_item')
+        .order_by('-updated_at')
+    )
+    context = {'substitutions': substitutions, 'active_nav': 'item_lifecycle'}
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/substitution_table_body.html', context)
+    return render(request, 'demand/lifecycle/substitution_list.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def item_substitution_create(request, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    ctx = {'active_nav': 'item_lifecycle'}
+    if request.method == 'POST':
+        errors = {}
+        old_item_id = request.POST.get('old_item', '').strip()
+        new_item_id = request.POST.get('new_item', '').strip()
+        conversion_factor = request.POST.get('conversion_factor', '1').strip()
+        effective_from = request.POST.get('effective_from', '').strip() or None
+        notes = request.POST.get('notes', '').strip()
+
+        if not old_item_id:
+            errors['old_item'] = 'Required.'
+        if not new_item_id:
+            errors['new_item'] = 'Required.'
+        if old_item_id == new_item_id and old_item_id:
+            errors['new_item'] = 'Must differ from old item.'
+        try:
+            cf = Decimal(conversion_factor)
+            if cf <= 0:
+                errors['conversion_factor'] = 'Must be > 0.'
+        except (InvalidOperation, TypeError):
+            errors['conversion_factor'] = 'Invalid number.'
+
+        if not errors:
+            try:
+                sub = ItemSubstitution(
+                    client=request.client,
+                    old_item_id=int(old_item_id),
+                    new_item_id=int(new_item_id),
+                    conversion_factor=cf,
+                    effective_from=effective_from,
+                    notes=notes,
+                    created_by=request.user,
+                )
+                sub.full_clean()
+                sub.save()
+                if _is_htmx(request):
+                    subs = list(ItemSubstitution.objects.filter(client=request.client)
+                                .select_related('old_item', 'new_item').order_by('-updated_at'))
+                    resp = render(request, 'demand/lifecycle/partials/substitution_table_body.html',
+                                  {'substitutions': subs, 'active_nav': 'item_lifecycle'})
+                    resp['HX-Trigger'] = 'lifecycleCreated'
+                    return resp
+                return redirect('demand_ui:item_substitution_list', client_id=request.client.client_id)
+            except Exception as e:
+                errors['__all__'] = str(e)
+
+        form_data = request.POST.dict()
+        ctx.update({'errors': errors, 'form_data': form_data})
+        resp = render(request, 'demand/lifecycle/partials/substitution_form.html', ctx, status=400)
+        resp['HX-Retarget'] = '#modal-content'
+        resp['HX-Reswap'] = 'innerHTML'
+        return resp
+
+    # GET
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/substitution_form.html', ctx)
+    return render(request, 'demand/lifecycle/substitution_list.html', ctx)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def item_substitution_edit(request, pk, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    sub = get_object_or_404(ItemSubstitution, pk=pk, client=request.client)
+    ctx = {'substitution': sub, 'active_nav': 'item_lifecycle'}
+    if request.method == 'POST':
+        errors = {}
+        sub.old_item_id = int(request.POST.get('old_item', sub.old_item_id))
+        sub.new_item_id = int(request.POST.get('new_item', sub.new_item_id))
+        try:
+            sub.conversion_factor = Decimal(request.POST.get('conversion_factor', str(sub.conversion_factor)))
+            if sub.conversion_factor <= 0:
+                errors['conversion_factor'] = 'Must be > 0.'
+        except (InvalidOperation, TypeError):
+            errors['conversion_factor'] = 'Invalid number.'
+        sub.effective_from = request.POST.get('effective_from', '').strip() or None
+        sub.notes = request.POST.get('notes', '').strip()
+
+        if not errors:
+            try:
+                sub.full_clean()
+                sub.save()
+                if _is_htmx(request):
+                    subs = list(ItemSubstitution.objects.filter(client=request.client)
+                                .select_related('old_item', 'new_item').order_by('-updated_at'))
+                    resp = render(request, 'demand/lifecycle/partials/substitution_table_body.html',
+                                  {'substitutions': subs, 'active_nav': 'item_lifecycle'})
+                    resp['HX-Trigger'] = 'lifecycleCreated'
+                    return resp
+                return redirect('demand_ui:item_substitution_list', client_id=request.client.client_id)
+            except Exception as e:
+                errors['__all__'] = str(e)
+
+        ctx.update({'errors': errors, 'form_data': request.POST.dict()})
+        resp = render(request, 'demand/lifecycle/partials/substitution_form.html', ctx, status=400)
+        resp['HX-Retarget'] = '#modal-content'
+        resp['HX-Reswap'] = 'innerHTML'
+        return resp
+
+    ctx['form_data'] = sub
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/substitution_form.html', ctx)
+    return render(request, 'demand/lifecycle/substitution_list.html', ctx)
+
+
+@login_required
+@require_POST
+def item_substitution_delete(request, pk, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    sub = get_object_or_404(ItemSubstitution, pk=pk, client=request.client)
+    sub.delete()
+    messages.success(request, f'Substitution {sub.old_item_id} → {sub.new_item_id} deleted.')
+    if _is_htmx(request):
+        subs = list(ItemSubstitution.objects.filter(client=request.client)
+                    .select_related('old_item', 'new_item').order_by('-updated_at'))
+        resp = render(request, 'demand/lifecycle/partials/substitution_table_body.html',
+                      {'substitutions': subs, 'active_nav': 'item_lifecycle'})
+        return resp
+    return redirect('demand_ui:item_substitution_list', client_id=request.client.client_id)
+
+
+# ── Item Discontinuation ─────────────────────────────────────────────────
+
+@login_required
+def item_discontinuation_list(request, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    discontinuations = list(
+        ItemDiscontinuation.objects.filter(client=request.client)
+        .select_related('item')
+        .order_by('-updated_at')
+    )
+    context = {'discontinuations': discontinuations, 'active_nav': 'item_lifecycle'}
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/discontinuation_table_body.html', context)
+    return render(request, 'demand/lifecycle/discontinuation_list.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def item_discontinuation_create(request, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    ctx = {'active_nav': 'item_lifecycle'}
+    if request.method == 'POST':
+        errors = {}
+        item_id = request.POST.get('item', '').strip()
+        effective_from = request.POST.get('effective_from', '').strip() or None
+        notes = request.POST.get('notes', '').strip()
+
+        if not item_id:
+            errors['item'] = 'Required.'
+
+        if not errors:
+            try:
+                disc = ItemDiscontinuation(
+                    client=request.client,
+                    item_id=int(item_id),
+                    effective_from=effective_from,
+                    notes=notes,
+                    created_by=request.user,
+                )
+                disc.full_clean()
+                disc.save()
+                if _is_htmx(request):
+                    discs = list(ItemDiscontinuation.objects.filter(client=request.client)
+                                 .select_related('item').order_by('-updated_at'))
+                    resp = render(request, 'demand/lifecycle/partials/discontinuation_table_body.html',
+                                  {'discontinuations': discs, 'active_nav': 'item_lifecycle'})
+                    resp['HX-Trigger'] = 'lifecycleCreated'
+                    return resp
+                return redirect('demand_ui:item_discontinuation_list', client_id=request.client.client_id)
+            except Exception as e:
+                errors['__all__'] = str(e)
+
+        ctx.update({'errors': errors, 'form_data': request.POST.dict()})
+        resp = render(request, 'demand/lifecycle/partials/discontinuation_form.html', ctx, status=400)
+        resp['HX-Retarget'] = '#modal-content'
+        resp['HX-Reswap'] = 'innerHTML'
+        return resp
+
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/discontinuation_form.html', ctx)
+    return render(request, 'demand/lifecycle/discontinuation_list.html', ctx)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def item_discontinuation_edit(request, pk, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    disc = get_object_or_404(ItemDiscontinuation, pk=pk, client=request.client)
+    ctx = {'discontinuation': disc, 'active_nav': 'item_lifecycle'}
+    if request.method == 'POST':
+        errors = {}
+        disc.item_id = int(request.POST.get('item', disc.item_id))
+        disc.effective_from = request.POST.get('effective_from', '').strip() or None
+        disc.notes = request.POST.get('notes', '').strip()
+
+        if not errors:
+            try:
+                disc.full_clean()
+                disc.save()
+                if _is_htmx(request):
+                    discs = list(ItemDiscontinuation.objects.filter(client=request.client)
+                                 .select_related('item').order_by('-updated_at'))
+                    resp = render(request, 'demand/lifecycle/partials/discontinuation_table_body.html',
+                                  {'discontinuations': discs, 'active_nav': 'item_lifecycle'})
+                    resp['HX-Trigger'] = 'lifecycleCreated'
+                    return resp
+                return redirect('demand_ui:item_discontinuation_list', client_id=request.client.client_id)
+            except Exception as e:
+                errors['__all__'] = str(e)
+
+        ctx.update({'errors': errors, 'form_data': request.POST.dict()})
+        resp = render(request, 'demand/lifecycle/partials/discontinuation_form.html', ctx, status=400)
+        resp['HX-Retarget'] = '#modal-content'
+        resp['HX-Reswap'] = 'innerHTML'
+        return resp
+
+    ctx['form_data'] = disc
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/discontinuation_form.html', ctx)
+    return render(request, 'demand/lifecycle/discontinuation_list.html', ctx)
+
+
+@login_required
+@require_POST
+def item_discontinuation_delete(request, pk, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    disc = get_object_or_404(ItemDiscontinuation, pk=pk, client=request.client)
+    disc.delete()
+    messages.success(request, f'Discontinuation for {disc.item_id} deleted.')
+    if _is_htmx(request):
+        discs = list(ItemDiscontinuation.objects.filter(client=request.client)
+                     .select_related('item').order_by('-updated_at'))
+        resp = render(request, 'demand/lifecycle/partials/discontinuation_table_body.html',
+                      {'discontinuations': discs, 'active_nav': 'item_lifecycle'})
+        return resp
+    return redirect('demand_ui:item_discontinuation_list', client_id=request.client.client_id)
+
+
+# ── Item Introduction ────────────────────────────────────────────────────
+
+@login_required
+def item_introduction_list(request, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    introductions = list(
+        ItemIntroduction.objects.filter(client=request.client)
+        .select_related('new_item', 'reference_item')
+        .order_by('-updated_at')
+    )
+    context = {'introductions': introductions, 'active_nav': 'item_lifecycle'}
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/introduction_table_body.html', context)
+    return render(request, 'demand/lifecycle/introduction_list.html', context)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def item_introduction_create(request, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    ctx = {'active_nav': 'item_lifecycle'}
+    if request.method == 'POST':
+        errors = {}
+        new_item_id = request.POST.get('new_item', '').strip()
+        reference_item_id = request.POST.get('reference_item', '').strip()
+        ratio = request.POST.get('ratio', '1').strip()
+        copy_from = request.POST.get('copy_from', '').strip() or None
+        copy_to = request.POST.get('copy_to', '').strip() or None
+        notes = request.POST.get('notes', '').strip()
+
+        if not new_item_id:
+            errors['new_item'] = 'Required.'
+        if not reference_item_id:
+            errors['reference_item'] = 'Required.'
+        if new_item_id == reference_item_id and new_item_id:
+            errors['reference_item'] = 'Must differ from new item.'
+        try:
+            r = Decimal(ratio)
+            if r <= 0:
+                errors['ratio'] = 'Must be > 0.'
+        except (InvalidOperation, TypeError):
+            errors['ratio'] = 'Invalid number.'
+
+        if not errors:
+            try:
+                intro = ItemIntroduction(
+                    client=request.client,
+                    new_item_id=int(new_item_id),
+                    reference_item_id=int(reference_item_id),
+                    ratio=r,
+                    copy_from=copy_from,
+                    copy_to=copy_to,
+                    notes=notes,
+                    created_by=request.user,
+                )
+                intro.full_clean()
+                intro.save()
+                if _is_htmx(request):
+                    intros = list(ItemIntroduction.objects.filter(client=request.client)
+                                  .select_related('new_item', 'reference_item').order_by('-updated_at'))
+                    resp = render(request, 'demand/lifecycle/partials/introduction_table_body.html',
+                                  {'introductions': intros, 'active_nav': 'item_lifecycle'})
+                    resp['HX-Trigger'] = 'lifecycleCreated'
+                    return resp
+                return redirect('demand_ui:item_introduction_list', client_id=request.client.client_id)
+            except Exception as e:
+                errors['__all__'] = str(e)
+
+        ctx.update({'errors': errors, 'form_data': request.POST.dict()})
+        resp = render(request, 'demand/lifecycle/partials/introduction_form.html', ctx, status=400)
+        resp['HX-Retarget'] = '#modal-content'
+        resp['HX-Reswap'] = 'innerHTML'
+        return resp
+
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/introduction_form.html', ctx)
+    return render(request, 'demand/lifecycle/introduction_list.html', ctx)
+
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def item_introduction_edit(request, pk, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    intro = get_object_or_404(ItemIntroduction, pk=pk, client=request.client)
+    ctx = {'introduction': intro, 'active_nav': 'item_lifecycle'}
+    if request.method == 'POST':
+        errors = {}
+        intro.new_item_id = int(request.POST.get('new_item', intro.new_item_id))
+        intro.reference_item_id = int(request.POST.get('reference_item', intro.reference_item_id))
+        try:
+            intro.ratio = Decimal(request.POST.get('ratio', str(intro.ratio)))
+            if intro.ratio <= 0:
+                errors['ratio'] = 'Must be > 0.'
+        except (InvalidOperation, TypeError):
+            errors['ratio'] = 'Invalid number.'
+        intro.copy_from = request.POST.get('copy_from', '').strip() or None
+        intro.copy_to = request.POST.get('copy_to', '').strip() or None
+        intro.notes = request.POST.get('notes', '').strip()
+
+        if not errors:
+            try:
+                intro.full_clean()
+                intro.save()
+                if _is_htmx(request):
+                    intros = list(ItemIntroduction.objects.filter(client=request.client)
+                                  .select_related('new_item', 'reference_item').order_by('-updated_at'))
+                    resp = render(request, 'demand/lifecycle/partials/introduction_table_body.html',
+                                  {'introductions': intros, 'active_nav': 'item_lifecycle'})
+                    resp['HX-Trigger'] = 'lifecycleCreated'
+                    return resp
+                return redirect('demand_ui:item_introduction_list', client_id=request.client.client_id)
+            except Exception as e:
+                errors['__all__'] = str(e)
+
+        ctx.update({'errors': errors, 'form_data': request.POST.dict()})
+        resp = render(request, 'demand/lifecycle/partials/introduction_form.html', ctx, status=400)
+        resp['HX-Retarget'] = '#modal-content'
+        resp['HX-Reswap'] = 'innerHTML'
+        return resp
+
+    ctx['form_data'] = intro
+    if _is_htmx(request):
+        return render(request, 'demand/lifecycle/partials/introduction_form.html', ctx)
+    return render(request, 'demand/lifecycle/introduction_list.html', ctx)
+
+
+@login_required
+@require_POST
+def item_introduction_delete(request, pk, client_id=None):
+    blocked = _lifecycle_gate(request)
+    if blocked:
+        return blocked
+    intro = get_object_or_404(ItemIntroduction, pk=pk, client=request.client)
+    intro.delete()
+    messages.success(request, f'Introduction for {intro.new_item_id} deleted.')
+    if _is_htmx(request):
+        intros = list(ItemIntroduction.objects.filter(client=request.client)
+                      .select_related('new_item', 'reference_item').order_by('-updated_at'))
+        resp = render(request, 'demand/lifecycle/partials/introduction_table_body.html',
+                      {'introductions': intros, 'active_nav': 'item_lifecycle'})
+        return resp
+    return redirect('demand_ui:item_introduction_list', client_id=request.client.client_id)

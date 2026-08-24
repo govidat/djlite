@@ -87,6 +87,39 @@ def resolve_node_subtree_ids(client, taxonomy_node_id: int) -> list[int]:
     return list(_descendant_node_ids(node))
 
 
+def resolve_node_subtree_ids_multi(client, taxonomy_node_ids):
+    """
+    Union of subtree NODE ids for one or more selected taxonomy nodes.
+
+    Used by reports that group BY taxonomy node (node ids, not mapped
+    item ids): a row bucketed under node X is kept when X falls in the
+    subtree of ANY selected node.
+
+    Follows the same taxonomy-scoping discipline as the rest of this
+    module (every descendant lookup is scoped by (client, taxonomy_id)).
+
+    Returns [] (not None) when no ids are passed. Raises
+    TaxonomyFilterError if ANY selected id doesn't resolve for this
+    client — fail closed, never silently drop a bad id (otherwise a
+    stale id looks identical to "filter matched nothing").
+    """
+    node_ids = [int(n) for n in taxonomy_node_ids if n and str(n).strip().isdigit()]
+    if not node_ids:
+        return []
+
+    nodes = list(TaxonomyNode.objects.filter(client=client, pk__in=node_ids))
+    if len(nodes) != len(set(node_ids)):
+        raise TaxonomyFilterError(
+            f'taxonomy_node_ids={taxonomy_node_ids!r}: one or more ids '
+            f'not found for client'
+        )
+
+    subtree: set[int] = set()
+    for node in nodes:
+        subtree.update(_descendant_node_ids(node))
+    return list(subtree)
+
+
 def resolve_item_ids_for_taxonomy_node(client, taxonomy_node_id):
     """
     item_ids for one selected node + all its descendants, scoped to its taxonomy.

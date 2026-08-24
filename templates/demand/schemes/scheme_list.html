@@ -1,0 +1,85 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<h1 class="text-2xl font-bold mb-6">{% trans "Sales Promotion Schemes" %}</h1>
+
+<div id="scheme-list">
+
+  {% if notice %}
+  <div class="alert alert-success py-2 text-sm mb-4">
+    <span>{{ notice }}</span>
+  </div>
+  {% endif %}
+
+  {# ── Create button ───────────────────────────────────────────────────── #}
+  <div class="flex items-center justify-between mb-4">
+    <div></div>
+    <button class="btn btn-primary btn-sm"
+            hx-get="{% url 'demand_ui:scheme_create' client_id=client.client_id %}"
+            hx-target="#scheme-modal-content" hx-swap="innerHTML"
+            onclick="document.getElementById('scheme-modal').showModal()">
+      {% trans "+ New Scheme" %}
+    </button>
+  </div>
+
+  {# ── Status tabs ───────────────────────────────────────────────────────── #}
+  <div class="tabs tabs-boxed w-fit mb-4"
+       hx-get="{% url 'demand_ui:scheme_list' client_id=client.client_id %}"
+       hx-target="#scheme-table-body" hx-swap="innerHTML" hx-push-url="true">
+    <a class="tab {% if not status_filter %}tab-active{% endif %}"
+       hx-vals='{"status": ""}'>{% trans "All" %}</a>
+    {% for value, label in status_choices %}
+    <a class="tab {% if status_filter == value %}tab-active{% endif %}"
+       hx-vals='{"status": "{{ value }}"}'>
+      {{ label }}
+      {% if value == 'DRAFT' and draft_count %}
+        <span class="badge badge-sm badge-warning">{{ draft_count }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+
+  {# ── Scheme table ──────────────────────────────────────────────────────── #}
+  <div class="overflow-x-auto">
+    <table class="table table-zebra">
+      <thead>
+        <tr>
+          <th>{% trans "Code" %}</th>
+          <th>{% trans "Name" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Qty Uplift" %}</th>
+          <th>{% trans "Value Uplift" %}</th>
+          <th>{% trans "Shadow" %}</th>
+          <th>{% trans "Pull-forward" %}</th>
+          <th>{% trans "Created by" %}</th>
+          <th>{% trans "Updated" %}</th>
+          <th>{% trans "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody id="scheme-table-body">
+        {% include "demand/schemes/partials/scheme_table_body.html" %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Create modal ──────────────────────────────────────────────────────── #}
+<dialog id="scheme-modal" class="modal">
+  <div class="modal-box w-11/12 max-w-3xl">
+    <form method="dialog">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+    </form>
+    <div id="scheme-modal-content"></div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
+
+<script>
+document.body.addEventListener('schemeCreated', function() {
+    document.getElementById('scheme-modal').close();
+});
+</script>
+{% endblock %}

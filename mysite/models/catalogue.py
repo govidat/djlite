@@ -209,6 +209,7 @@ class Taxonomy(models.Model):
         ('geography',  'Geography'),
         ('department', 'Department'),
         ('brand',      'Brand'),
+        ('sector',     'Client Sector (Industry classification)'),
         ('custom',     'Custom'),
     ]
     client      = models.ForeignKey(

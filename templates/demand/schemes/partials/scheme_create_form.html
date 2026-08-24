@@ -1,0 +1,137 @@
+{% load i18n %}
+{% csrf_token %}
+
+<div id="scheme-form-content">
+  <h2 class="text-lg font-bold mb-4">{% trans "Register New Scheme" %}</h2>
+
+  {% if errors %}
+  <div class="alert alert-error py-2 text-sm mb-4">
+    <span>{% trans "Please fix the errors below." %}</span>
+  </div>
+  {% endif %}
+
+  <div class="space-y-3">
+    {# ── Basic fields ────────────────────────────────────────────────────── #}
+    <div class="form-control">
+      <label class="label"><span class="label-text font-semibold">{% trans "Scheme Code" %}</span></label>
+      <input type="text" name="scheme_code" class="input input-bordered input-sm"
+             value="{{ form_data.scheme_code|default:'' }}"
+             placeholder="e.g. DIWALI2024">
+      {% if errors.scheme_code %}<span class="text-error text-xs">{{ errors.scheme_code }}</span>{% endif %}
+    </div>
+
+    <div class="form-control">
+      <label class="label"><span class="label-text font-semibold">{% trans "Name" %}</span></label>
+      <input type="text" name="name" class="input input-bordered input-sm"
+             value="{{ form_data.name|default:'' }}"
+             placeholder="e.g. Diwali 2024 1-for-1">
+      {% if errors.name %}<span class="text-error text-xs">{{ errors.name }}</span>{% endif %}
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Expected Qty Uplift %" %}</span></label>
+        <input type="number" name="expected_qty_uplift_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.expected_qty_uplift_pct|default:'0' }}">
+        {% if errors.expected_qty_uplift_pct %}<span class="text-error text-xs">{{ errors.expected_qty_uplift_pct }}</span>{% endif %}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Expected Value Uplift %" %}</span></label>
+        <input type="number" name="expected_value_uplift_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.expected_value_uplift_pct|default:'0' }}">
+        {% if errors.expected_value_uplift_pct %}<span class="text-error text-xs">{{ errors.expected_value_uplift_pct }}</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Shadow Periods" %}</span></label>
+        <input type="number" name="shadow_periods" class="input input-bordered input-sm"
+               value="{{ form_data.shadow_periods|default:'0' }}">
+        {% if errors.shadow_periods %}<span class="text-error text-xs">{{ errors.shadow_periods }}</span>{% endif %}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Pull-forward %" %}</span></label>
+        <input type="number" name="pull_forward_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.pull_forward_pct|default:'0.5' }}">
+        {% if errors.pull_forward_pct %}<span class="text-error text-xs">{{ errors.pull_forward_pct }}</span>{% endif %}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Discount % (info)" %}</span></label>
+        <input type="number" name="discount_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.discount_pct|default:'' }}">
+        {% if errors.discount_pct %}<span class="text-error text-xs">{{ errors.discount_pct }}</span>{% endif %}
+      </div>
+    </div>
+
+    {# ── Scope lines ─────────────────────────────────────────────────────── #}
+    <div class="divider text-sm">{% trans "Scope" %}</div>
+    {% if errors.scopes %}<div class="text-error text-xs mb-2">{{ errors.scopes }}</div>{% endif %}
+
+    <div id="scope-lines">
+      <div class="flex gap-2 items-center mb-2 scope-line">
+        <select name="scope_type" class="select select-bordered select-sm w-40">
+          <option value="OVERALL">{% trans "Overall" %}</option>
+          <option value="TAXONOMY">{% trans "Product group" %}</option>
+          <option value="BRAND">{% trans "Brand" %}</option>
+          <option value="ITEM">{% trans "Specific item" %}</option>
+        </select>
+        <input type="text" name="scope_taxonomy_node" class="input input-bordered input-sm flex-1"
+               placeholder="{% trans 'Taxonomy node ID' %}">
+        <input type="text" name="scope_item" class="input input-bordered input-sm flex-1 hidden"
+               placeholder="{% trans 'Item ID' %}">
+        <input type="text" name="scope_location" class="input input-bordered input-sm w-32"
+               placeholder="{% trans 'Location (opt)' %}">
+        <input type="text" name="scope_channel" class="input input-bordered input-sm w-32"
+               placeholder="{% trans 'Channel (opt)' %}">
+        <input type="text" name="scope_customer" class="input input-bordered input-sm w-32"
+               placeholder="{% trans 'Customer (opt)' %}">
+        <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('.scope-line').remove()">✕</button>
+      </div>
+    </div>
+    <button type="button" class="btn btn-outline btn-xs"
+            onclick="addScopeLine()">{% trans "+ Add scope line" %}</button>
+
+    {# ── Period lines ────────────────────────────────────────────────────── #}
+    <div class="divider text-sm">{% trans "Periods" %}</div>
+    {% if errors.periods %}<div class="text-error text-xs mb-2">{{ errors.periods }}</div>{% endif %}
+
+    <div id="period-lines">
+      <div class="flex gap-2 items-center mb-2 period-line">
+        <select name="period_type" class="select select-bordered select-sm w-36">
+          <option value="MONTHLY">{% trans "Monthly" %}</option>
+          <option value="WEEKLY">{% trans "Weekly" %}</option>
+          <option value="QUARTERLY">{% trans "Quarterly" %}</option>
+        </select>
+        <input type="date" name="period_start" class="input input-bordered input-sm flex-1">
+        <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('.period-line').remove()">✕</button>
+      </div>
+    </div>
+    <button type="button" class="btn btn-outline btn-xs"
+            onclick="addPeriodLine()">{% trans "+ Add period" %}</button>
+
+    {# ── Actions ─────────────────────────────────────────────────────────── #}
+    <div class="flex justify-end gap-2 mt-4">
+      <button type="button" class="btn btn-ghost btn-sm"
+              onclick="document.getElementById('scheme-modal').close()">{% trans "Cancel" %}</button>
+      <button type="submit" class="btn btn-primary btn-sm">{% trans "Create Scheme" %}</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function addScopeLine() {
+    var container = document.getElementById('scope-lines');
+    var first = container.querySelector('.scope-line');
+    var clone = first.cloneNode(true);
+    clone.querySelectorAll('input').forEach(function(inp) { inp.value = ''; });
+    container.appendChild(clone);
+}
+function addPeriodLine() {
+    var container = document.getElementById('period-lines');
+    var first = container.querySelector('.period-line');
+    var clone = first.cloneNode(true);
+    clone.querySelectorAll('input').forEach(function(inp) { inp.value = ''; });
+    container.appendChild(clone);
+}
+</script>

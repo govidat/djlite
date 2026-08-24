@@ -3,9 +3,10 @@ FILE: templates/catalogue/page_catalogue.html
 Track B — component tree layout (extends base.html)
 ============================================================ -->
 {% extends "base.html" %}
-{% load my_tags %}
+{% load my_tags static %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'admin/css/taxonomy_tree.css' %}">
 <div class="flex min-h-screen bg-base-100">
 
   <!-- ── Filter Sidebar ─────────────────────────────────────── -->
@@ -44,4 +45,6 @@ Track B — component tree layout (extends base.html)
 
   </main>
 </div>
+{# Tri-state cascade for the LHS tree (capture-phase change listener) #}
+<script src="{% static 'admin/js/taxonomy_tree.js' %}"></script>
 {% endblock %}

@@ -1,0 +1,8 @@
+{% load i18n %}
+<div class="alert alert-success py-2 text-sm">
+  <span>
+    {% blocktrans with start=period_start end=period_end %}
+      Scheme detection queued for {{ start }} to {{ end }}. Check the review queue shortly.
+    {% endblocktrans %}
+  </span>
+</div>

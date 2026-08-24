@@ -29,22 +29,32 @@
 .tx-node-row {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   padding: 2px 0;
 }
 
 .tx-toggle {
   cursor: pointer;
-  width: 1rem;
+  width: 1.7rem;
   flex: none;
   text-align: center;
   user-select: none;
   color: #888;
+  font-size: 1.6rem;
+  line-height: 1;
 }
 
 .tx-toggle-leaf {
   cursor: default;
-  color: #ccc;
+  visibility: hidden;
+}
+
+.tx-checkbox {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+  cursor: pointer;
+  accent-color: #3b82f6;
 }
 
 .tx-node-label {
@@ -53,6 +63,14 @@
   align-items: center;
   gap: 0.35rem;
   line-height: 1.3;
+}
+
+.tx-node-level {
+  color: #999;
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .tx-children.tx-collapsed {
@@ -64,4 +82,17 @@
   color: #999;
   font-style: italic;
   padding-left: 1.1rem;
+}
+
+/*
+ * Filter-bar hosting container (line 2 of the filter). Scrolls so a deep
+ * hierarchy never pushes the rest of the filter around.
+ */
+.tx-tree-container {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: rgba(128, 128, 128, 0.05);
 }

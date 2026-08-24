@@ -24,7 +24,7 @@
     {% endif %}
 
     {# ── Active filter badges ──────────────────────────────────────── #}
-    {% if filters.period_start or filters.customer_code or filters.revenue_min or filters.revenue_max or filters.qty_min or filters.qty_max or filters.sales_node_id or filters.taxonomy_node_id %}
+    {% if filters.period_start or filters.customer_code or filters.revenue_min or filters.revenue_max or filters.qty_min or filters.qty_max or filters.sales_node_ids or filters.taxonomy_node_ids %}
     <div class="flex flex-wrap gap-2 mb-3">
         <span class="text-xs text-base-content/50 self-center">
             {% trans "Active filters:" %}
@@ -59,16 +59,16 @@
                     class="ml-1 font-bold">×</button>
         </span>
         {% endif %}
-        {% if filters.sales_node_id %}
+        {% if filters.sales_node_ids %}
         <span class="badge badge-neutral gap-1">
-            {% trans "Sales org" %}: {{ filters.sales_node_id }}
+            {% trans "Sales org" %}: {{ filters.sales_node_names|default:filters.sales_node_ids }}
             <button onclick="clearActualsAggFilter('sales_node')"
                     class="ml-1 font-bold">×</button>
         </span>
         {% endif %}
-        {% if filters.taxonomy_node_id %}
+        {% if filters.taxonomy_node_ids %}
         <span class="badge badge-neutral gap-1">
-            {% trans "Item category" %}: {{ filters.taxonomy_node_id }}
+            {% trans "Item category" %}: {{ filters.taxonomy_node_names|default:filters.taxonomy_node_ids }}
             <button onclick="clearActualsAggFilter('taxonomy_node')"
                     class="ml-1 font-bold">×</button>
         </span>
@@ -101,44 +101,6 @@
         {% else %}
         <input type="hidden" id="actuals-agg-period"
                value="{{ filters.period_start }}">
-        {% endif %}
-
-        {# ── Sales hierarchy — sales level only ─────────────────────── #}
-        {% if agg_level == 'sales' and sales_node_choices %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Drill into sales org" %}</span>
-            </label>
-            <select id="actuals-agg-sales-node" class="select select-bordered select-sm">
-                <option value="">{% trans "Whole sales org" %}</option>
-                {% for node in sales_node_choices %}
-                <option value="{{ node.id }}"
-                        {% if filters.sales_node_id == node.id|stringformat:'s' %}
-                        selected{% endif %}>
-                    {{ node.level_label }}: {{ node.code }} — {{ node.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-
-        {# ── Item hierarchy — item_hierarchy level only ─────────────── #}
-        {% if agg_level == 'item_hierarchy' and taxonomy_node_choices %}
-        <div class="form-control">
-            <label class="label py-0 mb-1">
-                <span class="label-text text-xs">{% trans "Drill into item category" %}</span>
-            </label>
-            <select id="actuals-agg-taxonomy-node" class="select select-bordered select-sm">
-                <option value="">{% trans "Whole item hierarchy" %}</option>
-                {% for node in taxonomy_node_choices %}
-                <option value="{{ node.id }}"
-                        {% if filters.taxonomy_node_id == node.id|stringformat:'s' %}
-                        selected{% endif %}>
-                    {{ node.taxonomy__name }} › {{ node.name }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
         {% endif %}
 
         {# ── Customer — customer level only ───────────────────────── #}
@@ -208,6 +170,39 @@
         {% endif %}
 
     </div>
+
+    {# ── Line 2: hierarchy drill-down tree (one per level) ───────────── #}
+    {% if agg_level == 'sales' %}
+    <div class="mt-3 border-t border-base-300 pt-3">
+        <div class="form-control w-full">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Drill into sales org" %}</span>
+            </label>
+            <div id="actuals-agg-sales-tree-container"
+                 class="tx-tree-container"
+                 hx-get="{% url 'demand_ui:sales_tree_panel' client_id=client.client_id %}?sales_node_ids={{ filters.sales_node_ids }}"
+                 hx-trigger="load"
+                 hx-target="this">
+                <span class="text-xs text-base-content/50">{% trans "Loading…" %}</span>
+            </div>
+        </div>
+    </div>
+    {% elif agg_level == 'item_hierarchy' and planning_taxonomy_slug %}
+    <div class="mt-3 border-t border-base-300 pt-3">
+        <div class="form-control w-full">
+            <label class="label py-0 mb-1">
+                <span class="label-text text-xs">{% trans "Drill into item category" %}</span>
+            </label>
+            <div id="actuals-agg-taxonomy-tree-container"
+                 class="tx-tree-container"
+                 hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_id=client.client_id %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}&taxonomy_slug={{ planning_taxonomy_slug }}"
+                 hx-trigger="load"
+                 hx-target="this">
+                <span class="text-xs text-base-content/50">{% trans "Loading…" %}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script>
@@ -225,6 +220,12 @@
         return el ? el.value : '';
     }
 
+    function getCheckedIds(name) {
+        return Array.prototype.slice.call(
+            document.querySelectorAll('input[name="' + name + '"]:checked')
+        ).map(function(el) { return el.value; });
+    }
+
     function applyFilters() {
         var params = new URLSearchParams();
         params.set('agg_level', currentAggLevel);
@@ -235,8 +236,6 @@
         var revMax    = getVal('actuals-agg-revenue-max');
         var qtyMin    = getVal('actuals-agg-qty-min');
         var qtyMax    = getVal('actuals-agg-qty-max');
-        var salesNode = getVal('actuals-agg-sales-node');
-        var taxNode   = getVal('actuals-agg-taxonomy-node');
         var excludeOutliers = getRadioVal('exclude_outliers');
 
         if (period)   params.set('period_start', period);
@@ -245,8 +244,12 @@
         if (revMax)   params.set('revenue_max', revMax);
         if (qtyMin)   params.set('qty_min', qtyMin);
         if (qtyMax)   params.set('qty_max', qtyMax);
-        if (salesNode) params.set('sales_node_id', salesNode);
-        if (taxNode)   params.set('taxonomy_node_id', taxNode);
+        getCheckedIds('sales_node_ids').forEach(function(v) {
+            params.append('sales_node_ids', v);
+        });
+        getCheckedIds('taxonomy_node_ids').forEach(function(v) {
+            params.append('taxonomy_node_ids', v);
+        });
         if (excludeOutliers) params.set('exclude_outliers', excludeOutliers);
 
         htmx.ajax('GET', baseUrl + '?' + params.toString(), {
@@ -262,13 +265,17 @@
             'customer_code':  ['actuals-agg-customer'],
             'revenue_range':  ['actuals-agg-revenue-min', 'actuals-agg-revenue-max'],
             'qty_range':      ['actuals-agg-qty-min', 'actuals-agg-qty-max'],
-            'sales_node':     ['actuals-agg-sales-node'],
-            'taxonomy_node':  ['actuals-agg-taxonomy-node'],
         };
         (map[name] || []).forEach(function(id) {
             var el = document.getElementById(id);
             if (el) el.value = '';
         });
+        if (name === 'sales_node' || name === 'taxonomy_node' || name === 'hierarchy') {
+            ['sales_node_ids', 'taxonomy_node_ids'].forEach(function(boxName) {
+                document.querySelectorAll('input[name="' + boxName + '"]')
+                    .forEach(function(el) { el.checked = false; el.indeterminate = false; });
+            });
+        }
         applyFilters();
     };
 
@@ -277,18 +284,20 @@
         clearAll.addEventListener('click', function() {
             ['actuals-agg-period', 'actuals-agg-customer',
              'actuals-agg-revenue-min', 'actuals-agg-revenue-max',
-             'actuals-agg-qty-min', 'actuals-agg-qty-max',
-             'actuals-agg-sales-node', 'actuals-agg-taxonomy-node'].forEach(function(id) {
+             'actuals-agg-qty-min', 'actuals-agg-qty-max'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.value = '';
+            });
+            ['sales_node_ids', 'taxonomy_node_ids'].forEach(function(boxName) {
+                document.querySelectorAll('input[name="' + boxName + '"]')
+                    .forEach(function(el) { el.checked = false; el.indeterminate = false; });
             });
             applyFilters();
         });
     }
 
     // Dropdown change listeners
-    ['actuals-agg-period', 'actuals-agg-customer',
-     'actuals-agg-sales-node', 'actuals-agg-taxonomy-node'].forEach(function(id) {
+    ['actuals-agg-period', 'actuals-agg-customer'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', applyFilters);
     });
@@ -303,6 +312,14 @@
      'actuals-agg-qty-min', 'actuals-agg-qty-max'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', applyFilters);
+    });
+
+    // Tree checkboxes — delegated so lazily-loaded nodes are covered too
+    document.addEventListener('change', function(evt) {
+        var name = evt.target && evt.target.name;
+        if (name === 'sales_node_ids' || name === 'taxonomy_node_ids') {
+            applyFilters();
+        }
     });
 })();
 </script>

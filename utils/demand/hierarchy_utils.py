@@ -278,6 +278,25 @@ def get_sales_node_subtree_ids(client_id: int, node_id: int) -> list[int]:
     return list(qs.values_list('id', flat=True))
 
 
+def get_sales_node_subtree_ids_multi(client_id: int, node_ids) -> list[int]:
+    """
+    Union of subtree NODE ids for one or more selected sales nodes.
+
+    A row resolved to sales node X is kept when X falls in the subtree
+    of ANY selected node. Raises SalesNode.DoesNotExist if ANY id
+    doesn't resolve for this client — fail closed, never silently drop
+    a stale id.
+    """
+    node_ids = [int(n) for n in node_ids if n and str(n).strip().isdigit()]
+    if not node_ids:
+        return []
+
+    subtree: set[int] = set()
+    for node_id in node_ids:
+        subtree.update(get_sales_node_subtree_ids(client_id, node_id))
+    return list(subtree)
+
+
 def get_sales_hierarchy_levels(client_id: int) -> list[dict]:
     """
     Same shape as get_location_levels(): depth 0 = virtual 'Top' (whole
@@ -498,6 +517,26 @@ def get_item_hierarchy_chain(client_id: int, item_id: int) -> list[dict]:
     return get_item_hierarchy_chains_bulk(client_id, [item_id])[item_id]
  
  
+def get_planning_product_hierarchy(client_id: int):
+    """
+    The Taxonomy used as this client's planning product hierarchy
+    (from ForecastingConfig.planning_producthierarchy), or None if not
+    configured/not found. Client-specific taxonomy wins over the shared
+    (client=None) one with the same slug.
+    """
+    from mysite.models import Taxonomy
+    from mysite.models.demand.forecast import ForecastingConfig
+
+    slug = (
+        ForecastingConfig.get_for_client_id(client_id)
+        .planning_producthierarchy or 'gpc'
+    )
+    return (
+        Taxonomy.objects.filter(Q(client_id=client_id) | Q(client=None), slug=slug)
+        .order_by('-client_id').first()
+    )
+
+
 def get_item_primary_node_map(client_id: int, item_ids: list[int] | None = None) -> dict[int, int]:
     """
     Bulk {item_id -> leaf TaxonomyNode id} for the client's configured

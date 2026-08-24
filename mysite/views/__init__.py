@@ -31,6 +31,11 @@ from mysite.views.taxonomy_tree import (
     taxonomy_tree_panel,
     taxonomy_tree_children
 )
+
+from mysite.views.sales_tree import (
+    sales_tree_panel,
+    sales_tree_children
+)
 """
 from mysite.views.demand.forecast_htmx import (
     override_key_field,

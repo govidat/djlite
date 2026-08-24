@@ -1,10 +1,11 @@
 # forms.py
 from django import forms
 from django.conf import settings
+from django.db.models import Q
 
 from django.contrib.auth.models import User
 from allauth.account.forms import SignupForm
-from .models import DistributionChannel, CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation
+from .models import DistributionChannel, CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation, Taxonomy
 from django.utils.translation import gettext_lazy as _
 
 class ClientForm(forms.ModelForm):
@@ -33,6 +34,17 @@ class ClientForm(forms.ModelForm):
         help_text="Leave all unchecked if Distribution Channel is not required.",
     )
 
+    catalogue_taxonomy_order = forms.CharField(
+        required=False,  # blank = show all active taxonomies (legacy behavior)
+        label="Catalogue class order",
+        help_text=(
+            "Comma-separated taxonomy slugs shown in the catalogue filter "
+            "sidebar (LHS), in display order — e.g. gpc, brand, geography. "
+            "Slugs not listed are hidden. Leave blank to show ALL active "
+            "taxonomies in default order."
+        ),
+    )
+
     class Meta:
         model = Client
         fields = ['client_id', 'parent', 'name', 'nb_title', 'nb_title_svg_pre', 'nb_title_svg_suf'] # Include all fields
@@ -56,6 +68,12 @@ class ClientForm(forms.ModelForm):
         if self.instance and self.instance.pk and self.instance.allowed_distribution_channels:
             self.fields['distribution_channel_choices'].initial = self.instance.allowed_distribution_channels
 
+        # Catalogue LHS filter: render stored slug list back as CSV text.
+        if self.instance and self.instance.pk and self.instance.catalogue_taxonomy_slugs:
+            self.fields['catalogue_taxonomy_order'].initial = ', '.join(
+                self.instance.catalogue_taxonomy_slugs
+            )
+
 
     def clean(self):
         cleaned = super().clean()
@@ -67,6 +85,41 @@ class ClientForm(forms.ModelForm):
                 "Default language must be part of selected languages."
             )
         return cleaned
+
+    def clean_catalogue_taxonomy_order(self):
+        raw = self.cleaned_data.get('catalogue_taxonomy_order') or ''
+        slugs = [s.strip().lower() for s in raw.split(',') if s.strip()]
+        if not slugs:
+            return None  # NULL on the model = unrestricted (show all)
+
+        # De-dupe preserving first occurrence — display order is the list order.
+        seen, ordered = set(), []
+        for slug in slugs:
+            if slug not in seen:
+                seen.add(slug)
+                ordered.append(slug)
+
+        # Validate against taxonomies this client can actually see:
+        # global ones plus its own client-specific overrides.
+        qs = Taxonomy.objects.filter(client=None, is_active=True)
+        if self.instance.pk:
+            qs = Taxonomy.objects.filter(
+                Q(client=None) | Q(client=self.instance),
+                is_active=True,
+            )
+        valid = set(qs.values_list('slug', flat=True))
+        unknown = [slug for slug in ordered if slug not in valid]
+        if unknown:
+            raise forms.ValidationError(
+                "Unknown or inactive taxonomy slug(s): %(unknown)s. "
+                "Available: %(available)s",
+                code='invalid',
+                params={
+                    'unknown': ', '.join(unknown),
+                    'available': ', '.join(sorted(valid)) or '(none)',
+                },
+            )
+        return ordered
     
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -75,6 +128,10 @@ class ClientForm(forms.ModelForm):
         # NEW — empty selection means "no restriction" -> store NULL, not [].
         selected_channels = self.cleaned_data.get('distribution_channel_choices') or []
         instance.allowed_distribution_channels = selected_channels or None
+        # Catalogue LHS filter — blank input means "show all" -> store NULL.
+        instance.catalogue_taxonomy_slugs = (
+            self.cleaned_data.get('catalogue_taxonomy_order') or None
+        )
 
         if commit:
             instance.save()

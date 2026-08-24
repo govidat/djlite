@@ -1,0 +1,72 @@
+{% load i18n %}
+{% csrf_token %}
+
+<div id="scheme-edit-content">
+  <h2 class="text-lg font-bold mb-4">
+    {% trans "Edit Scheme" %} <span class="font-mono">{{ scheme.scheme_code }}</span>
+  </h2>
+
+  {% if errors %}
+  <div class="alert alert-error py-2 text-sm mb-4">
+    <span>{% trans "Please fix the errors below." %}</span>
+  </div>
+  {% endif %}
+
+  <div class="space-y-3">
+    <div class="form-control">
+      <label class="label"><span class="label-text font-semibold">{% trans "Scheme Code" %}</span></label>
+      <input type="text" name="scheme_code" class="input input-bordered input-sm"
+             value="{{ form_data.scheme_code|default:scheme.scheme_code }}">
+      {% if errors.scheme_code %}<span class="text-error text-xs">{{ errors.scheme_code }}</span>{% endif %}
+    </div>
+
+    <div class="form-control">
+      <label class="label"><span class="label-text font-semibold">{% trans "Name" %}</span></label>
+      <input type="text" name="name" class="input input-bordered input-sm"
+             value="{{ form_data.name|default:scheme.name }}">
+      {% if errors.name %}<span class="text-error text-xs">{{ errors.name }}</span>{% endif %}
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Expected Qty Uplift %" %}</span></label>
+        <input type="number" name="expected_qty_uplift_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.expected_qty_uplift_pct|default:scheme.expected_qty_uplift_pct }}">
+        {% if errors.expected_qty_uplift_pct %}<span class="text-error text-xs">{{ errors.expected_qty_uplift_pct }}</span>{% endif %}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Expected Value Uplift %" %}</span></label>
+        <input type="number" name="expected_value_uplift_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.expected_value_uplift_pct|default:scheme.expected_value_uplift_pct }}">
+        {% if errors.expected_value_uplift_pct %}<span class="text-error text-xs">{{ errors.expected_value_uplift_pct }}</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-3">
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Shadow Periods" %}</span></label>
+        <input type="number" name="shadow_periods" class="input input-bordered input-sm"
+               value="{{ form_data.shadow_periods|default:scheme.shadow_periods }}">
+        {% if errors.shadow_periods %}<span class="text-error text-xs">{{ errors.shadow_periods }}</span>{% endif %}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Pull-forward %" %}</span></label>
+        <input type="number" name="pull_forward_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.pull_forward_pct|default:scheme.pull_forward_pct }}">
+        {% if errors.pull_forward_pct %}<span class="text-error text-xs">{{ errors.pull_forward_pct }}</span>{% endif %}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text font-semibold">{% trans "Discount % (info)" %}</span></label>
+        <input type="number" name="discount_pct" step="0.0001" class="input input-bordered input-sm"
+               value="{{ form_data.discount_pct|default:scheme.discount_pct|default:'' }}">
+        {% if errors.discount_pct %}<span class="text-error text-xs">{{ errors.discount_pct }}</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2 mt-4">
+      <a href="{% url 'demand_ui:scheme_detail' client_id=client.client_id pk=scheme.pk %}"
+         class="btn btn-ghost btn-sm">{% trans "Cancel" %}</a>
+      <button type="submit" class="btn btn-primary btn-sm">{% trans "Save Changes" %}</button>
+    </div>
+  </div>
+</div>

@@ -19,7 +19,8 @@ from .global_config import (
 
 from .client import (
     Client,
-    Theme, ClientTemplate, ClientBlock, ClientFeatureControl
+    Theme, ClientTemplate, ClientBlock, ClientFeatureControl,
+    SectorTemplate
 )
 from .admin_proxies import (
     ClientContentStructured,

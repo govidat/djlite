@@ -90,4 +90,5 @@ django-money>=3.6.0
 #vine==5.1.0
 #wcwidth==0.7.0
 django-celery-results>=2.6.0
+psycopg[binary]>=3.2
 

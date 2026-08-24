@@ -1,0 +1,87 @@
+{% load i18n %}
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">
+      {% trans "Occurrences" %} — <span class="font-mono">{{ scheme.scheme_code }}</span>
+    </h1>
+    <p class="text-sm text-base-content/60 mt-1">{{ scheme.name }}</p>
+  </div>
+  <a href="{% url 'demand_ui:scheme_detail' client_id=client.client_id pk=scheme.pk %}"
+     class="btn btn-ghost btn-sm">{% trans "← Back to Scheme" %}</a>
+</div>
+
+{# ── Expected values ───────────────────────────────────────────────────── #}
+<div class="card bg-base-200 mb-6">
+  <div class="card-body">
+    <h3 class="card-title text-sm">{% trans "Expected (from scheme)" %}</h3>
+    <div class="flex gap-6">
+      <div>
+        <span class="text-xs text-base-content/60">{% trans "Qty Uplift" %}</span>
+        <p class="font-semibold">{{ scheme.expected_qty_uplift_pct }}</p>
+      </div>
+      <div>
+        <span class="text-xs text-base-content/60">{% trans "Value Uplift" %}</span>
+        <p class="font-semibold">{{ scheme.expected_value_uplift_pct }}</p>
+      </div>
+      <div>
+        <span class="text-xs text-base-content/60">{% trans "Pull-forward" %}</span>
+        <p class="font-semibold">{{ scheme.pull_forward_pct }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Occurrences table ─────────────────────────────────────────────────── #}
+<div class="overflow-x-auto">
+  <table class="table table-zebra">
+    <thead>
+      <tr>
+        <th>{% trans "Period" %}</th>
+        <th>{% trans "Actual Qty Uplift" %}</th>
+        <th>{% trans "Actual Value Uplift" %}</th>
+        <th>{% trans "Pull-forward" %}</th>
+        <th>{% trans "Qty Variance" %}</th>
+        <th>{% trans "Value Variance" %}</th>
+        <th>{% trans "PF Variance" %}</th>
+        <th>{% trans "Closed at" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for occ in occurrences %}
+      <tr>
+        <td>{{ occ.period_start|date:"d M Y" }}</td>
+        <td>{{ occ.actual_qty_uplift_pct|default:"—" }}</td>
+        <td>{{ occ.actual_value_uplift_pct|default:"—" }}</td>
+        <td>{{ occ.actual_pull_forward_pct|default:"—" }}</td>
+        <td>
+          {% if occ.qty_uplift_variance is not None %}
+            <span class="{% if occ.qty_uplift_variance > 0.1 %}text-error{% elif occ.qty_uplift_variance < -0.1 %}text-warning{% endif %}">
+              {{ occ.qty_uplift_variance }}
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if occ.value_uplift_variance is not None %}
+            <span class="{% if occ.value_uplift_variance > 0.1 %}text-error{% elif occ.value_uplift_variance < -0.1 %}text-warning{% endif %}">
+              {{ occ.value_uplift_variance }}
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if occ.pull_forward_variance is not None %}
+            <span class="{% if occ.pull_forward_variance > 0.1 %}text-error{% elif occ.pull_forward_variance < -0.1 %}text-warning{% endif %}">
+              {{ occ.pull_forward_variance }}
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ occ.closed_at|date:"d M Y, H:i"|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="text-base-content/60">{% trans "No occurrences recorded yet." %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

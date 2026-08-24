@@ -5,7 +5,7 @@ from modeltranslation.translator import translator, TranslationOptions
 # This avoids the circular import that occurs when modeltranslation autodiscovers
 # translation.py before the models package __init__ has finished loading.
 from mysite.models.global_config import GlobalVal
-from mysite.models.client import Client, Theme, ClientTemplate
+from mysite.models.client import Client, Theme, ClientTemplate, SectorTemplate
 from mysite.models.admin_proxies import ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper
 from mysite.models.page import NavItem, PageContent #Page, 
 from mysite.models.catalogue import (
@@ -48,7 +48,11 @@ class PageContentTranslationOptions(TranslationOptions):
 
 class ClientTemplateTranslationOptions(TranslationOptions):
     fields = ('htmlblob',)
-    required_languages = ('en',)    
+    required_languages = ('en',)
+
+class SectorTemplateTranslationOptions(TranslationOptions):
+    fields = ('htmlblob',)
+    required_languages = ('en',)
 
 class NavItemTranslationOptions(TranslationOptions):
     fields = ('name',)
@@ -119,6 +123,7 @@ translator.register(Theme,     ThemeTranslationOptions)
 #translator.register(Page,      PageTranslationOptions)
 translator.register(PageContent,      PageContentTranslationOptions)
 translator.register(ClientTemplate,      ClientTemplateTranslationOptions)
+translator.register(SectorTemplate,      SectorTemplateTranslationOptions)
 translator.register(NavItem,   NavItemTranslationOptions)
 
 translator.register(Taxonomy,      TaxonomyTranslationOptions)

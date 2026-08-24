@@ -24,8 +24,6 @@ from mysite.models.catalogue import (
     # — fetched only in item_detail view
 )
 import os
-from django.template.loader import get_template
-from django.template import TemplateDoesNotExist
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,11 @@ logger = logging.getLogger(__name__)
 def get_resolved_taxonomies(client):
     """
     Returns active taxonomies for a client, client-specific overriding global.
-    Ordered by taxonomy.order.
+
+    Display subset/order comes from Client.catalogue_taxonomy_slugs when set:
+    only listed slugs appear, in list order (unknown/stale slugs skipped,
+    duplicates ignored — first occurrence wins). NULL/empty falls back to the
+    legacy behavior: all active taxonomies ordered by Taxonomy.order.
     """
     qs = Taxonomy.objects.filter(
         Q(client=None) | Q(client=client),
@@ -49,6 +51,17 @@ def get_resolved_taxonomies(client):
         slug = taxonomy.slug
         if slug not in seen or taxonomy.client is not None:
             seen[slug] = taxonomy
+
+    configured_order = getattr(client, 'catalogue_taxonomy_slugs', None)
+    if configured_order:
+        # Dedupe preserving first occurrence — guards against hand-edited
+        # JSON producing duplicate LHS facet blocks.
+        picked, picked_slugs = [], set()
+        for slug in configured_order:
+            if slug in seen and slug not in picked_slugs:
+                picked_slugs.add(slug)
+                picked.append(seen[slug])
+        return picked
 
     return sorted(seen.values(), key=lambda t: t.order)
 
@@ -149,7 +162,8 @@ def _get_attr_types_by_node(client, node_ids, base_ids):
 
     return by_node
 
-def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None):
+def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None,
+                      selected_node_ids=None):
     cache_key = f"taxonomy_tree:{client.client_id}:{taxonomy_slug}"
     if not include_counts:
         cached = cache.get(cache_key)
@@ -224,19 +238,17 @@ def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None)
             node_map_by_slug[key] = node
     ordered_nodes = sorted(node_map_by_slug.values(), key=lambda n: n.path)
 
-    # Counts — one query for all nodes at once
+    # Counts — rolled-up subtree counts (distinct items tagged to the node OR
+    # any descendant, across both client-item and global-item tag tables), so
+    # every badge equals what checking that box actually matches.
     counts = {}
     if include_counts and base_qs is not None:
-        count_qs = (
-            ItemTaxonomyNode.objects
-            .filter(item__in=base_qs, node__in=ordered_nodes)
-            .values('node_id')
-            .annotate(count=Count('item', distinct=True))
-        )
-        counts = {row['node_id']: row['count'] for row in count_qs}
-        
+        counts = _subtree_item_counts(base_qs, base_ids, ordered_nodes)
+
+    selected_paths = _selection_paths_by_taxonomy(selected_node_ids).get(taxonomy.id, [])
+
     attr_types_by_node = _get_attr_types_by_node(client, [n.id for n in ordered_nodes], base_ids)
-    tree = _build_tree(ordered_nodes, counts, attr_types_by_node)
+    tree = _build_tree(ordered_nodes, counts, attr_types_by_node, selected_paths)
 
     #tree = _build_tree(ordered_nodes, counts)
 
@@ -246,24 +258,121 @@ def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None)
     return tree
 
 
+def _subtree_item_counts(base_qs, base_ids, ordered_nodes):
+    """
+    Rolled-up LHS badge counts. For each node returns the number of DISTINCT
+    items tagged to it or to ANY descendant, reading both tag tables:
 
-def _build_tree(nodes, counts=None, attr_types_by_node=None):
+      - ItemTaxonomyNode          (client-item tags)
+      - GlobalItemTaxonomyNode    (tags inherited by derived items through
+                                   their GlobalItem — previously ignored,
+                                   which showed such nodes with count 0)
+
+    Merge is done bottom-up over the path-sorted node list, so an item
+    double-tagged under two children is still counted once per subtree.
+    """
+    from collections import defaultdict
+
+    node_ids = [n.id for n in ordered_nodes]
+    tag_sets = defaultdict(set)
+    for nid, iid in (
+        ItemTaxonomyNode.objects
+        .filter(item__in=base_qs, node__in=node_ids)
+        .values_list('node_id', 'item_id')
+    ):
+        tag_sets[nid].add(iid)
+
+    gid_to_iids = defaultdict(set)
+    for iid, gid in (
+        Item.objects.filter(id__in=base_ids)
+        .exclude(global_item=None)
+        .values_list('id', 'global_item_id')
+    ):
+        gid_to_iids[gid].add(iid)
+    if gid_to_iids:
+        for nid, gid in (
+            GlobalItemTaxonomyNode.objects
+            .filter(global_item_id__in=list(gid_to_iids.keys()), node__in=node_ids)
+            .values_list('node_id', 'global_item_id')
+        ):
+            tag_sets[nid] |= gid_to_iids[gid]
+
+    id_set = set(node_ids)
+    children_of = defaultdict(list)
+    for n in ordered_nodes:
+        if n.parent_id in id_set:
+            children_of[n.parent_id].append(n.id)
+
+    # Path sort guarantees descendants precede ancestors when reversed.
+    # Counts are recorded as each node is finalized (before its set is
+    # popped into the parent), so every level keeps its own badge value.
+    subtree_sets = {}
+    counts = {}
+    for n in reversed(ordered_nodes):
+        acc = tag_sets.get(n.id)
+        merged = set(acc) if acc else set()
+        for cid in children_of.get(n.id, []):
+            child_set = subtree_sets.pop(cid, None)
+            if child_set:
+                merged |= child_set
+        subtree_sets[n.id] = merged
+        counts[n.id] = len(merged)
+
+    return counts
+
+
+def _selection_paths_by_taxonomy(selected_node_ids):
+    """{taxonomy_id: [materialized paths]} for the given selected node ids."""
+    if not selected_node_ids:
+        return {}
+    by_tax = {}
+    for tid, path in TaxonomyNode.objects.filter(
+        id__in=selected_node_ids
+    ).values_list('taxonomy_id', 'path'):
+        by_tax.setdefault(tid, []).append(path)
+    return by_tax
+
+
+def _node_selection_state(node_path, selected_paths):
+    """
+    'selected' — node itself or an ancestor was chosen (a chosen parent
+                 covers the whole subtree, matching query-side expansion).
+    'partial'  — no ancestor chosen, but some descendant was.
+    ''         — untouched.
+    """
+    if not selected_paths:
+        return ''
+    for p in selected_paths:
+        if node_path == p or node_path.startswith(p + '.'):
+            return 'selected'
+    prefix = node_path + '.'
+    if any(p.startswith(prefix) for p in selected_paths):
+        return 'partial'
+    return ''
+
+
+
+def _build_tree(nodes, counts=None, attr_types_by_node=None, selected_paths=None):
     counts = counts or {}
     attr_types_by_node = attr_types_by_node or {}
+    selected_paths = selected_paths or []
     node_map = {}
     roots = []
     for node in nodes:
+        state = _node_selection_state(node.path, selected_paths)
         entry = {
-            'id':        node.id,
-            'slug':      node.slug,
-            'name':      node.name,
-            'depth':     node.depth,
-            'path':      node.path,
-            'gpc_code':  node.gpc_code,
-            'is_global': node.client is None,
-            'attr_types': attr_types_by_node.get(node.id, []),
-            'count':     counts.get(node.id, 0),
-            'children':  [],
+            'id':          node.id,
+            'slug':        node.slug,
+            'name':        node.name,
+            'depth':       node.depth,
+            'path':        node.path,
+            'gpc_code':    node.gpc_code,
+            'is_global':   node.client is None,
+            'attr_types':  attr_types_by_node.get(node.id, []),
+            'count':       counts.get(node.id, 0),
+            'is_selected': state == 'selected',
+            'is_partial':  state == 'partial',
+            'children':    [],
         }
         node_map[node.id] = entry
         if node.parent_id and node.parent_id in node_map:
@@ -815,6 +924,17 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
 
     # Taxonomy trees with counts and attribute types
     resolved_taxonomies = get_resolved_taxonomies(client)
+    resolved_slugs = {t.slug for t in resolved_taxonomies}
+
+    # Own-facet-excluded counting: attribute value counts are computed on a
+    # queryset that carries every filter EXCEPT attr-value selections, so
+    # picking one brand doesn't zero out its siblings.
+    attr_selections = filters.get('attr_values') or {}
+    qs_no_attr = (
+        get_item_queryset(client, {**filters, 'attr_values': {}})
+        if attr_selections else qs
+    )
+
     taxonomy_trees = []
     for taxonomy in resolved_taxonomies:
         tree = get_taxonomy_tree(
@@ -822,11 +942,46 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
             taxonomy_slug=taxonomy.slug,
             include_counts=True,
             base_qs=qs,
+            selected_node_ids=filters.get('node_ids') or None,
         )
         active_node_ids = filters.get('node_ids', [])
 
-        attr_type_qs, used_value_ids = get_filterable_attribute_types(
-            client, taxonomy.slug, qs,
+        # Types are discovered under the node/search/price scope (attribute
+        # selections excluded) so sibling values never disappear.
+        attr_type_qs, _used_value_ids = get_filterable_attribute_types(
+            client, taxonomy.slug, qs_no_attr,
+            active_node_ids if active_node_ids else None
+        )
+        attr_types = []
+        for at in attr_type_qs:
+            # Taxonomy wins — an attribute type duplicating a resolved
+            # taxonomy (e.g. flat 'brand' tree + 'brand' attribute) would
+            # render the same facet twice.
+            if at.slug in resolved_slugs:
+                continue
+            own_selected = set(attr_selections.get(at.id, []))
+            fcounts = _facet_value_counts(qs_no_attr, attr_selections, at.id)
+            values = [
+                {
+                    'id':       v.id,
+                    'slug':     v.slug,
+                    'name':     v.name,
+                    'count':    fcounts.get(v.id, 0),
+                    'selected': v.id in own_selected,
+                }
+                for v in at.predefined_values.all()
+                if fcounts.get(v.id, 0) > 0 or v.id in own_selected
+            ]
+            attr_types.append({
+                'id':         at.id,
+                'slug':       at.slug,
+                'name':       at.name,
+                'field_type': at.field_type,
+                'values':     values,
+            })
+        """
+        attr_type_qs = get_filterable_attribute_types(
+            client, taxonomy.slug,
             active_node_ids if active_node_ids else None
         )
         attr_types = [
@@ -844,24 +999,6 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
             for at in attr_type_qs
         ]
         """
-        attr_type_qs = get_filterable_attribute_types(
-            client, taxonomy.slug,
-            active_node_ids if active_node_ids else None
-        )
-        attr_types = [
-            {
-                'id':         at.id,
-                'slug':       at.slug,
-                'name':       at.name,
-                'field_type': at.field_type,
-                'values': [
-                    {'id': v.id, 'slug': v.slug, 'name': v.name}
-                    for v in at.predefined_values.all()
-                ],
-            }
-            for at in attr_type_qs
-        ]
-        """
         taxonomy_trees.append({
             'slug':       taxonomy.slug,
             'name':       taxonomy.name,
@@ -869,9 +1006,13 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
             'attr_types': attr_types,
         })
 
-    # Brand facets — extract from taxonomy tree (no extra query)
-    # Brand taxonomy tree is already built above; walk it for leaf nodes
-    brands_list = _extract_brand_facets(taxonomy_trees, qs)
+    # Brand facets — extracted from the brand taxonomy tree. When a 'brand'
+    # taxonomy resolves, its accordion already renders these same nodes with
+    # counts; the flat section would be pure duplication.
+    brands_list = (
+        [] if 'brand' in resolved_slugs
+        else _extract_brand_facets(taxonomy_trees, qs)
+    )
 
     # Price stats — lightweight separate query on ProductItem only
     price_stats_raw = qs.filter(
@@ -891,7 +1032,7 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
     domain_filters = _build_domain_filters(qs, filters)
 
     # Client template resolution
-    template_info = _resolve_client_templates(client)
+    # (render_client_template tag handles Client > Sector > global DB resolution)
 
     return {
         'items':          items,
@@ -899,7 +1040,6 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
         'brands':         brands_list,
         'price_stats':    price_stats,
         'domain_filters': domain_filters,
-        'template_info':  template_info,
         'pagination': {
             'page':        page.number,
             'num_pages':   paginator.num_pages,
@@ -912,6 +1052,54 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
         },
         'filters': filters,
     }
+
+
+def _facet_value_counts(base_qs, attr_selections, attr_type_id):
+    """
+    {predefined_value_id: item_count} for ONE attribute type.
+
+    base_qs already excludes ALL attribute-value constraints (own-facet
+    excluded); this helper re-applies every OTHER attribute's selection so a
+    facet's own choices never collapse its siblings to zero. Node / search /
+    price filters stay applied — facets are linked to the selections above.
+
+    Two grouped queries (client-item and global-item value tables) summed;
+    an item carrying the identical value in BOTH tables is atypical (derived
+    items inherit rather than duplicate values) and would over-count by 1.
+    """
+    qs = base_qs
+    for other_id, v_ids in (attr_selections or {}).items():
+        if other_id == attr_type_id or not v_ids:
+            continue
+        qs = qs.filter(
+            Q(attribute_values__attribute_type_id=other_id,
+              attribute_values__predefined_value_id__in=v_ids) |
+            Q(global_item__attribute_values__attribute_type_id=other_id,
+              global_item__attribute_values__predefined_value_id__in=v_ids)
+        ).distinct()
+
+    counts = {}
+    rows = qs.filter(
+        attribute_values__attribute_type_id=attr_type_id,
+    ).values(
+        'attribute_values__predefined_value_id'
+    ).annotate(c=Count('id', distinct=True))
+    for r in rows:
+        vid = r['attribute_values__predefined_value_id']
+        if vid is not None:
+            counts[vid] = counts.get(vid, 0) + r['c']
+
+    rows = qs.filter(
+        global_item__attribute_values__attribute_type_id=attr_type_id,
+    ).values(
+        'global_item__attribute_values__predefined_value_id'
+    ).annotate(c=Count('id', distinct=True))
+    for r in rows:
+        vid = r['global_item__attribute_values__predefined_value_id']
+        if vid is not None:
+            counts[vid] = counts.get(vid, 0) + r['c']
+
+    return counts
 
 
 def _extract_brand_facets(taxonomy_trees, base_qs):
@@ -987,58 +1175,11 @@ def _build_domain_filters(qs, filters):
 
 """
 def _resolve_client_templates(client):
-    cache_key = f"client_templates:{client.client_id}"
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
-
-    from mysite.models.page import ClientTemplate
-    templates = ClientTemplate.objects.filter(
-        client=client, is_active=True
-    ).values('template_key', 'language_code')
-
-    # Build the resolution dict
-    result = _build_template_resolution(client, templates)
-
-    cache.set(cache_key, result, timeout=3600)
-    return result
+    # REMOVED — superseded by the DB-backed resolution in
+    # mysite/templatetags/my_tags.py > render_client_template
+    # (ClientTemplate > SectorTemplate chain > global default).
+    pass
 """
-
-def _resolve_client_templates(client):
-    """
-    Resolves which templates to use for this client's catalogue.
-
-    Priority:
-      1. Client-specific: templates/catalogue/{client_id}/filter_sidebar.html
-      2. Default:         templates/catalogue/partials/filter_sidebar.html
-
-    Returns a dict of template paths for use in views/templates.
-    No DB query — purely filesystem resolution.
-    """
-    cache_key = f"client_templates:{client.client_id}"
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
-
-    client_id = client.client_id
-
-    def resolve(template_name):
-        client_path = f"catalogue/{client_id}/{template_name}"
-        default_path = f"catalogue/partials/{template_name}"
-        try:
-            get_template(client_path)
-            return client_path
-        except TemplateDoesNotExist:
-            return default_path
-
-    result = {
-        'filter_sidebar': resolve('filter_sidebar.html'),
-        'items_list':     resolve('items_list.html'),
-        'item_card':      resolve('item_card.html'),
-        'pagination':     resolve('pagination.html'),
-    }
-    cache.set(cache_key, result, timeout=3600)
-    return result    
 
 
 

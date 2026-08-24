@@ -19,7 +19,9 @@ _FEATURE_HIERARCHY = {
         "forecast_run",
         "consensus_override",
         "forecast_approval",
-        "outlier_management"
+        "outlier_management",
+        "scheme_management",
+        "item_lifecycle",
     }),
     "inventory":  frozenset(),   # populate in Phase 2
     "ecommerce":  frozenset(),   # populate in Phase 3
@@ -186,10 +188,27 @@ def outlier_ui_visible(client) -> bool:
     if client is None:
         return False
  
-    # Adjust this import to wherever is_feature_disabled actually lives.
-    #from mysite.utils.features import is_feature_disabled
- 
     result = is_feature_disabled(client, 'outlier_management')
+    return not result['disabled']
+
+def scheme_ui_visible(client) -> bool:
+    """
+    True when the scheme-management UI should be shown for this client.
+    Same disabler logic as outlier_ui_visible.
+    """
+    if client is None:
+        return False
+    result = is_feature_disabled(client, 'scheme_management')
+    return not result['disabled']
+
+def item_lifecycle_ui_visible(client) -> bool:
+    """
+    True when the item-lifecycle UI (substitution / discontinuation /
+    introduction sections) should be shown for this client.
+    """
+    if client is None:
+        return False
+    result = is_feature_disabled(client, 'item_lifecycle')
     return not result['disabled']
 
 def demand_ui_visible(client) -> bool:

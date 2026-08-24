@@ -88,13 +88,15 @@ are captured by hx-include="#filter-form" on any checkbox change.
                   name="attr_val_{{ attr.id }}"
                   value="{{ val.id }}"
                   class="checkbox checkbox-xs checkbox-primary"
+                  {% if val.selected %}checked{% endif %}
                   hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
                   hx-target="#items-container"
                   hx-swap="innerHTML"
                   hx-include="#filter-form"
                   hx-trigger="change"
                 >
-                <span class="text-sm">{{ val.name }}</span>
+                <span class="text-sm flex-1">{{ val.name }}</span>
+                <span class="badge badge-xs badge-ghost">{{ val.count|default:0 }}</span>
               </label>
             </li>
             {% endfor %}

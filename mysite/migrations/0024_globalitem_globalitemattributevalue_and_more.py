@@ -16,7 +16,7 @@ def add_postgres_indexes(apps, schema_editor):
         # Item base table
         """CREATE INDEX IF NOT EXISTS item_client_domain_status_idx ON mysite_item (client_id, domain, status)""",
         """CREATE INDEX IF NOT EXISTS item_client_status_order_idx ON mysite_item (client_id, status, "order")""",
-        """CREATE INDEX IF NOT EXISTS item_global_item_idx ON mysite_item (global_item_id, client_id)'""",
+        """CREATE INDEX IF NOT EXISTS item_global_item_idx ON mysite_item (global_item_id, client_id)""",
         """CREATE INDEX IF NOT EXISTS item_gtin_idx ON mysite_item (gtin) WHERE gtin != ''""",
 
         # GlobalItem
@@ -40,10 +40,10 @@ def add_postgres_indexes(apps, schema_editor):
         """CREATE INDEX IF NOT EXISTS songitem_album_idx ON mysite_songitem (album) WHERE album != ''""",        
         ## DocumentItem
         """CREATE INDEX IF NOT EXISTS documentitem_attributes_gin_idx ON mysite_documentitem USING GIN (attributes jsonb_path_ops)""",
-        """CREATE INDEX IF NOT EXISTS documentitem_format_idx ON mysite_documentitem (format) WHERE artist != ''""",        
+        """CREATE INDEX IF NOT EXISTS documentitem_format_idx ON mysite_documentitem (format) WHERE format != ''""",        
         ## ServiceItem
         """CREATE INDEX IF NOT EXISTS serviceitem_attributes_gin_idx ON mysite_serviceitem USING GIN (attributes jsonb_path_ops)""",
-        """CREATE INDEX IF NOT EXISTS serviceitem_fulfillment_type_idx ON mysite_serviceitem (fulfillment_type) WHERE artist != ''""",        
+        """CREATE INDEX IF NOT EXISTS serviceitem_fulfillment_type_idx ON mysite_serviceitem (fulfillment_type) WHERE fulfillment_type != ''""",        
         # ItemAttributeValue — critical for faceted filter queries
         """CREATE INDEX IF NOT EXISTS itemattributevalue_lookup_idx ON mysite_itemattributevalue (attribute_type_id, predefined_value_id)""",
         """CREATE INDEX IF NOT EXISTS globalitemattributevalue_lookup_idx ON mysite_globalitemattributevalue (attribute_type_id, predefined_value_id)""",

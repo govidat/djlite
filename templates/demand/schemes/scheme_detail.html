@@ -1,0 +1,10 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<div id="scheme-detail">
+  {% include "demand/schemes/partials/scheme_detail_content.html" %}
+</div>
+
+<div id="scheme-toast"></div>
+{% endblock %}

@@ -87,6 +87,10 @@
      class="tab tab-active">{% trans "Value Summary" %}</a>
   <a href="{% url 'demand_ui:version_lines' client_id=client.client_id pk=version.pk %}"
      class="tab">{% trans "Forecast Grid" %}</a>
+  {% if show_scheme_tab %}
+  <a href="{% url 'demand_ui:version_scheme_numbers' client_id=client.client_id pk=version.pk %}"
+     class="tab">{% trans "Scheme Numbers" %}</a>
+  {% endif %}
   <a href="{% url 'demand_ui:override_list' client_id=client.client_id pk=version.pk %}"
      class="tab">{% trans "Overrides" %}</a>
   <a href="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}"

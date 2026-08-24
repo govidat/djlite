@@ -10,31 +10,46 @@ hx-include="#filter-form" captures ALL filter inputs at once.
   Input: taxonomy_slug   — slug of parent taxonomy (for recursion context)
 {% endcomment %}
 
-<li class="{% if node.depth > 0 %}pl-{{ node.depth|add:node.depth }}{% endif %}">
-  <label class="flex items-center gap-2 cursor-pointer py-1 hover:text-primary">
-    <input
-      type="checkbox"
-      name="node"
-      value="{{ node.id }}"
-      class="checkbox checkbox-sm checkbox-primary"
-      {% if node.id in active_node_ids %}checked{% endif %}
-      hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
-      hx-target="#items-container"
-      hx-swap="innerHTML"
-      hx-include="#filter-form"
-      hx-trigger="change"
-    >
-    <span class="text-sm flex-1">{{ node.name }}</span>
-    {% if counts %}
-    <span class="badge badge-sm badge-ghost">
-      {{ counts|get_item:node.id|default:0 }}
-    </span>
+<li class="tx-node" data-node-id="{{ node.id }}">
+  <div class="tx-node-row">
+    {% if node.children %}
+      {# Eager tree: children are already rendered; toggle is purely visual #}
+      <span
+        class="tx-toggle {% if node.depth == 0 %}tx-toggle-open{% endif %}"
+        data-target="cat-tx-children-{{ node.id }}"
+        onclick="txToggleNode(this)"
+      >{% if node.depth == 0 %}▾{% else %}▸{% endif %}</span>
+    {% else %}
+      <span class="tx-toggle tx-toggle-leaf">•</span>
     {% endif %}
-  </label>
+
+    <label class="tx-node-label">
+      <input
+        type="checkbox"
+        name="node"
+        value="{{ node.id }}"
+        class="tx-checkbox"
+        {% if node.is_selected %}checked{% endif %}
+        {% if node.is_partial %}data-partial{% endif %}
+        hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+        hx-target="#items-container"
+        hx-swap="innerHTML"
+        hx-include="#filter-form"
+        hx-trigger="change"
+      >
+      <span class="flex-1">{{ node.name }}</span>
+      {% if counts %}
+      <span class="badge badge-sm badge-ghost">
+        {{ counts|get_item:node.id|default:0 }}
+      </span>
+      {% endif %}
+    </label>
+  </div>
 
   <!-- Recurse for children -->
   {% if node.children %}
-  <ul class="ml-3 space-y-1 mt-1 border-l border-base-300 pl-2">
+  <ul id="cat-tx-children-{{ node.id }}"
+      class="tx-children {% if node.depth > 0 %}tx-collapsed{% endif %}">
     {% for child in node.children %}
       {% include "catalogue/partials/filter_node.html"
          with node=child

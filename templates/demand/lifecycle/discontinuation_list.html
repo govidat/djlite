@@ -1,0 +1,45 @@
+{% extends "demand/_base_demand.html" %}
+{% load i18n %}
+
+{% block demand_content %}
+<h1 class="text-2xl font-bold mb-6">{% trans "Item Discontinuations" %}</h1>
+<p class="text-base-content/60 mb-4">{% trans "Withdraw an item from forecasting after a given date." %}</p>
+
+<div class="mb-4">
+  <button class="btn btn-primary btn-sm"
+          hx-get="{% url 'demand_ui:item_discontinuation_create' client_id=client.client_id %}"
+          hx-target="#modal-content"
+          hx-swap="innerHTML"
+          onclick="document.getElementById('lifecycle-modal').showModal()">
+    + {% trans "New Discontinuation" %}
+  </button>
+</div>
+
+<table class="table table-zebra w-full">
+  <thead>
+    <tr>
+      <th>{% trans "Item" %}</th>
+      <th>{% trans "Effective From" %}</th>
+      <th>{% trans "Updated" %}</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="discontinuation-table-body">
+    {% include "demand/lifecycle/partials/discontinuation_table_body.html" %}
+  </tbody>
+</table>
+
+<dialog id="lifecycle-modal" class="modal">
+  <div class="modal-box">
+    <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button></form>
+    <div id="modal-content"></div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<script>
+document.body.addEventListener('lifecycleCreated', function() {
+  document.getElementById('lifecycle-modal').close();
+});
+</script>
+{% endblock %}

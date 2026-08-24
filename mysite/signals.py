@@ -7,12 +7,19 @@ from django.core.cache import cache
 from guardian.shortcuts import assign_perm, remove_perm
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, ClientFeatureControl, Theme, Page, NavItem, PageContent, ClientTemplate, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
+from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, ClientFeatureControl, Theme, Page, NavItem, PageContent, ClientTemplate, SectorTemplate, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
 from django.contrib.auth.models import User
 
 from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
 from .models import PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, ActualSaleImport, ActualSale, ActualSaleOutlierAdjustment, ActualSaleLocation, ItemPlanningProfile
 from .models import ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
+from .models.demand.schemes import (
+    SalesScheme, SalesSchemeScope, SalesSchemePeriod,
+    ResolvedSalesSchemePeriod, SalesSchemeOccurrence,
+)
+from .models.demand.lifecycle import (
+    ItemSubstitution, ItemDiscontinuation, ItemIntroduction,
+)
 
 """
 @receiver(post_save, sender=GlobalVal)
@@ -58,7 +65,17 @@ ADMIN_ONLY_MODELS = [
 
     # Demand Planning
     PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, ActualSaleImport, ActualSale, ActualSaleOutlierAdjustment, ActualSaleLocation, ItemPlanningProfile,
-    ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
+    ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile,
+
+    # Sales Promotion Schemes
+    SalesScheme, SalesSchemeScope, SalesSchemePeriod,
+    ResolvedSalesSchemePeriod, SalesSchemeOccurrence,
+
+    # Item Lifecycle
+    ItemSubstitution, ItemDiscontinuation, ItemIntroduction,
+
+    # Sector templates (structural defaults + sector-tier overrides)
+    SectorTemplate,
 ]
 
 # ADMIN Add only for Admin — needed for user creation
@@ -468,12 +485,43 @@ def invalidate_client_cache(sender, instance, **kwargs):
     if client_id:
         cache_key = f"clientstatic:{client_id}"
         cache.delete(cache_key)
+        if isinstance(instance, Client):
+            # Client.sector may have changed → rebuild its sector chain
+            cache.delete(f"sector_chain:{client_id}")
+
+def _bust_sector_chains():
+    """
+    Clear every client's cached sector chain. Backend-agnostic
+    (works on LocMemCache where delete_pattern is unavailable).
+    Called when taxonomy nodes change — re-parenting alters ancestry.
+    """
+    try:
+        for cid in Client.objects.exclude(sector=None).values_list('client_id', flat=True):
+            cache.delete(f"sector_chain:{cid}")
+    except Exception:
+        pass
+
+@receiver([post_save, post_delete], sender=SectorTemplate)
+def invalidate_client_template_cache(sender, instance, **kwargs):
+    """
+    A SectorTemplate row serves many clients at once (a whole sector
+    subtree, or ALL clients when it is the global default), so the
+    per-client resolved-fragment caches must all go.
+    """
+    if hasattr(cache, 'delete_pattern'):
+        cache.delete_pattern('client_template:*')
+    else:
+        # LocMemCache (dev) — no pattern delete; full clear is acceptable
+        cache.clear()
 
 def invalidate_taxonomy_cache(sender, instance, **kwargs):
     """
     Invalidates taxonomy tree cache entries.
     Only Taxonomy and TaxonomyNode trigger this.
     """
+    # Sector chains may become stale if nodes are moved / re-parented
+    _bust_sector_chains()
+
     client = getattr(instance, 'client', None)
 
     # Safe delete_pattern — works on Redis, gracefully skips on LocMemCache
@@ -539,6 +587,41 @@ def outlier_adjustment_status_changed(sender, instance, **kwargs):
     if instance.status in ("CONFIRMED", "REJECTED"):
         from mysite.tasks.demand.detect_outliers import flag_stale_forecast_versions
         flag_stale_forecast_versions.delay(actual_sale_id=instance.actual_sale_id)
+
+
+# ── SalesScheme / SalesSchemeScope → re-resolve + flag stale DRAFT versions ──
+
+@receiver(post_save, sender=SalesScheme)
+def scheme_changed(sender, instance, **kwargs):
+    """ACTIVE scheme create/edit: re-materialize resolved rows, flag stale
+    DRAFT versions, and re-run outlier detection on the covered range."""
+    from mysite.tasks.demand.resolve_scheme_scope import resolve_scheme_scope
+    if instance.status != "ACTIVE":
+        return
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and not update_fields.intersection(
+        {"status", "expected_qty_uplift_pct", "expected_value_uplift_pct",
+         "shadow_periods", "pull_forward_pct"}):
+        return
+    resolve_scheme_scope.delay(scheme_id=instance.pk)
+
+
+@receiver(post_save, sender=SalesSchemeScope)
+def scheme_scope_changed(sender, instance, **kwargs):
+    """When a scheme's scope is modified, re-resolve the scope."""
+    from mysite.tasks.demand.resolve_scheme_scope import resolve_scheme_scope
+    scheme = instance.scheme
+    if scheme.status == "ACTIVE":
+        resolve_scheme_scope.delay(scheme_id=scheme.pk)
+
+
+@receiver([post_save, post_delete], sender=SalesSchemePeriod)
+def scheme_periods_changed(sender, instance, **kwargs):
+    """When a scheme's periods are added/removed/modified, re-resolve."""
+    from mysite.tasks.demand.resolve_scheme_scope import resolve_scheme_scope
+    scheme = instance.scheme
+    if scheme.status == "ACTIVE":
+        resolve_scheme_scope.delay(scheme_id=scheme.pk)
 
 # ── Registration helper (called from AppConfig.ready) ─────────────────
 

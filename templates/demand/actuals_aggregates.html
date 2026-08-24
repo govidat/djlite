@@ -1,7 +1,9 @@
 {% extends "demand/_base_demand.html" %}
 {% load i18n %}
+{% load static %}
 
 {% block demand_content %}
+<link rel="stylesheet" href="{% static 'admin/css/taxonomy_tree.css' %}">
 <div class="flex items-center justify-between mb-6">
     <div>
         <h2 class="text-xl font-bold">{% trans "Actuals Summary" %}</h2>
@@ -35,5 +37,6 @@
     {% include "demand/partials/actuals_aggregates_filter_bar.html" %}
     {% include "demand/partials/actuals_aggregates_table_body.html" %}
 </div>
+<script src="{% static 'admin/js/taxonomy_tree.js' %}"></script>
 
 {% endblock %}
