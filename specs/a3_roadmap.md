@@ -273,6 +273,27 @@ demand sidebar nav, etc.) moved from filesystem fallbacks into the database.
 > default is done in Django admin (SectorTemplate), not by editing files — code
 > deploys no longer change rendered chrome.
 
+### Country Dimension (§8b) ✅ Done
+- [x] `Country` model: PK = ISO alpha-2 code, `name` (translatable), `flag_emoji`, `order`, `is_active`. Verbose name `00-00B Country`. Superuser-only.
+- [x] Seed migration (`0086_*`): IN (India, default), US (USA), FR (France), DE (Germany), MY (Malaysia)
+- [x] `Client.allowed_countries` JSONField (null = disabled, list = enabled) + `Client.default_country_code` CharField (default `IN`)
+- [x] `Client.is_country_enabled()` / `Client.get_allowed_country_codes()` helper methods
+- [x] `CountryAdmin` in Django admin (`00-00B Country` under Global Config)
+- [x] `ClientForm` country_choices checkbox widget (DB-backed, populated from active Countries)
+- [x] `set_country` POST view — validates against allowed list, sets `request.session['active_country_code']`
+- [x] `CustomerProfileMiddleware`: resolves `active_country_code` from session, validates, auto-sets default
+- [x] Geo-detection: `django-geoip2` + `django-ipware` detect country from IP on first authenticated visit
+- [x] `Country` FK on `SectorTemplate` + `ClientTemplate` — nullable, NULL = all countries
+- [x] Resolution chain extended: client+country → client+NULL → sector+country → sector+NULL → global+country → global+NULL
+- [x] Cache key includes country: `client_template:{id}:{key}:{country}`
+- [x] `select_country.html` cotton component — dropdown with flag emoji + country name
+- [x] Navbar: country selector shown when `show_country_selector` and >1 allowed country
+- [x] Footer: displays active country flag + name
+- [x] Context processor: `active_country_code`, `show_country_selector`, `allowed_countries_list`
+- [x] `build_client_payload`: `show_country_selector`, `allowed_countries_list` computed fields
+- [x] Tests: `mysite/tests/test_country.py` (20 tests: model, client fields, set_country view, template resolution)
+- [x] Migrations: `0085_country_model`, `0086_seed_countries`, `0087_client_country_fields`, `0088_sectortemplate_country_dim`, `0089_clienttemplate_country_dim`
+
 ---
  
 ## Open Decisions (Phase 2)

@@ -1466,20 +1466,25 @@ Key changes to be done:
 |-------|-------|
 | `template_key` | Choice from Client's `TEMPLATE_CHOICES` (now includes `demand_sidebar_nav`) |
 | `sector_node` | FK → TaxonomyNode, nullable. **NULL row = the active global default** |
+| `country` | FK → Country, nullable. **NULL = all countries (default)**. Selects country-specific template overrides. |
 | `htmlblob` | Translated (modeltranslation: en/fr/hi/ta + original column) |
 | `is_active` | Only active rows resolve |
 
-Constraints: unique `(sector_node, template_key)` among active rows; conditional
-unique index enforces exactly one active NULL-sector row per key.
+Constraints: unique `(sector_node, country, template_key)` among active rows; conditional
+unique index enforces exactly one active NULL-sector NULL-country row per key.
 
 ### Resolution chain (uniform for ALL keys — navbar, footer, demand sidebar, …)
 Implemented in `mysite/templatetags/my_tags.py::render_client_template`:
 
-1. `ClientTemplate` for `(client, key)` — client-specific override.
-2. `SectorTemplate` rows walking the client's sector chain **deepest → root**;
+1. `ClientTemplate` for `(client, key, country=X)` — client+country override.
+2. `ClientTemplate` for `(client, key, country=NULL)` — client override.
+3. `SectorTemplate` rows walking the client's sector chain with `country=X` **deepest → root**;
    most-specific non-blank active blob wins.
-3. `SectorTemplate` with `sector_node IS NULL` — seeded global default.
-4. Nothing found → render empty string + `logger.warning`.
+4. `SectorTemplate` with `sector_node IS NULL` and `country=X` — country-specific global default.
+5. `SectorTemplate` rows walking the client's sector chain with `country=NULL` **deepest → root**;
+   existing behaviour for country-disabled clients.
+6. `SectorTemplate` with `sector_node IS NULL` and `country=NULL` — seeded global default.
+7. Nothing found → render empty string + `logger.warning`.
 
 The old in-tag filesystem map and `_resolve_client_templates()` /
 `template_info` payload in `utils/catalogue_queries.py` were **removed** —
@@ -1490,7 +1495,7 @@ chain, not plain `Template()` rendering. Seeded defaults that need cotton wrap
 the include instead, e.g. `{% include 'cotton/navbar_v001.html' %}`.
 
 ### Caching & invalidation
-- `client_template:{client_id}:{key}` → resolved HTML (LocMemCache fallback clears everything).
+- `client_template:{client_id}:{key}:{country}` → resolved HTML (LocMemCache fallback clears everything).
 - `sector_chain:{client_id}` → list of ancestor node ids (deepest-first), exception-safe.
 - Invalidation (`mysite/signals.py`): SectorTemplate save/delete clears
   `client_template:*`; any `TaxonomyNode` move busts all chains; Client save
@@ -1504,6 +1509,8 @@ the include instead, e.g. `{% include 'cotton/navbar_v001.html' %}`.
 ### Migrations & ops
 - `0081_*` schema · `0082_seed_sector_taxonomy` idempotent tree seed ·
   `0083_seed_global_default_templates` seeds all 8 keys into every language column.
+- `0088_*` adds `country` FK to SectorTemplate + new UniqueConstraints.
+- `0089_*` adds `country` FK to ClientTemplate + updates unique_together.
 - Defaults are DB-owned from here on: change them in admin, not in git — deploys no longer alter rendered chrome.
 - Regression guard: `mysite/tests/test_sector_templates.py` fails if a future
   `TEMPLATE_CHOICES` addition ships without a seeded default.

@@ -92,9 +92,37 @@ class GlobalVal(models.Model):
         cat_id = getattr(self.globalvalcat, 'globalvalcat_id', '?')
         return f"{cat_id}.{self.key}"
     
+class Country(models.Model):
+    """
+    Global list of countries the platform supports.
+    Superadmin-managed (ADMIN_VIEW_ONLY_MODELS).
+    Client selects which countries its site serves via Client.allowed_countries.
+    """
+    code        = models.CharField(
+        _('code'), max_length=2, primary_key=True,
+        help_text="ISO 3166-1 alpha-2 country code"
+    )
+    name        = models.CharField(_('name'), max_length=100, blank=True) # modeltranslation
+    description = models.TextField(_('description'), blank=True) # modeltranslation
+    flag_emoji  = models.CharField(
+        _('flag emoji'), max_length=10, blank=True,
+        help_text="Unicode flag emoji e.g. \U0001f1ee\U0001f1f3 for India"
+    )
+    order       = models.PositiveIntegerField(default=0)
+    is_active   = models.BooleanField(default=True)
+
+    class Meta:
+        app_label = 'mysite'
+        verbose_name = _('00-00B Country')
+        verbose_name_plural = _('00-00B Countries')
+        ordering = ['order', 'code']
+
+    def __str__(self):
+        return f'{self.flag_emoji} {self.code} - {self.name}'
+
 class DistributionChannel(models.Model):
     code = models.CharField(_('code'), max_length=2, primary_key=True)
-    label = models.CharField(_('label'), max_length=64)
+    label = models.CharField(_('label'), max_length=64, blank=True) # modeltranslation
     is_active = models.BooleanField(default=True)
 
     class Meta:

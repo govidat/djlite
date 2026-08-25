@@ -1,5 +1,5 @@
 """Catalogue LHS: rolled-up counts, tri-state selection annotations,
-own-facet-excluded attribute value counts, taxonomy-wins dedupe.
+own-facet-excluded node + attribute value counts, taxonomy-wins dedupe.
 
 Tree fixture (global 'gpc' taxonomy, materialized paths via save()):
     R (order 1)
@@ -138,6 +138,37 @@ def test_no_selection_flags_when_empty(setup):
         assert not flat[slug]['is_partial']
 
 
+# ── Node badge counts (own-facet excluded, payload level) ────────────
+
+def test_selecting_node_keeps_sibling_badges(setup):
+    """Ticking A narrows the grid to i1/i3/i4 but B and R badges must
+    keep their un-narrowed values (own-facet-excluded counting)."""
+    c = setup['client']
+    payload = build_catalogue_payload(
+        client=c, filters={'node_ids': [setup['A'].id]},
+        page_number=1, per_page=24,
+    )
+
+    assert payload['pagination']['total_count'] == 3   # grid narrowed
+
+    gpc = next(t for t in payload['taxonomies'] if t['slug'] == 'gpc')
+    flat = {}
+
+    def walk(nodes):
+        for n in nodes:
+            flat[n['slug']] = n
+            walk(n['children'])
+
+    walk(gpc['tree'])
+    assert flat['a']['count'] == 3
+    assert flat['b']['count'] == 2      # sibling unaffected by selection
+    assert flat['b1']['count'] == 2
+    assert flat['root']['count'] == 4
+
+    assert flat['a']['is_selected']     # checkbox state still annotated
+    assert flat['root']['is_partial']
+
+
 # ── Attribute facet counts (own-facet excluded) ──────────────────────
 
 @pytest.fixture
@@ -263,3 +294,5 @@ def test_filter_node_renders_tx_markup_with_states(setup):
     assert 'hx-include="#filter-form"' in html          # items stay wired
     assert 'data-partial' in html                        # root above selection
     assert 'txToggleNode(this)' in html                  # collapse toggle
+    assert 'badge-sm badge-ghost' in html                # count badge renders…
+    assert str(flat['root']['count']) in html            # …with node's own count

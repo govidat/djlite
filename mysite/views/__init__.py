@@ -4,6 +4,7 @@ from mysite.views.main import (
     ClientPageView,
     landing_page,
     set_theme,
+    set_country,
     custom_404,
     custom_500,
 )

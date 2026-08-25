@@ -4,7 +4,7 @@ from modeltranslation.translator import translator, TranslationOptions
 # Import directly from the submodules — NOT from mysite.models (the package __init__)
 # This avoids the circular import that occurs when modeltranslation autodiscovers
 # translation.py before the models package __init__ has finished loading.
-from mysite.models.global_config import GlobalVal
+from mysite.models.global_config import GlobalVal, Country, DistributionChannel
 from mysite.models.client import Client, Theme, ClientTemplate, SectorTemplate
 from mysite.models.admin_proxies import ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper
 from mysite.models.page import NavItem, PageContent #Page, 
@@ -17,6 +17,14 @@ from mysite.models.demand import PlanningLocation, PlanningCustomer, SalesNode
 
 class GlobalValTranslationOptions(TranslationOptions):
     fields = ('keyval',)
+    required_languages = ('en',)
+
+class CountryTranslationOptions(TranslationOptions):
+    fields = ('name', 'description')
+    required_languages = ('en',)
+
+class DistributionChannelTranslationOptions(TranslationOptions):
+    fields = ('label', )
     required_languages = ('en',)
 
 class ClientTranslationOptions(TranslationOptions):
@@ -113,6 +121,8 @@ NavItem   = apps.get_model('mysite', 'NavItem')
 """
 
 translator.register(GlobalVal, GlobalValTranslationOptions)
+translator.register(Country, CountryTranslationOptions)
+translator.register(DistributionChannel, DistributionChannelTranslationOptions)
 translator.register(Client,    ClientTranslationOptions)
 translator.register(ClientContentStructured,    ClientContentStructuredTranslationOptions)
 translator.register(ClientContentHtml,    ClientContentHtmlTranslationOptions)

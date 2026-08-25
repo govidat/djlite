@@ -1,0 +1,35 @@
+{# templates/cotton/select_country.html #}
+{% load i18n %}
+
+<form method="post" action="{% url 'set_country' %}" id="country-form">
+  {% csrf_token %}
+
+  <div class="dropdown dropdown-end">
+    <!-- ICON BUTTON -->
+    <div tabindex="0" role="button" class="btn group btn-sm gap-1.5 px-1.5 btn-ghost"
+      aria-label="Change Country">
+      <span class="text-lg leading-none">{{ active_country.flag_emoji|default:"🌐" }}</span>
+
+      <svg width="12px" height="12px" class="mt-px hidden size-2 fill-current opacity-60 sm:inline-block" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2048 2048"><path d="M1799 349l242 241-1017 1017L7 590l242-241 775 775 775-775z"></path></svg>
+    </div>
+
+    <!-- DROPDOWN CONTENT -->
+    <ul tabindex="0"
+        class="dropdown-content bg-base-200 rounded-box z-50 w-52 p-2 shadow-xl">
+
+      {% for c in allowed_countries_list %}
+      <li>
+        <button
+          type="submit"
+          name="country_code"
+          value="{{ c.code }}"
+          class="btn btn-sm btn-block justify-start
+                 {% if c.code == active_country_code %}btn-active{% endif %}">
+          {{ c.flag_emoji }} {{ c.name }}
+        </button>
+      </li>
+      {% endfor %}
+
+    </ul>
+  </div>
+</form>

@@ -96,7 +96,7 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
         )
         fieldsets = [
             ('General', {
-                'fields': ('client_id', 'parent', 'sector', 'language_choices', 'default_language', 'distribution_channel_choices', 'catalogue_taxonomy_order', 'nb_title_svg_pre', 'nb_title_svg_suf'),
+                'fields': ('client_id', 'parent', 'sector', 'language_choices', 'default_language', 'distribution_channel_choices', 'country_choices', 'default_country_code', 'catalogue_taxonomy_order', 'nb_title_svg_pre', 'nb_title_svg_suf'),
                 'classes': ('collapse',),
             }),            
             ('Main Language', {

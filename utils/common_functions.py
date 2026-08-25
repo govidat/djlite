@@ -610,7 +610,19 @@ def build_client_payload(client):
         'footer_nav': footer_nav,
         'show_language_selector' : len(client.language_list) > 1,
         'show_theme_selector' : len(lv_themes) > 1,
+        'show_country_selector': client.is_country_enabled() and len(client.get_allowed_country_codes() or []) > 1 if client.allowed_countries is not None else False,
+        'allowed_countries_list': _build_country_list(client),
     }
+
+
+def _build_country_list(client):
+    """Return list of {code, name, flag_emoji} dicts for the client's allowed countries."""
+    if not client.is_country_enabled():
+        return []
+    from mysite.models.global_config import Country
+    codes = client.get_allowed_country_codes()
+    countries = Country.objects.filter(code__in=codes, is_active=True).order_by('order')
+    return [{'code': c.code, 'name': c.name, 'flag_emoji': c.flag_emoji} for c in countries]
 
 """
 def build_client_payload(client):
@@ -640,7 +652,7 @@ def build_client_payload(client):
     all_pages = list(getattr(client, "prefetched_pages", []))
 
     return {
-        **serialize_model(client, exclude={'id', 'parent', 'language_list'}),
+        **serialize_model(client, exclude={'id', 'parent', 'language_list', 'allowed_countries'}),
         "languages":  client.language_list, 
         #lv_languages,
         "themes":     lv_themes,
@@ -648,7 +660,9 @@ def build_client_payload(client):
         "pages":      [p for p in (build_page(page) for page in all_pages) if p], # [build_page(page) for page in all_pages],
         #"page_tree":  build_page_tree([p for p in all_pages if not p.hidden]),
         'header_nav':  header_nav,
-        'footer_nav':  footer_nav,        
+        'footer_nav':  footer_nav,
+        'show_country_selector': client.is_country_enabled() and len(client.get_allowed_country_codes() or []) > 1 if client.allowed_countries is not None else False,
+        'allowed_countries_list': _build_country_list(client),
     }
 """    
 # temporarily marking use_cache = False. To be changed after debugging

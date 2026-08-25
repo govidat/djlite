@@ -14,6 +14,7 @@ urlpatterns = [
 
     # this is for persisting theme selection 
     path("set-theme/", views.set_theme, name="set_theme"),
+    path("set-country/", views.set_country, name="set_country"),
 
     #path('', views.ClientPageView.as_view(), name="client_page"), 
     path('', views.landing_page, name='landing'),

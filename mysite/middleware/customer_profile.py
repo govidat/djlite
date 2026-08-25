@@ -70,6 +70,7 @@ class CustomerProfileMiddleware:
         request.customer_profile = None
         request.client_profile = None
         request.active_role = None
+        request.active_country_code = None
 
         # ── Resolve client_id (URL → session fallback) ───────────
         #── Resolve client_id ─────────────────────────────────────
@@ -92,6 +93,27 @@ class CustomerProfileMiddleware:
                 except Client.DoesNotExist:
                     request.session.pop('client_id', None)
 
+        # ── Resolve active country from session ──────────────────
+        if request.client and request.client.is_country_enabled():
+            session_country = request.session.get('active_country_code')
+            allowed = request.client.get_allowed_country_codes()
+            if session_country and session_country in allowed:
+                request.active_country_code = session_country
+            else:
+                default = request.client.default_country_code or 'IN'
+                request.active_country_code = default if default in allowed else next(iter(allowed), None)
+                request.session['active_country_code'] = request.active_country_code
+        # ── Geo-detect country on first visit after login ────────
+        if (request.user.is_authenticated and
+                request.client and
+                request.client.is_country_enabled() and
+                'active_country_code' not in request.session):
+            detected = _geo_detect_country(request)
+            if detected:
+                allowed = request.client.get_allowed_country_codes()
+                if detected in allowed:
+                    request.session['active_country_code'] = detected
+                    request.active_country_code = detected
 
 
         # ── Resolve profiles (ONLY if logged in) ─────────────────
@@ -153,4 +175,17 @@ class CustomerProfileMiddleware:
         return self.get_response(request)
 
 
-
+def _geo_detect_country(request):
+    """Best-effort geo-detect country from client IP. Returns ISO alpha-2 code or None."""
+    try:
+        from ipware import get_client_ip
+        from django.contrib.gis.geoip2 import GeoIP2
+        from django.conf import settings
+        client_ip, _ = get_client_ip(request)
+        if not client_ip or client_ip in ('127.0.0.1', '::1', 'localhost'):
+            return None
+        g = GeoIP2()
+        cc = g.country_code(client_ip)
+        return cc.upper() if cc else None
+    except Exception:
+        return None

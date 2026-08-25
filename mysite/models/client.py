@@ -29,6 +29,26 @@ class Client(models.Model):
             "this field directly."
         ),
     )
+    allowed_countries = models.JSONField(
+        _("allowed countries"),
+        null=True, blank=True, default=None,
+        help_text=_(
+            "List of ISO alpha-2 Country codes this client's website serves, "
+            'e.g. ["IN", "US"]. NULL means Country is NOT a '
+            "dimension for this client. Use is_country_enabled() "
+            "and get_allowed_country_codes() rather than reading "
+            "this field directly."
+        ),
+    )
+    default_country_code = models.CharField(
+        _("default country"),
+        max_length=2, blank=True, default='IN',
+        help_text=_(
+            "ISO alpha-2 code of the default country shown when no "
+            "session country is active. Must be in allowed_countries "
+            "if country is enabled."
+        ),
+    )
     sector = models.ForeignKey(
         'mysite.TaxonomyNode',
         null=True, blank=True,
@@ -121,7 +141,23 @@ class Client(models.Model):
                 f"Client {self.client_id} does not have Distribution Channel "
                 f"enabled — check is_distribution_channel_enabled() before calling this."
             )
-        return set(self.allowed_distribution_channels)    
+        return set(self.allowed_distribution_channels)
+
+    def is_country_enabled(self) -> bool:
+        """False means this client doesn't use the Country dimension."""
+        return self.allowed_countries is not None
+
+    def get_allowed_country_codes(self) -> set[str]:
+        """
+        Only meaningful when is_country_enabled() is True.
+        Returns the set of ISO alpha-2 country codes this client serves.
+        """
+        if self.allowed_countries is None:
+            raise ValueError(
+                f"Client {self.client_id} does not have Country "
+                f"enabled — check is_country_enabled() before calling this."
+            )
+        return set(self.allowed_countries)
 
     class Meta:
         verbose_name = "00-03 Client"
@@ -200,6 +236,14 @@ class ClientTemplate(models.Model):
         'mysite.Client', on_delete=models.CASCADE,
         related_name='templates'
     )
+    country = models.ForeignKey(
+        'mysite.Country',
+        null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name='client_templates',
+        help_text="Country this template applies to. "
+                  "Leave empty for ALL countries.",
+    )
     template_key    = models.CharField(
         max_length=50, choices=TEMPLATE_CHOICES,
         help_text="Which template this overrides"
@@ -219,7 +263,7 @@ class ClientTemplate(models.Model):
     updated_at      = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('client', 'template_key')
+        unique_together = ('client', 'template_key', 'country')
         ordering        = ['client', 'template_key']
         verbose_name = "00-03E Client Templates"
         verbose_name_plural = "00-03E Client Templates"
@@ -245,6 +289,13 @@ class SectorTemplate(models.Model):
     per template_key is enforced by a conditional UniqueConstraint.
     Defaults for every TEMPLATE_CHOICES key are seeded by data migration;
     from then on default content is admin-managed, not git-managed.
+
+    Country dimension (new):
+        5. ClientTemplate(country=X)            (client + country)
+        6. SectorTemplate(sector + country=X)   (sector + country)
+        7. SectorTemplate(country=X, sector=NULL) (global + country)
+        8. SectorTemplate(sector + country=NULL)  (sector + no country)
+        9. SectorTemplate(sector=NULL, country=NULL) (global default)
     """
     sector_node    = models.ForeignKey(
         'mysite.TaxonomyNode',
@@ -254,6 +305,14 @@ class SectorTemplate(models.Model):
         limit_choices_to={'taxonomy__slug': 'sector'},
         help_text="Sector node this template applies to. "
                   "Leave empty for the GLOBAL DEFAULT template."
+    )
+    country = models.ForeignKey(
+        'mysite.Country',
+        null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name='sector_templates',
+        help_text="Country this template applies to. "
+                  "Leave empty for the GLOBAL (all countries) default.",
     )
     template_key   = models.CharField(
         max_length=50, choices=ClientTemplate.TEMPLATE_CHOICES,
@@ -269,22 +328,23 @@ class SectorTemplate(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=['sector_node', 'template_key'],
-                name='uniq_sectortemplate_sector_key',
+                fields=['sector_node', 'country', 'template_key'],
+                name='uniq_sectortemplate_sector_country_key',
             ),
             models.UniqueConstraint(
                 fields=['template_key'],
-                condition=models.Q(sector_node__isnull=True),
+                condition=models.Q(sector_node__isnull=True, country__isnull=True),
                 name='uniq_sectortemplate_global_default',
             ),
         ]
-        ordering        = ['template_key', 'sector_node']
-        verbose_name = "00-03F Sector Templates"
-        verbose_name_plural = "00-03F Sector Templates"
+        ordering        = ['template_key', 'sector_node', 'country']
+        verbose_name = "00-00C Sector Templates"
+        verbose_name_plural = "00-00C Sector Templates"
 
     def __str__(self):
         scope = getattr(self.sector_node, 'path', None) or 'GLOBAL'
-        return f"[{scope}] / {self.template_key}"
+        country_code = getattr(self.country, 'code', None) or 'ALL'
+        return f"[{scope}] / {self.template_key} / {country_code}"
 
 
 # models/client_block.py

@@ -3,8 +3,8 @@ import nested_admin
 from django.conf import settings
 from django.contrib import admin
 from modeltranslation.admin import TranslationBaseModelAdmin
-from .base import BaseAdminInlinecss
-from mysite.models import (GlobalVal)
+from .base import BaseAdminInlinecss, ClientLanguageMixinV2
+from mysite.models import (GlobalVal, Country)
 
 class GlobalValInline(TranslationBaseModelAdmin, nested_admin.NestedTabularInline):
     model  = GlobalVal
@@ -28,7 +28,58 @@ class ThemePresetAdmin(admin.ModelAdmin):
     #fields = ["language_id", "label_obj"]
     search_fields = ("themepreset_id",)
 
-class DistributionChannelAdmin(admin.ModelAdmin):
-    #list_display = ("language_id", "label_obj")
-    #fields = ["language_id", "label_obj"]
+class CountryAdmin(TranslationBaseModelAdmin, admin.ModelAdmin, ClientLanguageMixinV2):
+    list_display = ('code', 'flag_emoji', 'name', 'order', 'is_active')
+    list_filter = ('is_active',)
+    ordering = ('order', 'code')
+
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['name', 'description'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('code', 'flag_emoji', 'order', 'is_active'),
+                'classes': ('collapse',),
+            }),
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
+
+class DistributionChannelAdmin(TranslationBaseModelAdmin, admin.ModelAdmin, ClientLanguageMixinV2):
+    list_display = ('code', 'label', 'is_active')
+    list_filter = ('is_active',)
     search_fields = ("code",)
+
+    def get_fieldsets(self, request, obj=None):
+        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
+            request, ['label'], obj
+        )
+        fieldsets = [
+            ('General', {
+                'fields': ('code', 'is_active'),
+                'classes': ('collapse',),
+            }),
+            ('Main Language', {
+                'fields': main_ln_fields,
+                'classes': ('collapse',),
+            }),
+        ]
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)

@@ -935,13 +935,23 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
         if attr_selections else qs
     )
 
+    # Same discipline for the LHS tree badges: node counts are computed on a
+    # queryset that carries every filter EXCEPT taxonomy-node selections, so
+    # ticking one branch keeps its siblings' badge values intact. The grid
+    # itself (qs) and checkbox states (selected_node_ids) still narrow.
+    node_selections = filters.get('node_ids') or []
+    qs_no_nodes = (
+        get_item_queryset(client, {**filters, 'node_ids': []})
+        if node_selections else qs
+    )
+
     taxonomy_trees = []
     for taxonomy in resolved_taxonomies:
         tree = get_taxonomy_tree(
             client=client,
             taxonomy_slug=taxonomy.slug,
             include_counts=True,
-            base_qs=qs,
+            base_qs=qs_no_nodes,
             selected_node_ids=filters.get('node_ids') or None,
         )
         active_node_ids = filters.get('node_ids', [])

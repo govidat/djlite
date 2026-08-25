@@ -37,9 +37,9 @@ Identical to filter_node.html except hx-include target.
         hx-trigger="change"
       >
       <span class="flex-1">{{ node.name }}</span>
-      {% if counts %}
+      {% if node.count %}
       <span class="badge badge-sm badge-ghost">
-        {{ counts|get_item:node.id|default:0 }}
+        {{ node.count }}
       </span>
       {% endif %}
     </label>

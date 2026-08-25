@@ -91,4 +91,6 @@ django-money>=3.6.0
 #wcwidth==0.7.0
 django-celery-results>=2.6.0
 psycopg[binary]>=3.2
+django-ipware>=7.0.1
+django-geoip2>=4.1.0
 

@@ -14,7 +14,8 @@ from .global_config import (
     ThemePreset,
     GlobalValCat,
     GlobalVal,
-    DistributionChannel
+    DistributionChannel,
+    Country,
 )
 
 from .client import (

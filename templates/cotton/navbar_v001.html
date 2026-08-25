@@ -51,6 +51,9 @@
   </div>
   <div class="navbar-end flex xl:gap-1">
     <c-customer-menu />
+    {% if show_country_selector %}
+        <c-select_country></c-select_country>
+    {% endif %}
     {% if client.show_theme_selector %}
         <c-select_theme></c-select_theme>
     {% endif %}  

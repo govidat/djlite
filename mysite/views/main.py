@@ -87,6 +87,21 @@ def set_theme(request):
     return redirect(request.META.get("HTTP_REFERER", "/"))
 
 
+@require_POST
+def set_country(request):
+    """Set the active country in the session. Validates against the client's
+    allowed countries; falls back to the client's default if invalid."""
+    code = request.POST.get("country_code", "").strip().upper()
+    client = getattr(request, 'client', None)
+    if client and client.is_country_enabled():
+        allowed = client.get_allowed_country_codes()
+        if code in allowed:
+            request.session["active_country_code"] = code
+        else:
+            request.session["active_country_code"] = client.default_country_code or 'IN'
+    return redirect(request.META.get("HTTP_REFERER", "/"))
+
+
 # ── Error handlers ────────────────────────────────────────────────────
 # Registered in mydj/urls.py as handler404 and handler500.
 

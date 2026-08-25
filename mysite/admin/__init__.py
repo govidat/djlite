@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 
 from mysite.admin.global_config import (
-    ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline, DistributionChannelAdmin
+    ThemePresetAdmin, GlobalValCatAdmin, GlobalValInline, DistributionChannelAdmin, CountryAdmin
 )
 from mysite.admin.client import ClientAdmin, ClientBlockAdmin, ClientFeatureControlAdmin, ClientContentStructuredAdmin, ClientContentHtmlAdmin, ClientStaffAdmin, ClientTemplatewrapperAdmin, SectorTemplateAdmin #ClientTemplateAdmin
 
@@ -31,7 +31,7 @@ from mysite.admin.demand_lifecycle import (
 )
 
 from mysite.models import (
-    ThemePreset, GlobalValCat, GlobalVal, DistributionChannel,
+    ThemePreset, GlobalValCat, GlobalVal, DistributionChannel, Country,
     Client, ClientBlock, ClientFeatureControl, 
     ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper,
     Theme, ClientLocation,
@@ -66,6 +66,7 @@ admin.site.register(ClientFeatureControl,          ClientFeatureControlAdmin)
 
 admin.site.register(ThemePreset,          ThemePresetAdmin)
 admin.site.register(DistributionChannel,          DistributionChannelAdmin)
+admin.site.register(Country,                      CountryAdmin)
 
 
 admin.site.register(GlobalValCat,         GlobalValCatAdmin)

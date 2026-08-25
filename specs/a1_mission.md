@@ -134,6 +134,41 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
 - First consumer: `SectorTemplate` — DB-owned template defaults resolved by
   client override → sector chain → global default (see tech-stack doc).
 
+### 8b. Country Dimension
+
+The platform supports multi-country websites for clients that operate across
+national borders. Country is an optional, opt-in dimension — clients that serve
+a single market leave it disabled and incur zero overhead.
+
+**Core models:**
+- `Country` (PK = ISO 3166-1 alpha-2 code, e.g. `IN`, `US`, `FR`) — global
+  lookup, superadmin-managed. Seeded with IN, US, FR, DE, MY.
+- `Client.allowed_countries` — JSONField, null = country disabled, list of
+  ISO codes = enabled.
+- `Client.default_country_code` — fallback when no session country is set.
+
+**Session-based active country:**
+- `request.session['active_country_code']` — resolved on every request by
+  `CustomerProfileMiddleware`, validated against `Client.allowed_countries`.
+- `set_country` POST view — sets the session, validates against allowed list.
+
+**Template resolution:**
+- `SectorTemplate` and `ClientTemplate` gain a nullable `country` FK.
+- Resolution order becomes: client+country → client+NULL → sector+country →
+  sector+NULL → global+country → global+NULL.
+- Cache key includes country code (`client_template:{id}:{key}:{country}`).
+
+**UI:**
+- Navbar country switcher (`select_country.html` cotton component) — dropdown
+  showing flag emoji + country name for each allowed country.
+- Footer displays active country flag and name.
+- Country selector shown only when `Client.is_country_enabled()` and >1 country.
+
+**Geo-detection:**
+- On first authenticated visit (no session country), IP-based geo-detection
+  via `django-geoip2` + `django-ipware` sets the session country.
+- Detected country must be in `Client.allowed_countries` to be used.
+
 ## Phase 3B Demand Planning Module
  
 #### Business Context

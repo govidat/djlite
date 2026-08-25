@@ -123,11 +123,25 @@ def client_context(request):
         {}
     )
 
+    # Resolve active country code from request (set by middleware)
+    active_country_code = getattr(request, 'active_country_code', None)
+    active_country = None
+    if active_country_code:
+        from mysite.models import Country
+        try:
+            active_country = Country.objects.get(code=active_country_code)
+        except Country.DoesNotExist:
+            pass
+
     return {
         'client': client_dict,
         'theme':  theme,
         'page_dict': page_dict,
-        'jsonclient': json.dumps(client_dict),        
+        'jsonclient': json.dumps(client_dict),
+        'active_country_code': active_country_code,
+        'active_country': active_country,
+        'show_country_selector': client_dict.get('show_country_selector', False),
+        'allowed_countries_list': client_dict.get('allowed_countries_list', []),
     }
 
 def demand_planning_nav(request):

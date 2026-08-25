@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from .models import GlobalVal, DistributionChannel
+from .models import GlobalVal, DistributionChannel, Country
 from utils.globalval import bust_globalval_cache
 
 from django.core.cache import cache
@@ -73,9 +73,6 @@ ADMIN_ONLY_MODELS = [
 
     # Item Lifecycle
     ItemSubstitution, ItemDiscontinuation, ItemIntroduction,
-
-    # Sector templates (structural defaults + sector-tier overrides)
-    SectorTemplate,
 ]
 
 # ADMIN Add only for Admin — needed for user creation
@@ -85,7 +82,10 @@ ADMIN_ADD_ONLY_MODELS = [
 
 # ADMIN View only for Admin — to check if needed
 ADMIN_VIEW_ONLY_MODELS = [
-    GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, DistributionChannel
+    GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, DistributionChannel,
+    Country,
+    # Sector templates (structural defaults + sector-tier overrides)
+    SectorTemplate,
 ]
 
 # Actions per role per category

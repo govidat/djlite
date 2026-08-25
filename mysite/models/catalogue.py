@@ -238,7 +238,7 @@ class Taxonomy(models.Model):
     class Meta:
         unique_together = ('client', 'slug')
         ordering        = ['order', 'slug']
-        verbose_name    = '01-01 Item Taxonomy'
+        verbose_name    = '01-01 Taxonomy'
         indexes         = [
             models.Index(fields=['client', 'slug']),
             models.Index(fields=['client', 'is_active']),
@@ -323,7 +323,7 @@ class TaxonomyNode(models.Model):
     class Meta:
         unique_together = ('taxonomy', 'client', 'slug')
         ordering        = ['taxonomy', 'path', 'order']
-        verbose_name    = '01-02 Item Taxonomy Node'
+        verbose_name    = '01-02 Taxonomy Node'
         indexes         = [
             models.Index(fields=['taxonomy', 'client', 'path']),
             models.Index(fields=['taxonomy', 'client', 'is_active', 'depth']),
@@ -431,7 +431,7 @@ class NodeAttributeType(models.Model):
     class Meta:
         unique_together = ('node', 'client', 'slug')
         ordering        = ['node', 'order']
-        verbose_name    = '01-03 Item Node Attribute Type'
+        verbose_name    = '01-03 Node Attribute Type'
 
     def __str__(self):
         return f"{self.node} / {self.slug}"
@@ -462,7 +462,7 @@ class NodeAttributeValue(models.Model):
     class Meta:
         unique_together = ('attribute_type', 'client', 'slug')
         ordering        = ['attribute_type', 'order']
-        verbose_name    = '01-04 Item Node Attribute Value'
+        verbose_name    = '01-04 Node Attribute Value'
 
     def __str__(self):
         attslug = getattr(self.attribute_type, 'slug', '?') if self.attribute_type else '?'

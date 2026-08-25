@@ -63,58 +63,120 @@ def get_client_sector_chain(client_id):
     return chain
 
 
-def _resolve_template_html(client_id, template_key):
+def _resolve_template_html(client_id, template_key, country_code=None):
     """
     Resolution order (first non-empty wins):
-      1. ClientTemplate            (per-client)
-      2. SectorTemplate @ client's sector chain (deepest node first)
-      3. SectorTemplate @ NULL     (global default)
-      4. ''                        (unseeded key — caller logs a warning)
+      1. ClientTemplate (client + country=X)
+      2. ClientTemplate (client + country=NULL)
+      3. SectorTemplate @ client's sector chain (deepest sector, country=X)
+      4. SectorTemplate @ NULL sector (global + country=X)
+      5. SectorTemplate @ client's sector chain (deepest sector, country=NULL)
+      6. SectorTemplate @ NULL sector (global default, country=NULL)
+      7. ''                        (unseeded key — caller logs a warning)
 
     Defaults are DB-seeded by migration — there is no filesystem fallback.
     """
     from mysite.models.client import ClientTemplate, SectorTemplate
+    from django.db.models import Q
 
-    candidates = []
+    country_id = country_code  # Country PK is the ISO code string
 
+    # 1. ClientTemplate with country=X (highest priority)
+    if country_id:
+        ct = (
+            ClientTemplate.objects
+            .filter(
+                client__client_id=client_id,
+                template_key=template_key,
+                country__code=country_id,
+                is_active=True,
+            )
+            .first()
+        )
+        if ct and ct.htmlblob and ct.htmlblob.strip():
+            return ct.htmlblob
+
+    # 2. ClientTemplate with country=NULL (existing behavior)
     ct = (
         ClientTemplate.objects
         .filter(
             client__client_id=client_id,
             template_key=template_key,
+            country__isnull=True,
             is_active=True,
         )
         .first()
     )
-    if ct:
-        candidates.append(ct.htmlblob)
+    if ct and ct.htmlblob and ct.htmlblob.strip():
+        return ct.htmlblob
 
     chain_ids = get_client_sector_chain(client_id)
-    if chain_ids:
-        candidates.extend(
+
+    # 3. SectorTemplate: sector chain + country=X
+    if country_id and chain_ids:
+        blobs = (
             SectorTemplate.objects
             .filter(
                 sector_node_id__in=chain_ids,
+                country__code=country_id,
                 template_key=template_key,
                 is_active=True,
             )
-            .order_by('-sector_node__depth')     # deepest sector wins
+            .order_by('-sector_node__depth')
             .values_list('htmlblob', flat=True)
         )
+        for blob in blobs:
+            if blob and blob.strip():
+                return blob
 
-    candidates.extend(
+    # 4. SectorTemplate: global (NULL sector) + country=X
+    if country_id:
+        blobs = (
+            SectorTemplate.objects
+            .filter(
+                sector_node__isnull=True,
+                country__code=country_id,
+                template_key=template_key,
+                is_active=True,
+            )
+            .values_list('htmlblob', flat=True)
+        )
+        for blob in blobs:
+            if blob and blob.strip():
+                return blob
+
+    # 5. SectorTemplate: sector chain + country=NULL (existing behavior)
+    if chain_ids:
+        blobs = (
+            SectorTemplate.objects
+            .filter(
+                sector_node_id__in=chain_ids,
+                country__isnull=True,
+                template_key=template_key,
+                is_active=True,
+            )
+            .order_by('-sector_node__depth')
+            .values_list('htmlblob', flat=True)
+        )
+        for blob in blobs:
+            if blob and blob.strip():
+                return blob
+
+    # 6. SectorTemplate: global default (NULL sector, NULL country)
+    blobs = (
         SectorTemplate.objects
         .filter(
-            sector_node__isnull=True,            # global default
+            sector_node__isnull=True,
+            country__isnull=True,
             template_key=template_key,
             is_active=True,
         )
         .values_list('htmlblob', flat=True)
     )
-
-    for blob in candidates:
+    for blob in blobs:
         if blob and blob.strip():
             return blob
+
     return ''
 
 
@@ -415,12 +477,13 @@ def render_client_template(context, template_key, **extra_context):
         return ''
 
     # modeltranslation already resolves language automatically
-    cache_key = f"client_template:{client_id}:{template_key}"
+    country_code = getattr(request, 'active_country_code', None)
+    cache_key = f"client_template:{client_id}:{template_key}:{country_code or 'global'}"
 
     cached_html = cache.get(cache_key)
 
     if cached_html is None:
-        cached_html = _resolve_template_html(client_id, template_key)
+        cached_html = _resolve_template_html(client_id, template_key, country_code=country_code)
         cache.set(cache_key, cached_html, timeout=3600)
 
     if cached_html and cached_html.strip():

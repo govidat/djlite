@@ -5,7 +5,7 @@ from django.db.models import Q
 
 from django.contrib.auth.models import User
 from allauth.account.forms import SignupForm
-from .models import DistributionChannel, CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation, Taxonomy
+from .models import DistributionChannel, Country, CustomerProfile, ClientUserProfile, Client, CustomerAddress, ClientLocation, Taxonomy
 from django.utils.translation import gettext_lazy as _
 
 class ClientForm(forms.ModelForm):
@@ -34,6 +34,14 @@ class ClientForm(forms.ModelForm):
         help_text="Leave all unchecked if Distribution Channel is not required.",
     )
 
+    country_choices = forms.MultipleChoiceField(
+        choices=[],
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Countries this client serves",
+        help_text="Leave all unchecked if Country is not a dimension for this client.",
+    )
+
     catalogue_taxonomy_order = forms.CharField(
         required=False,  # blank = show all active taxonomies (legacy behavior)
         label="Catalogue class order",
@@ -57,6 +65,11 @@ class ClientForm(forms.ModelForm):
             for dc in DistributionChannel.objects.filter(is_active=True).order_by('code')
         ]
 
+        self.fields['country_choices'].choices = [
+            (c.code, f'{c.flag_emoji} {c.code} - {c.name}')
+            for c in Country.objects.filter(is_active=True).order_by('order')
+        ]
+
         # If an instance already exists, populate the form field with current data
         if self.instance and self.instance.pk and self.instance.language_list:
             # language_list is already a list of codes e.g. ['en', 'ta']
@@ -67,6 +80,9 @@ class ClientForm(forms.ModelForm):
         # NULL stays as "nothing checked" = unrestricted, matching save() below.
         if self.instance and self.instance.pk and self.instance.allowed_distribution_channels:
             self.fields['distribution_channel_choices'].initial = self.instance.allowed_distribution_channels
+
+        if self.instance and self.instance.pk and self.instance.allowed_countries:
+            self.fields['country_choices'].initial = self.instance.allowed_countries
 
         # Catalogue LHS filter: render stored slug list back as CSV text.
         if self.instance and self.instance.pk and self.instance.catalogue_taxonomy_slugs:
@@ -128,6 +144,9 @@ class ClientForm(forms.ModelForm):
         # NEW — empty selection means "no restriction" -> store NULL, not [].
         selected_channels = self.cleaned_data.get('distribution_channel_choices') or []
         instance.allowed_distribution_channels = selected_channels or None
+
+        selected_countries = self.cleaned_data.get('country_choices') or []
+        instance.allowed_countries = selected_countries or None
         # Catalogue LHS filter — blank input means "show all" -> store NULL.
         instance.catalogue_taxonomy_slugs = (
             self.cleaned_data.get('catalogue_taxonomy_order') or None
