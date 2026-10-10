@@ -36,7 +36,7 @@ def remove_countries(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('mysite', '0085_country_model'),
+        ('mysite', '0003_seed_global_default_templates'),
     ]
 
     operations = [

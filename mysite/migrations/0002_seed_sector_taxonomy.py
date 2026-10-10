@@ -73,7 +73,7 @@ def remove_sector_taxonomy(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('mysite', '0081_client_sector_alter_clienttemplate_template_key_and_more'),
+        ('mysite', '0001_initial'),
     ]
 
     operations = [

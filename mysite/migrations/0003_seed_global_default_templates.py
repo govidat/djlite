@@ -90,7 +90,7 @@ def unseed(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('mysite', '0082_seed_sector_taxonomy'),
+        ('mysite', '0002_seed_sector_taxonomy'),
     ]
 
     operations = [
