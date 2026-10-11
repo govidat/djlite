@@ -3,6 +3,7 @@ from django.dispatch import receiver
 from .models import GlobalVal, DistributionChannel, Country
 from utils.globalval import bust_globalval_cache
 
+from django.conf import settings
 from django.core.cache import cache
 from guardian.shortcuts import assign_perm, remove_perm
 from django.contrib.auth.models import Permission
@@ -483,8 +484,13 @@ def invalidate_client_cache(sender, instance, **kwargs):
     """
     client_id = get_client_id_from_instance(instance)
     if client_id:
-        cache_key = f"clientstatic:{client_id}"
-        cache.delete(cache_key)
+        # fetch_clientstatic caches per active language as
+        # "clientstatic:{client_id}-{lang}", so bust every language variant.
+        if hasattr(cache, "delete_pattern"):        # Redis
+            cache.delete_pattern(f"clientstatic:{client_id}-*")
+        else:                                        # LocMemCache (dev)
+            for lang_code, _label in settings.LANGUAGES:
+                cache.delete(f"clientstatic:{client_id}-{lang_code}")
         if isinstance(instance, Client):
             # Client.sector may have changed → rebuild its sector chain
             cache.delete(f"sector_chain:{client_id}")

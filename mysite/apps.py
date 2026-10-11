@@ -12,5 +12,6 @@ class MysiteConfig(AppConfig):
 
 
     def ready(self):
-        import mysite.signals   # ensures signals are connected on startup
+        from mysite.signals import register_signals
+        register_signals()   # connects CMS/taxonomy cache-invalidation handlers
 
