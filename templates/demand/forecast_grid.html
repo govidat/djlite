@@ -118,8 +118,7 @@
 
                 {% if cell.line.override_qty is not None %}
                   {# Cell has an applied or pending override → show badge #}
-                  {% include "demand/partials/override_badge.html"
-                     with line=cell.line override=cell.override version=version %}
+                  {% include "demand/partials/override_badge.html" with line=cell.line override=cell.override version=version %}
                 {% else %}
                   {# Plain statistical cell → click opens the inline form #}
                   <span class="forecast-cell__value"
@@ -189,8 +188,7 @@
             </thead>
             <tbody id="override-list-{{ version.pk }}">
               {% for override in overrides %}
-                {% include "demand/partials/override_list_row.html"
-                   with override=override version=version %}
+                {% include "demand/partials/override_list_row.html" with override=override version=version %}
               {% empty %}
                 <tr>
                   <td colspan="9" class="override-list--empty">

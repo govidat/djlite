@@ -51,11 +51,7 @@ hx-include="#filter-form" captures ALL filter inputs at once.
   <ul id="cat-tx-children-{{ node.id }}"
       class="tx-children {% if node.depth > 0 %}tx-collapsed{% endif %}">
     {% for child in node.children %}
-      {% include "catalogue/partials/filter_node.html"
-         with node=child
-         active_node_ids=active_node_ids
-         counts=counts
-         taxonomy_slug=taxonomy_slug %}
+      {% include "catalogue/partials/filter_node.html" with node=child active_node_ids=active_node_ids counts=counts taxonomy_slug=taxonomy_slug %}
     {% endfor %}
   </ul>
   {% endif %}
@@ -99,11 +95,7 @@ Self-includes for children.
   {% if node.children %}
   <ul class="ml-4 space-y-1 mt-1">
     {% for child in node.children %}
-      {% include "catalogue/partials/filter_node.html"
-         with node=child
-         active_node_ids=active_node_ids
-         counts=counts
-         taxonomy_slug=taxonomy_slug %}
+      {% include "catalogue/partials/filter_node.html" with node=child active_node_ids=active_node_ids counts=counts taxonomy_slug=taxonomy_slug %}
     {% endfor %}
   </ul>
   {% endif %}

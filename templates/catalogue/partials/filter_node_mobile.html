@@ -49,11 +49,7 @@ Identical to filter_node.html except hx-include target.
   <ul id="cat-tx-children-m-{{ node.id }}"
       class="tx-children {% if node.depth > 0 %}tx-collapsed{% endif %}">
     {% for child in node.children %}
-      {% include "catalogue/partials/filter_node_mobile.html"
-         with node=child
-         active_node_ids=active_node_ids
-         counts=counts
-         taxonomy_slug=taxonomy_slug %}
+      {% include "catalogue/partials/filter_node_mobile.html" with node=child active_node_ids=active_node_ids counts=counts taxonomy_slug=taxonomy_slug %}
     {% endfor %}
   </ul>
   {% endif %}

@@ -52,11 +52,7 @@ are captured by hx-include="#filter-form" on any checkbox change.
     <div class="collapse-content pt-2">
       <ul class="space-y-1">
         {% for node in taxonomy.tree %}
-          {% include "catalogue/partials/filter_node.html"
-             with node=node
-             active_node_ids=catalogue.filters.node_ids
-             counts=taxonomy.counts
-             taxonomy_slug=taxonomy.slug %}
+          {% include "catalogue/partials/filter_node.html" with node=node active_node_ids=catalogue.filters.node_ids counts=taxonomy.counts taxonomy_slug=taxonomy.slug %}
         {% endfor %}
       </ul>
     </div>
@@ -343,11 +339,7 @@ HTMX: filters update #items-container on change
     <div class="collapse-content">
       <ul class="space-y-1">
         {% for node in taxonomy.tree %}
-          {% include "catalogue/partials/filter_node.html"
-             with node=node
-             active_node_ids=catalogue.filters.node_ids
-             counts=taxonomy.counts
-             taxonomy_slug=taxonomy.slug %}
+          {% include "catalogue/partials/filter_node.html" with node=node active_node_ids=catalogue.filters.node_ids counts=taxonomy.counts taxonomy_slug=taxonomy.slug %}
         {% endfor %}
       </ul>
     </div>

@@ -14,9 +14,7 @@
    'code_name' renders "code — name" plus an optional level label
    (sales hierarchy).
 #}
-{% with checkbox_name=checkbox_name|default:'taxonomy_node_ids'
-      label_mode=label_mode|default:'name'
-      tree_kind=tree_kind|default:'taxonomy' %}
+{% with checkbox_name=checkbox_name|default:'taxonomy_node_ids' label_mode=label_mode|default:'name' tree_kind=tree_kind|default:'taxonomy' %}
 <li class="tx-node" data-node-id="{{ node.id }}">
   <div class="tx-node-row">
     {% if node.has_children %}
