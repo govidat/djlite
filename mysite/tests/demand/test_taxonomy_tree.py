@@ -100,7 +100,7 @@ class TestTaxonomyTreeWidget:
     def _panel(self, client_obj, **params):
         base = reverse(
             'demand_ui:taxonomy_tree_panel',
-            kwargs={'client_id': client_obj.client_id},
+            kwargs={'client_code': client_obj.client_code},
         )
         if params:
             return f'{base}?' + '&'.join(f'{k}={v}' for k, v in params.items())
@@ -109,7 +109,7 @@ class TestTaxonomyTreeWidget:
     def _children(self, client_obj, node_id, **params):
         base = reverse(
             'demand_ui:taxonomy_tree_children',
-            kwargs={'client_id': client_obj.client_id, 'node_id': node_id},
+            kwargs={'client_code': client_obj.client_code, 'node_id': node_id},
         )
         if params:
             return f'{base}?' + '&'.join(f'{k}={v}' for k, v in params.items())
@@ -225,7 +225,7 @@ class TestSalesTreeWidget:
     def _panel(self, client_obj, **params):
         base = reverse(
             'demand_ui:sales_tree_panel',
-            kwargs={'client_id': client_obj.client_id},
+            kwargs={'client_code': client_obj.client_code},
         )
         if params:
             return f'{base}?' + '&'.join(f'{k}={v}' for k, v in params.items())
@@ -234,7 +234,7 @@ class TestSalesTreeWidget:
     def _children(self, client_obj, node_id, **params):
         base = reverse(
             'demand_ui:sales_tree_children',
-            kwargs={'client_id': client_obj.client_id, 'node_id': node_id},
+            kwargs={'client_code': client_obj.client_code, 'node_id': node_id},
         )
         if params:
             return f'{base}?' + '&'.join(f'{k}={v}' for k, v in params.items())

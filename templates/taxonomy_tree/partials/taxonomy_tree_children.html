@@ -4,7 +4,7 @@
    the requesting node's #tx-children-{id} container via hx-swap="innerHTML".
 #}
 {% for node in nodes %}
-  {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=node client_id=client_id checkbox_name=checkbox_name label_mode=label_mode tree_kind=tree_kind %}
+  {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=node client_code=client_code checkbox_name=checkbox_name label_mode=label_mode tree_kind=tree_kind %}
 {% empty %}
   <li class="tx-node-empty">
     {% trans "No sub-categories." %}

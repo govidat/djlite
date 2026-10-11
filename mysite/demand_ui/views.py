@@ -127,7 +127,7 @@ def _feature_gate(request, feature: str):
 
 
 def _client_url_kwargs(request) -> dict:
-    return {'client_id': request.client.client_id}
+    return {'client_code': request.client.client_code}
 """
 
 
@@ -152,9 +152,9 @@ def _demand_ui_role(request) -> str | None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def dashboard(request, client_id=None):
+def dashboard(request, client_code=None):
     """
-    GET /{client_id}/demand/
+    GET /{client_code}/demand/
 
     Landing page. Shows:
       - Count of versions by status
@@ -200,9 +200,9 @@ def dashboard(request, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def version_list(request, client_id=None):
+def version_list(request, client_code=None):
     """
-    GET /{client_id}/demand/versions/
+    GET /{client_code}/demand/versions/
 
     Query params: status (filter)
     HTMX requests return only the table body partial for re-filtering.
@@ -240,7 +240,7 @@ def version_list(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def version_create(request, client_id=None):
+def version_create(request, client_code=None):
     blocked = feature_gate(request, 'forecast_run')
     if blocked:
         return blocked
@@ -359,7 +359,7 @@ def version_create(request, client_id=None):
         )
         return redirect(
             'demand_ui:version_detail',
-            client_id=request.client.client_id, pk=version.pk
+            client_code=request.client.client_code, pk=version.pk
         )
 
     # ── GET ───────────────────────────────────────────────────────────────────
@@ -373,9 +373,9 @@ def version_create(request, client_id=None):
     return render(request, 'demand/version_create.html', ctx)
 
 @login_required
-def version_detail(request, pk, client_id=None):
+def version_detail(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/
+    GET /{client_code}/demand/versions/{id}/
 
     Shows version metadata, status badge, run_status, and tab navigation
     to lines / aggregates / overrides / accuracy / export.
@@ -411,9 +411,9 @@ def version_detail(request, pk, client_id=None):
 
 @login_required
 @require_http_methods(['POST'])
-def version_run(request, pk, client_id=None):
+def version_run(request, pk, client_code=None):
     """
-    POST /{client_id}/demand/versions/{id}/run/
+    POST /{client_code}/demand/versions/{id}/run/
 
     Triggers the Celery chain (compute_series_profiles → run_forecast).
     Returns the run-status partial which polls itself via hx-trigger.
@@ -462,9 +462,9 @@ def version_run(request, pk, client_id=None):
 
 
 @login_required
-def version_run_status(request, pk, client_id=None):
+def version_run_status(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/run-status/
+    GET /{client_code}/demand/versions/{id}/run-status/
 
     Polled by HTMX every 2s while a run is in progress (hx-trigger="every 2s").
     Returns the same partial; the partial itself decides whether to keep
@@ -487,9 +487,9 @@ def version_run_status(request, pk, client_id=None):
 
 @login_required
 @require_http_methods(['POST'])
-def version_approve(request, pk, client_id=None):
+def version_approve(request, pk, client_code=None):
     """
-    POST /{client_id}/demand/versions/{id}/approve/
+    POST /{client_code}/demand/versions/{id}/approve/
 
     Body (form-encoded): action=submit|approve|reject|lock, note=...
     """
@@ -510,7 +510,7 @@ def version_approve(request, pk, client_id=None):
 
     if action not in transitions:
         messages.error(request, f'Unknown action "{action}".')
-        return redirect('demand_ui:version_detail', client_id=request.client.client_id, pk=pk)
+        return redirect('demand_ui:version_detail', client_code=request.client.client_code, pk=pk)
 
     from django.core.exceptions import ValidationError
     try:
@@ -529,13 +529,13 @@ def version_approve(request, pk, client_id=None):
             kwargs={**_client_url_kwargs(request), 'pk': pk},
         )
         return response
-    return redirect('demand_ui:version_detail', client_id=request.client.client_id, pk=pk)
+    return redirect('demand_ui:version_detail', client_code=request.client.client_code, pk=pk)
 
 
 @login_required
 @require_http_methods(['POST'])
-def version_delete(request, pk, client_id=None):
-    """POST /{client_id}/demand/versions/{id}/delete/ — delete a DRAFT version."""
+def version_delete(request, pk, client_code=None):
+    """POST /{client_code}/demand/versions/{id}/delete/ — delete a DRAFT version."""
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
@@ -544,13 +544,13 @@ def version_delete(request, pk, client_id=None):
         name__in=['demand_client_admin', 'demand_client_planner']
     ).exists()):
         messages.error(request, 'You do not have permission to delete versions.')
-        return redirect('demand_ui:version_list', client_id=request.client.client_id)
+        return redirect('demand_ui:version_list', client_code=request.client.client_code)
 
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
 
     if version.status != ForecastVersion.Status.DRAFT:
         messages.error(request, 'Only DRAFT versions can be deleted.')
-        return redirect('demand_ui:version_list', client_id=request.client.client_id)
+        return redirect('demand_ui:version_list', client_code=request.client.client_code)
 
     label = version.version_label
     version.delete()
@@ -563,13 +563,13 @@ def version_delete(request, pk, client_id=None):
             kwargs={**_client_url_kwargs(request)},
         )
         return response
-    return redirect('demand_ui:version_list', client_id=request.client.client_id)
+    return redirect('demand_ui:version_list', client_code=request.client.client_code)
 
 
 @login_required
 @require_http_methods(['POST'])
-def version_copy(request, pk, client_id=None):
-    """POST /{client_id}/demand/versions/{id}/copy/ — clone to new DRAFT."""
+def version_copy(request, pk, client_code=None):
+    """POST /{client_code}/demand/versions/{id}/copy/ — clone to new DRAFT."""
     blocked = feature_gate(request, 'forecast_run')
     if blocked:
         return blocked
@@ -591,7 +591,7 @@ def version_copy(request, pk, client_id=None):
 # Forecast Lines (grid)
 # ─────────────────────────────────────────────────────────────────────────────
 @login_required
-def version_lines(request, pk, client_id=None):
+def version_lines(request, pk, client_code=None):
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
@@ -602,7 +602,7 @@ def version_lines(request, pk, client_id=None):
         ForecastLine.objects
         .filter(version=version)
         .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
-        .order_by('period_start', 'planning_location__code', 'item__item_id')
+        .order_by('period_start', 'planning_location__code', 'item__item_code')
     )
 
     item_id       = request.GET.get('item_id', '').strip()
@@ -613,7 +613,7 @@ def version_lines(request, pk, client_id=None):
     period_start  = request.GET.get('period_start', '').strip()
 
     if item_id:
-        qs = qs.filter(item__item_id__icontains=item_id)
+        qs = qs.filter(item__item_code__icontains=item_id)
     if location_code:
         qs = qs.filter(planning_location__code=location_code)
     if customer_code:
@@ -655,7 +655,7 @@ def version_lines(request, pk, client_id=None):
     )
 
     # Distinct item count — drives qty total visibility
-    distinct_items = qs.values('item__item_id').distinct().count()
+    distinct_items = qs.values('item__item_code').distinct().count()
     single_item    = distinct_items == 1
 
     # Totals
@@ -734,9 +734,9 @@ def version_lines(request, pk, client_id=None):
     return render(request, 'demand/version_lines.html', context)
 
 @login_required
-def version_line_row(request, pk, line_id, client_id=None):
+def version_line_row(request, pk, line_id, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/lines/row/{line_id}/
+    GET /{client_code}/demand/versions/{id}/lines/row/{line_id}/
 
     Returns a single <tr> partial — used after an inline override edit
     to refresh just that row (final_qty / final_value recompute).
@@ -759,9 +759,9 @@ def version_line_row(request, pk, line_id, client_id=None):
 # Scheme Numbers (inline-editable scheme fields per ForecastLine)
 # ─────────────────────────────────────────────────────────────────────────────
 @login_required
-def version_scheme_numbers(request, pk, client_id=None):
+def version_scheme_numbers(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/scheme-numbers/
+    GET /{client_code}/demand/versions/{id}/scheme-numbers/
 
     Table of ForecastLines showing scheme breakdown:
     pre_scheme_statistical_qty, scheme_qty, scheme_value,
@@ -784,7 +784,7 @@ def version_scheme_numbers(request, pk, client_id=None):
         .filter(version=version)
         .select_related('item', 'planning_location', 'planning_customer',
                          'distribution_channel', 'scheme')
-        .order_by('period_start', 'planning_location__code', 'item__item_id')
+        .order_by('period_start', 'planning_location__code', 'item__item_code')
     )
 
     # Only show lines that have scheme data (pre_scheme_statistical_qty set)
@@ -798,7 +798,7 @@ def version_scheme_numbers(request, pk, client_id=None):
     period_start = request.GET.get('period_start', '').strip()
 
     if item_id:
-        qs = qs.filter(item__item_id__icontains=item_id)
+        qs = qs.filter(item__item_code__icontains=item_id)
     if location_code:
         qs = qs.filter(planning_location__code=location_code)
     if period_start:
@@ -814,7 +814,7 @@ def version_scheme_numbers(request, pk, client_id=None):
         qs.values_list('period_start', flat=True)
         .distinct().order_by('period_start')
     )
-    distinct_items = qs.values('item__item_id').distinct().count()
+    distinct_items = qs.values('item__item_code').distinct().count()
 
     # Totals
     grand_total = qs.aggregate(
@@ -881,9 +881,9 @@ def version_scheme_numbers(request, pk, client_id=None):
 
 
 @login_required
-def version_scheme_update(request, pk, line_id, client_id=None):
+def version_scheme_update(request, pk, line_id, client_code=None):
     """
-    POST /{client_id}/demand/versions/{id}/scheme-numbers/{line_id}/update/
+    POST /{client_code}/demand/versions/{id}/scheme-numbers/{line_id}/update/
 
     Updates scheme_qty (and optionally scheme_value) on a ForecastLine,
     then recalculates statistical_qty = pre_scheme + scheme_qty,
@@ -962,9 +962,9 @@ def version_scheme_update(request, pk, line_id, client_id=None):
 
 
 @login_required
-def version_scheme_row(request, pk, line_id, client_id=None):
+def version_scheme_row(request, pk, line_id, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/scheme-numbers/{line_id}/row/?edit=scheme_qty|scheme_value
+    GET /{client_code}/demand/versions/{id}/scheme-numbers/{line_id}/row/?edit=scheme_qty|scheme_value
 
     Returns a single <tr> partial. When ?edit= is set, the corresponding
     cell is replaced with an inline form for editing.
@@ -988,9 +988,9 @@ def version_scheme_row(request, pk, line_id, client_id=None):
 
 
 @login_required
-def scheme_suggest(request, client_id=None):
+def scheme_suggest(request, client_code=None):
     """
-    GET /{client_id}/demand/schemes/suggest/?code=SCHEME_CODE
+    GET /{client_code}/demand/schemes/suggest/?code=SCHEME_CODE
 
     Returns JSON with suggested uplift values from prior occurrences.
     Called by the admin form when the planner types a scheme_code.
@@ -1013,9 +1013,9 @@ def scheme_suggest(request, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def scheme_list(request, client_id=None):
+def scheme_list(request, client_code=None):
     """
-    GET /{client_id}/demand/schemes/
+    GET /{client_code}/demand/schemes/
 
     List all schemes for the client, filterable by status.
     HTMX requests return only the table body partial.
@@ -1054,7 +1054,7 @@ def scheme_list(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def scheme_create(request, client_id=None):
+def scheme_create(request, client_code=None):
     """
     GET  renders the scheme registration form (in a modal partial).
     POST creates a new SalesScheme + scopes + periods.
@@ -1213,7 +1213,7 @@ def scheme_create(request, client_id=None):
             return response
 
         return redirect('demand_ui:scheme_list',
-                        client_id=request.client.client_id)
+                        client_code=request.client.client_code)
 
     # GET
     ctx = {'config': config, 'errors': {}}
@@ -1223,9 +1223,9 @@ def scheme_create(request, client_id=None):
 
 
 @login_required
-def scheme_detail(request, pk, client_id=None):
+def scheme_detail(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/schemes/{pk}/
+    GET /{client_code}/demand/schemes/{pk}/
 
     Shows scheme details, scopes, periods, resolved rows, and occurrences.
     """
@@ -1260,7 +1260,7 @@ def scheme_detail(request, pk, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def scheme_edit(request, pk, client_id=None):
+def scheme_edit(request, pk, client_code=None):
     """
     GET  renders the edit form (only DRAFT schemes).
     POST updates the scheme.
@@ -1276,7 +1276,7 @@ def scheme_edit(request, pk, client_id=None):
             return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
         messages.error(request, msg)
         return redirect('demand_ui:scheme_detail', pk=pk,
-                        client_id=request.client.client_id)
+                        client_code=request.client.client_code)
 
     if request.method == 'POST':
         errors = {}
@@ -1351,7 +1351,7 @@ def scheme_edit(request, pk, client_id=None):
             )
             return response
         return redirect('demand_ui:scheme_detail', pk=pk,
-                        client_id=request.client.client_id)
+                        client_code=request.client.client_code)
 
     # GET
     ctx = {'scheme': scheme, 'errors': {}}
@@ -1362,9 +1362,9 @@ def scheme_edit(request, pk, client_id=None):
 
 @login_required
 @require_POST
-def scheme_activate(request, pk, client_id=None):
+def scheme_activate(request, pk, client_code=None):
     """
-    POST /{client_id}/demand/schemes/{pk}/activate/
+    POST /{client_code}/demand/schemes/{pk}/activate/
 
     Sets status to ACTIVE and triggers resolve_scheme_scope.
     """
@@ -1379,7 +1379,7 @@ def scheme_activate(request, pk, client_id=None):
             return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
         messages.error(request, msg)
         return redirect('demand_ui:scheme_detail', pk=pk,
-                        client_id=request.client.client_id)
+                        client_code=request.client.client_code)
 
     scheme.status = 'ACTIVE'
     scheme.save(update_fields=['status', 'updated_at'])
@@ -1398,14 +1398,14 @@ def scheme_activate(request, pk, client_id=None):
         )
         return response
     return redirect('demand_ui:scheme_detail', pk=pk,
-                    client_id=request.client.client_id)
+                    client_code=request.client.client_code)
 
 
 @login_required
 @require_POST
-def scheme_archive(request, pk, client_id=None):
+def scheme_archive(request, pk, client_code=None):
     """
-    POST /{client_id}/demand/schemes/{pk}/archive/
+    POST /{client_code}/demand/schemes/{pk}/archive/
 
     Sets status to ARCHIVED.
     """
@@ -1420,7 +1420,7 @@ def scheme_archive(request, pk, client_id=None):
             return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
         messages.error(request, msg)
         return redirect('demand_ui:scheme_detail', pk=pk,
-                        client_id=request.client.client_id)
+                        client_code=request.client.client_code)
 
     scheme.status = 'ARCHIVED'
     scheme.save(update_fields=['status', 'updated_at'])
@@ -1435,14 +1435,14 @@ def scheme_archive(request, pk, client_id=None):
         )
         return response
     return redirect('demand_ui:scheme_detail', pk=pk,
-                    client_id=request.client.client_id)
+                    client_code=request.client.client_code)
 
 
 @login_required
 @require_POST
-def scheme_delete(request, pk, client_id=None):
+def scheme_delete(request, pk, client_code=None):
     """
-    POST /{client_id}/demand/schemes/{pk}/delete/
+    POST /{client_code}/demand/schemes/{pk}/delete/
 
     Deletes a DRAFT scheme.
     """
@@ -1457,7 +1457,7 @@ def scheme_delete(request, pk, client_id=None):
             return HttpResponse(msg, status=409, headers={'HX-Retarget': '#scheme-toast'})
         messages.error(request, msg)
         return redirect('demand_ui:scheme_detail', pk=pk,
-                        client_id=request.client.client_id)
+                        client_code=request.client.client_code)
 
     code = scheme.scheme_code
     scheme.delete()
@@ -1471,15 +1471,15 @@ def scheme_delete(request, pk, client_id=None):
         )
         return response
     return redirect('demand_ui:scheme_list',
-                    client_id=request.client.client_id)
+                    client_code=request.client.client_code)
 
 
 # ── Scheme Review Queue (system-detected candidates) ──────────────────────
 
 @login_required
-def scheme_review_queue(request, client_id=None):
+def scheme_review_queue(request, client_code=None):
     """
-    GET /{client_id}/demand/schemes/review-queue/
+    GET /{client_code}/demand/schemes/review-queue/
 
     Shows DRAFT schemes created by the detection task (scheme_code starts with 'SYS-').
     """
@@ -1512,7 +1512,7 @@ def scheme_review_queue(request, client_id=None):
 
 
 @login_required
-def scheme_detection_form(request, client_id=None):
+def scheme_detection_form(request, client_code=None):
     """
     GET renders the range-picker form fragment for scheme detection.
     """
@@ -1553,7 +1553,7 @@ def scheme_detection_form(request, client_id=None):
 
 @login_required
 @require_POST
-def trigger_scheme_detection(request, client_id=None):
+def trigger_scheme_detection(request, client_code=None):
     """
     POST triggers the detect_scheme_candidates Celery task.
     """
@@ -1572,7 +1572,7 @@ def trigger_scheme_detection(request, client_id=None):
 
     from mysite.tasks.demand.detect_scheme_candidates import detect_scheme_candidates
     detect_scheme_candidates.delay(
-        client_id=request.client.client_id,
+        client_code=request.client.client_code,
         target_period_start=period_start,
         target_period_end=period_end,
         triggered_by_user_id=request.user.id,
@@ -1587,9 +1587,9 @@ def trigger_scheme_detection(request, client_id=None):
 # ── Scheme Occurrences (closed-scheme report) ────────────────────────────
 
 @login_required
-def scheme_occurrences(request, pk, client_id=None):
+def scheme_occurrences(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/schemes/{pk}/occurrences/
+    GET /{client_code}/demand/schemes/{pk}/occurrences/
 
     Shows actual-vs-expected report for a closed scheme.
     """
@@ -1620,9 +1620,9 @@ def scheme_occurrences(request, pk, client_id=None):
 # Aggregates (value summary)
 # ─────────────────────────────────────────────────────────────────────────────
 @login_required
-def version_aggregates(request, pk, client_id=None):
+def version_aggregates(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/aggregates/
+    GET /{client_code}/demand/versions/{id}/aggregates/
 
     Query params: agg_level (total|sales|item_hierarchy|customer)
     Shows the comprehensible single-number view per your Sprint 3B.4
@@ -1947,8 +1947,8 @@ def version_aggregates(request, pk, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def override_list(request, pk, client_id=None):
-    """GET /{client_id}/demand/versions/{id}/overrides/"""
+def override_list(request, pk, client_code=None):
+    """GET /{client_code}/demand/versions/{id}/overrides/"""
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
@@ -1968,7 +1968,7 @@ def override_list(request, pk, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def override_create(request, pk, client_id=None):
+def override_create(request, pk, client_code=None):
     blocked = feature_gate(request, 'consensus_override')
     if blocked:
         return blocked
@@ -1977,7 +1977,7 @@ def override_create(request, pk, client_id=None):
 
     if not version.is_editable:
         messages.error(request, f'Version is {version.status}. Overrides require a DRAFT version.')
-        return redirect('demand_ui:override_list', client_id=request.client.client_id, pk=pk)
+        return redirect('demand_ui:override_list', client_code=request.client.client_code, pk=pk)
 
     if request.method == 'GET':
         if _is_htmx(request):
@@ -2075,9 +2075,9 @@ def override_create(request, pk, client_id=None):
 
 @login_required
 @require_http_methods(['POST', 'DELETE'])
-def override_delete(request, pk, override_id, client_id=None):
+def override_delete(request, pk, override_id, client_code=None):
     """
-    DELETE /{client_id}/demand/versions/{id}/overrides/{override_id}/delete/
+    DELETE /{client_code}/demand/versions/{id}/overrides/{override_id}/delete/
 
     Only unapplied overrides on DRAFT versions can be deleted
     (matches the admin.has_delete_permission guard from Sprint 3B.3).
@@ -2117,9 +2117,9 @@ def override_delete(request, pk, override_id, client_id=None):
 
 
 @login_required
-def override_affected_lines(request, pk, override_id, client_id=None):
+def override_affected_lines(request, pk, override_id, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/overrides/{override_id}/affected/
+    GET /{client_code}/demand/versions/{id}/overrides/{override_id}/affected/
 
     Shows which ForecastLine rows were touched by this override —
     the propagation view your earlier sprint plan called for.
@@ -2136,7 +2136,7 @@ def override_affected_lines(request, pk, override_id, client_id=None):
 
     key = override.override_key
     if override.override_level == 'sku' and key.get('item_id'):
-        qs = qs.filter(item__item_id=key['item_id'])
+        qs = qs.filter(item__item_code=key['item_id'])
     elif override.override_level == 'location' and key.get('location_code'):
         qs = qs.filter(planning_location__code=key['location_code'])
     elif override.override_level == 'customer' and key.get('customer_code'):
@@ -2158,9 +2158,9 @@ def override_affected_lines(request, pk, override_id, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def version_export(request, pk, client_id=None):
+def version_export(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/export/
+    GET /{client_code}/demand/versions/{id}/export/
 
     Streams an .xlsx export. Page itself just shows a download button
     that hits this endpoint directly (not via HTMX — browsers handle
@@ -2195,11 +2195,11 @@ def version_export(request, pk, client_id=None):
         ForecastLine.objects
         .filter(version=version)
         .select_related('item', 'planning_location', 'planning_customer')
-        .order_by('period_start', 'planning_location__code', 'item__item_id')
+        .order_by('period_start', 'planning_location__code', 'item__item_code')
     )
     for line in lines:
         ws.append([
-            line.item.item_id,
+            line.item.item_code,
             line.planning_location.code,
             line.planning_customer.code if line.planning_customer else '',
             line.period_start.isoformat(),
@@ -2265,9 +2265,9 @@ def _accuracy_agg_totals(rows):
 
 
 @login_required
-def version_accuracy(request, pk, client_id=None):
+def version_accuracy(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/accuracy/
+    GET /{client_code}/demand/versions/{id}/accuracy/
 
     Mirrors the Value Summary / Actuals Summary layout: level tabs
     (total|sales|item_hierarchy|customer), a filter bar (period, sales-org
@@ -2449,9 +2449,9 @@ def version_accuracy(request, pk, client_id=None):
 
 @login_required
 @require_http_methods(['POST'])
-def version_accuracy_run(request, pk, client_id=None):
+def version_accuracy_run(request, pk, client_code=None):
     """
-    POST /{client_id}/demand/versions/{id}/accuracy/run/
+    POST /{client_code}/demand/versions/{id}/accuracy/run/
 
     Triggers compute_accuracy for this single version via Celery.
     Enforce the same enable rule server-side (role + status + actuals).
@@ -2509,9 +2509,9 @@ def version_accuracy_run(request, pk, client_id=None):
 
 
 @login_required
-def version_accuracy_run_status(request, pk, client_id=None):
+def version_accuracy_run_status(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/accuracy/run-status/
+    GET /{client_code}/demand/versions/{id}/accuracy/run-status/
 
     Polled by HTMX while an accuracy run is in progress. Returns the same
     partial; the partial stops polling once COMPLETE or FAILED.
@@ -2528,9 +2528,9 @@ def version_accuracy_run_status(request, pk, client_id=None):
 
 
 @login_required
-def accuracy_hierarchy_locations(request, pk, client_id=None):
+def accuracy_hierarchy_locations(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/accuracy/hierarchy-locations/
+    GET /{client_code}/demand/versions/{id}/accuracy/hierarchy-locations/
     Query params: location_id (drill into a location), items=1 (item rows).
     HTMX partial: swaps itself into #accuracy-hierarchy-locations-container.
     """
@@ -2567,9 +2567,9 @@ def accuracy_hierarchy_locations(request, pk, client_id=None):
 
 
 @login_required
-def accuracy_hierarchy_taxonomy(request, pk, client_id=None):
+def accuracy_hierarchy_taxonomy(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/accuracy/hierarchy-taxonomy/
+    GET /{client_code}/demand/versions/{id}/accuracy/hierarchy-taxonomy/
     Query params: node_path (materialized path to drill into), items=1.
     HTMX partial: swaps itself into #accuracy-hierarchy-taxonomy-container.
     """
@@ -2611,7 +2611,7 @@ def accuracy_hierarchy_taxonomy(request, pk, client_id=None):
 
 
 @login_required
-def actuals_list(request, client_id=None):
+def actuals_list(request, client_code=None):
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
@@ -2631,7 +2631,7 @@ def actuals_list(request, client_id=None):
     period_start  = request.GET.get('period_start', '').strip()
 
     if item_id:
-        qs = qs.filter(item__item_id__icontains=item_id)
+        qs = qs.filter(item__item_code__icontains=item_id)
     if location_code:
         qs = qs.filter(planning_location__code=location_code)
     if customer_code:
@@ -2691,7 +2691,7 @@ def actuals_list(request, client_id=None):
 
     # Check if the result set is for a single item — item total is only
     # meaningful when filtering to one item
-    distinct_items = qs.values('item__item_id').distinct().count()
+    distinct_items = qs.values('item__item_code').distinct().count()
     single_item = distinct_items == 1
 
     paginator = Paginator(qs, 50)
@@ -2759,9 +2759,9 @@ def actuals_list(request, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def actuals_aggregates(request, client_id=None):
+def actuals_aggregates(request, client_code=None):
     """
-    GET /{client_id}/demand/actuals/aggregates/
+    GET /{client_code}/demand/actuals/aggregates/
 
     Query params: agg_level (total|sales|item_hierarchy|customer),
     sales_node_id / taxonomy_node_id (subtree drill filters),
@@ -3133,7 +3133,7 @@ def actuals_aggregates(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def actuals_upload(request, client_id=None):
+def actuals_upload(request, client_code=None):
     blocked = feature_gate(request, 'actuals_upload')
     if blocked:
         return blocked
@@ -3435,9 +3435,9 @@ def actuals_upload(request, client_id=None):
     return render(request, 'demand/actuals_upload.html', ctx)
 
 @login_required
-def actuals_upload_status(request, job_id, client_id=None):
+def actuals_upload_status(request, job_id, client_code=None):
     """
-    GET /{client_id}/demand/actuals/upload/{job_id}/status/
+    GET /{client_code}/demand/actuals/upload/{job_id}/status/
 
     Polled by HTMX while status is pending/processing.
     """
@@ -3446,8 +3446,8 @@ def actuals_upload_status(request, job_id, client_id=None):
 
 
 @login_required
-def actuals_template_download(request, client_id=None):
-    """GET /{client_id}/demand/actuals/template/ — streams generated .xlsx."""
+def actuals_template_download(request, client_code=None):
+    """GET /{client_code}/demand/actuals/template/ — streams generated .xlsx."""
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
@@ -3463,7 +3463,7 @@ def actuals_template_download(request, client_id=None):
     tmp_path = tempfile.mktemp(suffix='.xlsx')
     call_command(
         'generate_actuals_template',
-        client=request.client.client_id,
+        client=request.client.client_code,
         period_type=period_type,
         output_path=tmp_path,
     )
@@ -3472,7 +3472,7 @@ def actuals_template_download(request, client_id=None):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     response['Content-Disposition'] = (
-        f'attachment; filename="actuals_template_{request.client.client_id}_{period_type}.xlsx"'
+        f'attachment; filename="actuals_template_{request.client.client_code}_{period_type}.xlsx"'
     )
     return response
 
@@ -3482,7 +3482,7 @@ def actuals_template_download(request, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def series_profile_list(request, client_id=None):
+def series_profile_list(request, client_code=None):
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
@@ -3615,7 +3615,7 @@ def series_profile_list(request, client_id=None):
         SeriesProfile.objects
         .filter(client=request.client)
         .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
-        .order_by('item__item_id', 'planning_location__code',
+        .order_by('item__item_code', 'planning_location__code',
                   'planning_customer__code')
     )
 
@@ -3632,7 +3632,7 @@ def series_profile_list(request, client_id=None):
     if location_code:
         qs = qs.filter(planning_location__code=location_code)
     if item_id:
-        qs = qs.filter(item__item_id__icontains=item_id)
+        qs = qs.filter(item__item_code__icontains=item_id)
 
     # Filter by ABC class at the selected grain level (by pattern, not exact grain)
     if abc_class:
@@ -3666,7 +3666,7 @@ def series_profile_list(request, client_id=None):
         .values_list('planning_location__code', 'planning_location__name')
         .distinct().order_by('planning_location__code')
     )
-    distinct_items = qs.values('item__item_id').distinct().count()
+    distinct_items = qs.values('item__item_code').distinct().count()
 
     # ── Paginate ──────────────────────────────────────────────────────────────
     paginator = Paginator(qs, 50)
@@ -3940,9 +3940,9 @@ def series_profile_list(request, client_id=None):
     return render(request, 'demand/series_profile_list.html', context)
 
 @login_required
-def series_profile_detail(request, pk, client_id=None):
+def series_profile_detail(request, pk, client_code=None):
     """
-    GET /{client_id}/demand/series-profiles/{pk}/
+    GET /{client_code}/demand/series-profiles/{pk}/
 
     Shows the full evaluation log (search path) for one series —
     the audit trail from Sprint 3B.3's classification engine.
@@ -3971,9 +3971,9 @@ def series_profile_detail(request, pk, client_id=None):
 
 @login_required
 @require_http_methods(['POST'])
-def series_profile_override(request, pk, client_id=None):
+def series_profile_override(request, pk, client_code=None):
     """
-    POST /{client_id}/demand/series-profiles/{pk}/override/
+    POST /{client_code}/demand/series-profiles/{pk}/override/
 
     Sets override_grain / override_strategy / override_note.
     """
@@ -3995,7 +3995,7 @@ def series_profile_override(request, pk, client_id=None):
 
     if override_grain and valid_grains and override_grain not in valid_grains:
         messages.error(request, f'"{override_grain}" is not a valid grain for this series.')
-        return redirect('demand_ui:series_profile_detail', client_id=request.client.client_id, pk=pk)
+        return redirect('demand_ui:series_profile_detail', client_code=request.client.client_code, pk=pk)
 
     from django.utils import timezone
     profile.override_grain    = override_grain
@@ -4009,12 +4009,12 @@ def series_profile_override(request, pk, client_id=None):
     ])
     messages.success(request, 'Override saved.')
 
-    return redirect('demand_ui:series_profile_detail', client_id=request.client.client_id, pk=pk)
+    return redirect('demand_ui:series_profile_detail', client_code=request.client.client_code, pk=pk)
 
 
 @login_required
 @require_http_methods(['POST'])
-def recompute_series_profiles(request, client_id=None):
+def recompute_series_profiles(request, client_code=None):
     blocked = feature_gate(request, 'demand_planning')
     if blocked:
         return blocked
@@ -4055,7 +4055,7 @@ def recompute_series_profiles(request, client_id=None):
     })
 
 @login_required
-def recompute_status(request, client_id=None):
+def recompute_status(request, client_code=None):
     from celery.result import AsyncResult
     task_id = request.GET.get('task_id', '')
 
@@ -4083,7 +4083,7 @@ from mysite.tasks.demand.detect_outliers import run_outlier_detection
 from datetime import timedelta
  
 @login_required
-def outlier_detection_form(request, client_id):
+def outlier_detection_form(request, client_code):
     """
     GET renders the range-picker form fragment.
  
@@ -4139,7 +4139,7 @@ def outlier_detection_form(request, client_id):
 
 @login_required
 @require_POST
-def trigger_outlier_detection(request, client_id):
+def trigger_outlier_detection(request, client_code):
     client = request.client
     period_start = request.POST.get("period_start")
     period_end = request.POST.get("period_end")
@@ -4150,7 +4150,7 @@ def trigger_outlier_detection(request, client_id):
         })
  
     run_outlier_detection.delay(
-        client_id=client.client_id,
+        client_code=client.client_code,
         target_period_start=period_start,
         target_period_end=period_end,
         triggered_by_user_id=request.user.id,
@@ -4161,7 +4161,7 @@ def trigger_outlier_detection(request, client_id):
 
 
 @login_required
-def outlier_queue(request, client_id):
+def outlier_queue(request, client_code):
     return render(request, "demand/outliers/queue.html", _outlier_queue_context(request))
 
 
@@ -4193,7 +4193,7 @@ def _outlier_queue_context(request):
 
 @login_required
 @require_POST
-def outlier_bulk_delete(request, client_id):
+def outlier_bulk_delete(request, client_code):
     """
     Discard proposed (CANDIDATE) outlier adjustments so a future detection
     run can re-propose them afresh. Only CANDIDATE rows are eligible —
@@ -4227,7 +4227,7 @@ def outlier_bulk_delete(request, client_id):
 
 @login_required
 @require_POST
-def outlier_confirm(request, client_id, pk):
+def outlier_confirm(request, client_code, pk):
     adj = get_object_or_404(ActualSaleOutlierAdjustment, pk=pk, actual_sale__client=request.client)
     if "qty_adjustment" in request.POST:
         adj.qty_adjustment = request.POST["qty_adjustment"]
@@ -4239,14 +4239,14 @@ def outlier_confirm(request, client_id, pk):
 
 @login_required
 @require_POST
-def outlier_reject(request, client_id, pk):
+def outlier_reject(request, client_code, pk):
     adj = get_object_or_404(ActualSaleOutlierAdjustment, pk=pk, actual_sale__client=request.client)
     adj.reject(user=request.user)
     return render(request, "demand/outliers/partials/_row.html", {"adjustment": adj})
 
 
 @login_required
-def raise_exception_form(request, client_id, actual_sale_id):
+def raise_exception_form(request, client_code, actual_sale_id):
     actual = get_object_or_404(ActualSale, pk=actual_sale_id, client=request.client)
     if request.method == "POST":
         adj, created = ActualSaleOutlierAdjustment.objects.get_or_create(
@@ -4268,7 +4268,7 @@ def raise_exception_form(request, client_id, actual_sale_id):
     return render(request, "demand/outliers/partials/_raise_exception_form.html", {"actual": actual})
 
 @login_required
-def outlier_decisions_report(request, client_id):
+def outlier_decisions_report(request, client_code):
     client = request.client
     qs = ActualSaleOutlierAdjustment.objects.filter(
         actual_sale__client=client
@@ -4301,7 +4301,7 @@ def outlier_decisions_report(request, client_id):
 
 @login_required
 @require_POST
-def outlier_revise(request, client_id, pk):
+def outlier_revise(request, client_code, pk):
     """
     Edit a previously CONFIRMED/REJECTED adjustment's qty/revenue or status —
     reuses the same mutable record per the earlier one-to-one decision, not a
@@ -4336,7 +4336,7 @@ def outlier_revise(request, client_id, pk):
 
 @login_required
 @require_POST
-def outlier_undo_decision(request, client_id, pk):
+def outlier_undo_decision(request, client_code, pk):
     """
     Reverts a CONFIRMED/REJECTED adjustment back to CANDIDATE — the same
     mutable record, not a new one (consistent with the one-to-one design).
@@ -4383,7 +4383,7 @@ def _lifecycle_gate(request):
 # ── Item Substitution ────────────────────────────────────────────────────
 
 @login_required
-def item_substitution_list(request, client_id=None):
+def item_substitution_list(request, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4400,7 +4400,7 @@ def item_substitution_list(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def item_substitution_create(request, client_id=None):
+def item_substitution_create(request, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4446,7 +4446,7 @@ def item_substitution_create(request, client_id=None):
                                   {'substitutions': subs, 'active_nav': 'item_lifecycle'})
                     resp['HX-Trigger'] = 'lifecycleCreated'
                     return resp
-                return redirect('demand_ui:item_substitution_list', client_id=request.client.client_id)
+                return redirect('demand_ui:item_substitution_list', client_code=request.client.client_code)
             except Exception as e:
                 errors['__all__'] = str(e)
 
@@ -4465,7 +4465,7 @@ def item_substitution_create(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def item_substitution_edit(request, pk, client_id=None):
+def item_substitution_edit(request, pk, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4495,7 +4495,7 @@ def item_substitution_edit(request, pk, client_id=None):
                                   {'substitutions': subs, 'active_nav': 'item_lifecycle'})
                     resp['HX-Trigger'] = 'lifecycleCreated'
                     return resp
-                return redirect('demand_ui:item_substitution_list', client_id=request.client.client_id)
+                return redirect('demand_ui:item_substitution_list', client_code=request.client.client_code)
             except Exception as e:
                 errors['__all__'] = str(e)
 
@@ -4513,7 +4513,7 @@ def item_substitution_edit(request, pk, client_id=None):
 
 @login_required
 @require_POST
-def item_substitution_delete(request, pk, client_id=None):
+def item_substitution_delete(request, pk, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4526,13 +4526,13 @@ def item_substitution_delete(request, pk, client_id=None):
         resp = render(request, 'demand/lifecycle/partials/substitution_table_body.html',
                       {'substitutions': subs, 'active_nav': 'item_lifecycle'})
         return resp
-    return redirect('demand_ui:item_substitution_list', client_id=request.client.client_id)
+    return redirect('demand_ui:item_substitution_list', client_code=request.client.client_code)
 
 
 # ── Item Discontinuation ─────────────────────────────────────────────────
 
 @login_required
-def item_discontinuation_list(request, client_id=None):
+def item_discontinuation_list(request, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4549,7 +4549,7 @@ def item_discontinuation_list(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def item_discontinuation_create(request, client_id=None):
+def item_discontinuation_create(request, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4581,7 +4581,7 @@ def item_discontinuation_create(request, client_id=None):
                                   {'discontinuations': discs, 'active_nav': 'item_lifecycle'})
                     resp['HX-Trigger'] = 'lifecycleCreated'
                     return resp
-                return redirect('demand_ui:item_discontinuation_list', client_id=request.client.client_id)
+                return redirect('demand_ui:item_discontinuation_list', client_code=request.client.client_code)
             except Exception as e:
                 errors['__all__'] = str(e)
 
@@ -4598,7 +4598,7 @@ def item_discontinuation_create(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def item_discontinuation_edit(request, pk, client_id=None):
+def item_discontinuation_edit(request, pk, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4621,7 +4621,7 @@ def item_discontinuation_edit(request, pk, client_id=None):
                                   {'discontinuations': discs, 'active_nav': 'item_lifecycle'})
                     resp['HX-Trigger'] = 'lifecycleCreated'
                     return resp
-                return redirect('demand_ui:item_discontinuation_list', client_id=request.client.client_id)
+                return redirect('demand_ui:item_discontinuation_list', client_code=request.client.client_code)
             except Exception as e:
                 errors['__all__'] = str(e)
 
@@ -4639,7 +4639,7 @@ def item_discontinuation_edit(request, pk, client_id=None):
 
 @login_required
 @require_POST
-def item_discontinuation_delete(request, pk, client_id=None):
+def item_discontinuation_delete(request, pk, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4652,13 +4652,13 @@ def item_discontinuation_delete(request, pk, client_id=None):
         resp = render(request, 'demand/lifecycle/partials/discontinuation_table_body.html',
                       {'discontinuations': discs, 'active_nav': 'item_lifecycle'})
         return resp
-    return redirect('demand_ui:item_discontinuation_list', client_id=request.client.client_id)
+    return redirect('demand_ui:item_discontinuation_list', client_code=request.client.client_code)
 
 
 # ── Item Introduction ────────────────────────────────────────────────────
 
 @login_required
-def item_introduction_list(request, client_id=None):
+def item_introduction_list(request, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4675,7 +4675,7 @@ def item_introduction_list(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def item_introduction_create(request, client_id=None):
+def item_introduction_create(request, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4723,7 +4723,7 @@ def item_introduction_create(request, client_id=None):
                                   {'introductions': intros, 'active_nav': 'item_lifecycle'})
                     resp['HX-Trigger'] = 'lifecycleCreated'
                     return resp
-                return redirect('demand_ui:item_introduction_list', client_id=request.client.client_id)
+                return redirect('demand_ui:item_introduction_list', client_code=request.client.client_code)
             except Exception as e:
                 errors['__all__'] = str(e)
 
@@ -4740,7 +4740,7 @@ def item_introduction_create(request, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def item_introduction_edit(request, pk, client_id=None):
+def item_introduction_edit(request, pk, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4771,7 +4771,7 @@ def item_introduction_edit(request, pk, client_id=None):
                                   {'introductions': intros, 'active_nav': 'item_lifecycle'})
                     resp['HX-Trigger'] = 'lifecycleCreated'
                     return resp
-                return redirect('demand_ui:item_introduction_list', client_id=request.client.client_id)
+                return redirect('demand_ui:item_introduction_list', client_code=request.client.client_code)
             except Exception as e:
                 errors['__all__'] = str(e)
 
@@ -4789,7 +4789,7 @@ def item_introduction_edit(request, pk, client_id=None):
 
 @login_required
 @require_POST
-def item_introduction_delete(request, pk, client_id=None):
+def item_introduction_delete(request, pk, client_code=None):
     blocked = _lifecycle_gate(request)
     if blocked:
         return blocked
@@ -4802,4 +4802,4 @@ def item_introduction_delete(request, pk, client_id=None):
         resp = render(request, 'demand/lifecycle/partials/introduction_table_body.html',
                       {'introductions': intros, 'active_nav': 'item_lifecycle'})
         return resp
-    return redirect('demand_ui:item_introduction_list', client_id=request.client.client_id)
+    return redirect('demand_ui:item_introduction_list', client_code=request.client.client_code)

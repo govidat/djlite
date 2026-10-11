@@ -11,7 +11,7 @@
 
 {# ── Status filter ───────────────────────────────────────────────────── #}
 <div class="tabs tabs-boxed mb-4 w-fit"
-     hx-get="{% url 'demand_ui:version_list' client_id=client.client_id %}"
+     hx-get="{% url 'demand_ui:version_list' client_code=client.client_code %}"
      hx-target="#version-table-body"
      hx-swap="innerHTML"
      hx-push-url="true">
@@ -64,7 +64,7 @@ function closeVersionModal() {
 
 document.getElementById('new-version-btn').addEventListener('click', function() {
     htmx.ajax('GET',
-        '{% url "demand_ui:version_create" client_id=client.client_id %}',
+        '{% url "demand_ui:version_create" client_code=client.client_code %}',
         { target: '#modal-content', swap: 'innerHTML' }
     );
 });
@@ -85,7 +85,7 @@ document.addEventListener('keydown', function(e) {
 document.body.addEventListener('versionCreated', function() {
     closeVersionModal();
     htmx.ajax('GET',
-        '{% url "demand_ui:version_list" client_id=client.client_id %}',
+        '{% url "demand_ui:version_list" client_code=client.client_code %}',
         { target: '#version-table-body', swap: 'innerHTML',
           headers: {'HX-Request': 'true'} }
     );
@@ -102,9 +102,9 @@ document.body.addEventListener('versionCreated', function() {
 {% block demand_content %}
 <div class="flex items-center justify-between mb-6">
   <h1 class="text-2xl font-bold">{% trans "Forecast Versions" %}</h1>
-  <a href="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+  <a href="{% url 'demand_ui:version_create' client_code=client.client_code %}"
      class="btn btn-primary btn-sm"
-     hx-get="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+     hx-get="{% url 'demand_ui:version_create' client_code=client.client_code %}"
      hx-target="#modal-content" hx-trigger="click"
      onclick="document.getElementById('version-create-modal').showModal()">
     + {% trans "New Version" %}
@@ -113,7 +113,7 @@ document.body.addEventListener('versionCreated', function() {
 
 {# ── Status filter ───────────────────────────────────────────────────── #}
 <div class="tabs tabs-boxed mb-4 w-fit"
-     hx-get="{% url 'demand_ui:version_list' client_id=client.client_id %}"
+     hx-get="{% url 'demand_ui:version_list' client_code=client.client_code %}"
      hx-target="#version-table-body" hx-swap="innerHTML" hx-push-url="true">
   <a class="tab {% if not status_filter %}tab-active{% endif %}"
      hx-vals='{"status": ""}'>{% trans "All" %}</a>

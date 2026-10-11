@@ -40,7 +40,7 @@
         <tbody>
             {% for profile in profiles %}
             <tr class="hover">
-                <td class="font-mono text-xs">{{ profile.item.item_id }}
+                <td class="font-mono text-xs">{{ profile.item.item_code }}
                     <span class="block text-base-content/50 text-xs font-normal">
                         {{ profile.item.name }}
                     </span>
@@ -118,7 +118,7 @@
                 </td>
 
                 <td>
-                    <a href="{% url 'demand_ui:series_profile_detail' client_id=client.client_id pk=profile.pk %}"
+                    <a href="{% url 'demand_ui:series_profile_detail' client_code=client.client_code pk=profile.pk %}"
                        class="btn btn-ghost btn-xs">{% trans "View" %}</a>
                 </td>
             </tr>

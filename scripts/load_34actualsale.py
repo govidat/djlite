@@ -32,7 +32,7 @@ User = get_user_model()
 # ============================================================================
 
 # id,period_type,period_start,qty,revenue,
-# client_id,planning_customer_code,
+# client_code,planning_customer_code,
 # planning_location_code,item_code
 
 
@@ -60,10 +60,10 @@ def load_val01(
     # COLLECT IDS
     # =========================================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if row.get("client_id")
+        if row.get("client_code")
     }
 
     location_codes = {
@@ -95,9 +95,9 @@ def load_val01(
     # =========================================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -110,7 +110,7 @@ def load_val01(
     ):
 
         key = (
-            obj.client.client_id,
+            obj.client.client_code,
             obj.code,
         )
 
@@ -125,7 +125,7 @@ def load_val01(
     ):
 
         key = (
-            obj.client.client_id,
+            obj.client.client_code,
             obj.code,
         )
 
@@ -135,13 +135,13 @@ def load_val01(
 
     for obj in (
         Item.objects
-        .filter(item_id__in=item_codes)
+        .filter(item_code__in=item_codes)
         .select_related("client")
     ):
 
         key = (
-            obj.client.client_id,
-            obj.item_id,
+            obj.client.client_code,
+            obj.item_code,
         )
 
         items[key] = obj
@@ -157,12 +157,12 @@ def load_val01(
     # CREATE IMPORT BATCH
     # =========================================================================
 
-    first_client_id = clean(
-        rows[0].get("client_id"),
+    first_client_code = clean(
+        rows[0].get("client_code"),
         lower=True,
     )
 
-    batch_client = clients.get(first_client_id)
+    batch_client = clients.get(first_client_code)
 
     import_batch = None
 
@@ -201,8 +201,8 @@ def load_val01(
         # BASIC VALUES
         # =====================================================================
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
@@ -252,7 +252,7 @@ def load_val01(
         # =====================================================================
 
         if not all([
-            client_id,
+            client_code,
             planning_location_code,
             item_code,
             period_type,
@@ -275,7 +275,7 @@ def load_val01(
         # =====================================================================
 
         unique_key = (
-            client_id,
+            client_code,
             planning_location_code,
             planning_customer_code,
             item_code,
@@ -301,11 +301,11 @@ def load_val01(
         # CLIENT
         # =====================================================================
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
-            msg = f"Missing client: {client_id}"
+            msg = f"Missing client: {client_code}"
 
             print(msg)
 
@@ -320,7 +320,7 @@ def load_val01(
 
         planning_location = planning_locations.get(
             (
-                client_id,
+                client_code,
                 planning_location_code,
             )
         )
@@ -329,7 +329,7 @@ def load_val01(
 
             msg = (
                 f"Missing planning location: "
-                f"{client_id} / "
+                f"{client_code} / "
                 f"{planning_location_code}"
             )
 
@@ -350,7 +350,7 @@ def load_val01(
 
             planning_customer = planning_customers.get(
                 (
-                    client_id,
+                    client_code,
                     planning_customer_code,
                 )
             )
@@ -359,7 +359,7 @@ def load_val01(
 
                 msg = (
                     f"Missing planning customer: "
-                    f"{client_id} / "
+                    f"{client_code} / "
                     f"{planning_customer_code}"
                 )
 
@@ -387,7 +387,7 @@ def load_val01(
 
                 msg = (
                     f"Missing distribution_channel: "
-                    f"{client_id} / "
+                    f"{client_code} / "
                     f"{distribution_channel_code}"
                 )
 
@@ -404,7 +404,7 @@ def load_val01(
 
         item = items.get(
             (
-                client_id,
+                client_code,
                 item_code,
             )
         )
@@ -413,7 +413,7 @@ def load_val01(
 
             msg = (
                 f"Missing item: "
-                f"{client_id} / "
+                f"{client_code} / "
                 f"{item_code}"
             )
 
@@ -449,7 +449,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / "
+                f"{client_code} / "
                 f"{planning_location_code} / "
                 f"{planning_customer_code} / "
                 f"{distribution_channel_code} / "
@@ -498,7 +498,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"ActualSale: "
-                f"{client_id} / "
+                f"{client_code} / "
                 f"{planning_location_code} / "
                 f"{item_code}"
             )

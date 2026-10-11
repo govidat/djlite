@@ -6,14 +6,14 @@
 <p class="text-base-content/70 mb-6">
   {% blocktrans %}Every confirmed or rejected outlier decision, across all periods — audit and revise past calls here.{% endblocktrans %}
   {% trans "New, unreviewed candidates live on the" %}
-  <a class="link" href="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}">{% trans "Outlier Review Queue" %}</a>
+  <a class="link" href="{% url 'demand_ui:outlier_queue' client_code=client.client_code %}">{% trans "Outlier Review Queue" %}</a>
   {% trans "instead." %}
 </p>
 
 <div id="outlier-decisions-report">
 
   {# ── Filters ──────────────────────────────────────────────────────────── #}
-  <form hx-get="{% url 'demand_ui:outlier_decisions_report' client_id=client.client_id %}"
+  <form hx-get="{% url 'demand_ui:outlier_decisions_report' client_code=client.client_code %}"
         hx-target="#outlier-decisions-report" hx-select="#outlier-decisions-report"
         hx-swap="outerHTML" hx-push-url="true" class="flex flex-wrap gap-4 items-end mb-6">
     <label class="form-control">

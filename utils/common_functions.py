@@ -460,24 +460,24 @@ def build_layout(layout, layout_map, client):
 
     return layout_data
 """
-def build_nav_item(item, client_id):
+def build_nav_item(item, client_code):
     return {
         'name':           item.name,   # modeltranslation will expand to label_en etc.
-        'url':             item.get_url(client_id),
+        'url':             item.get_url(client_code),
         'nav_type':        item.nav_type,
         'open_in_new_tab': item.open_in_new_tab,
         'children': [
-            build_nav_item(child, client_id)
+            build_nav_item(child, client_code)
             for child in getattr(item, 'prefetched_children', [])
         ],
     }
 """
 def build_nav_item(item, client):
-    #data = serialize_model(item, exclude={'id', 'parent_id', 'page_id'})
+    #data = serialize_model(item, exclude={'id', 'parent_id', 'page_code'})
     data = serialize_model_resolved(item, client=client)    
-    #data['url']      = item.get_url(client_id)
+    #data['url']      = item.get_url(client_code)
 
-    data['href'] = item.get_url(client.client_id)   # ← resolved full URL, separate from raw 'url' field
+    data['href'] = item.get_url(client.client_code)   # ← resolved full URL, separate from raw 'url' field
     data['children'] = [
         build_nav_item(child, client)
         for child in getattr(item, 'prefetched_children', [])
@@ -636,7 +636,7 @@ def build_client_payload(client):
         })
 
     all_nav_items = getattr(client, 'prefetched_nav_items', [])
-    client_id     = client.client_id
+    client_code     = client.client_code
 
     header_nav = [
         build_nav_item(item, client)
@@ -670,16 +670,16 @@ def build_client_payload(client):
 # TBD in PRD use_cache=True
 
   
-def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout=3600):
+def fetch_clientstatic(lv_client_code=None, as_dict=False, use_cache=True, timeout=3600):
     """
     Fetch clientstatic with optional caching.
-    Works when client_id as primary key. Language specific
+    Works when client_code as primary key. Language specific
     """
     lang = get_language() or settings.LANGUAGE_CODE
     # Build cache key
     cache_key = None
-    if use_cache and lv_client_id:
-        cache_key = f"clientstatic:{lv_client_id}-{lang}"
+    if use_cache and lv_client_code:
+        cache_key = f"clientstatic:{lv_client_code}-{lang}"
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             return cached_data
@@ -688,7 +688,7 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
     client_static = {}
     # refactored to get all static data in one go and cache the sql call
     #Step 4: Page + Client Query (The Entry Point)
-    if lv_client_id:
+    if lv_client_code:
         try:
           
           qs_client = (
@@ -718,7 +718,7 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                     "nav_items",
                     queryset=NavItem.objects
                         .filter(hidden=False)
-                        .select_related("page")          # to resolve page.page_id for URL building
+                        .select_related("page")          # to resolve page.page_code for URL building
                         .prefetch_related(
                             Prefetch(
                                 "children",
@@ -734,7 +734,7 @@ def fetch_clientstatic(lv_client_id=None, as_dict=False, use_cache=True, timeout
                     to_attr="prefetched_nav_items",
                 ),                               
             )
-            .get(client_id=lv_client_id)
+            .get(client_code=lv_client_code)
           )
             # If we get here, the client exists
           client_static = build_client_payload(qs_client)
@@ -810,7 +810,7 @@ def resolve_theme(theme):
 
 """ jsonclient
 {
-   "client_id":"bahushira",
+   "client_code":"bahushira",
    "theme_list":[
       
    ],
@@ -940,7 +940,7 @@ def resolve_theme(theme):
    "pages":[
       {
          "client":1,
-         "page_id":"home",
+         "page_code":"home",
          "ltext":"Home Page",
          "order":1,
          "hidden":false,
@@ -1078,7 +1078,7 @@ def resolve_theme(theme):
       },
       {
          "client":1,
-         "page_id":"about",
+         "page_code":"about",
          "ltext":"About Page",
          "order":2,
          "hidden":false,
@@ -1270,7 +1270,7 @@ def resolve_theme(theme):
 
 """
 {
-  "client_id": "bahushira",
+  "client_code": "bahushira",
   "default_language": "en",
   "theme_list": [],
   "name": "Bahushira",
@@ -1371,7 +1371,7 @@ def resolve_theme(theme):
   "pages": [
     {
       "client": 1,
-      "page_id": "home",
+      "page_code": "home",
       "ltext": "Home Page",
       "hidden": false,
       "layouts": [
@@ -1469,7 +1469,7 @@ def resolve_theme(theme):
     },
     {
       "client": 1,
-      "page_id": "about",
+      "page_code": "about",
       "ltext": "About Page",
       "hidden": false,
       "layouts": [
@@ -1568,19 +1568,19 @@ def resolve_theme(theme):
     },
     {
       "client": 1,
-      "page_id": "catalogue",
+      "page_code": "catalogue",
       "hidden": false,
       "layouts": []
     },
     {
       "client": 1,
-      "page_id": "terms",
+      "page_code": "terms",
       "hidden": false,
       "layouts": []
     },
     {
       "client": 1,
-      "page_id": "privacy",
+      "page_code": "privacy",
       "hidden": false,
       "layouts": []
     }

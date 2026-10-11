@@ -44,8 +44,8 @@
     var selectedDiv  = document.getElementById('item-id-selected');
     var selectedLabel = document.getElementById('item-id-selected-label');
     var searchTimer  = null;
-    var searchUrl    = '{% url "demand_ui:item_search" client_id=client.client_id pk=version.pk %}';
-    var encodeUrl    = '{% url "demand_ui:encode_override_key" client_id=client.client_id pk=version.pk %}';
+    var searchUrl    = '{% url "demand_ui:item_search" client_code=client.client_code pk=version.pk %}';
+    var encodeUrl    = '{% url "demand_ui:encode_override_key" client_code=client.client_code pk=version.pk %}';
     var csrfToken    = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     searchInput.addEventListener('input', function() {
@@ -75,9 +75,9 @@
         results.forEach(function(item) {
             var li = document.createElement('li');
             li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
-            li.textContent = item.item_id + ' — ' + item.name;
+            li.textContent = item.item_code + ' — ' + item.name;
             li.addEventListener('click', function() {
-                selectItem(item.item_id, item.item_id + ' — ' + item.name);
+                selectItem(item.item_code, item.item_code + ' — ' + item.name);
             });
             resultsList.appendChild(li);
         });
@@ -150,7 +150,7 @@ window.clearItemSelection = function() {
 <div class="form-control">
     <label class="label"><span class="label-text">{% trans "Item" %}</span></label>
     <select name="item_id" class="select select-bordered"
-            hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+            hx-get="{% url 'demand_ui:encode_override_key' client_code=client.client_code pk=version.pk %}"
             hx-trigger="change" hx-target="#override-key-hidden-container"
             hx-include="closest form">
         <option value="">{% trans "Select an item…" %}</option>
@@ -165,12 +165,12 @@ window.clearItemSelection = function() {
 <div class="form-control">
     <label class="label"><span class="label-text">{% trans "Item" %}</span></label>
     <select name="item_id" class="select select-bordered"
-            hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+            hx-get="{% url 'demand_ui:encode_override_key' client_code=client.client_code pk=version.pk %}"
             hx-trigger="change" hx-target="#override-key-hidden-container"
             hx-include="closest form">
         <option value="">{% trans "Select an item…" %}</option>
         {% for item in items %}
-        <option value="{{ item.item_id }}">{{ item.item_id }} — {{ item.name }}</option>
+        <option value="{{ item.item_code }}">{{ item.item_code }} — {{ item.name }}</option>
         {% endfor %}
     </select>
 </div>

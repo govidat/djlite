@@ -116,16 +116,16 @@ class ClientScopedMixin:
             )
         return request._permitted_client_pks
 
-    def _permitted_client_ids(self, request):
+    def _permitted_client_codes(self, request):
         """
-        Flat list of permitted client_id.
+        Flat list of permitted client codes.
         Cached on request object.
         """
-        if not hasattr(request, '_permitted_client_ids_list'):
-            request._permitted_client_ids_list = list(
-                self._permitted_clients(request).values_list('client_id', flat=True)
+        if not hasattr(request, '_permitted_client_codes_list'):
+            request._permitted_client_codes_list = list(
+                self._permitted_clients(request).values_list("client_code", flat=True)
             )
-        return request._permitted_client_ids_list
+        return request._permitted_client_codes_list
 
     def _client_from_obj(self, obj, max_depth=5):
         """
@@ -168,7 +168,7 @@ class ClientScopedMixin:
         if request.user.is_superuser:
             return True
         if obj is None:
-            #return bool(self._permitted_client_ids(request))
+            #return bool(self._permitted_client_codes(request))
             return bool(self._permitted_client_pks(request))
         client = self._client_from_obj(obj)
         if client is None:
@@ -180,7 +180,7 @@ class ClientScopedMixin:
     def has_module_perms(self, request, app_label=None):
         if request.user.is_superuser:
             return True
-        #return bool(self._permitted_client_ids(request))
+        #return bool(self._permitted_client_codes(request))
         return bool(self._permitted_client_pks(request))
 
     def has_view_permission(self, request, obj=None):
@@ -254,7 +254,7 @@ class ClientScopedMixin:
         #    return _user_has_admin_role(request.user)
         if obj is not None:
             return self._has_guardian_perm(request, 'create_client_data', obj)
-        #return bool(self._permitted_client_ids(request))
+        #return bool(self._permitted_client_codes(request))
         return bool(self._permitted_client_pks(request))
     
 
@@ -465,7 +465,7 @@ class ClientLanguageMixinV2:
 
         return (
             ('GS1 Identification', {
-                'fields': ('gtin', 'gpc_brick_code', 'global_item_id', 'domain', 'status'),
+                'fields': ('gtin', 'gpc_brick_code', 'global_item_code', 'domain', 'status'),
                 'classes': ('collapse',),
             }),
 

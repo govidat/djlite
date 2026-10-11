@@ -99,7 +99,7 @@ def tax_leaf_b(db, client_obj, taxonomy_common, tax_root):
 def item2(db, client_obj):
     from mysite.models import Item
     return Item.objects.create(
-        client=client_obj, item_id='item-002', name='Wiper',
+        client=client_obj, item_code='item-002', name='Wiper',
         status='active',
     )
 
@@ -108,7 +108,7 @@ def item2(db, client_obj):
 def unmapped_item(db, client_obj):
     from mysite.models import Item
     return Item.objects.create(
-        client=client_obj, item_id='item-UN', name='Unmapped Widget',
+        client=client_obj, item_code='item-UN', name='Unmapped Widget',
         status='active',
     )
 
@@ -273,7 +273,7 @@ class TestVersionAggregatesView:
     def _url(self, version, client_obj, **params):
         base = reverse(
             'demand_ui:version_aggregates',
-            kwargs={'client_id': client_obj.client_id, 'pk': version.pk},
+            kwargs={'client_code': client_obj.client_code, 'pk': version.pk},
         )
         if params:
             return f'{base}?' + '&'.join(f'{k}={v}' for k, v in params.items())
@@ -459,7 +459,7 @@ class TestActualsAggregatesView:
     def _url(self, client_obj, **params):
         base = reverse(
             'demand_ui:actuals_aggregates',
-            kwargs={'client_id': client_obj.client_id},
+            kwargs={'client_code': client_obj.client_code},
         )
         if params:
             return f'{base}?' + '&'.join(f'{k}={v}' for k, v in params.items())

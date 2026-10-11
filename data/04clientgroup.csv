@@ -1,3 +1,3 @@
-clientgroup_code,name,role,description,is_active,client_id
+clientgroup_code,name,role,description,is_active,client_code
 bahushira_admins,Bahushira Admin2,admin,,1,bahushira
 delivery,Delivery Users2,staff,,1,bahushira

@@ -18,26 +18,26 @@ class ClientPageView(TemplateView):
         if not client_obj:
             raise Http404("Client not found.")
 
-        page_id = kwargs.get('page', 'home')
+        page_code = kwargs.get('page', 'home')
 
         # fetch_clientstatic is cached — calling it here and in the
         # context processor costs nothing on the second call
-        client_dict = fetch_clientstatic(lv_client_id=client_obj.client_id)
+        client_dict = fetch_clientstatic(lv_client_code=client_obj.client_code)
 
         page_dict = next(
             (p for p in client_dict.get('pages', [])
-             if p.get('page_id') == page_id),
+             if p.get('page_code') == page_code),
             None
         )
 
         if not page_dict:
-            raise Http404(f"Page '{page_id}' not found.")
+            raise Http404(f"Page '{page_code}' not found.")
 
         #return super().get(request, *args, **kwargs)
         # ── Track A: check for raw HTML content first ─────────────
         #active_lang = get_language() or settings.LANGUAGE_CODE
         raw_html = self._resolve_page_content(
-            client_obj, page_id, #active_lang
+            client_obj, page_code, #active_lang
         )
 
         if raw_html is not None:
@@ -51,7 +51,7 @@ class ClientPageView(TemplateView):
         return super().get(request, *args, **kwargs)
     
     # This is specifically kept page wise lookup as teh blob values of pages may be largeg and there is no need to bring all the values into memory
-    def _resolve_page_content(self, client_obj, page_id):
+    def _resolve_page_content(self, client_obj, page_code):
         #Returns translated htmlblob for the page.
         #Fallback handled automatically by django-modeltranslation.
 
@@ -62,7 +62,7 @@ class ClientPageView(TemplateView):
             .select_related('page')
             .filter(
                 page__client=client_obj,
-                page__page_id=page_id
+                page__page_code=page_code
             )
             .first()
         )

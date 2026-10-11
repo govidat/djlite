@@ -410,43 +410,43 @@ def get_client_id_from_instance(instance):
         if isinstance(instance, (Theme, Page, NavItem, ClientTemplate, PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, 
                                  ActualSaleImport, ActualSale, ActualSaleLocation, ItemPlanningProfile,
                                  ForecastVersion, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile)):
-            return instance.client.client_id
+            return instance.client.client_code
 
         # Two hops: PageContent → page → client
         if isinstance(instance, (PageContent, Layout)):
-            return instance.page.client.client_id
+            return instance.page.client.client_code
 
         # Two hops: xxx → ForecastVersion → client
         if isinstance(instance, (ForecastLine, ForecastAggregate, ForecastOverride, ForecastAccuracy)):
-            return instance.version.client.client_id        
+            return instance.version.client.client_code        
         
         # Two hops: ActualSaleOutlierAdjustment → actual_sale → client
         if isinstance(instance, ActualSaleOutlierAdjustment):
-            return instance.actual_sale.client.client_id
+            return instance.actual_sale.client.client_code
         
         # Three hops: OverrideSplitWeight → ForecastOverride → ForecastVersion → client
         if isinstance(instance, OverrideSplitWeight):
-            return instance.override.version.client.client_id
+            return instance.override.version.client.client_code
 
         # Two hops: Layout → page → client
         #if isinstance(instance, Layout):
-        #    return instance.page.client.client_id
+        #    return instance.page.client.client_code
 
 
        # Three hops: Component → layout → page → client
         if isinstance(instance, Component):
-            return instance.layout.page.client.client_id
+            return instance.layout.page.client.client_code
 
         # Four hops: ComponentSlot → component → layout → page → client
         if isinstance(instance, ComponentSlot):
-            return instance.component.layout.page.client.client_id
+            return instance.component.layout.page.client.client_code
 
         # GenericForeignKey models — content_object is the parent
         # ComptextBlock.content_object is a ComponentSlot
         if isinstance(instance, ComptextBlock):
             slot = instance.content_object
             if isinstance(slot, ComponentSlot):
-                return slot.component.layout.page.client.client_id
+                return slot.component.layout.page.client.client_code
             return None
 
         # TextstbItem.content_object is a ComptextBlock
@@ -455,7 +455,7 @@ def get_client_id_from_instance(instance):
             if isinstance(block, ComptextBlock):
                 slot = block.content_object
                 if isinstance(slot, ComponentSlot):
-                    return slot.component.layout.page.client.client_id
+                    return slot.component.layout.page.client.client_code
             return None
 
         # SvgtextbadgeValue → textstbitem → content_object (ComptextBlock) → ...
@@ -465,7 +465,7 @@ def get_client_id_from_instance(instance):
             if isinstance(block, ComptextBlock):
                 slot = block.content_object
                 if isinstance(slot, ComponentSlot):
-                    return slot.component.layout.page.client.client_id
+                    return slot.component.layout.page.client.client_code
             return None
 
     except Exception:
@@ -502,7 +502,7 @@ def _bust_sector_chains():
     Called when taxonomy nodes change — re-parenting alters ancestry.
     """
     try:
-        for cid in Client.objects.exclude(sector=None).values_list('client_id', flat=True):
+        for cid in Client.objects.exclude(sector=None).values_list('client_code', flat=True):
             cache.delete(f"sector_chain:{cid}")
     except Exception:
         pass
@@ -534,7 +534,7 @@ def invalidate_taxonomy_cache(sender, instance, **kwargs):
     if hasattr(cache, 'delete_pattern'):
         # django-redis is available
         if client:
-            cache.delete_pattern(f'taxonomy_tree:{client.client_id}:*')
+            cache.delete_pattern(f'taxonomy_tree:{client.client_code}:*')
         else:
             cache.delete_pattern('taxonomy_tree:*')
     else:
@@ -548,7 +548,7 @@ def invalidate_taxonomy_cache(sender, instance, **kwargs):
                 client=client
             ).values_list('slug', flat=True)
             for slug in slugs:
-                cache.delete(f'taxonomy_tree:{client.client_id}:{slug}')
+                cache.delete(f'taxonomy_tree:{client.client_code}:{slug}')
         else:
             # Global taxonomy changed — no safe way to clear without
             # delete_pattern on LocMemCache. Clear all in dev.
@@ -569,7 +569,7 @@ def clear_feature_control_cache(sender, instance, **kwargs):
     # Clear client cache if client exists
     if instance.client:
         cache.delete(
-            f"feature_control:{instance.client.client_id}:{feature}"
+            f"feature_control:{instance.client.client_code}:{feature}"
         )
 
 # ── ActualSaleOutlierAdjustment → flag stale DRAFT forecast versions ──

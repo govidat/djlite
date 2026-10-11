@@ -200,7 +200,7 @@ def upload_slots(slots_data, component):
 def upload_layouts(layouts_data, page, slug_map=None):
     """
     Recursively create Layout records — generic field extraction.
-    slug_map is keyed by (page_id, slug) to ensure uniqueness per page
+    slug_map is keyed by (page_code, slug) to ensure uniqueness per page
     not across the whole client.
     """
     if slug_map is None:
@@ -210,7 +210,7 @@ def upload_layouts(layouts_data, page, slug_map=None):
 
         # Resolve parent using (page, slug) as key
         parent_slug = layout_data.get("parent_slug")
-        parent_layout = slug_map.get((page.page_id, parent_slug)) if parent_slug else None
+        parent_layout = slug_map.get((page.page_code, parent_slug)) if parent_slug else None
 
         # Extract lookup fields
         level = layout_data["level"]
@@ -232,8 +232,8 @@ def upload_layouts(layouts_data, page, slug_map=None):
             defaults=defaults
         )
 
-        # Register using (page_id, slug) as key — unique per page not client
-        slug_map[(page.page_id, slug)] = layout
+        # Register using (page_code, slug) as key — unique per page not client
+        slug_map[(page.page_code, slug)] = layout
 
         # Upload component if level=40 and component data present
         if level == 40 and layout_data.get("component"):
@@ -256,7 +256,7 @@ def upload_pages(pages_data, client):
 
         page, created = Page.objects.update_or_create(
             client=client,
-            page_id=page_data["page_id"],
+            page_code=page_data["page_code"],
             defaults={
                 "ltext":  page_data.get("ltext", ""),
                 "order":  page_data.get("order", 0),
@@ -264,7 +264,7 @@ def upload_pages(pages_data, client):
                 "parent": parent_page,
             }
         )
-        page_map[page_data["page_id"]] = page
+        page_map[page_data["page_code"]] = page
 
         upload_gentextblocks(page_data.get("gentextblocks", []), page)
         upload_layouts(page_data.get("layouts", []), page)
@@ -283,14 +283,14 @@ def bulk_upload(json_data):
     if isinstance(json_data, str):
         json_data = json.loads(json_data)
 
-    client_id = json_data["client_id"]
+    client_code = json_data["client_code"]
 
     try:
-        client = Client.objects.get(client_id=client_id)
+        client = Client.objects.get(client_code=client_code)
     except Client.DoesNotExist:
-        raise ValueError(f"Client '{client_id}' does not exist. Create it first.")
+        raise ValueError(f"Client '{client_code}' does not exist. Create it first.")
 
-    print(f"Uploading data for client: {client_id}")
+    print(f"Uploading data for client: {client_code}")
 
     # Client level gentextblocks
     upload_gentextblocks(json_data.get("gentextblocks", []), client)
@@ -298,6 +298,6 @@ def bulk_upload(json_data):
     # Pages + layouts + components
     upload_pages(json_data.get("pages", []), client)
 
-    print(f"Upload complete for client: {client_id}")
+    print(f"Upload complete for client: {client_code}")
 
 

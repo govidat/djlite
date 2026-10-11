@@ -1,4 +1,4 @@
-client_id,page_id,htmlblob_en,htmlblob_fr,htmlblob_hi,htmlblob_ta
+client_code,page_code,htmlblob_en,htmlblob_fr,htmlblob_hi,htmlblob_ta
 bahushira,about,"<!-- 
   About page — Tailwind + DaisyUI only. No inline styles.
   Paste into PageContent.html in Django Admin.
@@ -259,7 +259,7 @@ bahushira,about,"<!--
   <section class=""bg-primary text-primary-content py-16 px-4 text-center"">
     <h2 class=""text-3xl font-bold mb-4"">संपर्क करें</h2>
     <p class=""text-xl opacity-80 mb-8"">हम आपसे सुनना पसंद करेंगे।</p>
-    <a href=""/{{ client.client_id }}/contact/""
+    <a href=""/{{ client.client_code }}/contact/""
        class=""btn btn-outline btn-lg text-primary-content border-primary-content"">
       संपर्क करें
     </a>

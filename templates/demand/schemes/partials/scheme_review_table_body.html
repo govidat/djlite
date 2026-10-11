@@ -2,7 +2,7 @@
 {% for scheme in schemes %}
 <tr>
   <td>
-    <a href="{% url 'demand_ui:scheme_detail' client_id=client.client_id pk=scheme.pk %}"
+    <a href="{% url 'demand_ui:scheme_detail' client_code=client.client_code pk=scheme.pk %}"
        class="link link-primary font-mono text-sm">
       {{ scheme.scheme_code }}
     </a>
@@ -23,13 +23,13 @@
   <td>
     <div class="flex gap-1">
       <button class="btn btn-success btn-xs"
-              hx-post="{% url 'demand_ui:scheme_activate' client_id=client.client_id pk=scheme.pk %}"
+              hx-post="{% url 'demand_ui:scheme_activate' client_code=client.client_code pk=scheme.pk %}"
               hx-confirm="{% trans 'Activate this scheme?' %}"
               hx-target="#scheme-review-queue" hx-swap="innerHTML">
         {% trans "Activate" %}
       </button>
       <button class="btn btn-ghost btn-xs"
-              hx-post="{% url 'demand_ui:scheme_archive' client_id=client.client_id pk=scheme.pk %}"
+              hx-post="{% url 'demand_ui:scheme_archive' client_code=client.client_code pk=scheme.pk %}"
               hx-confirm="{% trans 'Reject (archive) this scheme?' %}"
               hx-target="#scheme-review-queue" hx-swap="innerHTML">
         {% trans "Reject" %}

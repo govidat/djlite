@@ -35,9 +35,9 @@ class ClientUserProfile(models.Model):
 
 
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
+        client_code = getattr(self.client, 'client_code', '?')
         email = getattr(self.user, 'email', '?')
-        return f"{email} @ {client_id} [staff]"
+        return f"{email} @ {client_code} [staff]"
 
 
 # ── Type 2: Customer ──────────────────────────────────────────────────
@@ -75,9 +75,9 @@ class CustomerProfile(models.Model):
         verbose_name    = 'Customer Profile'
 
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
+        client_code = getattr(self.client, 'client_code', '?')
         email = getattr(self.user, 'email', '?')        
-        return f"{email} @ {client_id} [customer]"
+        return f"{email} @ {client_code} [customer]"
 
 
 class CustomerAddress(models.Model):
@@ -117,7 +117,7 @@ class ClientLocation(models.Model):
     ]
 
     client        = models.ForeignKey('mysite.Client', on_delete=models.CASCADE, related_name='locations')
-    location_id   = LowercaseCharField(max_length=50)
+    location_code   = LowercaseCharField(max_length=50)
     name          = models.CharField(max_length=100)
     location_type = models.CharField(max_length=20, choices=LOCATION_TYPE_CHOICES, default='store')
     is_active     = models.BooleanField(default=True)
@@ -156,12 +156,12 @@ class ClientLocation(models.Model):
             self.path = computed
             
     class Meta:
-        unique_together = ('client', 'location_id')
-        ordering        = ['client', 'location_id']
+        unique_together = ('client', 'location_code')
+        ordering        = ['client', 'location_code']
         verbose_name = "00-05 Client Location"
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')       
-        return f"{client_id} / {self.location_id} ({self.location_type})"
+        client_code = getattr(self.client, 'client_code', '?')       
+        return f"{client_code} / {self.location_code} ({self.location_type})"
 
     def clean(self):
         
@@ -215,9 +215,9 @@ class ClientGroup(models.Model):
         ordering        = ['client', 'clientgroup_code']
         verbose_name = "00-04 Client Group"
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
+        client_code = getattr(self.client, 'client_code', '?')
                 
-        return f"{client_id} / {self.name} ({self.role})"
+        return f"{client_code} / {self.name} ({self.role})"
 
     def has_location_access(self, location):
         #Empty locations = all access. Otherwise check membership.
@@ -275,7 +275,7 @@ class ClientUserMembership(models.Model):
             if profile.client != self.group.client:
                 raise ValidationError(
                     f"User {self.user.username} belongs to "
-                    f"{profile.client.client_id}, not {self.group.client.client_id}"
+                    f"{profile.client.client_code}, not {self.group.client.client_code}"
                 )
 
         except ClientUserProfile.DoesNotExist:

@@ -206,7 +206,7 @@ class ActualSaleImportSerializer(serializers.ModelSerializer):
 
 
 class ActualSaleSerializer(serializers.ModelSerializer):
-    item_id           = serializers.CharField(source='item.item_id', read_only=True)
+    item_id           = serializers.CharField(source='item.item_code', read_only=True)
     item_name         = serializers.CharField(source='item.name',    read_only=True)
     location_code     = serializers.CharField(
         source='planning_location.code', read_only=True
@@ -287,7 +287,7 @@ class ForecastVersionCreateSerializer(serializers.ModelSerializer):
 
 
 class ForecastLineSerializer(serializers.ModelSerializer):
-    item_id       = serializers.CharField(source='item.item_id',         read_only=True)
+    item_id       = serializers.CharField(source='item.item_code',         read_only=True)
     item_name     = serializers.CharField(source='item.name',            read_only=True)
     location_code = serializers.CharField(
         source='planning_location.code', read_only=True
@@ -409,7 +409,7 @@ class SeriesLevelEvaluationSerializer(serializers.ModelSerializer):
     One evaluated level in the classification search for an item.
     Read-only — created by the Celery task.
     """
-    item_id      = serializers.CharField(source='item.item_id', read_only=True)
+    item_id      = serializers.CharField(source='item.item_code', read_only=True)
     grain_label  = serializers.SerializerMethodField()
 
     class Meta:
@@ -482,7 +482,7 @@ class SeriesProfileSerializer(serializers.ModelSerializer):
     """
 
     # FK resolution
-    item_id       = serializers.CharField(source='item.item_id',            read_only=True)
+    item_id       = serializers.CharField(source='item.item_code',            read_only=True)
     item_name     = serializers.CharField(source='item.name',               read_only=True)
     location_code = serializers.CharField(source='planning_location.code',  read_only=True)
     customer_code = serializers.CharField(
@@ -621,7 +621,7 @@ class SeriesProfileListSerializer(serializers.ModelSerializer):
     Does NOT include the nested evaluations (too expensive for 10k+ rows).
     Use the detail endpoint for the full evaluation log.
     """
-    item_id       = serializers.CharField(source='item.item_id',           read_only=True)
+    item_id       = serializers.CharField(source='item.item_code',           read_only=True)
     location_code = serializers.CharField(source='planning_location.code', read_only=True)
     customer_code = serializers.CharField(
         source='planning_customer.code', read_only=True, default=None
@@ -782,7 +782,7 @@ class AffectedLineSerializer(serializers.ModelSerializer):
     Lightweight read-only serializer for the affected-lines view.
     Shows before/after quantities so planners can see the override impact.
     """
-    item_id       = serializers.CharField(source='item.item_id',          read_only=True)
+    item_id       = serializers.CharField(source='item.item_code',          read_only=True)
     item_name     = serializers.CharField(source='item.name',             read_only=True)
     location_code = serializers.CharField(source='planning_location.code', read_only=True)
     customer_code = serializers.CharField(
@@ -807,7 +807,7 @@ class AffectedLineSerializer(serializers.ModelSerializer):
             'final_value',
         ]
         read_only_fields = fields
-    item_id           = serializers.CharField(source='item.item_id',         read_only=True)
+    item_id           = serializers.CharField(source='item.item_code',         read_only=True)
     item_name         = serializers.CharField(source='item.name',            read_only=True)
     location_code     = serializers.CharField(
         source='planning_location.code', read_only=True

@@ -16,7 +16,7 @@
         <tbody>
             {% for sale in page_obj %}
             <tr class="hover">
-                <td class="font-mono text-xs">{{ sale.item.item_id }}</td>
+                <td class="font-mono text-xs">{{ sale.item.item_code }}</td>
                 <td class="font-mono text-xs">{{ sale.planning_location.code }}</td>
                 <td class="text-xs">{{ sale.planning_customer.code|default:"—" }}</td>
                 {% if show_channel %}<td class="text-xs">{{ sale.distribution_channel.code|default:"—" }}</td>{% endif %}
@@ -126,7 +126,7 @@
         <tbody>
             {% for sale in page_obj %}
             <tr class="hover">
-                <td class="font-mono text-xs">{{ sale.item.item_id }}</td>
+                <td class="font-mono text-xs">{{ sale.item.item_code }}</td>
                 <td class="font-mono text-xs">{{ sale.planning_location.code }}</td>
                 <td class="text-xs">{{ sale.planning_customer.code|default:"—" }}</td>
                 <td>{{ sale.period_start|date:"M Y" }}</td>

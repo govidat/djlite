@@ -19,7 +19,7 @@ LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 # taxonomy_slug,node_slug,type_slug,slug,
 # name_en,name_hi,name_fr,name_ta,
-# order,gpc_value_code,client_id
+# order,gpc_value_code,client_code
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -49,10 +49,10 @@ def load_val01(
     # COLLECT IDS
     # =========================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     taxonomy_slugs = {
@@ -78,16 +78,16 @@ def load_val01(
     # =========================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # =========================================================
     # PREFETCH ATTRIBUTE TYPES
     # key = (
-    #   client_id_or_none,
+    #   client_code_or_none,
     #   taxonomy_slug,
     #   node_slug,
     #   type_slug
@@ -97,7 +97,7 @@ def load_val01(
     attribute_types = {
 
         (
-            at.client.client_id if at.client else None,
+            at.client.client_code if at.client else None,
             at.node.taxonomy.slug,
             at.node.slug,
             at.slug,
@@ -134,8 +134,8 @@ def load_val01(
         # BASIC VALUES
         # =====================================================
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
@@ -180,7 +180,7 @@ def load_val01(
         # =====================================================
 
         key = (
-            client_id,
+            client_code,
             taxonomy_slug,
             node_slug,
             type_slug,
@@ -201,8 +201,8 @@ def load_val01(
         # =====================================================
 
         client = (
-            clients.get(client_id)
-            if client_id else None
+            clients.get(client_code)
+            if client_code else None
         )
 
         # =====================================================
@@ -211,7 +211,7 @@ def load_val01(
 
         attribute_type = attribute_types.get(
             (
-                client_id,
+                client_code,
                 taxonomy_slug,
                 node_slug,
                 type_slug,
@@ -235,7 +235,7 @@ def load_val01(
 
             print(
                 f"Missing attribute type: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "
                 f"{type_slug}"
@@ -275,7 +275,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "
                 f"{type_slug} / "
@@ -313,7 +313,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"NodeAttributeValue: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "
                 f"{type_slug} / "
@@ -388,7 +388,7 @@ from mysite.models import (
 
 # taxonomy_slug,node_slug,type_slug,slug,
 # name_en,name_hi,name_fr,name_ta,
-# order,gpc_value_code,client_id
+# order,gpc_value_code,client_code
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -407,10 +407,10 @@ def load_val01():
 
     # ── Collect required IDs/slugs ─────────────────────────
 
-    client_ids = {
-        (row.get("client_id") or "").strip().lower()
+    client_codes = {
+        (row.get("client_code") or "").strip().lower()
         for row in rows
-        if (row.get("client_id") or "").strip()
+        if (row.get("client_code") or "").strip()
     }
 
     taxonomy_slugs = {
@@ -434,9 +434,9 @@ def load_val01():
     # ── Fetch clients ───────────────────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -445,7 +445,7 @@ def load_val01():
     attribute_types = {
 
         (
-            at.client.client_id if at.client else "",
+            at.client.client_code if at.client else "",
             at.node.taxonomy.slug,
             at.node.slug,
             at.slug
@@ -466,8 +466,8 @@ def load_val01():
 
     for row in rows:
 
-        client_id = (
-            row.get("client_id") or ""
+        client_code = (
+            row.get("client_code") or ""
         ).strip().lower()
 
         taxonomy_slug = (
@@ -489,15 +489,15 @@ def load_val01():
         # ── Resolve client ────────────────────────────────
 
         client = (
-            clients.get(client_id)
-            if client_id else None
+            clients.get(client_code)
+            if client_code else None
         )
 
         # ── Resolve attribute type ────────────────────────
 
         attribute_type = attribute_types.get(
             (
-                client_id,
+                client_code,
                 taxonomy_slug,
                 node_slug,
                 type_slug,
@@ -520,7 +520,7 @@ def load_val01():
 
             print(
                 f"Missing attribute type: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "
                 f"{type_slug}"
@@ -563,7 +563,7 @@ def load_val01():
         print(
             f"{'Created' if created else 'Updated'} "
             f"NodeAttributeValue: "
-            f"{client_id or 'GLOBAL'} / "
+            f"{client_code or 'GLOBAL'} / "
             f"{taxonomy_slug} / "
             f"{node_slug} / "
             f"{type_slug} / "

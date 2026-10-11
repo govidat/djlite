@@ -1,4 +1,4 @@
-id,page_id,ltext,hidden,client_id
+id,page_code,ltext,hidden,client_code
 1,home,Home Page,0,bahushira
 2,about,About Page,0,bahushira
 3,catalogue,Catalogue,0,bahushira

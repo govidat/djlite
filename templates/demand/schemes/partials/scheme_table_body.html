@@ -2,7 +2,7 @@
 {% for scheme in schemes %}
 <tr>
   <td>
-    <a href="{% url 'demand_ui:scheme_detail' client_id=client.client_id pk=scheme.pk %}"
+    <a href="{% url 'demand_ui:scheme_detail' client_code=client.client_code pk=scheme.pk %}"
        class="link link-primary font-mono text-sm">
       {{ scheme.scheme_code }}
     </a>
@@ -25,14 +25,14 @@
   <td>{{ scheme.updated_at|date:"d M Y" }}</td>
   <td>
     <div class="flex gap-1">
-      <a href="{% url 'demand_ui:scheme_detail' client_id=client.client_id pk=scheme.pk %}"
+      <a href="{% url 'demand_ui:scheme_detail' client_code=client.client_code pk=scheme.pk %}"
          class="btn btn-ghost btn-xs">{% trans "View" %}</a>
       {% if scheme.status == 'DRAFT' %}
-        <a href="{% url 'demand_ui:scheme_edit' client_id=client.client_id pk=scheme.pk %}"
+        <a href="{% url 'demand_ui:scheme_edit' client_code=client.client_code pk=scheme.pk %}"
            class="btn btn-ghost btn-xs">{% trans "Edit" %}</a>
       {% endif %}
       {% if scheme.status != 'ARCHIVED' and scheme.status != 'ACTIVE' %}
-        <a href="{% url 'demand_ui:scheme_occurrences' client_id=client.client_id pk=scheme.pk %}"
+        <a href="{% url 'demand_ui:scheme_occurrences' client_code=client.client_code pk=scheme.pk %}"
            class="btn btn-ghost btn-xs">{% trans "Occurrences" %}</a>
       {% endif %}
     </div>

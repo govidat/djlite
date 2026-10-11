@@ -6,7 +6,7 @@
 
   {# ── Header ───────────────────────────────────────────────── #}
   <div class="flex items-center gap-2 mb-6">
-    <a href="{% url 'customer_profile' client_id=request.client.client_id %}"
+    <a href="{% url 'customer_profile' client_code=request.client.client_code %}"
        class="btn btn-ghost btn-sm btn-circle">←</a>
     <h1 class="text-xl font-bold">{% trans "My Addresses" %}</h1>
   </div>
@@ -45,7 +45,7 @@
           {# Set as default #}
           {% if not address.is_default %}
           <form method="post"
-                action="{% url 'set_default_address' client_id=request.client.client_id address_id=address.pk %}">
+                action="{% url 'set_default_address' client_code=request.client.client_code address_id=address.pk %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-ghost btn-xs">
               {% trans "Set Default" %}
@@ -55,7 +55,7 @@
 
           {# Delete #}
           <form method="post"
-                action="{% url 'delete_address' client_id=request.client.client_id address_id=address.pk %}"
+                action="{% url 'delete_address' client_code=request.client.client_code address_id=address.pk %}"
                 onsubmit="return confirm('{% trans "Delete this address?" %}')">
             {% csrf_token %}
             <button type="submit" class="btn btn-ghost btn-xs text-error">
@@ -79,7 +79,7 @@
       <h2 class="card-title text-base">{% trans "Add Address" %}</h2>
 
       <form method="post"
-            action="{% url 'add_address' client_id=request.client.client_id %}">
+            action="{% url 'add_address' client_code=request.client.client_code %}">
         {% csrf_token %}
 
         <div class="form-control mb-3">

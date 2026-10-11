@@ -157,7 +157,7 @@ def _run_import(job: ActualSaleImport):
     # ── 3. Build FK lookup maps (one query each) ──────────────────────────────
     # Fetch all active items for this client indexed by item_id
     item_map = {
-        item.item_id: item
+        item.item_code: item
         for item in Item.objects.filter(client=client, status='active')
     }
     # Fetch all active planning locations indexed by code

@@ -8,7 +8,7 @@ stops by simply not including the hx-trigger attribute on that render.
 {% with in_progress="QUEUED,PROFILING,RUNNING,RECONCILING,AGGREGATING"|cut:" " %}
 <div id="run-status-panel"
      {% if version.run_status in "QUEUED,PROFILING,RUNNING,RECONCILING,AGGREGATING" %}
-     hx-get="{% url 'demand_ui:version_run_status' client_id=client.client_id pk=version.pk %}"
+     hx-get="{% url 'demand_ui:version_run_status' client_code=client.client_code pk=version.pk %}"
      hx-trigger="every 2s" hx-swap="outerHTML"
      {% endif %}
      class="card bg-base-200">
@@ -35,7 +35,7 @@ stops by simply not including the hx-trigger attribute on that render.
             <pre class="whitespace-pre-wrap bg-base-300 p-2 rounded mt-1">{{ version.run_error }}</pre>
           </details>
           <button class="btn btn-xs btn-outline mt-2"
-                  hx-post="{% url 'demand_ui:version_run' client_id=client.client_id pk=version.pk %}"
+                  hx-post="{% url 'demand_ui:version_run' client_code=client.client_code pk=version.pk %}"
                   hx-target="#run-status-panel" hx-swap="outerHTML">
             {% trans "Retry" %}
           </button>
@@ -61,7 +61,7 @@ stops by simply not including the hx-trigger attribute on that render.
         </div>
         {% if version.is_editable %}
         <button class="btn btn-primary btn-sm"
-                hx-post="{% url 'demand_ui:version_run' client_id=client.client_id pk=version.pk %}"
+                hx-post="{% url 'demand_ui:version_run' client_code=client.client_code pk=version.pk %}"
                 hx-target="#run-status-panel" hx-swap="outerHTML">
           ▶ {% trans "Run Forecast" %}
         </button>

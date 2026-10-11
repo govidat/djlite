@@ -12,19 +12,19 @@ class Page(models.Model):
         on_delete=models.CASCADE,
         related_name='pages'
         )    
-    page_id = LowercaseCharField(max_length=10)  
+    page_code = LowercaseCharField(max_length=10)  
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
 
     hidden = models.BooleanField(default=False)  
 
 
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
-        return f"{client_id} / {self.page_id}"
+        client_code = getattr(self.client, 'client_code', '?')
+        return f"{client_code} / {self.page_code}"
       
     # for usage in Admin Panel
     class Meta:
-        unique_together = ("client", "page_id")
+        unique_together = ("client", "page_code")
         ordering = ["client"]
         indexes = [
             models.Index(fields=["client"]),
@@ -75,16 +75,16 @@ class NavItem(models.Model):
         unique_together = ('client', 'location', 'parent', 'order')
         verbose_name = "00-03-03 NavItem"
 
-    def get_url(self, client_id):
+    def get_url(self, client_code):
         if self.nav_type == 'page' and self.page:
-            return self.page.page_id
+            return self.page.page_code
         if self.nav_type in ('url', 'anchor'):
             return self.url
         return '#'   # label-only — no navigation
 
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
-        return f"{client_id} / {self.location} / {self.name}"
+        client_code = getattr(self.client, 'client_code', '?')
+        return f"{client_code} / {self.location} / {self.name}"
 
 class PageContent(models.Model):
     """
@@ -144,8 +144,8 @@ class ClientTemplate(models.Model):
         verbose_name = "00-03E Client Templates"
         verbose_name_plural = "00-03E Client Templates"
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
-        return f"{client_id} / {self.template_key}"
+        client_code = getattr(self.client, 'client_code', '?')
+        return f"{client_code} / {self.template_key}"
 """
 class Layout(models.Model):
     # ideally layout can be an inline under page. but we are not able to brnach to a component inline from another inline.
@@ -197,10 +197,10 @@ class Layout(models.Model):
         if self.parent and self.parent.level != self.level - 10:
             raise ValidationError("Invalid parent level")
 
-        #if self.client.client_id != self.page.client.client_id:
+        #if self.client.client_code != self.page.client.client_code:
         #    raise ValidationError("Page and Layout Clients need to be same !")
 
     def __str__(self):
-        #return f"{self.page.client.client_id} / {self.page.page_id} / {self.level} / {self.slug}"
+        #return f"{self.page.client.client_code} / {self.page.page_code} / {self.level} / {self.slug}"
         return f"{self.page} / {self.level} / {self.slug}"    
 

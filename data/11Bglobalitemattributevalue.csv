@@ -1,4 +1,4 @@
-global_item_id,taxonomy_slug,node_slug,attribute_slug,predefined_value_slug,value_text,value_number
+global_item_code,taxonomy_slug,node_slug,attribute_slug,predefined_value_slug,value_text,value_number
 bosch-fr7dc,gpc,spark-plugs,thread-size,m14,,
 bosch-fr7dc,gpc,spark-plugs,plug-type,standard,,
 bosch-fr7dc,gpc,spark-plugs,electrode-gap-mm,,,0.7

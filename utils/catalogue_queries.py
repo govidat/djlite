@@ -164,7 +164,7 @@ def _get_attr_types_by_node(client, node_ids, base_ids):
 
 def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None,
                       selected_node_ids=None):
-    cache_key = f"taxonomy_tree:{client.client_id}:{taxonomy_slug}"
+    cache_key = f"taxonomy_tree:{client.client_code}:{taxonomy_slug}"
     if not include_counts:
         cached = cache.get(cache_key)
         if cached:
@@ -388,7 +388,7 @@ def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None)
     #Returns nested tree dict. Cached when include_counts=False.
     #When include_counts=True, counts are computed from base_qs.
     
-    cache_key = f"taxonomy_tree:{client.client_id}:{taxonomy_slug}"
+    cache_key = f"taxonomy_tree:{client.client_code}:{taxonomy_slug}"
 
     if not include_counts:
         cached = cache.get(cache_key)
@@ -574,7 +574,7 @@ def get_base_item_ids(client, status='active'):
     Filters are applied after, against this cached ID list.
     TTL: short (5 minutes) since stock/status can change.
     """
-    cache_key = f"catalogue_base_ids:{client.client_id}:{status}"
+    cache_key = f"catalogue_base_ids:{client.client_code}:{status}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -582,7 +582,7 @@ def get_base_item_ids(client, status='active'):
     # The expensive query — client override logic + 6 LEFT OUTER JOINs
     client_item_ids = set(
         Item.objects.filter(client=client, status=status)
-        .values_list('item_id', flat=True)
+        .values_list('item_code', flat=True)
     )
     base_ids = list(
         Item.objects.filter(
@@ -590,7 +590,7 @@ def get_base_item_ids(client, status='active'):
             status=status,
         ).exclude(
             client=None,
-            item_id__in=client_item_ids
+            item_code__in=client_item_ids
         ).values_list('id', flat=True)
     )
 
@@ -723,7 +723,7 @@ def get_item_queryset(client, filters=None):
         qs = qs.filter(
             Q(name__icontains=search) |
             Q(description__icontains=search) |
-            Q(item_id__icontains=search) |
+            Q(item_code__icontains=search) |
             Q(global_item__name__icontains=search) |
             Q(product_detail__sku__icontains=search)
         )
@@ -741,7 +741,7 @@ def get_item_queryset(client, filters=None):
     qs = qs.distinct()
     qs = _apply_client_override(qs, client)
 
-    return qs.order_by('order', 'item_id')
+    return qs.order_by('order', 'item_code')
 
  
 def _expand_node_ids_grouped(node_id_list):
@@ -770,15 +770,15 @@ def _expand_node_ids_grouped(node_id_list):
 
 
 def _apply_client_override(qs, client):
-    """Suppress shared items whose item_id exists at client level."""
+    """Suppress shared items whose item_code exists at client level."""
     client_item_ids = Item.objects.filter(
         client=client, status='active'
-    ).values_list('item_id', flat=True)
+    ).values_list('item_code', flat=True)
 
     if not client_item_ids:
         return qs
 
-    return qs.exclude(client=None, item_id__in=client_item_ids)
+    return qs.exclude(client=None, item_code__in=client_item_ids)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -875,7 +875,7 @@ def serialize_item(item):
 
     return {
         'id':           item.id,
-        'item_id':      item.item_id,
+        'item_code':      item.item_code,
         'domain':       item.domain,
         'name':         item.resolved_name(),
         'description':  item.resolved_description(),
@@ -1206,10 +1206,10 @@ def get_global_items_for_client(client, domain=None, search=None):
     if search:
         qs = qs.filter(
             Q(name__icontains=search) |
-            Q(global_item_id__icontains=search) |
+            Q(global_item_code__icontains=search) |
             Q(gtin__icontains=search)
         )
-    return qs.order_by('global_item_id')
+    return qs.order_by('global_item_code')
 
 
 def get_global_nodes_for_client(client, taxonomy_slug=None):

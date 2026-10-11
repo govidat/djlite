@@ -71,7 +71,7 @@
     <div class="card-body">
       <div class="flex justify-between items-center mb-3">
         <h2 class="card-title text-base">{% trans "My Addresses" %}</h2>
-        <a href="{% url 'customer_addresses' client_id=client.client_id %}"
+        <a href="{% url 'customer_addresses' client_code=client.client_code %}"
            class="btn btn-ghost btn-xs">
           {% trans "Manage" %} →
         </a>
@@ -96,7 +96,7 @@
       {% else %}
         <p class="text-sm opacity-50">
           {% trans "No addresses yet." %}
-          <a href="{% url 'customer_addresses' client_id=client.client_id %}"
+          <a href="{% url 'customer_addresses' client_code=client.client_code %}"
              class="link link-primary">
             {% trans "Add one" %}
           </a>

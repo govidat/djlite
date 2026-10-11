@@ -18,34 +18,34 @@ urlpatterns = [
 
     #path('', views.ClientPageView.as_view(), name="client_page"), 
     path('', views.landing_page, name='landing'),
-    path('<str:client_id>/', views.ClientPageView.as_view(), name="client_page"), 
+    path('<str:client_code>/', views.ClientPageView.as_view(), name="client_page"), 
 
     # ── Auth ──────────────────────────────────────────────────────────
-    path('<str:client_id>/login/', views.client_login, name='client_login'),
-    path('<str:client_id>/signup/', views.client_signup, name='client_signup'),
-    path('<str:client_id>/logout/', views.client_logout, name='client_logout'),
+    path('<str:client_code>/login/', views.client_login, name='client_login'),
+    path('<str:client_code>/signup/', views.client_signup, name='client_signup'),
+    path('<str:client_code>/logout/', views.client_logout, name='client_logout'),
 
     # ── Profile ───────────────────────────────────────────────────────
-    path('<str:client_id>/profile/', views.customer_profile, name='customer_profile'),
-    path('<str:client_id>/profile/onboarding/', views.customer_onboarding, name='customer_onboarding'),
+    path('<str:client_code>/profile/', views.customer_profile, name='customer_profile'),
+    path('<str:client_code>/profile/onboarding/', views.customer_onboarding, name='customer_onboarding'),
 
     # ── Addresses ─────────────────────────────────────────────────────
-    path('<str:client_id>/profile/addresses/', views.customer_addresses, name='customer_addresses'),
-    path('<str:client_id>/profile/addresses/add/', views.add_address, name='add_address'),
-    path('<str:client_id>/profile/addresses/<int:address_id>/default/', views.set_default_address, name='set_default_address'),
-    path('<str:client_id>/profile/addresses/<int:address_id>/delete/', views.delete_address, name='delete_address'),
+    path('<str:client_code>/profile/addresses/', views.customer_addresses, name='customer_addresses'),
+    path('<str:client_code>/profile/addresses/add/', views.add_address, name='add_address'),
+    path('<str:client_code>/profile/addresses/<int:address_id>/default/', views.set_default_address, name='set_default_address'),
+    path('<str:client_code>/profile/addresses/<int:address_id>/delete/', views.delete_address, name='delete_address'),
 
     # ── Catalogue ─────────────────────────────────────────────────────
-    path('<str:client_id>/catalogue/', views.catalogue_page, name='catalogue_page'),
-    path('<str:client_id>/catalogue/filter/', views.catalogue_filter, name='catalogue_filter'),
-    path('<str:client_id>/catalogue/<str:item_id>/', views.item_detail, name='item_detail'),
+    path('<str:client_code>/catalogue/', views.catalogue_page, name='catalogue_page'),
+    path('<str:client_code>/catalogue/filter/', views.catalogue_filter, name='catalogue_filter'),
+    path('<str:client_code>/catalogue/<str:item_code>/', views.item_detail, name='item_detail'),
 
     # --Demand Planning ------------------------------------------------
     #path('api/demand/',  include('mysite.api.demand.urls')),
-    path('api/<str:client_id>/demand/', include('mysite.api.demand.urls')),
+    path('api/<str:client_code>/demand/', include('mysite.api.demand.urls')),
 
     # ── Demand Planning — HTML UI (NEW: separate app, client-prefixed) ────
-    path('<str:client_id>/demand/', include('mysite.demand_ui.urls')),
+    path('<str:client_code>/demand/', include('mysite.demand_ui.urls')),
 
 
     # ── Demand Planning — forecast grid page ──────────────────────────────
@@ -60,10 +60,10 @@ urlpatterns = [
     #path('demand/partials/approval-panel/<int:pk>/', views.approval_panel, name='demand-approval-panel'),
     #path('demand/partials/approval-reject-form/<int:pk>/', views.approval_reject_form, name='demand-approval-reject-form'),
     #path('demand/partials/approval-copy-form/<int:pk>/', views.approval_copy_form, name='demand-approval-copy-form'),
-    #Add BEFORE <str:client_id>/<str:page>/ catch-all:
+    #Add BEFORE <str:client_code>/<str:page>/ catch-all:
 
     # ── Catch-all (must stay LAST) ────────────────────────────────────────
-    path("<str:client_id>/<str:page>/", views.ClientPageView.as_view(), name="client_page"),
+    path("<str:client_code>/<str:page>/", views.ClientPageView.as_view(), name="client_page"),
 
 
     # This is done in Project urls allauth handles the actual auth

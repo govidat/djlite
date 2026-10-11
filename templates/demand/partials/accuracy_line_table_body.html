@@ -19,7 +19,7 @@
                 <tbody>
                     {% for row in accuracy_rows %}
                     <tr class="hover">
-                        <td class="font-mono text-xs">{{ row.item.item_id }}</td>
+                        <td class="font-mono text-xs">{{ row.item.item_code }}</td>
                         <td class="font-mono text-xs">{{ row.planning_location.code }}</td>
                         <td>{{ row.planning_customer.code|default:"—" }}</td>
                         {% if show_channel %}<td>{{ row.distribution_channel.code|default:"—" }}</td>{% endif %}

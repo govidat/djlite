@@ -25,7 +25,7 @@ LANGS = [lang[0] for lang in settings.LANGUAGES]
 #
 # File: 26documentitem.csv
 #
-# client_id,item_id,
+# client_code,item_code,
 # file_url,format,page_count,file_size_kb,
 # version,language,is_free,
 # price,currency,
@@ -35,7 +35,7 @@ LANGS = [lang[0] for lang in settings.LANGUAGES]
 # Example
 # ---------------------------------------------------------
 #
-# client_id,item_id,file_url,format,page_count,file_size_kb,version,language,is_free,price,currency,attributes
+# client_code,item_code,file_url,format,page_count,file_size_kb,version,language,is_free,price,currency,attributes
 # acme,doc001,https://example.com/files/book1.pdf,pdf,120,5400,v1.0,en,1,0,INR,"{""author"": ""John Doe"", ""publisher"": ""ABC Publications""}"
 # acme,doc002,https://example.com/files/manual.epub,epub,85,2200,v2.1,en,0,199.99,INR,"{""edition"": ""Second""}"
 #
@@ -72,28 +72,28 @@ def load_val01(
     # Collect Keys
     # -----------------------------------------------------
 
-    client_ids = {
+    client_codes = {
 
         clean(
-            row.get("client_id"),
+            row.get("client_code"),
             lower=True,
         )
 
         for row in rows
 
-        if row.get("client_id")
+        if row.get("client_code")
     }
 
     item_ids = {
 
         clean(
-            row.get("item_id"),
+            row.get("item_code"),
             lower=True,
         )
 
         for row in rows
 
-        if row.get("item_id")
+        if row.get("item_code")
     }
 
     # -----------------------------------------------------
@@ -103,14 +103,14 @@ def load_val01(
     items = {
 
         (
-            item.client.client_id,
-            item.item_id,
+            item.client.client_code,
+            item.item_code,
         ): item
 
         for item in Item.objects.filter(
 
-            client__client_id__in=client_ids,
-            item_id__in=item_ids,
+            client__client_code__in=client_codes,
+            item_code__in=item_ids,
 
         ).select_related("client")
     }
@@ -131,13 +131,13 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
-        item_id = clean(
-            row.get("item_id"),
+        item_code = clean(
+            row.get("item_code"),
             lower=True,
         )
 
@@ -145,19 +145,19 @@ def load_val01(
         # Validation
         # -------------------------------------------------
 
-        if not client_id or not item_id:
+        if not client_code or not item_code:
 
             print(
                 "Skipping row with empty "
-                "client_id/item_id"
+                "client_code/item_code"
             )
 
             skipped_count += 1
             continue
 
         key = (
-            client_id,
-            item_id,
+            client_code,
+            item_code,
         )
 
         if key in seen:
@@ -177,8 +177,8 @@ def load_val01(
 
         item = items.get(
             (
-                client_id,
-                item_id,
+                client_code,
+                item_code,
             )
         )
 
@@ -186,7 +186,7 @@ def load_val01(
 
             print(
                 f"Missing Item: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             skipped_count += 1
@@ -249,7 +249,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             if verbose:
@@ -280,7 +280,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"DocumentItem: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
     # -----------------------------------------------------

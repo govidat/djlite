@@ -38,7 +38,7 @@
     </p>
 
     {# Option 1 — Cancel #}
-    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
           hx-target="#actuals-upload-panel"
           hx-swap="outerHTML">
         {% csrf_token %}
@@ -51,7 +51,7 @@
     </form>
 
     {# Option 2 — Add to existing #}
-    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
           hx-target="#actuals-upload-panel"
           hx-swap="outerHTML">
         {% csrf_token %}
@@ -71,7 +71,7 @@
     </form>
 
     {# Option 3 — Delete then upload fresh #}
-    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
           hx-target="#actuals-upload-panel"
           hx-swap="outerHTML"
           {% if not overlap_outlier_count %}hx-confirm="{% trans 'Delete all existing actuals for the overlapping periods and replace with this file?' %}"{% endif %}>

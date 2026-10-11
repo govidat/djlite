@@ -53,7 +53,7 @@ def _acc(version, item, location, period_start, qty=100, fc_qty=120,
 def accuracy_item2(db, client_obj):
     from mysite.models import Item
     return Item.objects.create(
-        client=client_obj, item_id='item-002', name='Oil Filter', status='active',
+        client=client_obj, item_code='item-002', name='Oil Filter', status='active',
     )
 
 
@@ -97,7 +97,7 @@ class TestDrillHeaderModes:
 
         c = _admin_client()
         resp = c.get(
-            f"/{client_obj.client_id}/demand/versions/{acc_view_version.pk}"
+            f"/{client_obj.client_code}/demand/versions/{acc_view_version.pk}"
             f"/accuracy/hierarchy-locations/"
         )
         assert resp.status_code == 200
@@ -119,7 +119,7 @@ class TestDrillHeaderModes:
 
         c = _admin_client()
         resp = c.get(
-            f"/{client_obj.client_id}/demand/versions/{acc_view_version.pk}"
+            f"/{client_obj.client_code}/demand/versions/{acc_view_version.pk}"
             f"/accuracy/hierarchy-locations/?location_id={leaf_location.pk}&items=1"
         )
         assert resp.status_code == 200
@@ -147,7 +147,7 @@ class TestDrillHeaderModes:
 
         c = _admin_client()
         resp = c.get(
-            f"/{client_obj.client_id}/demand/versions/{acc_view_version.pk}"
+            f"/{client_obj.client_code}/demand/versions/{acc_view_version.pk}"
             f"/accuracy/hierarchy-taxonomy/"
         )
         assert resp.status_code == 200
@@ -156,7 +156,7 @@ class TestDrillHeaderModes:
         assert 'text-right">MAPE %' not in body
 
         resp = c.get(
-            f"/{client_obj.client_id}/demand/versions/{acc_view_version.pk}"
+            f"/{client_obj.client_code}/demand/versions/{acc_view_version.pk}"
             f"/accuracy/hierarchy-taxonomy/?node_path=001&items=1"
         )
         assert resp.status_code == 200
@@ -181,7 +181,7 @@ class TestLineItemPagination:
             _acc(acc_view_version, active_item, leaf_location, ps)
 
         c = _admin_client()
-        url = (f"/{client_obj.client_id}/demand/versions/{acc_view_version.pk}"
+        url = (f"/{client_obj.client_code}/demand/versions/{acc_view_version.pk}"
                f"/accuracy/")
 
         resp = c.get(url)

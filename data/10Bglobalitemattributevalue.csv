@@ -1,4 +1,4 @@
-id,value_text,value_number,global_item_id,attribute_type_id,predefined_value_id
+id,value_text,value_number,global_item_code,attribute_type_id,predefined_value_id
 1,,,1,1,1
 2,,,1,3,4
 3,,0.7,1,2,

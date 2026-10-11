@@ -30,7 +30,7 @@ Identical to filter_node.html except hx-include target.
         class="tx-checkbox"
         {% if node.is_selected %}checked{% endif %}
         {% if node.is_partial %}data-partial{% endif %}
-        hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+        hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
         hx-target="#items-container"
         hx-swap="innerHTML"
         hx-include="#filter-form-mobile"

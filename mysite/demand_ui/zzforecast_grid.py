@@ -39,11 +39,11 @@ def forecast_grid(request, pk):
     row_keys = list(
         ForecastLine.objects
         .filter(version=version)
-        .order_by('planning_location__code', 'item__item_id')
+        .order_by('planning_location__code', 'item__item_code')
         .values_list(
             'planning_location__code',
             'distribution_channel__code',
-            'item__item_id',
+            'item__item_code',
             'planning_customer__code',
         )
         .distinct()
@@ -66,7 +66,7 @@ def forecast_grid(request, pk):
         key_filter |= Q(
             planning_location__code=loc_code,
             distribution_channel__code=channel_code,
-            item__item_id=item_id,
+            item__item_code=item_id,
             planning_customer__code=cust_code,
         )
 
@@ -75,7 +75,7 @@ def forecast_grid(request, pk):
         .filter(version=version)
         .filter(key_filter)
         .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
-        .order_by('planning_location__code', 'item__item_id', 'period_start')
+        .order_by('planning_location__code', 'item__item_code', 'period_start')
     )
 
     # Pivot into grid_rows
@@ -84,7 +84,7 @@ def forecast_grid(request, pk):
         row_key = (
             line.planning_location.code,
             line.distribution_channel.code,
-            line.item.item_id,
+            line.item.item_code,
             line.planning_customer.code if line.planning_customer else '',
         )
         if row_key not in line_index:
@@ -92,13 +92,13 @@ def forecast_grid(request, pk):
                 'key':           '-'.join(row_key),
                 'location_code': line.planning_location.code,
                 'channel_code':  line.distribution_channel.code,
-                'item_id':       line.item.item_id,
+                'item_id':       line.item.item_code,
                 'item_name':     line.item.name,
                 'customer_code': line.planning_customer.code
                                  if line.planning_customer else '',
                 'cells':         [],
             }
-        ovr = applied_overrides.get((line.item.item_id, line.period_start))
+        ovr = applied_overrides.get((line.item.item_code, line.period_start))
         line_index[row_key]['cells'].append({
             'line':         line,
             'period_label': line.period_start.strftime('%b-%y'),

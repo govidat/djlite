@@ -1,10 +1,10 @@
-template_key,is_active,client_id,htmlblob_en,htmlblob_fr,htmlblob_hi,htmlblob_ta
+template_key,is_active,client_code,htmlblob_en,htmlblob_fr,htmlblob_hi,htmlblob_ta
 catalogue_item_card,1,bahushira,"{#
 load dict_filters
 
   item_card — DB template for bahushira client
   Context: item (serialised dict from serialize_item())
-  item keys: item_id, name, description, image_url, image_alt,
+  item keys: item_code, name, description, image_url, image_alt,
              price, currency, sku, stock, domain, gtin,
              attr_values (dict), domain_data (dict)
 #}
@@ -14,7 +14,7 @@ load dict_filters
             transition-all duration-200 group"">
 
   {# ── Image ──────────────────────────────────────────────── #}
-  <a href=""{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}""
+  <a href=""{% url 'item_detail' client_code=client.client_code item_code=item.item_code %}""
      class=""block overflow-hidden rounded-t-2xl"">
     <figure class=""aspect-square bg-base-200 overflow-hidden"">
       {% if item.image_url %}
@@ -52,7 +52,7 @@ load dict_filters
     {% endif %}
 
     {# ── Name ─────────────────────────────────────────────────── #}
-    <a href=""{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}""
+    <a href=""{% url 'item_detail' client_code=client.client_code item_code=item.item_code %}""
        class=""font-semibold text-sm text-base-content
               hover:text-primary line-clamp-2 leading-snug"">
       {{ item.name }}
@@ -115,7 +115,7 @@ load dict_filters
 
     {# ── Actions ──────────────────────────────────────────────── #}
     <div class=""card-actions mt-2"">
-      <a href=""{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}""
+      <a href=""{% url 'item_detail' client_code=client.client_code item_code=item.item_code %}""
          class=""btn btn-primary btn-sm w-full"">
         V2View Details
       </a>
@@ -146,9 +146,9 @@ catalogue_item_detail,1,bahushira,"{# load my_tags
   {# ── Breadcrumb ──────────────────────────────────────────── #}
   <div class=""text-sm breadcrumbs text-base-content/60 mb-6"">
     <ul>
-      <li><a href=""/{{ client.client_id }}/"">Home</a></li>
+      <li><a href=""/{{ client.client_code }}/"">Home</a></li>
       <li>
-        <a href=""{% url 'catalogue_page' client_id=client.client_id %}"">
+        <a href=""{% url 'catalogue_page' client_code=client.client_code %}"">
           Catalogue
         </a>
       </li>

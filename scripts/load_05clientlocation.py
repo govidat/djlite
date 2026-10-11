@@ -16,12 +16,12 @@ from scripts.helpers import (
 # =========================================================
 # CSV FORMAT
 # =========================================================
-# location_id,name,location_type,is_active,
-# client_id,parent_location_id
+# location_code,name,location_type,is_active,
+# client_code,parent_location_code
 #
 # Example:
 #
-# location_id,name,location_type,is_active,client_id,parent_location_id
+# location_code,name,location_type,is_active,client_code,parent_location_code
 # india,India,office,1,bahushira,
 # south,South Region,branch,1,bahushira,india
 # blr,Bangalore Branch,branch,1,bahushira,south
@@ -62,16 +62,16 @@ def load_val01(
     # COLLECT CLIENT IDS
     # =====================================================
 
-    client_ids = {
+    client_codes = {
 
         clean(
-            row.get("client_id"),
+            row.get("client_code"),
             lower=True,
         )
 
         for row in rows
 
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     # =====================================================
@@ -80,16 +80,16 @@ def load_val01(
 
     clients = {
 
-        c.client_id: c
+        c.client_code: c
 
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # =====================================================
     # PREFETCH EXISTING LOCATIONS
-    # key = (client_id, location_id)
+    # key = (client_code, location_code)
     # =====================================================
 
     location_cache = {}
@@ -97,7 +97,7 @@ def load_val01(
     existing_locations = (
         ClientLocation.objects
         .filter(
-            client__client_id__in=client_ids
+            client__client_code__in=client_codes
         )
         .select_related("client")
     )
@@ -105,8 +105,8 @@ def load_val01(
     for loc in existing_locations:
 
         key = (
-            loc.client.client_id,
-            loc.location_id,
+            loc.client.client_code,
+            loc.location_code,
         )
 
         location_cache[key] = loc
@@ -137,26 +137,26 @@ def load_val01(
             # BASIC VALUES
             # =================================================
 
-            client_id = clean(
-                row.get("client_id"),
+            client_code = clean(
+                row.get("client_code"),
                 lower=True,
             )
 
-            location_id = clean(
-                row.get("location_id"),
+            location_code = clean(
+                row.get("location_code"),
                 lower=True,
             )
 
-            parent_location_id = clean(
-                row.get("parent_location_id"),
+            parent_location_code = clean(
+                row.get("parent_location_code"),
                 lower=True,
             )
 
-            if not client_id or not location_id:
+            if not client_code or not location_code:
 
                 print(
                     "Skipping row with missing "
-                    "client_id or location_id"
+                    "client_code or location_code"
                 )
 
                 skipped_count += 1
@@ -166,13 +166,13 @@ def load_val01(
             # CLIENT
             # =================================================
 
-            client = clients.get(client_id)
+            client = clients.get(client_code)
 
             if not client:
 
                 print(
                     f"Missing client: "
-                    f"{client_id}"
+                    f"{client_code}"
                 )
 
                 skipped_count += 1
@@ -184,12 +184,12 @@ def load_val01(
 
             parent = None
 
-            if parent_location_id:
+            if parent_location_code:
 
                 parent = location_cache.get(
                     (
-                        client_id,
-                        parent_location_id,
+                        client_code,
+                        parent_location_code,
                     )
                 )
 
@@ -228,8 +228,8 @@ def load_val01(
 
                 print(
                     f"[DRY RUN] "
-                    f"{client_id} / "
-                    f"{location_id}"
+                    f"{client_code} / "
+                    f"{location_code}"
                 )
 
                 if verbose:
@@ -247,7 +247,7 @@ def load_val01(
                 .update_or_create(
 
                     client=client,
-                    location_id=location_id,
+                    location_code=location_code,
 
                     defaults=defaults,
                 )
@@ -258,8 +258,8 @@ def load_val01(
             # =================================================
 
             cache_key = (
-                client_id,
-                location_id,
+                client_code,
+                location_code,
             )
 
             location_cache[cache_key] = obj
@@ -276,8 +276,8 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"ClientLocation: "
-                    f"{client_id} / "
-                    f"{location_id}"
+                    f"{client_code} / "
+                    f"{location_code}"
                 )
 
         # =====================================================
@@ -293,11 +293,11 @@ def load_val01(
                 print(
                     f"Could not resolve parent "
                     f"[client="
-                    f"{row.get('client_id')} "
+                    f"{row.get('client_code')} "
                     f"location="
-                    f"{row.get('location_id')} "
+                    f"{row.get('location_code')} "
                     f"parent="
-                    f"{row.get('parent_location_id')}]"
+                    f"{row.get('parent_location_code')}]"
                 )
 
             skipped_count += len(next_pending)
@@ -374,7 +374,7 @@ import csv
 from pathlib import Path
 
 from mysite.models import Client, ClientLocation
-#location_id,name,location_type,is_active,client_id
+#location_code,name,location_type,is_active,client_code
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
@@ -384,26 +384,26 @@ def load_val01():
 
     file_path = DATA_DIR / "05clientlocation.csv"
 
-    # ── First pass: collect client_ids from CSV ─────────────
+    # ── First pass: collect client_codes from CSV ─────────────
 
     with open(file_path, newline="", encoding="utf-8") as f:
 
         reader = csv.DictReader(f)
         rows = list(reader)   # if multiple passes are required, then this construct is required
 
-        client_ids = {
-            (row.get("client_id") or "").strip().lower()
+        client_codes = {
+            (row.get("client_code") or "").strip().lower()
             for row in rows
-            if (row.get("client_id") or "").strip()
+            if (row.get("client_code") or "").strip()
         }
 
 
     # ── Fetch only required clients  ─────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -417,18 +417,18 @@ def load_val01():
 
     for row in rows:
 
-        client_id = row["client_id"]
-        client = clients.get(client_id)
+        client_code = row["client_code"]
+        client = clients.get(client_code)
         if not client:
-            print(f"Missing client: {client_id}")
+            print(f"Missing client: {client_code}")
             continue
         
-        location_id= row.get("location_id", "")
+        location_code= row.get("location_code", "")
 
         obj, created = ClientLocation.objects.update_or_create(
 
             client=client,
-            location_id= location_id,
+            location_code= location_code,
 
             defaults={
                 
@@ -442,7 +442,7 @@ def load_val01():
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"ClientLocation: {client_id} / {location_id}"
+            f"ClientLocation: {client_code} / {location_code}"
         )
 
     print("Loaded ClientLocation")

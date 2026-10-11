@@ -9,7 +9,7 @@
             {% trans "Item-level forecast lines" %} · {{ version.version_label }}
         </p>
     </div>
-    <a href="{% url 'demand_ui:drilldown_location' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+    <a href="{% url 'demand_ui:drilldown_location' client_code=client.client_code pk=version.pk location_id=location.pk %}"
        class="btn btn-ghost btn-sm">
         ← {% trans "Back to drilldown" %}
     </a>

@@ -38,7 +38,7 @@
 
         {# My Profile #}
         <li>
-          <a href="{% url 'customer_profile' client_id=request.client.client_id %}"
+          <a href="{% url 'customer_profile' client_code=request.client.client_code %}"
             class="gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none"
                 viewBox="0 0 24 24" stroke-width="1.5"
@@ -53,7 +53,7 @@
 
         {# My Addresses #}
         <li>
-          <a href="{% url 'customer_addresses' client_id=request.client.client_id %}"
+          <a href="{% url 'customer_addresses' client_code=request.client.client_code %}"
             class="gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none"
                 viewBox="0 0 24 24" stroke-width="1.5"
@@ -88,7 +88,7 @@
       {# Sign Out #}    
       <li>
         {% comment "" %}<form method="post" action="{% url 'account_logout' %}">{% endcomment %}
-        <form method="post" action="{% url 'client_logout' client_id=request.client.client_id %}">
+        <form method="post" action="{% url 'client_logout' client_code=request.client.client_code %}">
           {% csrf_token %}
           <button type="submit" class="gap-3 w-full text-left text-error">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -134,7 +134,7 @@
 {% else %}
   
   {# Not logged in — only show if we have a client context #}
-  {% if client.client_id %}
+  {% if client.client_code %}
     <div class="dropdown dropdown-end">
       <div tabindex="0" role="button"
           class="btn btn-ghost btn-sm gap-2 px-2">
@@ -156,12 +156,12 @@
           class="dropdown-content menu bg-base-200 rounded-box
                 z-50 w-52 p-2 shadow-xl mt-1">
         <li>
-          <a href="{% url 'client_login' client_id=client.client_id %}">
+          <a href="{% url 'client_login' client_code=client.client_code %}">
             {% trans "Sign In" %}
           </a>
         </li>
         <li>
-          <a href="{% url 'client_signup' client_id=client.client_id %}">
+          <a href="{% url 'client_signup' client_code=client.client_code %}">
             {% trans "Sign Up" %}
           </a>
         </li>

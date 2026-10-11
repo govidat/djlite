@@ -1941,7 +1941,7 @@ class SeriesLevelEvaluation(models.Model):
 
     class Meta:
         app_label = 'mysite'
-        ordering  = ['item__item_id', 'grain']
+        ordering  = ['item__item_code', 'grain']
         verbose_name        = _('02-13 Series Level Evaluation')
         verbose_name_plural = _('02-13 Series Level Evaluations')
         indexes = [
@@ -1962,7 +1962,7 @@ class SeriesLevelEvaluation(models.Model):
     def __str__(self):
         status = 'ACCEPTED' if self.is_accepted else 'rejected'
         return (
-            f'{self.item.item_id} | {self.grain} | '
+            f'{self.item.item_code} | {self.grain} | '
             f'{self.demand_class} | {status}'
         )
 
@@ -2081,7 +2081,7 @@ class SeriesProfile(models.Model):
             ('client', 'item', 'planning_customer',
              'planning_location', 'distribution_channel', 'period_type'),
         ]
-        ordering = ['item__item_id', 'planning_location__code']
+        ordering = ['item__item_code', 'planning_location__code']
         verbose_name        = _('02-14 Series Profile')
         verbose_name_plural = _('02-14 Series Profiles')
         indexes = [
@@ -2093,7 +2093,7 @@ class SeriesProfile(models.Model):
     def __str__(self):
         cust = self.planning_customer or 'all'
         return (
-            f'{self.item.item_id} | {self.planning_location.code} | {cust} | '
+            f'{self.item.item_code} | {self.planning_location.code} | {cust} | '
             f'atomic={self.demand_class_atomic} | chosen={self.chosen_grain}'
         )
 

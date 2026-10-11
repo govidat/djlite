@@ -58,7 +58,7 @@ class DemandFeatureMixin:
     Checks the master demand_planning feature flag before processing.
     Assumes request.client is set by your ClientScopedMixin / middleware.
 
-    Also strips the URL-captured `client_id` kwarg, and enforces
+    Also strips the URL-captured `client_code` kwarg, and enforces
     IsAuthenticated + IsClientMember as the default permission set
     for all demand API views, so cross-tenant access can't be
     accidentally reintroduced by a view omitting permission_classes.
@@ -66,7 +66,7 @@ class DemandFeatureMixin:
     permission_classes = [IsAuthenticated, IsClientMember]
 
     def dispatch(self, request, *args, **kwargs):
-        kwargs.pop('client_id', None)
+        kwargs.pop('client_code', None)
         return super().dispatch(request, *args, **kwargs)
 
     def initial(self, request, *args, **kwargs):
@@ -526,14 +526,14 @@ class ActualsQueryView(DemandFeatureMixin, APIView):
             ActualSale.objects
             .filter(client=request.client)
             .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
-            .order_by('period_start', 'planning_location__code', 'item__item_id')
+            .order_by('period_start', 'planning_location__code', 'item__item_code')
         )
 
         # ── Filters ───────────────────────────────────────────────────────
         p = request.query_params
 
         if p.get('item_id'):
-            qs = qs.filter(item__item_id=p['item_id'])
+            qs = qs.filter(item__item_code=p['item_id'])
 
         if p.get('location_code'):
             qs = qs.filter(planning_location__code=p['location_code'])
@@ -625,7 +625,7 @@ class ActualsTemplateDownloadView(DemandFeatureMixin, APIView):
         from django.core.management import call_command
         call_command(
             'generate_actuals_template',
-            client=client.client_id,
+            client=client.client_code,
             period_type=period_type,
             output_path=tmp_path,
         )
@@ -635,7 +635,7 @@ class ActualsTemplateDownloadView(DemandFeatureMixin, APIView):
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         )
         response['Content-Disposition'] = (
-            f'attachment; filename="actuals_template_{client.client_id}_{period_type}.xlsx"'
+            f'attachment; filename="actuals_template_{client.client_code}_{period_type}.xlsx"'
         )
         return response
     
@@ -789,13 +789,13 @@ class ForecastVersionLinesView(DemandFeatureMixin, APIView):
             ForecastLine.objects
             .filter(version=version)
             .select_related('item', 'planning_location', 'planning_customer')
-            .order_by('period_start', 'planning_location__code', 'item__item_id')
+            .order_by('period_start', 'planning_location__code', 'item__item_code')
         )
 
         p = request.query_params
 
         if p.get('item_id'):
-            qs = qs.filter(item__item_id=p['item_id'])
+            qs = qs.filter(item__item_code=p['item_id'])
         if p.get('location_code'):
             qs = qs.filter(planning_location__code=p['location_code'])
         if p.get('customer_code'):
@@ -1001,7 +1001,7 @@ class SeriesProfileListView(DemandFeatureMixin, APIView):
             SeriesProfile.objects
             .filter(client=request.client)
             .select_related('item', 'planning_location', 'planning_customer')
-            .order_by('abc_class_atomic', 'demand_class_atomic', 'item__item_id')
+            .order_by('abc_class_atomic', 'demand_class_atomic', 'item__item_code')
         )
 
         p = request.query_params
@@ -1249,7 +1249,7 @@ class ForecastVersionRunView(DemandFeatureMixin, APIView):
             'version_id':      version.pk,
             'run_status':      'QUEUED',
             'celery_task_id':  async_result.id,
-            'poll_url':        f'/api/{version.client.client_id}/demand/forecast-versions/{pk}/run-status/',
+            'poll_url':        f'/api/{version.client.client_code}/demand/forecast-versions/{pk}/run-status/',
             'warnings':        warnings,  # empty list if data is sufficient
         }, status=status.HTTP_202_ACCEPTED)
 
@@ -1430,7 +1430,7 @@ def _build_affected_lines_qs(override, version):
             period_start = override.period_start,
         )
         .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
-        .order_by('planning_location__code', 'item__item_id')
+        .order_by('planning_location__code', 'item__item_code')
     )
 
     key   = override.override_key
@@ -1439,7 +1439,7 @@ def _build_affected_lines_qs(override, version):
     if level == 'sku':
         item_id_str = key.get('item_id')
         if item_id_str:
-            qs = qs.filter(item__item_id=item_id_str)
+            qs = qs.filter(item__item_code=item_id_str)
 
     elif level == 'location':
         loc_code = key.get('location_code')
@@ -1750,7 +1750,7 @@ class ForecastVersionExportView(DemandFeatureMixin, APIView):
             .select_related('item', 'planning_location', 'planning_customer')
             .order_by(
                 'planning_location__code',
-                'item__item_id',
+                'item__item_code',
                 'planning_customer__code',
                 'period_start',
             )
@@ -1895,7 +1895,7 @@ class ForecastVersionExportView(DemandFeatureMixin, APIView):
         for line in lines:
             key = (
                 line.planning_location.code,
-                line.item.item_id,
+                line.item.item_code,
                 line.planning_customer.code if line.planning_customer else '',
             )
             if key not in pivot:
@@ -2146,7 +2146,7 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
             qs_base
             .select_related('item', 'planning_location')
             .values(
-                'item__item_id',
+                'item__item_code',
                 'item__name',
                 'planning_location__code',
                 'planning_location__name',
@@ -2182,10 +2182,10 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
         group_cols_map = {
-            'category': ['item_item_id', 'item_name'],
+            'category': ['item_item_code', 'item_name'],
             'location': ['planning_location_code'],
             'period':   ['period_start'],
-            'item':     ['item_item_id', 'item_name'],
+            'item':     ['item_item_code', 'item_name'],
         }
         group_cols = group_cols_map[group_by]
 
@@ -2194,7 +2194,7 @@ class ForecastVersionAccuracyView(DemandFeatureMixin, APIView):
                 return str(row['planning_location_code'])
             if group_by == 'period':
                 return str(row['period_start'])
-            return f"{row['item_item_id']} — {row['item_name']}"
+            return f"{row['item_item_code']} — {row['item_name']}"
 
         def _mean_metrics(sub):
             mapes = sub['mape'].dropna()

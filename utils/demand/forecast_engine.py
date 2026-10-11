@@ -394,7 +394,7 @@ def build_actuals_dataframe(
         .select_related('item', 'planning_location', 'planning_customer')
         .values(
             'eff_item_id' if use_sub else 'item_id',
-            'item__item_id',
+            'item__item_code',
             'planning_location_id', 'planning_location__code',
             'planning_customer_id', 'planning_customer__code',
             'distribution_channel_id',
@@ -416,14 +416,14 @@ def build_actuals_dataframe(
     df_pd['customer_code'] = df_pd['planning_customer__code'].fillna('NULL')
     df_pd['dc_code']       = df_pd['distribution_channel_id'].fillna('00')
     df_pd['unique_id'] = (
-        df_pd['item__item_id'].astype(str) + '|' +
+        df_pd['item__item_code'].astype(str) + '|' +
         df_pd['customer_code'].astype(str) + '|' +
         df_pd['dc_code'].astype(str) + '|' +
         df_pd['planning_location__code'].astype(str)
     )
     df_pd = (
         df_pd.groupby([
-            'unique_id', item_key, 'item__item_id',
+            'unique_id', item_key, 'item__item_code',
             'planning_customer_id', 'customer_code',
             'distribution_channel_id', 'dc_code',
             'planning_location_id', 'planning_location__code',
@@ -472,7 +472,7 @@ def load_series_decisions(
     for profile in profiles:
         cust_code = profile.planning_customer.code if profile.planning_customer else 'NULL'
         dc_code   = profile.distribution_channel_id or '00'
-        uid = make_uid(profile.item.item_id, cust_code, dc_code, profile.planning_location.code)
+        uid = make_uid(profile.item.item_code, cust_code, dc_code, profile.planning_location.code)
         if uid not in unique_ids:
             continue
 
@@ -608,7 +608,7 @@ def build_aggregated_actuals(
     as_of_iso = as_of.isoformat() if hasattr(as_of, 'isoformat') else str(as_of)
 
     code_lookup = {
-        'item':     dict(zip(df_pd['item_id'], df_pd['item__item_id'])),
+        'item':     dict(zip(df_pd['item_id'], df_pd['item__item_code'])),
         'location': dict(zip(df_pd['planning_location_id'], df_pd['planning_location__code'])),
         'customer': {
             cid: code for cid, code in zip(df_pd['planning_customer_id'], df_pd['customer_code'])
@@ -1163,8 +1163,8 @@ def build_scheme_forecast_factors(client_id, period_type, period_start_from, per
     cust_code_to_pk['NULL'] = None
 
     from mysite.models import Item
-    item_str_to_pk = {r['item_id']: r['id'] for r in
-                      Item.objects.filter(client_id=client_id).values('id', 'item_id')}
+    item_str_to_pk = {r['item_code']: r['id'] for r in
+                      Item.objects.filter(client_id=client_id).values('id', 'item_code')}
     pk_to_item_str = {v: k for k, v in item_str_to_pk.items()}
 
     qs = ResolvedSalesSchemePeriod.objects.filter(
@@ -1332,7 +1332,7 @@ def write_forecast_lines(
     version = ForecastVersion.objects.get(pk=version_id)
     use_schemes = scheme_factors is not None and len(scheme_factors) > 0
 
-    item_str_to_pk = {r['item_id']: r['id'] for r in Item.objects.filter(client=version.client).values('id', 'item_id')}
+    item_str_to_pk = {r['item_code']: r['id'] for r in Item.objects.filter(client=version.client).values('id', 'item_code')}
     loc_code_to_pk = {r['code']: r['id'] for r in PlanningLocation.objects.filter(client=version.client).values('id', 'code')}
     cust_code_to_pk = {r['code']: r['id'] for r in PlanningCustomer.objects.filter(client=version.client).values('id', 'code')}
     cust_code_to_pk['NULL'] = None
@@ -1497,7 +1497,7 @@ def write_forecast_aggregates(version_id: int) -> int:
         ForecastLine.objects.filter(version=version)
         .select_related('item', 'planning_location', 'planning_customer')
         .values(
-            'item_id', 'item__item_id',
+            'item_id', 'item__item_code',
             'planning_location_id', 'planning_location__code',
             'planning_customer_id', 'planning_customer__code',
             'distribution_channel_id',
@@ -1578,13 +1578,13 @@ def write_forecast_aggregates(version_id: int) -> int:
             FROM lines GROUP BY taxonomy_node_id, period_type, period_start
         """,
         'item': """
-            SELECT 'item' AS agg_level, CONCAT('{"item_id": "', "item__item_id", '"}') AS agg_key_json,
+            SELECT 'item' AS agg_level, CONCAT('{"item_id": "', "item__item_code", '"}') AS agg_key_json,
                    period_type, period_start,
                    SUM(statistical_qty) AS statistical_qty, SUM(final_qty) AS final_qty,
                    SUM(statistical_value) AS total_statistical_value, SUM(final_value) AS total_final_value,
                    SUM(pre_scheme_statistical_qty) AS pre_scheme_statistical_qty,
                    SUM(pre_scheme_statistical_value) AS pre_scheme_statistical_value
-            FROM lines GROUP BY "item__item_id", period_type, period_start
+            FROM lines GROUP BY "item__item_code", period_type, period_start
         """,
         'customer': """
             SELECT 'customer' AS agg_level, CONCAT('{"customer_code": "', customer_code, '"}') AS agg_key_json,

@@ -23,9 +23,9 @@ Context variables (all pre-resolved in view):
   <!-- ── Breadcrumb ──────────────────────────────────────────── -->
   <div class="text-sm breadcrumbs text-base-content/60 mb-6">
     <ul>
-      <li><a href="/{{ client.client_id }}/">Home</a></li>
+      <li><a href="/{{ client.client_code }}/">Home</a></li>
       <li>
-        <a href="{% url 'catalogue_page' client_id=client.client_id %}">
+        <a href="{% url 'catalogue_page' client_code=client.client_code %}">
           Catalogue
         </a>
       </li>
@@ -597,10 +597,10 @@ Context variables (all pre-resolved in view):
   <div class="text-sm breadcrumbs text-base-content/60 mb-6">
     <ul>
       <li>
-        <a href="/{{ client.client_id }}/">Home</a>
+        <a href="/{{ client.client_code }}/">Home</a>
       </li>
       <li>
-        <a href="{% url 'catalogue_page' client_id=client.client_id %}">
+        <a href="{% url 'catalogue_page' client_code=client.client_code %}">
           Catalogue
         </a>
       </li>

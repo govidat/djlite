@@ -8,7 +8,7 @@
         <span class="font-semibold">{{ crumb.label }}</span>
       {% else %}
         <a class="link link-hover"
-           hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_id=client.client_id pk=version.pk %}?location_id={{ crumb.location_id }}"
+           hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_code=client.client_code pk=version.pk %}?location_id={{ crumb.location_id }}"
            hx-target="#accuracy-hierarchy-locations-container" hx-swap="innerHTML">
           {{ crumb.label }}
         </a>
@@ -16,7 +16,7 @@
     {% endfor %}
     {% if current %}
       <a class="link link-hover text-xs"
-         hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_id=client.client_id pk=version.pk %}"
+         hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_code=client.client_code pk=version.pk %}"
          hx-target="#accuracy-hierarchy-locations-container" hx-swap="innerHTML">
         ({% trans "top" %})
       </a>
@@ -51,13 +51,13 @@
           {% if row.type == 'location' %}
             {% if row.has_children %}
             <a class="link link-hover font-medium"
-               hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_id=client.client_id pk=version.pk %}?location_id={{ row.location_id }}"
+               hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_code=client.client_code pk=version.pk %}?location_id={{ row.location_id }}"
                hx-target="#accuracy-hierarchy-locations-container" hx-swap="innerHTML">
               {{ row.label }} →
             </a>
             {% else %}
             <a class="link link-hover"
-               hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_id=client.client_id pk=version.pk %}?location_id={{ row.location_id }}&items=1"
+               hx-get="{% url 'demand_ui:accuracy_hierarchy_locations' client_code=client.client_code pk=version.pk %}?location_id={{ row.location_id }}&items=1"
                hx-target="#accuracy-hierarchy-locations-container" hx-swap="innerHTML">
               {{ row.label }} ({% trans "items" %})
             </a>

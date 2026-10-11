@@ -169,7 +169,7 @@ class TestLocationDrill:
                                          active_item, distribution_channel_common):
         from mysite.models import Item
         leaf_a, _ = report_locations
-        item2 = Item.objects.create(client=report_version.client, item_id='item-002',
+        item2 = Item.objects.create(client=report_version.client, item_code='item-002',
                                     name='Oil Filter', status='active')
         _acc(report_version, active_item, leaf_a, 100, 120, None, None,
              datetime.date(2025, 2, 1))

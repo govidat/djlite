@@ -17,7 +17,7 @@
                 id="override-level-select"
                 onchange="
                     htmx.ajax('GET',
-                        '{% url "demand_ui:override_key_field" client_id=client.client_id pk=version.pk %}?override_level=' + this.value,
+                        '{% url "demand_ui:override_key_field" client_code=client.client_code pk=version.pk %}?override_level=' + this.value,
                         {target: '#override-key-container', swap: 'innerHTML'}
                     );
                     const qtyTab = document.getElementById('otab-qty');
@@ -35,7 +35,7 @@
         </select>
         
         <button class="btn btn-primary btn-sm"
-                hx-get="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+                hx-get="{% url 'demand_ui:override_create' client_code=client.client_code pk=version.pk %}"
                 hx-target="#override-create-modal-content"
                 hx-swap="innerHTML"
                 hx-on:htmx:after-request="document.getElementById('override-create-modal').classList.remove('hidden')">
@@ -46,7 +46,7 @@
     {% comment %}
     {% if version.is_editable %}
     <button class="btn btn-primary btn-sm"
-            hx-get="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+            hx-get="{% url 'demand_ui:override_create' client_code=client.client_code pk=version.pk %}"
             hx-target="#override-create-modal-content"
             hx-swap="innerHTML"
             hx-on::after-request="document.getElementById('override-create-modal').showModal()">
@@ -55,7 +55,7 @@
     {% endif %}
     
     {% if version.is_editable %}
-    <a href="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+    <a href="{% url 'demand_ui:override_create' client_code=client.client_code pk=version.pk %}"
        class="btn btn-primary btn-sm">+ {% trans "New Override" %}</a>
     {% endif %}
     {% endcomment %}
@@ -136,7 +136,7 @@ document.getElementById('new-override-btn') &&
 document.getElementById('new-override-btn').addEventListener('click', function() {
     htmx.ajax(
         'GET',
-        '{% url "demand_ui:override_create" client_id=client.client_id pk=version.pk %}',
+        '{% url "demand_ui:override_create" client_code=client.client_code pk=version.pk %}',
         {
             target: '#override-create-modal-content',
             swap: 'innerHTML',

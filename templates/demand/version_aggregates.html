@@ -9,7 +9,7 @@
         <h2 class="text-xl font-bold">{% trans "Value Summary" %}</h2>
         <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
     </div>
-    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+    <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=version.pk %}"
        class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
 </div>
 
@@ -18,7 +18,7 @@
     {% for level, label in agg_level_choices %}
     <a class="tab {% if agg_level == level %}tab-active{% endif %}"
        id="agg-tab-{{ level }}"
-       hx-get="{% url 'demand_ui:version_aggregates' client_id=client.client_id pk=version.pk %}?agg_level={{ level }}"
+       hx-get="{% url 'demand_ui:version_aggregates' client_code=client.client_code pk=version.pk %}?agg_level={{ level }}"
        hx-target="#aggregates-container"
        hx-swap="innerHTML"
        hx-headers='{"HX-Request": "true"}'
@@ -51,12 +51,12 @@
         <h2 class="text-xl font-bold">{% trans "Forecast Aggregates" %}</h2>
         <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
     </div>
-    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+    <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=version.pk %}"
        class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
 </div>
 
 <div class="flex gap-2 mb-4"
-     hx-get="{% url 'demand_ui:version_aggregates' client_id=client.client_id pk=version.pk %}"
+     hx-get="{% url 'demand_ui:version_aggregates' client_code=client.client_code pk=version.pk %}"
      hx-trigger="change"
      hx-target="#aggregates-container"
      hx-include="this">

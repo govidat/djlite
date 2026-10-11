@@ -5,7 +5,7 @@
 <div class="max-w-xl mx-auto">
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-bold">{% trans "New Override" %}</h2>
-        <a href="{% url 'demand_ui:override_list' client_id=client.client_id pk=version.pk %}"
+        <a href="{% url 'demand_ui:override_list' client_code=client.client_code pk=version.pk %}"
            class="btn btn-ghost btn-sm">← {% trans "Back to overrides" %}</a>
     </div>
     {% include "demand/partials/override_create_form.html" %}

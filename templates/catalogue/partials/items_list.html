@@ -37,7 +37,7 @@ Contains item grid + pagination.
     <div class="col-span-full text-center py-16 text-base-content/50">
       <div class="text-5xl mb-4">🔍</div>
       <p class="text-lg">No items found matching your filters.</p>
-      <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+      <a href="{% url 'catalogue_page' client_code=client.client_code %}"
          class="btn btn-outline btn-sm mt-4">
         Clear filters
       </a>
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
 document.querySelectorAll('a[href*="/catalogue/"]').forEach(link => {
   link.addEventListener('click', () => {
     sessionStorage.setItem(
-      'catalogue_scroll_{{ client.client_id }}',
+      'catalogue_scroll_{{ client.client_code }}',
       window.scrollY
     );
   });
@@ -93,11 +93,11 @@ document.querySelectorAll('a[href*="/catalogue/"]').forEach(link => {
 
 // Restore on page load
 const savedScroll = sessionStorage.getItem(
-  'catalogue_scroll_{{ client.client_id }}'
+  'catalogue_scroll_{{ client.client_code }}'
 );
 if (savedScroll && document.referrer.includes('/catalogue/')) {
   window.scrollTo(0, parseInt(savedScroll));
-  sessionStorage.removeItem('catalogue_scroll_{{ client.client_id }}');
+  sessionStorage.removeItem('catalogue_scroll_{{ client.client_code }}');
 }
 
 </script>

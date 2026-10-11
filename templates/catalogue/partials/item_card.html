@@ -11,7 +11,7 @@ Phase 3: add "Add to Cart" button here.
             transition-shadow duration-200 cursor-pointer group">
 
   <!-- Image -->
-  <a href="{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}">
+  <a href="{% url 'item_detail' client_code=client.client_code item_code=item.item_code %}">
     <figure class="aspect-square overflow-hidden bg-base-200 rounded-t-2xl">
       {% if item.image_url %}
         <img src="{{ item.image_url }}"
@@ -31,7 +31,7 @@ Phase 3: add "Add to Cart" button here.
   <div class="card-body p-4">
 
     <!-- Name -->
-    <a href="{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}"
+    <a href="{% url 'item_detail' client_code=client.client_code item_code=item.item_code %}"
        class="card-title text-sm font-semibold text-base-content
               hover:text-primary line-clamp-2">
       {{ item.name }}
@@ -51,13 +51,13 @@ Phase 3: add "Add to Cart" button here.
 
     <!-- Phase 3: Add to Cart button placeholder -->
     <div class="card-actions justify-end mt-2">
-      <a href="{% url 'item_detail' client_id=client.client_id item_id=item.item_id %}"
+      <a href="{% url 'item_detail' client_code=client.client_code item_code=item.item_code %}"
          class="btn btn-primary btn-sm w-full">
         View Details
       </a>
       {# Phase 3: replace with:
       <button class="btn btn-primary btn-sm w-full"
-              hx-post="{% url 'cart_add' client_id=client.client_id item_id=item.item_id %}"
+              hx-post="{% url 'cart_add' client_code=client.client_code item_code=item.item_code %}"
               hx-target="#cart-count"
               hx-swap="innerHTML">
         Add to Cart

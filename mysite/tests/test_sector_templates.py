@@ -50,7 +50,7 @@ def sector_tree():
 @pytest.fixture
 def client_under_autocomponents(sector_tree):
     return Client.objects.create(
-        client_id='zztest-auto-comp',
+        client_code='zztest-auto-comp',
         sector=sector_tree['autocomponents'],
     )
 
@@ -74,7 +74,7 @@ def test_every_template_key_has_active_global_default():
 
 def test_sector_chain_walks_to_root(client_under_autocomponents, sector_tree):
     cache.clear()
-    chain_ids = get_client_sector_chain(client_under_autocomponents.client_id)
+    chain_ids = get_client_sector_chain(client_under_autocomponents.client_code)
     expected = [
         sector_tree['autocomponents'].id,
         sector_tree['automotive'].id,
@@ -84,8 +84,8 @@ def test_sector_chain_walks_to_root(client_under_autocomponents, sector_tree):
 
 
 def test_sector_chain_empty_for_client_without_sector():
-    c = Client.objects.create(client_id='zztest-nosector')
-    assert get_client_sector_chain(c.client_id) == []
+    c = Client.objects.create(client_code='zztest-nosector')
+    assert get_client_sector_chain(c.client_code) == []
 
 
 # ── Resolution precedence ────────────────────────────────────────────
@@ -96,7 +96,7 @@ KEY = 'catalogue_item_card'
 def test_global_default_used_when_nothing_else(client_under_autocomponents):
     cache.clear()
     make_global(KEY, '<b>global</b>')
-    html = _resolve_template_html(client_under_autocomponents.client_id, KEY)
+    html = _resolve_template_html(client_under_autocomponents.client_code, KEY)
     assert html == '<b>global</b>'
 
 
@@ -104,7 +104,7 @@ def test_exact_sector_beats_global(client_under_autocomponents, sector_tree):
     cache.clear()
     make_global(KEY, 'global')
     make_sector(sector_tree['autocomponents'], KEY, 'autocomponents')
-    html = _resolve_template_html(client_under_autocomponents.client_id, KEY)
+    html = _resolve_template_html(client_under_autocomponents.client_code, KEY)
     assert html == 'autocomponents'
 
 
@@ -112,7 +112,7 @@ def test_ancestor_sector_used_when_no_exact_row(client_under_autocomponents, sec
     cache.clear()
     make_global(KEY, 'global')
     make_sector(sector_tree['automotive'], KEY, 'automotive')
-    html = _resolve_template_html(client_under_autocomponents.client_id, KEY)
+    html = _resolve_template_html(client_under_autocomponents.client_code, KEY)
     assert html == 'automotive'
 
 
@@ -121,7 +121,7 @@ def test_deepest_sector_wins_over_ancestor(client_under_autocomponents, sector_t
     make_sector(sector_tree['industrial'], KEY, 'industrial')
     make_sector(sector_tree['automotive'], KEY, 'automotive')
     make_sector(sector_tree['autocomponents'], KEY, 'autocomponents')
-    html = _resolve_template_html(client_under_autocomponents.client_id, KEY)
+    html = _resolve_template_html(client_under_autocomponents.client_code, KEY)
     assert html == 'autocomponents'
 
 
@@ -132,7 +132,7 @@ def test_client_template_beats_all_tiers(client_under_autocomponents, sector_tre
     ClientTemplate.objects.create(
         client=client_under_autocomponents, template_key=KEY, htmlblob='client',
     )
-    html = _resolve_template_html(client_under_autocomponents.client_id, KEY)
+    html = _resolve_template_html(client_under_autocomponents.client_code, KEY)
     assert html == 'client'
 
 
@@ -142,7 +142,7 @@ def test_inactive_sector_row_is_skipped(client_under_autocomponents, sector_tree
     row.is_active = False
     row.save()
     make_global(KEY, 'global')
-    html = _resolve_template_html(client_under_autocomponents.client_id, KEY)
+    html = _resolve_template_html(client_under_autocomponents.client_code, KEY)
     assert html == 'global'
 
 
@@ -153,7 +153,7 @@ def test_inactive_global_default_returns_empty(client_under_autocomponents):
     row.is_active = False
     row.save()
     assert _resolve_template_html(
-        client_under_autocomponents.client_id, seeded_key
+        client_under_autocomponents.client_code, seeded_key
     ) == ''
 
 
@@ -161,11 +161,11 @@ def test_blank_htmlblob_falls_through_to_next_tier(client_under_autocomponents, 
     cache.clear()
     make_sector(sector_tree['autocomponents'], KEY, '   ')  # blank
     make_global(KEY, 'global')
-    html = _resolve_template_html(client_under_autocomponents.client_id, KEY)
+    html = _resolve_template_html(client_under_autocomponents.client_code, KEY)
     assert html == 'global'
 
 
 def test_unseeded_key_returns_empty_string(client_under_autocomponents):
     cache.clear()
-    html = _resolve_template_html(client_under_autocomponents.client_id, 'no_such_key')
+    html = _resolve_template_html(client_under_autocomponents.client_code, 'no_such_key')
     assert html == ''

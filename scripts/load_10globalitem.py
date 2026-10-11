@@ -14,7 +14,7 @@ from scripts.helpers import clean, to_int, to_bool, to_json, to_decimal
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 
-# global_item_id,gtin,gpc_brick_code,domain,status,
+# global_item_code,gtin,gpc_brick_code,domain,status,
 # name_en,name_hi,name_fr,name_ta,
 # description_en,description_hi,description_fr,description_ta,
 # country_of_origin,image_url,image_alt,
@@ -48,15 +48,15 @@ def load_val01(dry_run=False, verbose=False,):
 
     for row in rows:
 
-        global_item_id = clean(row.get("global_item_id"),lower=True)
+        global_item_code = clean(row.get("global_item_code"),lower=True)
 
-        if not global_item_id:
+        if not global_item_code:
 
-            print("Skipping row with empty global_item_id")
+            print("Skipping row with empty global_item_code")
             skipped_count += 1            
             continue
 
-        key = global_item_id
+        key = global_item_code
         if key in seen:
             print(
                 f"Duplicate CSV row: {key}"
@@ -100,7 +100,7 @@ def load_val01(dry_run=False, verbose=False,):
             print(
                 
                 f"[DRY RUN] "
-                f"{global_item_id} "
+                f"{global_item_code} "
             )
 
             if verbose:
@@ -111,7 +111,7 @@ def load_val01(dry_run=False, verbose=False,):
             obj, created = (
                 GlobalItem.objects.update_or_create(
 
-                    global_item_id=global_item_id,
+                    global_item_code=global_item_code,
                     defaults=defaults
                 )
             )
@@ -123,7 +123,7 @@ def load_val01(dry_run=False, verbose=False,):
             if verbose:
                 print(
                     f"{'Created' if created else 'Updated'} "
-                    f"GlobalItem: {global_item_id}"
+                    f"GlobalItem: {global_item_code}"
                 )                
 
     print()

@@ -23,10 +23,10 @@ DATA_DIR = BASE_DIR / "data"
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 
-# item_id,variant_code,sku,gtin,
+# item_code,variant_code,sku,gtin,
 # name_en,name_hi,name_fr,name_ta,
 # price,stock,is_active,image_url,
-# order,attributes,client_id
+# order,attributes,client_code
 
 
 # =========================================================
@@ -58,28 +58,28 @@ def load_val01(
     # Collect Keys
     # -----------------------------------------------------
 
-    client_ids = {
+    client_codes = {
 
         clean(
-            row.get("client_id"),
+            row.get("client_code"),
             lower=True,
         )
 
         for row in rows
 
-        if row.get("client_id")
+        if row.get("client_code")
     }
 
     item_ids = {
 
         clean(
-            row.get("item_id"),
+            row.get("item_code"),
             lower=True,
         )
 
         for row in rows
 
-        if row.get("item_id")
+        if row.get("item_code")
     }
 
     # -----------------------------------------------------
@@ -89,14 +89,14 @@ def load_val01(
     items = {
 
         (
-            item.client.client_id,
-            item.item_id,
+            item.client.client_code,
+            item.item_code,
         ): item
 
         for item in Item.objects.filter(
 
-            client__client_id__in=client_ids,
-            item_id__in=item_ids,
+            client__client_code__in=client_codes,
+            item_code__in=item_ids,
 
         ).select_related("client")
     }
@@ -117,13 +117,13 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
-        item_id = clean(
-            row.get("item_id"),
+        item_code = clean(
+            row.get("item_code"),
             lower=True,
         )
 
@@ -136,19 +136,19 @@ def load_val01(
         # Validation
         # -------------------------------------------------
 
-        if not client_id:
+        if not client_code:
 
             print(
-                "Skipping row with empty client_id"
+                "Skipping row with empty client_code"
             )
 
             skipped_count += 1
             continue
 
-        if not item_id:
+        if not item_code:
 
             print(
-                "Skipping row with empty item_id"
+                "Skipping row with empty item_code"
             )
 
             skipped_count += 1
@@ -164,8 +164,8 @@ def load_val01(
             continue
 
         key = (
-            client_id,
-            item_id,
+            client_code,
+            item_code,
             variant_code,
         )
 
@@ -186,8 +186,8 @@ def load_val01(
 
         item = items.get(
             (
-                client_id,
-                item_id,
+                client_code,
+                item_code,
             )
         )
 
@@ -195,8 +195,8 @@ def load_val01(
 
             print(
                 f"Missing Item: "
-                f"{client_id} / "
-                f"{item_id}"
+                f"{client_code} / "
+                f"{item_code}"
             )
 
             skipped_count += 1
@@ -261,8 +261,8 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / "
-                f"{item_id} / "
+                f"{client_code} / "
+                f"{item_code} / "
                 f"{variant_code}"
             )
 
@@ -295,8 +295,8 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"ItemVariant: "
-                f"{client_id} / "
-                f"{item_id} / "
+                f"{client_code} / "
+                f"{item_code} / "
                 f"{variant_code}"
             )
 
@@ -459,13 +459,13 @@ def load_item_variants():
     # preload keys
     # ─────────────────────────────────────────
 
-    client_ids = {
-        clean(r.get("client_id")).lower()
+    client_codes = {
+        clean(r.get("client_code")).lower()
         for r in rows
     }
 
     item_ids = {
-        clean(r.get("item_id")).lower()
+        clean(r.get("item_code")).lower()
         for r in rows
     }
 
@@ -476,13 +476,13 @@ def load_item_variants():
     items = {
 
         (
-            i.client.client_id.lower(),
-            i.item_id.lower(),
+            i.client.client_code.lower(),
+            i.item_code.lower(),
         ): i
 
         for i in Item.objects.filter(
-            client__client_id__in=client_ids,
-            item_id__in=item_ids,
+            client__client_code__in=client_codes,
+            item_code__in=item_ids,
         ).select_related("client")
     }
 
@@ -492,12 +492,12 @@ def load_item_variants():
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id")
+        client_code = clean(
+            row.get("client_code")
         ).lower()
 
-        item_id = clean(
-            row.get("item_id")
+        item_code = clean(
+            row.get("item_code")
         ).lower()
 
         variant_code = clean(
@@ -505,14 +505,14 @@ def load_item_variants():
         ).lower()
 
         item = items.get(
-            (client_id, item_id)
+            (client_code, item_code)
         )
 
         if not item:
 
             print(
                 f"Missing Item: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             continue
@@ -562,8 +562,8 @@ def load_item_variants():
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"{client_id} / "
-            f"{item_id} / "
+            f"{client_code} / "
+            f"{item_code} / "
             f"{variant_code}"
         )
 

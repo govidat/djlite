@@ -66,11 +66,11 @@ class ThemeInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInline, C
     """
 class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
     form         = ClientForm
-    #list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
+    #list_display = ('client_code', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
     inlines      = [ThemeInline, PageInline, NavItemInline]
     admin_role_only = True
     search_fields = [
-        'client_id',
+        'client_code',
         'name',
     ]
     """ REDUNDANT AS IT IS IN ClientScope Mixin
@@ -81,14 +81,14 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
         if request.user.is_superuser:
             return qs
 
-        permitted_ids = list(
+        permitted_codes = list(
             Client.objects.filter(
                 groups__memberships__user=request.user,
                 groups__is_active=True,
-            ).distinct().values_list('client_id', flat=True)
+            ).distinct().values_list('client_code', flat=True)
         )
 
-        return qs.filter(client_id__in=permitted_ids)
+        return qs.filter(client_code__in=permitted_codes)
     """
     def get_fieldsets(self, request, obj=None):
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
@@ -96,7 +96,7 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
         )
         fieldsets = [
             ('General', {
-                'fields': ('client_id', 'parent', 'sector', 'language_choices', 'default_language', 'distribution_channel_choices', 'country_choices', 'default_country_code', 'catalogue_taxonomy_order', 'nb_title_svg_pre', 'nb_title_svg_suf'),
+                'fields': ('client_code', 'parent', 'sector', 'language_choices', 'default_language', 'distribution_channel_choices', 'country_choices', 'default_country_code', 'catalogue_taxonomy_order', 'nb_title_svg_pre', 'nb_title_svg_suf'),
                 'classes': ('collapse',),
             }),            
             ('Main Language', {
@@ -121,8 +121,8 @@ class ClientAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.Nes
         return super().get_inline_instances(request, obj)    
     
 class ClientContentStructuredAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, BaseAdminInlinecss):
-    readonly_fields = ('client_id',)
-    fields = ('client_id',)
+    readonly_fields = ('client_code',)
+    fields = ('client_code',)
     inlines      = [PageplusLayoutInline]
     admin_role_only = True
 
@@ -133,14 +133,14 @@ class ClientContentStructuredAdmin(ClientScopedMixin, nested_admin.NestedModelAd
         if request.user.is_superuser:
             return qs
 
-        permitted_ids = list(
+        permitted_codes = list(
             Client.objects.filter(
                 groups__memberships__user=request.user,
                 groups__is_active=True,
-            ).distinct().values_list('client_id', flat=True)
+            ).distinct().values_list('client_code', flat=True)
         )
 
-        return qs.filter(client_id__in=permitted_ids)
+        return qs.filter(client_code__in=permitted_codes)
         
     def has_add_permission(self, request):
         return False
@@ -150,8 +150,8 @@ class ClientContentStructuredAdmin(ClientScopedMixin, nested_admin.NestedModelAd
         return super().get_inline_instances(request, obj)        
     
 class ClientContentHtmlAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, BaseAdminInlinecss):
-    readonly_fields = ('client_id',)
-    fields = ('client_id',)
+    readonly_fields = ('client_code',)
+    fields = ('client_code',)
     inlines      = [PageplusPageContentInline]
     admin_role_only = True
     def get_queryset(self, request):
@@ -161,14 +161,14 @@ class ClientContentHtmlAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, B
         if request.user.is_superuser:
             return qs
 
-        permitted_ids = list(
+        permitted_codes = list(
             Client.objects.filter(
                 groups__memberships__user=request.user,
                 groups__is_active=True,
-            ).distinct().values_list('client_id', flat=True)
+            ).distinct().values_list('client_code', flat=True)
         )
 
-        return qs.filter(client_id__in=permitted_ids)
+        return qs.filter(client_code__in=permitted_codes)
 
     def has_add_permission(self, request):
         return False
@@ -178,8 +178,8 @@ class ClientContentHtmlAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, B
         return super().get_inline_instances(request, obj)      
     
 class ClientStaffAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, BaseAdminInlinecss):
-    readonly_fields = ('client_id',)
-    fields = ('client_id',)
+    readonly_fields = ('client_code',)
+    fields = ('client_code',)
     inlines      = [ClientUserProfileInline]
     admin_role_only = True
     def has_add_permission(self, request):
@@ -243,8 +243,8 @@ class ClientTemplateInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, nes
     """
    
 class ClientTemplatewrapperAdmin(ClientScopedMixin, nested_admin.NestedModelAdmin, BaseAdminInlinecss):
-    readonly_fields = ('client_id',)
-    fields = ('client_id',)
+    readonly_fields = ('client_code',)
+    fields = ('client_code',)
     inlines      = [ClientTemplateInline]
     admin_role_only = True
     #def has_add_permission(self, request):
@@ -299,7 +299,7 @@ class SectorTemplateAdmin(TranslationBaseModelAdmin, nested_admin.NestedModelAdm
 """
 class ClientTemplateAdmin(ClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
 
-    #list_display = ('client_id', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
+    #list_display = ('client_code', 'parent', 'nb_title_svg_pre', 'nb_title_svg_suf')
     #inlines      = [ThemeInline, PageInline, NavItemInline]
     admin_role_only = True
     classes = ['collapse']
@@ -372,11 +372,11 @@ class ClientBlockAdmin(nested_admin.NestedModelAdmin):
     )
 
     search_fields = (
-        'client__client_id',
+        'client__client_code',
         'remarks',
     )
     def target_client(self, obj):
-        return obj.client.client_id if obj.client else "ALL CLIENTS"
+        return obj.client.client_code if obj.client else "ALL CLIENTS"
         
     def has_module_permission(self, request):
         return request.user.is_superuser
@@ -410,11 +410,11 @@ class ClientFeatureControlAdmin(admin.ModelAdmin):
     )
 
     search_fields = (
-        'client__client_id',
+        'client__client_code',
     )
 
     def target_client(self, obj):
-        return obj.client.client_id if obj.client else "ALL CLIENTS"
+        return obj.client.client_code if obj.client else "ALL CLIENTS"
         
     def has_module_permission(self, request):
         return request.user.is_superuser

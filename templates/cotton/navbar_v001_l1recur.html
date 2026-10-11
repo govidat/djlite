@@ -5,7 +5,7 @@ Called with :items="client.header_nav" from parent navbar.
 Self-recurses for children via <c-navbar_v001_l1recur>.
 
 Item shape expected (header_nav):
-  item.url              → page_id string e.g. "home", "about"
+  item.url              → page_code string e.g. "home", "about"
   item.nav_type         → "page" | "url" | "anchor" | "label"
   item.translations.name → { "en": "Home", "hi": "होम", ... }
   item.open_in_new_tab  → true | false
@@ -51,7 +51,7 @@ Item shape expected (header_nav):
 
       {% if item.nav_type == "page" %}
         <li>
-          <a href="{% url 'client_page' client.client_id item.href %}"
+          <a href="{% url 'client_page' client.client_code item.href %}"
              {% if item.open_in_new_tab %}target="_blank" rel="noopener"{% endif %}
              class="{% if item.url == current_page %}active bg-base-300 font-semibold{% endif %}">
             <c-svgtextsvg
@@ -125,7 +125,7 @@ Item shape expected (header_nav):
           {% else %}
               {% if item.nav_type=="page" %}        
                 <li>
-                    <a href="{% url 'client_page' client.client_id item.url %}"
+                    <a href="{% url 'client_page' client.client_code item.url %}"
                       class="{% if item.url == current_page %}active bg-base-300 font-semibold{% endif %}">
                         <c-svgtextsvg  :textdict="item.translations.name" :svg_pre="item.svg_pre" :svg_suf="item.svg_suf"></c-svgtextsvg>
                     </a>
@@ -140,8 +140,8 @@ Item shape expected (header_nav):
 New Input is like:
    "page_tree":[
       {
-         "client_id":"bahushira",
-         "page_id":"home",
+         "client_code":"bahushira",
+         "page_code":"home",
          "order":1,
          "translations":{
             "name":{
@@ -156,8 +156,8 @@ New Input is like:
          ]
       },
       {
-         "client_id":"bahushira",
-         "page_id":"about",
+         "client_code":"bahushira",
+         "page_code":"about",
          "order":2,
          "translations":{
             "name":{

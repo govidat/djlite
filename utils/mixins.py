@@ -26,4 +26,4 @@ def feature_gate(request, feature: str):
 
 
 def _client_url_kwargs(request) -> dict:
-    return {'client_id': request.client.client_id}
+    return {'client_code': request.client.client_code}

@@ -31,7 +31,7 @@ from utils.demand.periods import as_date, step_date
 
 
 @shared_task
-def detect_scheme_candidates(client_id, target_period_start, target_period_end,
+def detect_scheme_candidates(client_code, target_period_start, target_period_end,
                              triggered_by_user_id=None):
     """Detect transient spikes in product-group actuals that may be schemes.
 
@@ -41,7 +41,7 @@ def detect_scheme_candidates(client_id, target_period_start, target_period_end,
     target_period_start = as_date(target_period_start)
     target_period_end = as_date(target_period_end)
 
-    client = Client.objects.select_related("forecasting_config").get(client_id=client_id)
+    client = Client.objects.select_related("forecasting_config").get(client_code=client_code)
     config = getattr(client, "forecasting_config", None)
     if config is None:
         return {"status": "no_config"}
@@ -66,7 +66,7 @@ def detect_scheme_candidates(client_id, target_period_start, target_period_end,
     from mysite.models import TaxonomyNode, ItemTaxonomyNode
     product_group_node_ids = TaxonomyNode.objects.filter(
         taxonomy__slug=config.planning_producthierarchy,
-        client_id=client_id,
+        client_id=client_code,
     ).values_list("id", flat=True)
 
     # Build item → product_group mapping

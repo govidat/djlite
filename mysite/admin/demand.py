@@ -308,7 +308,7 @@ class SalesForecastLinkAdmin(admin.ModelAdmin):
 # In your existing ItemAdmin, ensure this is present:
 #
 #   class ItemAdmin(admin.ModelAdmin):
-#       search_fields = ["item_id", "name", "name_en", "name_hi"]
+#       search_fields = ["item_code", "name", "name_en", "name_hi"]
 #
 # autocomplete_fields on ActualSaleAdmin requires it.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -325,7 +325,7 @@ class ActualSaleAdmin(admin.ModelAdmin):
     ]
     list_filter    = ["client", "period_type", "planning_location", "distribution_channel"]
     search_fields  = [
-        "item__item_id",    # Item.item_id  (your primary identifier)
+        "item__item_code",    # Item.item_code  (your primary identifier)
         "item__name",       # default language name
         "planning_customer__code",
         "planning_customer__name",
@@ -381,7 +381,7 @@ class ActualSaleAdmin(admin.ModelAdmin):
             if "item" in form.base_fields:
                 form.base_fields["item"].queryset = (
                     Item.objects.filter(client=obj.client, status="active")
-                    .order_by("item_id")
+                    .order_by("item_code")
                 )
             if "planning_location" in form.base_fields:
                 form.base_fields["planning_location"].queryset = (
@@ -482,11 +482,11 @@ class ItemPlanningProfileAdmin(admin.ModelAdmin):
     ]
     list_filter  = ['client']
     search_fields = [
-        'item__item_id',
+        'item__item_code',
         'item__name',
-        'client__client_id',
+        'client__client_code',
     ]
-    ordering = ['client', 'item__item_id']
+    ordering = ['client', 'item__item_code']
 
     # ── Field layout ──────────────────────────────────────────────────────────
     readonly_fields = [
@@ -538,9 +538,9 @@ class ItemPlanningProfileAdmin(admin.ModelAdmin):
 
     # ── Custom columns ────────────────────────────────────────────────────────
 
-    @admin.display(description='Item ID', ordering='item__item_id')
+    @admin.display(description='Item ID', ordering='item__item_code')
     def item_code(self, obj):
-        return obj.item.item_id
+        return obj.item.item_code
 
     @admin.display(description='Effective Price')
     def effective_price_display(self, obj):

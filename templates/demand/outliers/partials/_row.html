@@ -15,7 +15,7 @@
   <td>{{ adjustment.actual_sale.qty }}</td>
   <td>
     {% if adjustment.status == "CANDIDATE" %}
-      <form hx-post="{% url 'demand_ui:outlier_confirm' client_id=client.client_id pk=adjustment.pk %}"
+      <form hx-post="{% url 'demand_ui:outlier_confirm' client_code=client.client_code pk=adjustment.pk %}"
             hx-target="#outlier-row-{{ adjustment.pk }}" hx-swap="outerHTML"
             class="flex gap-2 items-center">
         <input type="number" step="0.001" name="qty_adjustment"
@@ -53,7 +53,7 @@
     {% if adjustment.status == "CANDIDATE" %}
         <button type="submit" class="btn btn-success btn-xs">{% trans "Confirm" %}</button>
       </form>
-      <form hx-post="{% url 'demand_ui:outlier_reject' client_id=client.client_id pk=adjustment.pk %}"
+      <form hx-post="{% url 'demand_ui:outlier_reject' client_code=client.client_code pk=adjustment.pk %}"
             hx-target="#outlier-row-{{ adjustment.pk }}" hx-swap="outerHTML">
         <button type="submit" class="btn btn-error btn-xs">{% trans "Reject" %}</button>
       </form>

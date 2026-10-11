@@ -128,7 +128,7 @@
             </label>
             <div id="agg-sales-tree-container"
                  class="tx-tree-container"
-                 hx-get="{% url 'demand_ui:sales_tree_panel' client_id=client.client_id %}?sales_node_ids={{ filters.sales_node_ids }}"
+                 hx-get="{% url 'demand_ui:sales_tree_panel' client_code=client.client_code %}?sales_node_ids={{ filters.sales_node_ids }}"
                  hx-trigger="load"
                  hx-target="this">
                 <span class="text-xs text-base-content/50">{% trans "Loading…" %}</span>
@@ -143,7 +143,7 @@
             </label>
             <div id="agg-taxonomy-tree-container"
                  class="tx-tree-container"
-                 hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_id=client.client_id %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}&taxonomy_slug={{ planning_taxonomy_slug }}"
+                 hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_code=client.client_code %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}&taxonomy_slug={{ planning_taxonomy_slug }}"
                  hx-trigger="load"
                  hx-target="this">
                 <span class="text-xs text-base-content/50">{% trans "Loading…" %}</span>
@@ -155,7 +155,7 @@
 
 <script>
 (function() {
-    var baseUrl   = '{% url "demand_ui:version_aggregates" client_id=client.client_id pk=version.pk %}';
+    var baseUrl   = '{% url "demand_ui:version_aggregates" client_code=client.client_code pk=version.pk %}';
     var currentAggLevel = '{{ agg_level }}';
 
     function getVal(id) {

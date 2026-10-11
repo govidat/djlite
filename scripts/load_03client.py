@@ -52,33 +52,33 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
         # ── validation ────────────────────────────────
 
-        if not client_id:
+        if not client_code:
 
             print(
-                "Skipping row with empty client_id"
+                "Skipping row with empty client_code"
             )
 
             skipped_count += 1
             continue
 
-        if client_id in seen:
+        if client_code in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{client_id}"
+                f"{client_code}"
             )
 
             skipped_count += 1
             continue
 
-        seen.add(client_id)
+        seen.add(client_code)
 
         # ── defaults ──────────────────────────────────
 
@@ -120,7 +120,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id}"
+                f"{client_code}"
             )
 
             if verbose:
@@ -133,7 +133,7 @@ def load_val01(
             obj, created = (
                 Client.objects.update_or_create(
 
-                    client_id=client_id,
+                    client_code=client_code,
 
                     defaults=defaults,
                 )
@@ -149,7 +149,7 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"Client: "
-                    f"{client_id}"
+                    f"{client_code}"
                 )
 
     # ── Summary ────────────────────────────────────────

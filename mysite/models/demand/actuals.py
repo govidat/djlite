@@ -735,7 +735,7 @@ class ItemPlanningProfile(models.Model):
         verbose_name_plural = _('02-07 Item Planning Profiles')
 
     def __str__(self):
-        return f'{self.item.item_id} | std_price={self.standard_price}'
+        return f'{self.item.item_code} | std_price={self.standard_price}'
 
     @property
     def effective_price(self) -> 'Decimal':

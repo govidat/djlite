@@ -21,7 +21,7 @@ Track B — component tree layout (extends base.html)
     <!-- Search bar -->
     <div class="mb-6">
       <form id="filter-form"
-            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+            hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
             hx-target="#items-container"
             hx-swap="innerHTML"
             hx-push-url="true"

@@ -20,7 +20,7 @@
         </ul>
       </div>
     {% endif %}
-    <form hx-post="{% url 'demand_ui:outlier_revise' client_id=client.client_id pk=adjustment.pk %}"
+    <form hx-post="{% url 'demand_ui:outlier_revise' client_code=client.client_code pk=adjustment.pk %}"
           hx-target="#decision-row-{{ adjustment.pk }}" hx-swap="outerHTML"
           class="flex gap-2 items-center">
       <input type="number" step="0.001" name="qty_adjustment"
@@ -50,7 +50,7 @@
   <td class="flex gap-2">
       <button type="submit" class="btn btn-primary btn-xs">{% trans "Revise" %}</button>
     </form>
-    <form hx-post="{% url 'demand_ui:outlier_undo_decision' client_id=client.client_id pk=adjustment.pk %}"
+    <form hx-post="{% url 'demand_ui:outlier_undo_decision' client_code=client.client_code pk=adjustment.pk %}"
           hx-target="#decision-row-{{ adjustment.pk }}" hx-swap="delete"
           hx-confirm="{% trans 'Move this back to the Outlier Review Queue as a new candidate?' %}">
       <button type="submit" class="btn btn-ghost btn-xs">{% trans "Undo" %}</button>

@@ -49,7 +49,7 @@
 
                     {# ── Propagation viewer ───────────────────────── #}
                     <button class="btn btn-ghost btn-xs"
-                            hx-get="{% url 'demand_ui:override_affected' client_id=client.client_id pk=version.pk override_id=override.pk %}"
+                            hx-get="{% url 'demand_ui:override_affected' client_code=client.client_code pk=version.pk override_id=override.pk %}"
                             hx-target="#propagation-container"
                             title="{% trans 'View affected lines' %}">
                         🔍
@@ -58,7 +58,7 @@
                     {# ── Custom weight editor — only for CUSTOM disagg ─ #}
                     {% if override.disagg_method == 'CUSTOM' %}
                     <button class="btn btn-ghost btn-xs"
-                            hx-get="{% url 'demand_ui:override_split_weights' client_id=client.client_id pk=version.pk override_id=override.pk %}"
+                            hx-get="{% url 'demand_ui:override_split_weights' client_code=client.client_code pk=version.pk override_id=override.pk %}"
                             hx-target="#split-weight-editor-container"
                             hx-swap="innerHTML"
                             title="{% trans 'Edit split weights' %}">
@@ -69,7 +69,7 @@
                     {# ── Delete — only editable + not yet applied ─────── #}
                     {% if version.is_editable and not override.is_applied %}
                     <button class="btn btn-ghost btn-xs text-error"
-                            hx-post="{% url 'demand_ui:override_delete' client_id=client.client_id pk=version.pk override_id=override.pk %}"
+                            hx-post="{% url 'demand_ui:override_delete' client_code=client.client_code pk=version.pk override_id=override.pk %}"
                             hx-target="#override-table-container"
                             hx-swap="innerHTML"
                             hx-confirm="{% trans 'Delete this override?' %}"

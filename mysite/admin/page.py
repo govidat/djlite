@@ -80,7 +80,7 @@ class PageInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
     extra = 0
     classes = ['collapse']
     inlines = [LayoutInline, PageContentInline]                        
-    fields  = ['page_id', 'ltext', 'hidden']
+    fields  = ['page_code', 'ltext', 'hidden']
 """
 
 
@@ -90,7 +90,7 @@ class PageInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
     extra = 0
     classes = ['collapse']
     #inlines = [LayoutInline, PageContentInline]                       
-    fields  = ['page_id', 'ltext', 'hidden']
+    fields  = ['page_code', 'ltext', 'hidden']
     show_change_link = True
 
 class PageplusLayoutInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
@@ -99,7 +99,7 @@ class PageplusLayoutInline(nested_admin.NestedStackedInline, BaseAdminInlinecss)
     extra = 0
     classes = ['collapse']
     inlines = [LayoutInline]                        
-    fields  = ['page_id', ]
+    fields  = ['page_code', ]
     show_change_link = True
 
 class PageplusPageContentInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
@@ -108,7 +108,7 @@ class PageplusPageContentInline(nested_admin.NestedStackedInline, BaseAdminInlin
     extra = 0
     classes = ['collapse']
     inlines = [PageContentInline]                        
-    fields  = ['page_id', ]
+    fields  = ['page_code', ]
     show_change_link = True    
 
 
@@ -126,7 +126,7 @@ class NavItemInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, nested_adm
             if object_id:
                 kwargs["queryset"] = Page.objects.filter(
                     client_id=object_id
-                ).order_by("page_id")
+                ).order_by("page_code")
 
         return super().formfield_for_foreignkey(
             db_field,

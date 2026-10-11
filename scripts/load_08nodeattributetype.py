@@ -22,7 +22,7 @@ LANGS = [lang[0] for lang in settings.LANGUAGES]
 # taxonomy_slug,node_slug,slug,
 # name_en,name_hi,name_fr,name_ta,
 # field_type,is_required,is_filterable,
-# order,gpc_attribute_code,client_id
+# order,gpc_attribute_code,client_code
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -52,10 +52,10 @@ def load_val01(
     # COLLECT IDS
     # =========================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     taxonomy_slugs = {
@@ -75,21 +75,21 @@ def load_val01(
     # =========================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # =========================================================
     # PREFETCH TAXONOMIES
-    # key = (client_id_or_none, taxonomy_slug)
+    # key = (client_code_or_none, taxonomy_slug)
     # =========================================================
 
     taxonomies = {
 
         (
-            t.client.client_id if t.client else None,
+            t.client.client_code if t.client else None,
             t.slug,
         ): t
 
@@ -104,13 +104,13 @@ def load_val01(
 
     # =========================================================
     # PREFETCH NODES
-    # key = (client_id_or_none, taxonomy_slug, node_slug)
+    # key = (client_code_or_none, taxonomy_slug, node_slug)
     # =========================================================
 
     nodes = {
 
         (
-            n.client.client_id if n.client else None,
+            n.client.client_code if n.client else None,
             n.taxonomy.slug,
             n.slug,
         ): n
@@ -144,8 +144,8 @@ def load_val01(
         # BASIC VALUES
         # =====================================================
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
@@ -179,7 +179,7 @@ def load_val01(
         # =====================================================
 
         key = (
-            client_id,
+            client_code,
             taxonomy_slug,
             node_slug,
             slug,
@@ -199,8 +199,8 @@ def load_val01(
         # =====================================================
 
         client = (
-            clients.get(client_id)
-            if client_id else None
+            clients.get(client_code)
+            if client_code else None
         )
 
         # =====================================================
@@ -209,7 +209,7 @@ def load_val01(
 
         taxonomy = taxonomies.get(
             (
-                client_id,
+                client_code,
                 taxonomy_slug,
             )
         )
@@ -229,7 +229,7 @@ def load_val01(
 
             print(
                 f"Missing taxonomy: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug}"
             )
 
@@ -242,7 +242,7 @@ def load_val01(
 
         node = nodes.get(
             (
-                client_id,
+                client_code,
                 taxonomy_slug,
                 node_slug,
             )
@@ -264,7 +264,7 @@ def load_val01(
 
             print(
                 f"Missing node: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug}"
             )
@@ -319,7 +319,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "
                 f"{slug}"
@@ -356,7 +356,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"NodeAttributeType: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "
                 f"{slug}"
@@ -427,7 +427,7 @@ from mysite.models import (
 
 # taxonomy_slug,node_slug,slug,name_en,name_hi,name_fr,name_ta,
 # field_type,is_required,is_filterable,order,
-# gpc_attribute_code,client_id
+# gpc_attribute_code,client_code
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -446,10 +446,10 @@ def load_val01():
 
     # ── Collect required IDs/slugs ─────────────────────────
 
-    client_ids = {
-        (row.get("client_id") or "").strip().lower()
+    client_codes = {
+        (row.get("client_code") or "").strip().lower()
         for row in rows
-        if (row.get("client_id") or "").strip()
+        if (row.get("client_code") or "").strip()
     }
 
     taxonomy_slugs = {
@@ -467,9 +467,9 @@ def load_val01():
     # ── Fetch clients ───────────────────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -477,7 +477,7 @@ def load_val01():
 
     taxonomies = {
         (
-            t.client.client_id if t.client else "",
+            t.client.client_code if t.client else "",
             t.slug
         ): t
 
@@ -490,7 +490,7 @@ def load_val01():
 
     nodes = {
         (
-            n.client.client_id if n.client else "",
+            n.client.client_code if n.client else "",
             n.taxonomy.slug,
             n.slug
         ): n
@@ -508,8 +508,8 @@ def load_val01():
 
     for row in rows:
 
-        client_id = (
-            row.get("client_id") or ""
+        client_code = (
+            row.get("client_code") or ""
         ).strip().lower()
 
         taxonomy_slug = (
@@ -527,14 +527,14 @@ def load_val01():
         # ── Resolve client ────────────────────────────────
 
         client = (
-            clients.get(client_id)
-            if client_id else None
+            clients.get(client_code)
+            if client_code else None
         )
 
         # ── Resolve taxonomy ──────────────────────────────
 
         taxonomy = taxonomies.get(
-            (client_id, taxonomy_slug)
+            (client_code, taxonomy_slug)
         )
 
         # fallback to global taxonomy
@@ -546,7 +546,7 @@ def load_val01():
         if not taxonomy:
             print(
                 f"Missing taxonomy: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug}"
             )
             continue
@@ -554,7 +554,7 @@ def load_val01():
         # ── Resolve node ──────────────────────────────────
 
         node = nodes.get(
-            (client_id, taxonomy_slug, node_slug)
+            (client_code, taxonomy_slug, node_slug)
         )
 
         # fallback to global node
@@ -566,7 +566,7 @@ def load_val01():
         if not node:
             print(
                 f"Missing node: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug}"
             )
@@ -616,7 +616,7 @@ def load_val01():
         print(
             f"{'Created' if created else 'Updated'} "
             f"NodeAttributeType: "
-            f"{client_id or 'GLOBAL'} / "
+            f"{client_code or 'GLOBAL'} / "
             f"{taxonomy_slug} / "
             f"{node_slug} / "
             f"{slug}"

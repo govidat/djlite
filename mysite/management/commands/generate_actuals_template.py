@@ -41,13 +41,13 @@ class Command(BaseCommand):
     help = (
         "Generate an .xlsx actuals upload template for a given client.\n"
         "Usage: python manage.py generate_actuals_template "
-        "--client <client_id> [--type <period_type>] [--out <path>]"
+        "--client <client_code> [--type <period_type>] [--out <path>]"
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--client', required=True,
-            help="client_id of the client to generate the template for."
+            help="client_code of the client to generate the template for."
         )
         parser.add_argument(
             '--type', dest='period_type', default='month',
@@ -67,23 +67,23 @@ class Command(BaseCommand):
         from mysite.models import Client, Item, DistributionChannel
         from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
 
-        client_id   = options['client']
+        client_code   = options['client']
         period_type = options['period_type']
         output_path = options['output_path'] or (
-            f"actuals_template_{client_id}_{period_type}.xlsx"
+            f"actuals_template_{client_code}_{period_type}.xlsx"
         )
         n_examples  = options['examples']
 
         # Resolve client
         try:
-            client = Client.objects.get(client_id=client_id)
+            client = Client.objects.get(client_code=client_code)
         except Client.DoesNotExist:
-            raise CommandError(f"Client '{client_id}' not found.")
+            raise CommandError(f"Client '{client_code}' not found.")
 
         # Fetch sample items, locations, customers for the example rows
         sample_items     = list(
             Item.objects.filter(client=client, status='active')
-            .values_list('item_id', flat=True)[:n_examples]
+            .values_list('item_code', flat=True)[:n_examples]
         )
         sample_locations = list(
             PlanningLocation.objects.filter(client=client, is_active=True, is_leaf=True)
@@ -175,7 +175,7 @@ class Command(BaseCommand):
         instructions = [
             ("Actuals Upload Template", True),
             ("", False),
-            (f"Client:      {client.client_id}", False),
+            (f"Client:      {client.client_code}", False),
             (f"Period Type: {period_type}", False),
             (f"Generated:   {timezone.now():%Y-%m-%d %H:%M}", False),
             ("", False),
@@ -227,7 +227,7 @@ class Command(BaseCommand):
         ref_cols = [
             ("Valid Item IDs",
              list(Item.objects.filter(client=client, status='active')
-                  .values_list('item_id', flat=True)[:200])),
+                  .values_list('item_code', flat=True)[:200])),
             ("Valid Location Codes",
              list(PlanningLocation.objects.filter(client=client, is_active=True, is_leaf=True)
                   .values_list('code', flat=True)[:200])),

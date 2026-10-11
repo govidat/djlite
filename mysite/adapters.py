@@ -13,12 +13,12 @@ class ClientAwareAccountAdapter(DefaultAccountAdapter):
         if commit:
             user.save()
 
-        client_id = request.session.get('client_id')
+        client_code = request.session.get('client_code')
         user_type = request.session.get('user_type', 'customer')
 
-        if client_id and not user.is_superuser:
+        if client_code and not user.is_superuser:
             try:
-                client = Client.objects.get(client_id=client_id)
+                client = Client.objects.get(client_code=client_code)
 
                 if user_type == 'customer':
                     # Type 2 — create CustomerProfile with extra fields from form
@@ -40,50 +40,50 @@ class ClientAwareAccountAdapter(DefaultAccountAdapter):
         return user
 
     def get_signup_redirect_url(self, request):
-        #client_id = request.session.pop('onboarding_client_id', None)
-        client_id = request.session.get('client_id')   # ✅ no pop
-        if client_id:
+        #client_code = request.session.pop('onboarding_client_code', None)
+        client_code = request.session.get('client_code')   # ✅ no pop
+        if client_code:
             try:
                 return reverse(
                     'customer_onboarding',
-                    kwargs={'client_id': client_id}
+                    kwargs={'client_code': client_code}
                 )
             except Exception:
                 pass  # fallback safely
 
             #return reverse(
             #    'customer_onboarding',
-            #    kwargs={'client_id': client_id}
+            #    kwargs={'client_code': client_code}
             #)
         return super().get_signup_redirect_url(request)
 
     def get_login_redirect_url(self, request):
-        client_id = request.session.pop('onboarding_client_id', None)
-        if client_id:
+        client_code = request.session.pop('onboarding_client_code', None)
+        if client_code:
             return reverse(
                 'customer_onboarding',
-                kwargs={'client_id': client_id}
+                kwargs={'client_code': client_code}
             )
         redirect_url = request.session.pop('login_redirect', None)
         if redirect_url:
             return redirect_url
-        client_id = request.session.get('client_id')
-        if client_id:
-            return reverse('client_home', kwargs={'client_id': client_id})
+        client_code = request.session.get('client_code')
+        if client_code:
+            return reverse('client_home', kwargs={'client_code': client_code})
         return super().get_login_redirect_url(request)
 
     def pre_login(self, request, user, **kwargs):
-        client_id = request.session.get('client_id')
-        if client_id and not user.is_superuser:
+        client_code = request.session.get('client_code')
+        if client_code and not user.is_superuser:
             if not hasattr(user, 'client_profile'):
                 try:
-                    client = Client.objects.get(client_id=client_id)
+                    client = Client.objects.get(client_code=client_code)
                     profile, created = CustomerProfile.objects.get_or_create(
                         user=user,
                         client=client,
                     )
                     if created:
-                        request.session['onboarding_client_id'] = client_id
+                        request.session['onboarding_client_code'] = client_code
                 except Client.DoesNotExist:
                     pass
         return super().pre_login(request, user, **kwargs)

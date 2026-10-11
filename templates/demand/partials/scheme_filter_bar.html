@@ -61,7 +61,7 @@
 
 <script>
 (function() {
-    var baseUrl = '{% url "demand_ui:version_scheme_numbers" client_id=client.client_id pk=version.pk %}';
+    var baseUrl = '{% url "demand_ui:version_scheme_numbers" client_code=client.client_code pk=version.pk %}';
 
     function applyFilters() {
         var params = new URLSearchParams();

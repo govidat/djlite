@@ -1,7 +1,7 @@
 {% load i18n %}
 {# Opened from the Actuals Dashboard drill-down row for a specific ActualSale. Planner raises an
    exception directly, without waiting for system detection. #}
-<form hx-post="{% url 'demand_ui:raise_exception_form' client_id=client.client_id actual_sale_id=actual.pk %}"
+<form hx-post="{% url 'demand_ui:raise_exception_form' client_code=client.client_code actual_sale_id=actual.pk %}"
       hx-target="this" hx-swap="outerHTML" class="card bg-base-200 p-4 space-y-2">
   {% if errors %}
     <div class="alert alert-error text-sm">

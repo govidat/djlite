@@ -1,4 +1,4 @@
-global_item_id,taxonomy_slug,node_slug,is_primary
+global_item_code,taxonomy_slug,node_slug,is_primary
 bosch-fr7dc,gpc,spark-plugs,1
 bosch-fr8dc,gpc,spark-plugs,1
 ngk-bpr6es,gpc,spark-plugs,1

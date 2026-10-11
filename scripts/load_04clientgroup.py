@@ -10,7 +10,7 @@ from scripts.helpers import (
     to_bool,
 )
 
-# clientgroup_code,name,role,description,is_active,client_id
+# clientgroup_code,name,role,description,is_active,client_code
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -32,18 +32,18 @@ def load_val01(
 
     # ── Collect keys ──────────────────────────────────────
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     # ── Preload clients ───────────────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -57,8 +57,8 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True
         )
 
@@ -67,23 +67,23 @@ def load_val01(
             lower=True
         )
 
-        if not client_id or not clientgroup_code:
+        if not client_code or not clientgroup_code:
 
             print(
                 "Skipping row with empty "
-                "client_id/clientgroup_code"
+                "client_code/clientgroup_code"
             )
 
             skipped_count += 1
             continue
 
-        key = (client_id, clientgroup_code)
+        key = (client_code, clientgroup_code)
 
         if key in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{client_id} / {clientgroup_code}"
+                f"{client_code} / {clientgroup_code}"
             )
 
             skipped_count += 1
@@ -93,13 +93,13 @@ def load_val01(
 
         # ── Client lookup ───────────────────────────────
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
             print(
                 f"Missing client: "
-                f"{client_id}"
+                f"{client_code}"
             )
 
             skipped_count += 1
@@ -131,7 +131,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {clientgroup_code}"
+                f"{client_code} / {clientgroup_code}"
             )
 
             if verbose:
@@ -161,7 +161,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"ClientGroup: "
-                f"{client_id} / {clientgroup_code}"
+                f"{client_code} / {clientgroup_code}"
             )
 
     # ── Summary ──────────────────────────────────────────

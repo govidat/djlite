@@ -16,7 +16,7 @@
   <div class="flex items-center justify-between mb-4">
     <div></div>
     <button class="btn btn-primary btn-sm"
-            hx-get="{% url 'demand_ui:scheme_create' client_id=client.client_id %}"
+            hx-get="{% url 'demand_ui:scheme_create' client_code=client.client_code %}"
             hx-target="#scheme-modal-content" hx-swap="innerHTML"
             onclick="document.getElementById('scheme-modal').showModal()">
       {% trans "+ New Scheme" %}
@@ -25,7 +25,7 @@
 
   {# ── Status tabs ───────────────────────────────────────────────────────── #}
   <div class="tabs tabs-boxed w-fit mb-4"
-       hx-get="{% url 'demand_ui:scheme_list' client_id=client.client_id %}"
+       hx-get="{% url 'demand_ui:scheme_list' client_code=client.client_code %}"
        hx-target="#scheme-table-body" hx-swap="innerHTML" hx-push-url="true">
     <a class="tab {% if not status_filter %}tab-active{% endif %}"
        hx-vals='{"status": ""}'>{% trans "All" %}</a>

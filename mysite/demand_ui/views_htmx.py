@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 from django.db import models
 
 @login_required
-def override_key_field(request, pk, client_id=None):
+def override_key_field(request, pk, client_code=None):
 
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
 
@@ -29,9 +29,9 @@ def override_key_field(request, pk, client_id=None):
                 ForecastLine.objects
                 .filter(version=version)
                 .select_related('item')
-                .values_list('item__item_id', 'item__name')
+                .values_list('item__item_code', 'item__name')
                 .distinct()
-                .order_by('item__item_id')
+                .order_by('item__item_code')
             )
         elif level == 'location':
             context['locations'] = (
@@ -52,7 +52,7 @@ def override_key_field(request, pk, client_id=None):
     return render(request, f'demand/partials/override_key_{level}.html', context)
 """
 @login_required
-def override_key_field(request, pk, client_id=None):
+def override_key_field(request, pk, client_code=None):
 
     level = request.GET.get('override_level', 'sku')
     if level not in ('sku', 'location', 'customer', 'total'):
@@ -61,7 +61,7 @@ def override_key_field(request, pk, client_id=None):
     context = {'level': level}
 
     if level == 'sku':
-        context['items'] = Item.objects.filter(client=request.client).order_by('item_id')[:500]
+        context['items'] = Item.objects.filter(client=request.client).order_by('item_code')[:500]
     elif level == 'location':
         context['locations'] = PlanningLocation.objects.filter(client=request.client).order_by('code')
     elif level == 'customer':
@@ -72,7 +72,7 @@ def override_key_field(request, pk, client_id=None):
 
 """
 @login_required
-def override_key_field(request, pk, client_id=None):
+def override_key_field(request, pk, client_code=None):
     
     #HTMX partial: renders the appropriate override_key input widget
     #based on the selected override_level.
@@ -87,7 +87,7 @@ def override_key_field(request, pk, client_id=None):
 """
 """
 @login_required
-def override_key_field(request, client_id=None):
+def override_key_field(request, client_code=None):
 
     level = request.GET.get('override_level', 'sku')
     return render(request, f'demand/partials/override_key_{level}.html', {
@@ -96,7 +96,7 @@ def override_key_field(request, client_id=None):
 """
 
 @login_required
-def override_value_inputs(request, pk, client_id=None):
+def override_value_inputs(request, pk, client_code=None):
     """
     HTMX partial: renders the active override value input (qty / pct / value)
     based on the selected mode tab.
@@ -110,7 +110,7 @@ def override_value_inputs(request, pk, client_id=None):
  
 """
 @login_required
-def override_value_inputs(request, client_id=None):
+def override_value_inputs(request, client_code=None):
 
     mode = request.GET.get('mode', 'qty')
     return render(request, f'demand/partials/override_value_{mode}.html', {
@@ -123,7 +123,7 @@ def override_value_inputs(request, client_id=None):
 
  
 @login_required
-def override_propagation(request, override_id, client_id=None):
+def override_propagation(request, override_id, client_code=None):
     """
     HTMX partial: renders the propagation panel for one override.
     Loaded when the planner clicks 🔍 on an override badge.
@@ -158,7 +158,7 @@ def override_propagation(request, override_id, client_id=None):
     })
 
 @login_required
-def encode_override_key(request, pk, client_id=None):
+def encode_override_key(request, pk, client_code=None):
     """
     Receives form fields named override_key_{field} and returns a hidden input
     containing the JSON-encoded override_key.  Called via HTMX on blur/change.
@@ -193,7 +193,7 @@ def encode_override_key(request, pk, client_id=None):
 
 
 @login_required
-def approval_panel(request, pk, client_id=None):
+def approval_panel(request, pk, client_code=None):
     """
     HTMX partial: renders the approval panel for a forecast version.
     Called after a successful approve/reject/lock action to refresh the panel.
@@ -206,7 +206,7 @@ def approval_panel(request, pk, client_id=None):
 
 
 @login_required
-def approval_reject_form(request, pk, client_id=None):
+def approval_reject_form(request, pk, client_code=None):
     """HTMX partial: reject-with-note modal body."""
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
     return render(request, 'demand/partials/approval_rejected_note.html', {
@@ -215,7 +215,7 @@ def approval_reject_form(request, pk, client_id=None):
 
 
 @login_required
-def approval_copy_form(request, pk, client_id=None):
+def approval_copy_form(request, pk, client_code=None):
     """HTMX partial: copy-to-new-draft modal body."""
     version = get_object_or_404(ForecastVersion, pk=pk, client=request.client)
     return render(request, 'demand/partials/approval_copy_form.html', {
@@ -223,7 +223,7 @@ def approval_copy_form(request, pk, client_id=None):
     })
 
 @login_required
-def override_split_weights(request, pk, override_id, client_id=None):
+def override_split_weights(request, pk, override_id, client_code=None):
     """
     GET  — render the split weight editor partial
     PUT  — handled by the API (api/demand/urls.py already has this route)
@@ -240,7 +240,7 @@ def override_split_weights(request, pk, override_id, client_id=None):
     })
 
 @login_required
-def item_search(request, pk=None, client_id=None):
+def item_search(request, pk=None, client_code=None):
     from mysite.models.catalogue import Item
     from django.db import models as db_models
     from django.http import JsonResponse
@@ -253,15 +253,15 @@ def item_search(request, pk=None, client_id=None):
         Item.objects
         .filter(client=request.client)
         .filter(
-            db_models.Q(item_id__icontains=q) | db_models.Q(name__icontains=q)
+            db_models.Q(item_code__icontains=q) | db_models.Q(name__icontains=q)
         )
-        .order_by('item_id')
-        .values('item_id', 'name')[:20]
+        .order_by('item_code')
+        .values('item_code', 'name')[:20]
     )
     return JsonResponse({'results': list(items)})
 """
 @login_required
-def item_search(request, pk=None, client_id=None):
+def item_search(request, pk=None, client_code=None):
     from mysite.models.catalogue import Item
     from django.http import JsonResponse
 
@@ -273,10 +273,10 @@ def item_search(request, pk=None, client_id=None):
         Item.objects
         .filter(client=request.client)
         .filter(
-            models.Q(item_id__icontains=q) | models.Q(name__icontains=q)
+            models.Q(item_code__icontains=q) | models.Q(name__icontains=q)
         )
-        .order_by('item_id')
-        .values('item_id', 'name')[:20]
+        .order_by('item_code')
+        .values('item_code', 'name')[:20]
     )
     return JsonResponse({'results': list(items)})
 """

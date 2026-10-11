@@ -1,5 +1,5 @@
 """
-Reusable taxonomy -> item_id resolution.
+Reusable taxonomy -> item_code resolution.
 
 Use this anywhere a taxonomy filter needs to turn one or more selected
 TaxonomyNode ids into the set of item_ids to filter a queryset by
@@ -143,7 +143,7 @@ def resolve_item_ids_for_taxonomy_node(client, taxonomy_node_id):
     return list(
         ItemTaxonomyNode.objects
         .filter(node_id__in=descendant_ids)
-        .values_list('item__item_id', flat=True)
+        .values_list('item__item_code', flat=True)
         .distinct()
     )
 
@@ -192,7 +192,7 @@ def resolve_item_ids_for_multiple_nodes(client, taxonomy_node_ids):
             descendant_ids = list(_descendant_node_ids(node))
             item_ids = ItemTaxonomyNode.objects.filter(
                 node_id__in=descendant_ids
-            ).values_list('item__item_id', flat=True)
+            ).values_list('item__item_code', flat=True)
             union_ids |= set(item_ids)
         result = union_ids if result is None else (result & union_ids)
 

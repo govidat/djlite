@@ -19,9 +19,9 @@
   <div class="tx-node-row">
     {% if node.has_children %}
       {% if tree_kind == 'sales' %}
-        {% url 'demand_ui:sales_tree_children' client_id=client_id node_id=node.id as children_url %}
+        {% url 'demand_ui:sales_tree_children' client_code=client_code node_id=node.id as children_url %}
       {% else %}
-        {% url 'demand_ui:taxonomy_tree_children' client_id=client_id node_id=node.id as children_url %}
+        {% url 'demand_ui:taxonomy_tree_children' client_code=client_code node_id=node.id as children_url %}
       {% endif %}
       <span
         class="tx-toggle {% if node.is_expanded %}tx-toggle-open{% endif %}"
@@ -58,7 +58,7 @@
   <ul id="tx-children-{{ node.id }}"
       class="tx-children {% if not node.is_expanded %}tx-collapsed{% endif %}">
     {% for child in node.children %}
-      {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=child client_id=client_id checkbox_name=checkbox_name label_mode=label_mode tree_kind=tree_kind %}
+      {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=child client_code=client_code checkbox_name=checkbox_name label_mode=label_mode tree_kind=tree_kind %}
     {% endfor %}
   </ul>
 </li>

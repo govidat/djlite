@@ -6,13 +6,13 @@
    tree. Include this inside your filter bar, e.g.:
 
    <div id="tx-tree-container"
-        hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_id=client.client_id %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}"
+        hx-get="{% url 'demand_ui:taxonomy_tree_panel' client_code=client.client_code %}?taxonomy_node_ids={{ filters.taxonomy_node_ids }}"
         hx-trigger="load"
         hx-target="this">
      Loading filters...
    </div>
 
-   Context: taxonomy_groups, client_id, plus optional checkbox_name /
+   Context: taxonomy_groups, client_code, plus optional checkbox_name /
    label_mode / tree_kind forwarded to the recursive node partial.
 #}
 <div class="tx-tree-panel">
@@ -21,7 +21,7 @@
       <div class="tx-tree-group-label">{{ group.name }}</div>
       <ul class="tx-tree tx-tree-root">
         {% for node in group.roots %}
-          {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=node client_id=client_id checkbox_name=checkbox_name label_mode=label_mode tree_kind=tree_kind %}
+          {% include 'taxonomy_tree/partials/taxonomy_tree_node.html' with node=node client_code=client_code checkbox_name=checkbox_name label_mode=label_mode tree_kind=tree_kind %}
         {% endfor %}
       </ul>
     </div>

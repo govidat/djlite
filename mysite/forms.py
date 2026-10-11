@@ -55,7 +55,7 @@ class ClientForm(forms.ModelForm):
 
     class Meta:
         model = Client
-        fields = ['client_id', 'parent', 'name', 'nb_title', 'nb_title_svg_pre', 'nb_title_svg_suf'] # Include all fields
+        fields = ['client_code', 'parent', 'name', 'nb_title', 'nb_title_svg_pre', 'nb_title_svg_suf'] # Include all fields
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -45,7 +45,7 @@
                     {% for line in page.object_list %}
                     <tr class="{% if line.override_qty %}bg-warning/10{% endif %}">
                         <td class="font-mono text-xs">
-                            {{ line.item.item_id }}
+                            {{ line.item.item_code }}
                             <span class="text-base-content/50 text-xs">— {{ line.item.name }}</span>
                         </td>
                         <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
@@ -81,7 +81,7 @@
         <div class="flex justify-center gap-2 mt-3">
             {% if page.has_previous %}
             <button class="btn btn-sm btn-ghost"
-                    hx-get="{% url 'demand_ui:override_propagation' client_id=client.client_id pk=version.pk override_id=override.pk %}?page={{ page.previous_page_number }}"
+                    hx-get="{% url 'demand_ui:override_propagation' client_code=client.client_code pk=version.pk override_id=override.pk %}?page={{ page.previous_page_number }}"
                     hx-target="#propagation-panel"
                     hx-swap="outerHTML">
                 ← {% trans "Previous" %}
@@ -92,7 +92,7 @@
             </span>
             {% if page.has_next %}
             <button class="btn btn-sm btn-ghost"
-                    hx-get="{% url 'demand_ui:override_propagation' client_id=client.client_id pk=version.pk override_id=override.pk %}?page={{ page.next_page_number }}"
+                    hx-get="{% url 'demand_ui:override_propagation' client_code=client.client_code pk=version.pk override_id=override.pk %}?page={{ page.next_page_number }}"
                     hx-target="#propagation-panel"
                     hx-swap="outerHTML">
                 {% trans "Next" %} →
@@ -143,7 +143,7 @@
     <tbody>
       {% for line in page.object_list %}
       <tr class="{% if line.override_qty %}propagation-table__row--overridden{% endif %}">
-        <td>{{ line.item.item_id }} — {{ line.item.name }}</td>
+        <td>{{ line.item.item_code }} — {{ line.item.name }}</td>
         <td>{{ line.planning_location.code }}</td>
         <td>{{ line.planning_customer.code|default:"—" }}</td>
         <td class="num">{{ line.statistical_qty|floatformat:0 }}</td>

@@ -19,7 +19,7 @@
             <tbody>
                 {% for line in page_obj %}
                 <tr class="hover">
-                    <td class="font-mono text-sm">{{ line.item.item_id }}</td>
+                    <td class="font-mono text-sm">{{ line.item.item_code }}</td>
                     <td>{{ line.item.name }}</td>
                     <td>{{ line.planning_customer.code|default:"—" }}</td>
                     {% if show_channel %}<td>{{ line.distribution_channel.code|default:"—" }}</td>{% endif %}
@@ -71,7 +71,7 @@
 
     {% if can_override %}
     <div class="mt-4 flex justify-end">
-        <a href="{% url 'demand_ui:drilldown_override_form' client_id=client.client_id pk=version.pk location_id=location.pk %}"
+        <a href="{% url 'demand_ui:drilldown_override_form' client_code=client.client_code pk=version.pk location_id=location.pk %}"
            class="btn btn-primary btn-sm">
             ✏ {% trans "Enter Override for this Location" %}
         </a>

@@ -7,7 +7,7 @@
 
 <div class="mb-4">
   <button class="btn btn-primary btn-sm"
-          hx-get="{% url 'demand_ui:item_introduction_create' client_id=client.client_id %}"
+          hx-get="{% url 'demand_ui:item_introduction_create' client_code=client.client_code %}"
           hx-target="#modal-content"
           hx-swap="innerHTML"
           onclick="document.getElementById('lifecycle-modal').showModal()">

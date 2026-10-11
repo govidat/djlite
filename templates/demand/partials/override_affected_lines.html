@@ -22,7 +22,7 @@
             <tbody>
                 {% for line in lines %}
                 <tr>
-                    <td class="font-mono text-xs">{{ line.item.item_id }}</td>
+                    <td class="font-mono text-xs">{{ line.item.item_code }}</td>
                     <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
                     <td class="text-xs">{{ line.planning_customer.code|default:"—" }}</td>
                     {% if show_channel %}<td class="text-xs">{{ line.distribution_channel.code|default:"—" }}</td>{% endif %}

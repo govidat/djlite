@@ -21,7 +21,7 @@ LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 # slug,order,is_active,metadata,taxonomy_slug,
 # name_en,name_fr,name_hi,name_ta,
-# client_id,gpc_code,parent_slug,global_node_id
+# client_code,gpc_code,parent_slug,global_node_id
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -51,10 +51,10 @@ def load_val01(
     # COLLECT IDS
     # =========================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     taxonomy_slugs = {
@@ -68,15 +68,15 @@ def load_val01(
     # =========================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # =========================================================
     # PREFETCH TAXONOMIES
-    # key = (client_id_or_none, taxonomy_slug)
+    # key = (client_code_or_none, taxonomy_slug)
     # =========================================================
 
     taxonomies = {}
@@ -88,7 +88,7 @@ def load_val01(
     ):
 
         key = (
-            t.client.client_id if t.client else None,
+            t.client.client_code if t.client else None,
             t.slug,
         )
 
@@ -96,7 +96,7 @@ def load_val01(
 
     # =========================================================
     # PREFETCH EXISTING NODES
-    # key = (client_id_or_none, taxonomy_slug, slug)
+    # key = (client_code_or_none, taxonomy_slug, slug)
     # =========================================================
 
     node_cache = {}
@@ -115,7 +115,7 @@ def load_val01(
     for n in existing_nodes:
 
         key = (
-            n.client.client_id if n.client else None,
+            n.client.client_code if n.client else None,
             n.taxonomy.slug,
             n.slug,
         )
@@ -148,8 +148,8 @@ def load_val01(
             # BASIC VALUES
             # =================================================
 
-            client_id = clean(
-                row.get("client_id"),
+            client_code = clean(
+                row.get("client_code"),
                 lower=True,
             )
 
@@ -179,8 +179,8 @@ def load_val01(
                 continue
 
             client = (
-                clients.get(client_id)
-                if client_id else None
+                clients.get(client_code)
+                if client_code else None
             )
 
             # =================================================
@@ -189,7 +189,7 @@ def load_val01(
 
             taxonomy = taxonomies.get(
                 (
-                    client_id if client_id else None,
+                    client_code if client_code else None,
                     taxonomy_slug,
                 )
             )
@@ -208,7 +208,7 @@ def load_val01(
 
                 print(
                     f"Missing taxonomy: "
-                    f"{client_id or 'GLOBAL'} / "
+                    f"{client_code or 'GLOBAL'} / "
                     f"{taxonomy_slug}"
                 )
 
@@ -225,7 +225,7 @@ def load_val01(
 
                 parent = node_cache.get(
                     (
-                        client_id if client_id else None,
+                        client_code if client_code else None,
                         taxonomy_slug,
                         parent_slug,
                     )
@@ -306,7 +306,7 @@ def load_val01(
 
                 print(
                     f"[DRY RUN] "
-                    f"{client_id or 'GLOBAL'} / "
+                    f"{client_code or 'GLOBAL'} / "
                     f"{taxonomy_slug} / "
                     f"{slug}"
                 )
@@ -338,7 +338,7 @@ def load_val01(
             # =================================================
 
             cache_key = (
-                client_id if client_id else None,
+                client_code if client_code else None,
                 taxonomy_slug,
                 slug,
             )
@@ -357,7 +357,7 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"TaxonomyNode: "
-                    f"{client_id or 'GLOBAL'} / "
+                    f"{client_code or 'GLOBAL'} / "
                     f"{taxonomy_slug} / "
                     f"{slug}"
                 )
@@ -451,7 +451,7 @@ from mysite.models import (
 )
 
 # slug,order,is_active,metadata,taxonomy_slug,
-# name_en,name_fr,name_hi,name_ta,client_id,gpc_code,
+# name_en,name_fr,name_hi,name_ta,client_code,gpc_code,
 # parent_slug,global_node_id
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -476,10 +476,10 @@ def load_val01():
     # COLLECT REQUIRED IDS
     # =========================================================
 
-    client_ids = {
-        (row.get("client_id") or "").strip().lower()
+    client_codes = {
+        (row.get("client_code") or "").strip().lower()
         for row in rows
-        if (row.get("client_id") or "").strip()
+        if (row.get("client_code") or "").strip()
     }
 
     taxonomy_slugs = {
@@ -493,15 +493,15 @@ def load_val01():
     # =========================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # =========================================================
     # PREFETCH TAXONOMIES
-    # key = (client_id_or_none, taxonomy_slug)
+    # key = (client_code_or_none, taxonomy_slug)
     # =========================================================
 
     taxonomies = {}
@@ -511,7 +511,7 @@ def load_val01():
     ).select_related("client"):
 
         key = (
-            t.client.client_id if t.client else None,
+            t.client.client_code if t.client else None,
             t.slug,
         )
 
@@ -520,7 +520,7 @@ def load_val01():
     # =========================================================
     # NODE CACHE
     # =========================================================
-    # key = (client_id_or_none, taxonomy_slug, slug)
+    # key = (client_code_or_none, taxonomy_slug, slug)
 
     node_cache = {}
 
@@ -534,7 +534,7 @@ def load_val01():
     for n in existing_nodes:
 
         key = (
-            n.client.client_id if n.client else None,
+            n.client.client_code if n.client else None,
             n.taxonomy.slug,
             n.slug,
         )
@@ -564,13 +564,13 @@ def load_val01():
             # BASIC VALUES
             # -------------------------------------------------
 
-            client_id = (
-                row.get("client_id") or ""
+            client_code = (
+                row.get("client_code") or ""
             ).strip().lower()
 
             client = (
-                clients.get(client_id)
-                if client_id else None
+                clients.get(client_code)
+                if client_code else None
             )
 
             taxonomy_slug = (
@@ -590,7 +590,7 @@ def load_val01():
             # -------------------------------------------------
 
             taxonomy = taxonomies.get(
-                (client_id if client_id else None,
+                (client_code if client_code else None,
                  taxonomy_slug)
             )
 
@@ -604,7 +604,7 @@ def load_val01():
 
                 print(
                     f"SKIPPED: taxonomy not found "
-                    f"[client={client_id or 'GLOBAL'} "
+                    f"[client={client_code or 'GLOBAL'} "
                     f"taxonomy={taxonomy_slug} "
                     f"slug={slug}]"
                 )
@@ -621,7 +621,7 @@ def load_val01():
 
                 parent = node_cache.get(
                     (
-                        client_id if client_id else None,
+                        client_code if client_code else None,
                         taxonomy_slug,
                         parent_slug,
                     )
@@ -714,7 +714,7 @@ def load_val01():
             # -------------------------------------------------
 
             cache_key = (
-                client_id if client_id else None,
+                client_code if client_code else None,
                 taxonomy_slug,
                 slug,
             )
@@ -727,7 +727,7 @@ def load_val01():
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"Node: "
-                f"{client_id if client_id else 'GLOBAL'} / "
+                f"{client_code if client_code else 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{slug}"
             )

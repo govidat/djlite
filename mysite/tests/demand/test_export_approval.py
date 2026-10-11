@@ -47,7 +47,7 @@ class TestForecastExport:
     def test_export_returns_xlsx_content_type(self, client_obj, api_client, version_with_lines):
         client, user = api_client   # ← conftest api_client, two values
         version, lines = version_with_lines
-        resp = client.get(f'/api/{client_obj.client_id}/demand/forecast-versions/{version.pk}/export/')
+        resp = client.get(f'/api/{client_obj.client_code}/demand/forecast-versions/{version.pk}/export/')
         assert resp.status_code == 200
         assert 'spreadsheetml' in resp['Content-Type']
         assert 'attachment' in resp['Content-Disposition']
@@ -56,7 +56,7 @@ class TestForecastExport:
     def test_export_returns_404_when_no_lines(self, client_obj, api_client, draft_version):
         client, user = api_client
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{draft_version.pk}/export/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{draft_version.pk}/export/'
         )
         assert resp.status_code == 404
 
@@ -70,7 +70,7 @@ class TestForecastExport:
         client, user = api_client
         version, lines = version_with_lines
 
-        resp = client.get(f'/api/{client_obj.client_id}/demand/forecast-versions/{version.pk}/export/')
+        resp = client.get(f'/api/{client_obj.client_code}/demand/forecast-versions/{version.pk}/export/')
         assert resp.status_code == 200
 
         wb  = load_workbook(io.BytesIO(resp.content))
@@ -93,7 +93,7 @@ class TestForecastExport:
         client, user = api_client
         version, lines = version_with_lines
 
-        resp = client.get(f'/api/{client_obj.client_id}/demand/forecast-versions/{version.pk}/export/')
+        resp = client.get(f'/api/{client_obj.client_code}/demand/forecast-versions/{version.pk}/export/')
         wb   = load_workbook(io.BytesIO(resp.content))
         ws   = wb['Forecast']
 
@@ -110,7 +110,7 @@ class TestForecastExport:
         client, user = api_client
         version, lines = version_with_lines
 
-        resp = client.get(f'/api/{client_obj.client_id}/demand/forecast-versions/{version.pk}/export/')
+        resp = client.get(f'/api/{client_obj.client_code}/demand/forecast-versions/{version.pk}/export/')
         wb   = load_workbook(io.BytesIO(resp.content))
         ws   = wb['Forecast']
 
@@ -137,7 +137,7 @@ class TestForecastExport:
         version.locked_at = __import__('django.utils.timezone', fromlist=['now']).now()
         version.save(update_fields=['status', 'locked_at'])
 
-        resp = client.get(f'/api/{client_obj.client_id}/demand/forecast-versions/{version.pk}/export/')
+        resp = client.get(f'/api/{client_obj.client_code}/demand/forecast-versions/{version.pk}/export/')
         assert resp.status_code == 200
         assert 'spreadsheetml' in resp['Content-Type']
 
@@ -145,7 +145,7 @@ class TestForecastExport:
         #Exporting a version with no ForecastLine rows returns 404.
         client, user = api_client
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{draft_version.pk}/export/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{draft_version.pk}/export/'
         )
         assert resp.status_code == 404
 
@@ -154,7 +154,7 @@ class TestForecastExport:
         client, user = api_client
         version, lines = version_with_lines
 
-        resp = client.get(f'/api/{client_obj.client_id}/demand/forecast-versions/{version.pk}/export/')
+        resp = client.get(f'/api/{client_obj.client_code}/demand/forecast-versions/{version.pk}/export/')
         wb   = load_workbook(io.BytesIO(resp.content))
         assert 'Summary' in wb.sheetnames
 
@@ -165,7 +165,7 @@ class TestForecastExport:
         location_code = lines[0].planning_location.code
 
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{version.pk}/export/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{version.pk}/export/'
             f'?location_code={location_code}'
         )
         assert resp.status_code == 200
@@ -179,7 +179,7 @@ class TestForecastExport:
 class TestApprovalWorkflow:
 
     def _approve_url(self, version):
-        return f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/approve/'
+        return f'/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/approve/'
 
     def test_submit_draft_to_in_review(self, client_obj, api_client, draft_version):
         client, user = api_client
@@ -304,7 +304,7 @@ class TestAccuracyDashboard:
     ):
         client, user = api_client
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
         )
         assert resp.status_code == 200
 
@@ -314,7 +314,7 @@ class TestAccuracyDashboard:
     ):
         client, user = api_client
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
             f'?group_by=period'
         )
         assert resp.status_code == 200
@@ -325,7 +325,7 @@ class TestAccuracyDashboard:
     def test_accuracy_group_by_period(self, client_obj, api_client, version_with_accuracy):
         client, user = api_client
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
             f'?group_by=period'
         )
         assert resp.status_code == 200
@@ -339,7 +339,7 @@ class TestAccuracyDashboard:
         #Version with no accuracy records returns 200 with empty results.#
         client, user = api_client
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{draft_version.pk}/accuracy/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{draft_version.pk}/accuracy/'
         )
         assert resp.status_code == 200
         assert resp.data['count'] == 0
@@ -350,7 +350,7 @@ class TestAccuracyDashboard:
     ):
         client, user = api_client
         resp = client.get(
-            f'/api/{client_obj.client_id}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
+            f'/api/{client_obj.client_code}/demand/forecast-versions/{version_with_accuracy.pk}/accuracy/'
             f'?group_by=invalid'
         )
         assert resp.status_code == 400

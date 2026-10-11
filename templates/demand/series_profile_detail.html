@@ -4,13 +4,13 @@
 {% block demand_content %}
 <div class="flex items-center justify-between mb-6">
     <div>
-        <h2 class="text-xl font-bold">{{ profile.item.item_id }}</h2>
+        <h2 class="text-xl font-bold">{{ profile.item.item_code }}</h2>
         <p class="text-sm text-base-content/60">
             {{ profile.planning_location.code }}
             {% if profile.planning_customer %} · {{ profile.planning_customer.code }}{% endif %}
         </p>
     </div>
-    <a href="{% url 'demand_ui:series_profile_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:series_profile_list' client_code=client.client_code %}"
        class="btn btn-ghost btn-sm">← {% trans "Back to profiles" %}</a>
 </div>
 
@@ -42,7 +42,7 @@
 {% endif %}
 
 <form method="post"
-      action="{% url 'demand_ui:series_profile_override' client_id=client.client_id pk=profile.pk %}"
+      action="{% url 'demand_ui:series_profile_override' client_code=client.client_code pk=profile.pk %}"
       class="card bg-base-200 mb-6">
     {% csrf_token %}
     <div class="card-body space-y-3">

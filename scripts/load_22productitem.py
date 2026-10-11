@@ -16,7 +16,7 @@ from scripts.helpers import (
 
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
-# client_id,item_id,price,compare_price,currency,
+# client_code,item_code,price,compare_price,currency,
 # sku,barcode,track_inventory,stock_quantity,attributes
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,35 +43,35 @@ def load_val01(
 
     # ── Collect required ids ────────────────────────────────
 
-    client_ids = {
+    client_codes = {
         clean(
-            row.get("client_id"),
+            row.get("client_code"),
             lower=True,
         )
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     item_ids = {
         clean(
-            row.get("item_id"),
+            row.get("item_code"),
             lower=True,
         )
         for row in rows
-        if clean(row.get("item_id"))
+        if clean(row.get("item_code"))
     }
 
     # ── Prefetch items ──────────────────────────────────────
 
     items = {
         (
-            item.client.client_id,
-            item.item_id,
+            item.client.client_code,
+            item.item_code,
         ): item
 
         for item in Item.objects.filter(
-            client__client_id__in=client_ids,
-            item_id__in=item_ids,
+            client__client_code__in=client_codes,
+            item_code__in=item_ids,
         ).select_related("client")
     }
 
@@ -87,33 +87,33 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
-        item_id = clean(
-            row.get("item_id"),
+        item_code = clean(
+            row.get("item_code"),
             lower=True,
         )
 
-        if not client_id or not item_id:
+        if not client_code or not item_code:
 
             print(
                 "Skipping row with missing "
-                "client_id/item_id"
+                "client_code/item_code"
             )
 
             skipped_count += 1
             continue
 
-        key = (client_id, item_id)
+        key = (client_code, item_code)
 
         if key in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             skipped_count += 1
@@ -129,7 +129,7 @@ def load_val01(
 
             print(
                 f"Missing item: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             skipped_count += 1
@@ -179,7 +179,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             if verbose:
@@ -208,7 +208,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"ProductItem: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
     # ── Summary ─────────────────────────────────────────────
@@ -335,13 +335,13 @@ def load_val01():
 
     # ── collect keys ─────────────────────────
 
-    client_ids = {
-        clean_lower(r.get("client_id"))
+    client_codes = {
+        clean_lower(r.get("client_code"))
         for r in rows
     }
 
     item_ids = {
-        clean_lower(r.get("item_id"))
+        clean_lower(r.get("item_code"))
         for r in rows
     }
 
@@ -350,14 +350,14 @@ def load_val01():
     items = {
 
         (
-            i.client.client_id,
-            i.item_id
+            i.client.client_code,
+            i.item_code
         ): i
 
         for i in Item.objects.filter(
 
-            client__client_id__in=client_ids,
-            item_id__in=item_ids,
+            client__client_code__in=client_codes,
+            item_code__in=item_ids,
 
         ).select_related("client")
     }
@@ -370,23 +370,23 @@ def load_val01():
 
     for row in rows:
 
-        client_id = clean_lower(
-            row.get("client_id")
+        client_code = clean_lower(
+            row.get("client_code")
         )
 
-        item_id = clean_lower(
-            row.get("item_id")
+        item_code = clean_lower(
+            row.get("item_code")
         )
 
         item = items.get(
-            (client_id, item_id)
+            (client_code, item_code)
         )
 
         if not item:
 
             print(
                 f"Missing item: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             skipped_count += 1
@@ -443,7 +443,7 @@ def load_val01():
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"{client_id} → {item_id}"
+            f"{client_code} → {item_code}"
         )
 
     print()

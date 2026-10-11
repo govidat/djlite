@@ -21,7 +21,7 @@ LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 
 # id,location,nav_type,url,name,name_en,name_hi,name_fr,
-# order,hidden,open_in_new_tab,client_id,page_id,
+# order,hidden,open_in_new_tab,client_code,page_code,
 # svg_pre,svg_suf,name_ta,parent_name_en
 
 
@@ -52,38 +52,38 @@ def load_val01(
 
     # ── Collect keys ────────────────────────────────────
 
-    client_ids = {
+    client_codes = {
 
         clean(
-            r.get("client_id"),
+            r.get("client_code"),
             lower=True,
         )
 
         for r in rows
 
-        if clean(r.get("client_id"))
+        if clean(r.get("client_code"))
     }
 
-    page_ids = {
+    page_codes = {
 
         clean(
-            r.get("page_id"),
+            r.get("page_code"),
             lower=True,
         )
 
         for r in rows
 
-        if clean(r.get("page_id"))
+        if clean(r.get("page_code"))
     }
 
     # ── Preload Clients ─────────────────────────────────
 
     clients = {
 
-        c.client_id: c
+        c.client_code: c
 
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -92,13 +92,13 @@ def load_val01(
     pages = {
 
         (
-            p.client.client_id,
-            p.page_id,
+            p.client.client_code,
+            p.page_code,
         ): p
 
         for p in Page.objects.filter(
-            client__client_id__in=client_ids,
-            page_id__in=page_ids,
+            client__client_code__in=client_codes,
+            page_code__in=page_codes,
         ).select_related("client")
     }
 
@@ -107,12 +107,12 @@ def load_val01(
     parents = {
 
         (
-            n.client.client_id,
+            n.client.client_code,
             clean(n.name_en, lower=True),
         ): n
 
         for n in NavItem.objects.filter(
-            client__client_id__in=client_ids
+            client__client_code__in=client_codes
         ).select_related("client")
     }
 
@@ -128,8 +128,8 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
@@ -140,18 +140,18 @@ def load_val01(
 
         # ── validation ────────────────────────────────
 
-        if not client_id or not name_en:
+        if not client_code or not name_en:
 
             print(
                 "Skipping row with empty "
-                "client_id/name_en"
+                "client_code/name_en"
             )
 
             skipped_count += 1
             continue
 
         key = (
-            client_id,
+            client_code,
             name_en,
         )
 
@@ -168,13 +168,13 @@ def load_val01(
 
         # ── resolve client ────────────────────────────
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
             print(
                 f"Missing client: "
-                f"{client_id}"
+                f"{client_code}"
             )
 
             skipped_count += 1
@@ -184,22 +184,22 @@ def load_val01(
 
         page = None
 
-        page_id = clean(
-            row.get("page_id"),
+        page_code = clean(
+            row.get("page_code"),
             lower=True,
         )
 
-        if page_id:
+        if page_code:
 
             page = pages.get(
-                (client_id, page_id)
+                (client_code, page_code)
             )
 
             if not page:
 
                 print(
                     f"Missing page: "
-                    f"{client_id} / {page_id}"
+                    f"{client_code} / {page_code}"
                 )
 
                 skipped_count += 1
@@ -218,7 +218,7 @@ def load_val01(
 
             parent = parents.get(
                 (
-                    client_id,
+                    client_code,
                     parent_name_en,
                 )
             )
@@ -227,7 +227,7 @@ def load_val01(
 
                 print(
                     f"Missing parent: "
-                    f"{client_id} / "
+                    f"{client_code} / "
                     f"{parent_name_en}"
                 )
 
@@ -289,7 +289,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {name_en}"
+                f"{client_code} / {name_en}"
             )
 
             if verbose:
@@ -318,7 +318,7 @@ def load_val01(
 
             parents[
                 (
-                    client_id,
+                    client_code,
                     name_en,
                 )
             ] = obj
@@ -328,7 +328,7 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"NavItem: "
-                    f"{client_id} / {name_en}"
+                    f"{client_code} / {name_en}"
                 )
 
     # ── Summary ────────────────────────────────────────

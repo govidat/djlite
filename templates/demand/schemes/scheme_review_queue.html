@@ -24,7 +24,7 @@
         {% endif %}
       </p>
 
-      <div hx-get="{% url 'demand_ui:scheme_detection_form' client_id=client.client_id %}"
+      <div hx-get="{% url 'demand_ui:scheme_detection_form' client_code=client.client_code %}"
            hx-trigger="load" hx-target="this" hx-swap="innerHTML">
       </div>
       <div id="detection-status"></div>

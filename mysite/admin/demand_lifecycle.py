@@ -12,7 +12,7 @@ class ItemSubstitutionAdmin(admin.ModelAdmin):
     list_display = ['client', 'old_item', 'new_item', 'conversion_factor',
                     'effective_from', 'updated_at']
     list_filter = ['client']
-    search_fields = ['old_item__item_id', 'new_item__item_id']
+    search_fields = ['old_item__item_code', 'new_item__item_code']
     readonly_fields = ['created_by', 'created_at', 'updated_at']
 
     def save_model(self, request, obj, form, change):
@@ -24,7 +24,7 @@ class ItemSubstitutionAdmin(admin.ModelAdmin):
 class ItemDiscontinuationAdmin(admin.ModelAdmin):
     list_display = ['client', 'item', 'effective_from', 'updated_at']
     list_filter = ['client']
-    search_fields = ['item__item_id']
+    search_fields = ['item__item_code']
     readonly_fields = ['created_by', 'created_at', 'updated_at']
 
     def save_model(self, request, obj, form, change):
@@ -37,7 +37,7 @@ class ItemIntroductionAdmin(admin.ModelAdmin):
     list_display = ['client', 'new_item', 'reference_item', 'ratio',
                     'copy_from', 'copy_to', 'updated_at']
     list_filter = ['client']
-    search_fields = ['new_item__item_id', 'reference_item__item_id']
+    search_fields = ['new_item__item_code', 'reference_item__item_code']
     readonly_fields = ['created_by', 'created_at', 'updated_at']
     raw_id_fields = ['new_item', 'reference_item']
 

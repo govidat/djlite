@@ -187,11 +187,11 @@ def xxxmytext_static(context, lv_token_id=''):
     Input is a lv_token; optional arg = "en', 'hi'...
     Output is a text. 
     This has to be derived from texts_static_dict which is of form:
-    texts_static_dict - {token_id: {client_id: {page_id: {en: val1, fr: val2}}}}
+    texts_static_dict - {token_id: {client_id: {page_code: {en: val1, fr: val2}}}}
     client_hierarchy_list = ['bahushira', parent, grandparent, 'default']
     LANGUAGE_CODE 
     CURRENT_LANGUAGE_CODE
-    page_id
+    page_code
 
     """    
 

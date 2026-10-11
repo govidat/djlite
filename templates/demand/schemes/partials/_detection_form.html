@@ -8,7 +8,7 @@
   </div>
 {% endif %}
 
-<form hx-post="{% url 'demand_ui:trigger_scheme_detection' client_id=client.client_id %}"
+<form hx-post="{% url 'demand_ui:trigger_scheme_detection' client_code=client.client_code %}"
       hx-target="#detection-status" hx-swap="innerHTML"
       class="flex flex-wrap items-end gap-3 mt-3">
   {% csrf_token %}

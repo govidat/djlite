@@ -111,9 +111,9 @@ def get_user_permissions(user, client):
         seen = set()
         for group in groups:
             for loc in group.locations.all():
-                if loc.location_id not in seen:
-                    location_ids.append(loc.location_id)
-                    seen.add(loc.location_id)
+                if loc.location_code not in seen:
+                    location_ids.append(loc.location_code)
+                    seen.add(loc.location_code)
 
     return {
         'role':          top_role,

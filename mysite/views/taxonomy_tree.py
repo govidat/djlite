@@ -15,7 +15,7 @@ Two views:
 
 NOTE: intentionally no @login_required here. This view is shared between
 version_aggregates (login-gated page) and catalogue (guest-accessible).
-request.client is resolved from the client_id URL segment the same way
+request.client is resolved from the client_code URL segment the same way
 for both, independent of auth state, so this exposes no more than
 catalogue's own view already does for the same taxonomy data.
 """
@@ -163,9 +163,9 @@ def _build_eager_subtree(client, node, expand_ids, selected_paths):
     return node_dict
 
 
-def taxonomy_tree_panel(request, client_id=None):
+def taxonomy_tree_panel(request, client_code=None):
     """
-    GET /{client_id}/demand/taxonomy-tree/
+    GET /{client_code}/demand/taxonomy-tree/
     Query params: taxonomy_node_ids=1,6,20 (currently selected)
                  taxonomy_slug=gs1-gpc (optional; when present, restrict
                  the tree to that single taxonomy instead of all of them)
@@ -201,16 +201,16 @@ def taxonomy_tree_panel(request, client_id=None):
         )
 
     context = {
-        'client_id': client_id,
+        'client_code': client_code,
         'taxonomy_groups': list(groups.values()),
         'selected_ids': selected_ids,
     }
     return render(request, 'taxonomy_tree/partials/taxonomy_tree_panel.html', context)
 
 
-def taxonomy_tree_children(request, client_id=None, node_id=None):
+def taxonomy_tree_children(request, client_code=None, node_id=None):
     """
-    GET /{client_id}/demand/taxonomy-tree/{node_id}/children/
+    GET /{client_code}/demand/taxonomy-tree/{node_id}/children/
     Query params: taxonomy_node_ids=1,6,20 (currently selected)
 
     htmx lazy-load endpoint: returns one node's direct children as
@@ -237,5 +237,5 @@ def taxonomy_tree_children(request, client_id=None, node_id=None):
     return render(
         request,
         'taxonomy_tree/partials/taxonomy_tree_children.html',
-        {'client_id': client_id, 'nodes': nodes},
+        {'client_code': client_code, 'nodes': nodes},
     )

@@ -17,7 +17,7 @@ from scripts.helpers import (
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 # code,name,level_label,is_leaf,is_active,notes,
-# client_id,parent_code,
+# client_code,parent_code,
 # name_en,name_fr,name_hi,name_ta,
 # level_label_en,level_label_fr,level_label_hi,level_label_ta
 
@@ -49,10 +49,10 @@ def load_val01(
     # COLLECT CLIENT IDS
     # =========================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     # =========================================================
@@ -60,15 +60,15 @@ def load_val01(
     # =========================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # =========================================================
     # PREFETCH EXISTING LOCATIONS
-    # key = (client_id, code)
+    # key = (client_code, code)
     # =========================================================
 
     location_cache = {}
@@ -76,13 +76,13 @@ def load_val01(
     existing_locations = (
         PlanningLocation.objects
         .select_related("client")
-        .filter(client__client_id__in=client_ids)
+        .filter(client__client_code__in=client_codes)
     )
 
     for loc in existing_locations:
 
         key = (
-            loc.client.client_id,
+            loc.client.client_code,
             loc.code,
         )
 
@@ -114,8 +114,8 @@ def load_val01(
             # BASIC VALUES
             # =================================================
 
-            client_id = clean(
-                row.get("client_id"),
+            client_code = clean(
+                row.get("client_code"),
                 lower=True,
             )
 
@@ -129,22 +129,22 @@ def load_val01(
                 lower=True,
             )
 
-            if not client_id or not code:
+            if not client_code or not code:
 
                 print(
                     "Skipping row with missing "
-                    "client_id or code"
+                    "client_code or code"
                 )
 
                 skipped_count += 1
                 continue
 
-            client = clients.get(client_id)
+            client = clients.get(client_code)
 
             if not client:
 
                 print(
-                    f"Missing client: {client_id}"
+                    f"Missing client: {client_code}"
                 )
 
                 skipped_count += 1
@@ -160,7 +160,7 @@ def load_val01(
 
                 parent = location_cache.get(
                     (
-                        client_id,
+                        client_code,
                         parent_code,
                     )
                 )
@@ -216,7 +216,7 @@ def load_val01(
 
                 print(
                     f"[DRY RUN] "
-                    f"{client_id} / {code}"
+                    f"{client_code} / {code}"
                 )
 
                 if verbose:
@@ -245,7 +245,7 @@ def load_val01(
             # =================================================
 
             cache_key = (
-                client_id,
+                client_code,
                 code,
             )
 
@@ -263,7 +263,7 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"PlanningLocation: "
-                    f"{client_id} / {code}"
+                    f"{client_code} / {code}"
                 )
 
         # =====================================================
@@ -279,7 +279,7 @@ def load_val01(
                 print(
                     f"Could not resolve parent "
                     f"[client="
-                    f"{row.get('client_id')} "
+                    f"{row.get('client_code')} "
                     f"code={row.get('code')} "
                     f"parent={row.get('parent_code')}]"
                 )

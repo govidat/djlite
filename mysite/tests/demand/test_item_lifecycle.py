@@ -21,31 +21,31 @@ from mysite.models.demand.lifecycle import (
 @pytest.fixture
 def item_a(db, client_obj):
     from mysite.models import Item
-    return Item.objects.create(client=client_obj, item_id='ITEM-A', name='Item A', status='active')
+    return Item.objects.create(client=client_obj, item_code='ITEM-A', name='Item A', status='active')
 
 
 @pytest.fixture
 def item_b(db, client_obj):
     from mysite.models import Item
-    return Item.objects.create(client=client_obj, item_id='ITEM-B', name='Item B', status='active')
+    return Item.objects.create(client=client_obj, item_code='ITEM-B', name='Item B', status='active')
 
 
 @pytest.fixture
 def item_c(db, client_obj):
     from mysite.models import Item
-    return Item.objects.create(client=client_obj, item_id='ITEM-C', name='Item C', status='active')
+    return Item.objects.create(client=client_obj, item_code='ITEM-C', name='Item C', status='active')
 
 
 @pytest.fixture
 def other_client_obj(db):
     from mysite.models import Client
-    return Client.objects.create(client_id='OTHER1', name='Other Client')
+    return Client.objects.create(client_code='OTHER1', name='Other Client')
 
 
 @pytest.fixture
 def other_item(db, other_client_obj):
     from mysite.models import Item
-    return Item.objects.create(client=other_client_obj, item_id='ITEM-X', name='Other Item', status='active')
+    return Item.objects.create(client=other_client_obj, item_code='ITEM-X', name='Other Item', status='active')
 
 
 # ============================================================================

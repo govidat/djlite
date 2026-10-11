@@ -11,7 +11,7 @@
         <div>
             {% include "demand/partials/accuracy_run_status.html" %}
         </div>
-        <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+        <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=version.pk %}"
            class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
     </div>
 </div>
@@ -159,7 +159,7 @@
     {% for level, label in agg_level_choices %}
     <a class="tab {% if agg_level == level %}tab-active{% endif %}"
        id="accuracy-tab-{{ level }}"
-       hx-get="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}?agg_level={{ level }}"
+       hx-get="{% url 'demand_ui:version_accuracy' client_code=client.client_code pk=version.pk %}?agg_level={{ level }}"
        hx-target="#accuracy-container"
        hx-swap="innerHTML"
        hx-headers='{"HX-Request": "true"}'

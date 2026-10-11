@@ -8,7 +8,7 @@
     {% trans "No new actuals since the last detection run — nothing to run yet." %}
   </div>
 {% endif %}
-<form hx-post="{% url 'demand_ui:trigger_outlier_detection' client_id=client.client_id %}"
+<form hx-post="{% url 'demand_ui:trigger_outlier_detection' client_code=client.client_code %}"
       hx-target="#detection-status" hx-swap="innerHTML"
       class="flex flex-wrap gap-4 items-end">
   {% if error %}<div class="alert alert-error text-sm">{{ error }}</div>{% endif %}

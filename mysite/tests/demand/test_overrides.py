@@ -22,15 +22,15 @@ from mysite.models.demand.forecast import (
 @pytest.mark.django_db
 class TestCreateOverride:
 
-    def _url(self, version_id, client_id='TEST01'):
-        return f'/api/{client_id}/demand/forecast-versions/{version_id}/overrides/'
+    def _url(self, version_id, client_code='TEST01'):
+        return f'/api/{client_code}/demand/forecast-versions/{version_id}/overrides/'
     
     def test_create_qty_override_returns_202(self, api_client, draft_version_with_lines):
         client, user = api_client
         version, line_a, _ = draft_version_with_lines
         payload = {
             'override_level': 'sku',
-            'override_key':   {'item_id': line_a.item.item_id},
+            'override_key':   {'item_id': line_a.item.item_code},
             'period_type':    'month',
             'period_start':   '2025-01-01',
             'override_qty':   120,
@@ -50,7 +50,7 @@ class TestCreateOverride:
         version, line_a, _ = draft_version_with_lines
         payload = {
             'override_level': 'sku',
-            'override_key':   {'item_id': line_a.item.item_id},
+            'override_key':   {'item_id': line_a.item.item_code},
             'period_type':    'month',
             'period_start':   '2025-01-01',
             'override_pct':   10.0,
@@ -68,7 +68,7 @@ class TestCreateOverride:
         version, line_a, _ = draft_version_with_lines
         payload = {
             'override_level': 'sku',
-            'override_key':   {'item_id': line_a.item.item_id},
+            'override_key':   {'item_id': line_a.item.item_code},
             'period_type':    'month',
             'period_start':   '2025-01-01',
             'override_qty':   100,
@@ -83,7 +83,7 @@ class TestCreateOverride:
         version, line_a, _ = draft_version_with_lines
         payload = {
             'override_level': 'sku',
-            'override_key':   {'item_id': line_a.item.item_id},
+            'override_key':   {'item_id': line_a.item.item_code},
             'period_type':    'month',
             'period_start':   '2025-01-01',
             'override_value': 50000,
@@ -100,7 +100,7 @@ class TestCreateOverride:
 
         payload = {
             'override_level': 'sku',
-            'override_key':   {'item_id': line_a.item.item_id},
+            'override_key':   {'item_id': line_a.item.item_code},
             'period_type':    'month',
             'period_start':   '2025-01-01',
             'override_qty':   100,
@@ -122,7 +122,7 @@ class TestListOverrides:
         ForecastOverride.objects.create(
             version        = version,
             override_level = 'sku',
-            override_key   = {'item_id': line_a.item.item_id},
+            override_key   = {'item_id': line_a.item.item_code},
             period_type    = 'month',
             period_start   = line_a.period_start,
             period_end     = line_a.period_end,
@@ -130,7 +130,7 @@ class TestListOverrides:
             disagg_method  = 'PROPORTIONAL',
             created_by     = user,
         )
-        resp = client.get(f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/')
+        resp = client.get(f'/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/overrides/')
         assert resp.status_code == 200
         assert resp.data['count'] == 1
         assert resp.data['results'][0]['override_qty'] == '120.000'
@@ -140,7 +140,7 @@ class TestListOverrides:
         version, line_a, _ = draft_version_with_lines
         ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('120'),
             disagg_method='PROPORTIONAL', created_by=user,
@@ -148,14 +148,14 @@ class TestListOverrides:
         )
         ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('130'),
             disagg_method='PROPORTIONAL', created_by=user,
             is_applied=False,
         )
         resp = client.get(
-            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/?is_applied=true'
+            f'/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/overrides/?is_applied=true'
         )
         assert resp.status_code == 200
         assert resp.data['count'] == 1
@@ -174,14 +174,14 @@ class TestDeleteOverride:
         version, line_a, _ = draft_version_with_lines
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('999'),
             disagg_method='PROPORTIONAL', created_by=user,
             is_applied=False,
         )
         resp = client.delete(
-            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
+            f'/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
         )
         assert resp.status_code == 204
         assert not ForecastOverride.objects.filter(pk=override.pk).exists()
@@ -206,7 +206,7 @@ class TestDeleteOverride:
 
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('999'),
             disagg_method='PROPORTIONAL', created_by=user,
@@ -214,7 +214,7 @@ class TestDeleteOverride:
         )
 
         resp = client.delete(
-            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
+            f'/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
         )
         assert resp.status_code == 204
 
@@ -229,7 +229,7 @@ class TestDeleteOverride:
         version, line_a, _ = draft_version_with_lines
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('100'),
             disagg_method='PROPORTIONAL', created_by=user,
@@ -238,7 +238,7 @@ class TestDeleteOverride:
         version.save(update_fields=['status'])
 
         resp = client.delete(
-            f'/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
+            f'/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/overrides/{override.pk}/'
         )
         assert resp.status_code == 403
 
@@ -260,7 +260,7 @@ class TestApplyOverridesTask:
 
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('150'),
             disagg_method='PROPORTIONAL', created_by=planner_user,  # ← use fixture
@@ -279,7 +279,7 @@ class TestApplyOverridesTask:
 
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_pct=Decimal('10'),
             disagg_method='PROPORTIONAL', created_by=planner_user,  # ← use fixture
@@ -299,7 +299,7 @@ class TestApplyOverridesTask:
 
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('200'),
             disagg_method='PROPORTIONAL', created_by=planner_user,  # ← use fixture
@@ -330,7 +330,7 @@ class TestApplyOverridesTask:
 
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('150'),
             disagg_method='PROPORTIONAL', created_by=user,
@@ -352,7 +352,7 @@ class TestApplyOverridesTask:
 
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_pct=Decimal('10'),
             disagg_method='PROPORTIONAL', created_by=user,
@@ -376,7 +376,7 @@ class TestApplyOverridesTask:
 
         override = ForecastOverride.objects.create(
             version=version, override_level='sku',
-            override_key={'item_id': line_a.item.item_id},
+            override_key={'item_id': line_a.item.item_code},
             period_type='month', period_start=line_a.period_start,
             period_end=line_a.period_end, override_qty=Decimal('200'),
             disagg_method='PROPORTIONAL', created_by=user,

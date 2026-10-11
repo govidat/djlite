@@ -1,7 +1,7 @@
 {% load i18n %}
 <tr class="hover" id="line-row-{{ line.pk }}">
     <td class="font-mono text-xs whitespace-nowrap">{{ line.planning_location.code }}</td>
-    <td class="font-mono text-xs whitespace-nowrap">{{ line.item.item_id }}</td>
+    <td class="font-mono text-xs whitespace-nowrap">{{ line.item.item_code }}</td>
     <td class="whitespace-nowrap">{{ line.item.name }}</td>
     <td class="whitespace-nowrap">{{ line.planning_customer.code|default:"—" }}</td>
     {% if show_channel %}<td class="whitespace-nowrap">{{ line.distribution_channel.code|default:"—" }}</td>{% endif %}
@@ -30,7 +30,7 @@
 {% load i18n %}
 <tr class="hover" id="line-row-{{ line.pk }}">
     <td class="font-mono text-xs">{{ line.planning_location.code }}</td>
-    <td class="font-mono text-xs">{{ line.item.item_id }}</td>
+    <td class="font-mono text-xs">{{ line.item.item_code }}</td>
     <td>{{ line.item.name }}</td>
     <td>{{ line.planning_customer.code|default:"—" }}</td>
     <td>{{ line.period_start|date:"M Y" }}</td>

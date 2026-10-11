@@ -9,7 +9,7 @@ HTMX pagination — updates #items-container
     <!-- Previous -->
     {% if catalogue.pagination.has_prev %}
     <button class="join-item btn btn-sm"
-            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}?page={{ catalogue.pagination.prev_page }}&{{ request.GET.urlencode }}"
+            hx-get="{% url 'catalogue_filter' client_code=client.client_code %}?page={{ catalogue.pagination.prev_page }}&{{ request.GET.urlencode }}"
             hx-target="#items-container"
             hx-swap="innerHTML">
       «
@@ -26,7 +26,7 @@ HTMX pagination — updates #items-container
     <!-- Next -->
     {% if catalogue.pagination.has_next %}
     <button class="join-item btn btn-sm"
-            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}?page={{ catalogue.pagination.next_page }}&{{ request.GET.urlencode }}"
+            hx-get="{% url 'catalogue_filter' client_code=client.client_code %}?page={{ catalogue.pagination.next_page }}&{{ request.GET.urlencode }}"
             hx-target="#items-container"
             hx-swap="innerHTML">
       »

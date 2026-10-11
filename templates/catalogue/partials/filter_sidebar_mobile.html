@@ -11,7 +11,7 @@ with the desktop filter-form when both are rendered.
 
   {% if catalogue.filters.node_ids or catalogue.filters.search or catalogue.filters.brands %}
   <div>
-    <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+    <a href="{% url 'catalogue_page' client_code=client.client_code %}"
        class="btn btn-outline btn-sm btn-error w-full">
       Clear All Filters
     </a>
@@ -63,7 +63,7 @@ with the desktop filter-form when both are rendered.
                   value="{{ val.id }}"
                   class="checkbox checkbox-xs checkbox-primary"
                   {% if val.selected %}checked{% endif %}
-                  hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                  hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
                   hx-target="#items-container"
                   hx-swap="innerHTML"
                   hx-include="#filter-form-mobile"
@@ -102,7 +102,7 @@ with the desktop filter-form when both are rendered.
               value="{{ brand.id }}"
               class="checkbox checkbox-sm checkbox-primary"
               {% if brand.name in catalogue.filters.brands %}checked{% endif %}
-              hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+              hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
               hx-target="#items-container"
               hx-swap="innerHTML"
               hx-include="#filter-form"
@@ -168,7 +168,7 @@ with the desktop filter-form when both are rendered.
             value="1"
             class="checkbox checkbox-sm checkbox-primary"
             {% if catalogue.filters.in_stock %}checked{% endif %}
-            hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+            hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
             hx-target="#items-container"
             hx-swap="innerHTML"
             hx-include="#filter-form"
@@ -191,7 +191,7 @@ with the desktop filter-form when both are rendered.
             <input type="checkbox" name="genre" value="{{ genre }}"
                   class="checkbox checkbox-xs checkbox-primary"
                   {% if genre == catalogue.filters.genre %}checked{% endif %}
-                  hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                  hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
                   hx-target="#items-container"
                   hx-swap="innerHTML"
                   hx-include="#filter-form"
@@ -218,7 +218,7 @@ with the desktop filter-form when both are rendered.
             <input type="checkbox" name="format" value="{{ fmt }}"
                   class="checkbox checkbox-xs checkbox-primary"
                   {% if fmt == catalogue.filters.format %}checked{% endif %}
-                  hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                  hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
                   hx-target="#items-container"
                   hx-swap="innerHTML"
                   hx-include="#filter-form"
@@ -237,7 +237,7 @@ with the desktop filter-form when both are rendered.
   <label class="flex items-center gap-3 cursor-pointer py-2">
     <input type="checkbox" name="is_free" value="1"
           class="checkbox checkbox-sm checkbox-primary"
-          hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+          hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
           hx-target="#items-container"
           hx-swap="innerHTML"
           hx-include="#filter-form"
@@ -255,7 +255,7 @@ function applyPriceFilter() {
  
   // Trigger HTMX request with all current filters + new price range
   htmx.ajax('GET',
-    '{% url "catalogue_filter" client_id=client.client_id %}',
+    '{% url "catalogue_filter" client_code=client.client_code %}',
     {
       target: '#items-container',
       swap:   'innerHTML',

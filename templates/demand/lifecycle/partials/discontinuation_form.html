@@ -8,7 +8,7 @@
 <div class="alert alert-error mb-4"><span>{{ errors.__all__ }}</span></div>
 {% endif %}
 
-<form hx-post="{% if discontinuation %}{% url 'demand_ui:item_discontinuation_edit' client_id=client.client_id pk=discontinuation.pk %}{% else %}{% url 'demand_ui:item_discontinuation_create' client_id=client.client_id %}{% endif %}"
+<form hx-post="{% if discontinuation %}{% url 'demand_ui:item_discontinuation_edit' client_code=client.client_code pk=discontinuation.pk %}{% else %}{% url 'demand_ui:item_discontinuation_create' client_code=client.client_code %}{% endif %}"
       hx-target="#modal-content"
       hx-swap="innerHTML">
   {% csrf_token %}

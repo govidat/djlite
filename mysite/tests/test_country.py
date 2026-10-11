@@ -58,7 +58,7 @@ class ClientCountryFieldsTest(TestCase):
 
     def setUp(self):
         self.client_obj = Client.objects.create(
-            client_id='testclient',
+            client_code='testclient',
             name='Test Client',
             allowed_countries=['IN', 'US'],
             default_country_code='IN',
@@ -68,7 +68,7 @@ class ClientCountryFieldsTest(TestCase):
         self.assertTrue(self.client_obj.is_country_enabled())
 
     def test_is_country_enabled_null(self):
-        c = Client.objects.create(client_id='no_country', name='No Country')
+        c = Client.objects.create(client_code='no_country', name='No Country')
         self.assertFalse(c.is_country_enabled())
 
     def test_get_allowed_country_codes(self):
@@ -76,7 +76,7 @@ class ClientCountryFieldsTest(TestCase):
         self.assertEqual(codes, {'IN', 'US'})
 
     def test_get_allowed_country_codes_raises_when_disabled(self):
-        c = Client.objects.create(client_id='no_country2', name='No Country 2')
+        c = Client.objects.create(client_code='no_country2', name='No Country 2')
         with self.assertRaises(ValueError):
             c.get_allowed_country_codes()
 
@@ -91,7 +91,7 @@ class SetCountryViewTest(TestCase):
         self.factory = RequestFactory()
         self.url = reverse('set_country')
         self.client_obj = Client.objects.create(
-            client_id='testclient',
+            client_code='testclient',
             allowed_countries=['IN', 'US', 'FR'],
             default_country_code='IN',
         )
@@ -135,7 +135,7 @@ class TemplateResolutionCountryTest(TestCase):
 
     def setUp(self):
         self.client_obj = Client.objects.create(
-            client_id='templclient',
+            client_code='templclient',
             name='Template Client',
             allowed_countries=['IN', 'US'],
             default_country_code='IN',

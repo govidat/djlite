@@ -1,4 +1,4 @@
-client_id,item_id,taxonomy_slug,node_client_id,node_slug,is_primary,order
+client_code,item_code,taxonomy_slug,node_client_code,node_slug,is_primary,order
 bahushira,bosch-fr7dc,gpc,,spark-plugs,1,1
 bahushira,bosch-fr8dc,gpc,,spark-plugs,1,1
 bahushira,ngk-bpr6es,gpc,,spark-plugs,1,1

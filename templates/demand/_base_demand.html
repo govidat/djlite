@@ -9,8 +9,8 @@ Demand Planning shell — sidebar nav + content area.
 Mirrors the catalogue page's sticky-sidebar + mobile-drawer pattern.
 Every demand page extends this instead of "base.html" directly.
 
-Menu items use {% url 'demand_ui:...' client_id=client.client_id %}
-matching the catalogue convention of passing client_id explicitly.
+Menu items use {% url 'demand_ui:...' client_code=client.client_code %}
+matching the catalogue convention of passing client_code explicitly.
 Old {% render_client_template 'demand_sidebar_nav' active=active_nav %}
 
 NEW: desktop sidebar is collapsible (Q5) — persisted via localStorage

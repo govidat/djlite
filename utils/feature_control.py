@@ -60,8 +60,8 @@ def _check_feature_disabled(client, feature: str) -> dict:
         )
 
     """Raw DB/cache lookup — no hierarchy logic."""
-    client_id = client.client_id if client else "global"
-    cache_key = f"feature_control:{client_id}:{feature}"
+    client_code = client.client_code if client else "global"
+    cache_key = f"feature_control:{client_code}:{feature}"
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
@@ -140,8 +140,8 @@ def demand_feature_required(feature, template="demand/feature_disabled.html"):
 #   from utils.feature_control import celery_demand_feature_guard
 #
 #   @app.task(bind=True)
-#   def run_forecast_task(self, client_id):
-#       client = Client.objects.get(pk=client_id)
+#   def run_forecast_task(self, client_code):
+#       client = Client.objects.get(pk=client_code)
 #       skip = celery_demand_feature_guard(client, "forecast_run")
 #       if skip:
 #           return skip           # {"status": "skipped", "reason": "..."}
@@ -242,10 +242,10 @@ def bust_feature_cache(sender, instance, **kwargs):
     Also clears the global key in case a client-specific row shadows it.
     """
     feature = instance.feature
-    client_id = instance.client.client_id if instance.client else "global"
+    client_code = instance.client.client_code if instance.client else "global"
  
     keys_to_delete = [
-        f"feature_control:{client_id}:{feature}",
+        f"feature_control:{client_code}:{feature}",
         f"feature_control:global:{feature}",   # always clear global too
     ]
     cache.delete_many(keys_to_delete)

@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 class Client(models.Model):
-    client_id = LowercaseCharField(max_length=25, unique=True, db_index=True)    
+    client_code = LowercaseCharField(max_length=25, unique=True, db_index=True)    
 
     parent = models.ForeignKey("self", null=True, blank=True, related_name="children", on_delete=models.CASCADE)
     language_list = models.JSONField(null = True, blank = True, default=default_languages, help_text="A JSON array of selected values from Language.")
@@ -96,7 +96,7 @@ class Client(models.Model):
     nb_title_svg_suf = models.CharField(max_length=500, blank=True, null=True)
 
     def __str__(self):
-        return self.client_id
+        return self.client_code
 
     # if a Model has a recursive relationship and its parent is maintained in the same row
     def get_ancestors(self):
@@ -104,7 +104,7 @@ class Client(models.Model):
         ancestors = []
         current = self.parent
         while current is not None:
-            ancestors.append(str(current.client_id))
+            ancestors.append(str(current.client_code))
             current = current.parent
         return ancestors  
      
@@ -114,7 +114,7 @@ class Client(models.Model):
 
         def collect_children(node):
             for child in node.children.all():
-                descendants.append(str(child.client_id))
+                descendants.append(str(child.client_code))
                 collect_children(child)
 
         collect_children(self)
@@ -138,7 +138,7 @@ class Client(models.Model):
         """
         if self.allowed_distribution_channels is None:
             raise ValueError(
-                f"Client {self.client_id} does not have Distribution Channel "
+                f"Client {self.client_code} does not have Distribution Channel "
                 f"enabled — check is_distribution_channel_enabled() before calling this."
             )
         return set(self.allowed_distribution_channels)
@@ -154,14 +154,14 @@ class Client(models.Model):
         """
         if self.allowed_countries is None:
             raise ValueError(
-                f"Client {self.client_id} does not have Country "
+                f"Client {self.client_code} does not have Country "
                 f"enabled — check is_country_enabled() before calling this."
             )
         return set(self.allowed_countries)
 
     class Meta:
         verbose_name = "00-03 Client"
-        ordering = ["client_id"]
+        ordering = ["client_code"]
         permissions = [
             ('view_client_data',   'Can view client data'),
             ('edit_client_data',   'Can edit client data'),
@@ -185,9 +185,9 @@ class Theme(models.Model):
     name = models.CharField(max_length=40, blank=True, null=True) # modeltranslation blank=True to be present
 
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
-        return f"{client_id} / {self.theme_code}"        
-        #return f"{self.client.client_id} / {self.theme_code}"
+        client_code = getattr(self.client, 'client_code', '?')
+        return f"{client_code} / {self.theme_code}"        
+        #return f"{self.client.client_code} / {self.theme_code}"
       
     # for usage in Admin Panel
     class Meta:
@@ -268,8 +268,8 @@ class ClientTemplate(models.Model):
         verbose_name = "00-03E Client Templates"
         verbose_name_plural = "00-03E Client Templates"
     def __str__(self):
-        client_id = getattr(self.client, 'client_id', '?')
-        return f"{client_id} / {self.template_key}"
+        client_code = getattr(self.client, 'client_code', '?')
+        return f"{client_code} / {self.template_key}"
 
 
 class SectorTemplate(models.Model):
@@ -381,7 +381,7 @@ class ClientBlock(models.Model):
     def __str__(self):
 
         target = (
-            self.client.client_id
+            self.client.client_code
             if self.client else
             "ALL CLIENTS"
         )
@@ -452,7 +452,7 @@ class ClientFeatureControl(models.Model):
         verbose_name_plural = "00-00B Client Feature Controls"
 
     def __str__(self):
-        target = self.client.client_id if self.client else "ALL CLIENTS"
+        target = self.client.client_code if self.client else "ALL CLIENTS"
         return f"{target} / {self.feature}"
 
     @property

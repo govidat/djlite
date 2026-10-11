@@ -25,7 +25,7 @@
     </div>
 
     {# Confirm — delete then upload fresh #}
-    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
           hx-target="#actuals-upload-panel"
           hx-swap="outerHTML"
           hx-confirm="{% trans 'Are you absolutely sure? This will delete the existing actuals AND their outlier adjustments.' %}">
@@ -44,7 +44,7 @@
     </form>
 
     {# Go back — re-render the overlap panel with the original choices #}
-    <form hx-post="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+    <form hx-post="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
           hx-target="#actuals-upload-panel"
           hx-swap="outerHTML">
         {% csrf_token %}

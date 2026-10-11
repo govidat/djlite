@@ -14,7 +14,7 @@
         class="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
         <c-navbar_v001_l1recur :items="client.header_nav"></c-navbar_v001_l1recur> 
         {% if demand_ui_visible %}
-          <li><a href="{% url 'demand_ui:dashboard' client_id=client.client_id %}">
+          <li><a href="{% url 'demand_ui:dashboard' client_code=client.client_code %}">
             📈 {% trans "Demand Planning" %}
           </a></li>
         {% endif %}        
@@ -22,7 +22,7 @@
       </ul>
     </div>
     {% comment %}
-    <a href="{% url 'client_page' client_id 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
+    <a href="{% url 'client_page' client_code 'home' %}" class="btn btn-ghost text-xl">{{nb.logo|default:"" }}</a>
     {% endcomment %}
 
     <h1 class="text-xl font-bold">
@@ -43,7 +43,7 @@
       
       <c-navbar_v001_l1recur :items="client.header_nav"></c-navbar_v001_l1recur>
       {% if demand_ui_visible %}
-      <li><a href="{% url 'demand_ui:dashboard' client_id=client.client_id %}">
+      <li><a href="{% url 'demand_ui:dashboard' client_code=client.client_code %}">
         📈 {% trans "Demand Planning" %}
       </a></li>
       {% endif %}      
@@ -70,7 +70,7 @@
 
 input 
 cilent: {
-"client_id": "bahushira",
+"client_code": "bahushira",
 "translations": {
   "name": {
     "en": "Bahushira2",

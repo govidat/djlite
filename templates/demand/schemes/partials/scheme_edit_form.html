@@ -64,7 +64,7 @@
     </div>
 
     <div class="flex justify-end gap-2 mt-4">
-      <a href="{% url 'demand_ui:scheme_detail' client_id=client.client_id pk=scheme.pk %}"
+      <a href="{% url 'demand_ui:scheme_detail' client_code=client.client_code pk=scheme.pk %}"
          class="btn btn-ghost btn-sm">{% trans "Cancel" %}</a>
       <button type="submit" class="btn btn-primary btn-sm">{% trans "Save Changes" %}</button>
     </div>

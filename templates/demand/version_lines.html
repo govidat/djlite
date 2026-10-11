@@ -7,7 +7,7 @@
         <h2 class="text-xl font-bold">{% trans "Forecast Lines" %}</h2>
         <p class="text-sm text-base-content/60">{{ version.version_label }}</p>
     </div>
-    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+    <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=version.pk %}"
        class="btn btn-ghost btn-sm">← {% trans "Back to version" %}</a>
 </div>
 

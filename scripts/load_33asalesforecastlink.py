@@ -16,7 +16,7 @@ from scripts.helpers import (
 # CSV FORMAT
 # =========================================================
 #
-# client_id,planning_location_code,distribution_channel_code,planning_customer_code,sales_node_code,valid_from,valid_to
+# client_code,planning_location_code,distribution_channel_code,planning_customer_code,sales_node_code,valid_from,valid_to
 # autocomp,del-01,,,rm-ntn,2024-01-01,                                    <- shape c, open
 # autocomp,del-01,00,,rm-ntn,2024-01-01,                                  <- shape b, open
 # autocomp,del-01,00,cust-chn-001,rm-ntn,2024-01-01,2024-12-31            <- shape a, closed (historical)
@@ -58,10 +58,10 @@ def load_val01(
     # COLLECT IDS
     # =========================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     planning_location_codes = {
@@ -93,35 +93,35 @@ def load_val01(
     # =========================================================
 
     clients = {
-        c.client_id: c
-        for c in Client.objects.filter(client_id__in=client_ids)
+        c.client_code: c
+        for c in Client.objects.filter(client_code__in=client_codes)
     }
 
     planning_locations = {}
     for obj in (
         PlanningLocation.objects
-        .filter(code__in=planning_location_codes, client__client_id__in=client_ids)
+        .filter(code__in=planning_location_codes, client__client_code__in=client_codes)
         .select_related("client")
     ):
-        key = (obj.client.client_id, clean(obj.code, lower=True))
+        key = (obj.client.client_code, clean(obj.code, lower=True))
         planning_locations[key] = obj
 
     planning_customers = {}
     for obj in (
         PlanningCustomer.objects
-        .filter(code__in=planning_customer_codes, client__client_id__in=client_ids)
+        .filter(code__in=planning_customer_codes, client__client_code__in=client_codes)
         .select_related("client")
     ):
-        key = (obj.client.client_id, clean(obj.code, lower=True))
+        key = (obj.client.client_code, clean(obj.code, lower=True))
         planning_customers[key] = obj
 
     sales_nodes = {}
     for obj in (
         SalesNode.objects
-        .filter(code__in=sales_node_codes, client__client_id__in=client_ids)
+        .filter(code__in=sales_node_codes, client__client_code__in=client_codes)
         .select_related("client")
     ):
-        key = (obj.client.client_id, clean(obj.code, lower=True))
+        key = (obj.client.client_code, clean(obj.code, lower=True))
         sales_nodes[key] = obj
 
     distribution_channels = {
@@ -145,7 +145,7 @@ def load_val01(
         # BASIC VALUES
         # =====================================================
 
-        client_id = clean(row.get("client_id"), lower=True)
+        client_code = clean(row.get("client_code"), lower=True)
         planning_location_code = clean(row.get("planning_location_code"), lower=True)
         distribution_channel_code = clean(row.get("distribution_channel_code"), lower=False) or None
         planning_customer_code = clean(row.get("planning_customer_code"), lower=True) or None
@@ -157,7 +157,7 @@ def load_val01(
         # VALIDATIONS
         # =====================================================
 
-        if not client_id or not planning_location_code or not sales_node_code or not valid_from:
+        if not client_code or not planning_location_code or not sales_node_code or not valid_from:
             print("Skipping row with missing required fields (valid_from is mandatory)")
             skipped_count += 1
             continue
@@ -181,7 +181,7 @@ def load_val01(
         # prevent duplicate rows inside CSV — identity now includes valid_from,
         # since the same key can legitimately recur across time as a new row.
         row_key = (
-            client_id, planning_location_code, distribution_channel_code,
+            client_code, planning_location_code, distribution_channel_code,
             planning_customer_code, str(valid_from),
         )
         if row_key in seen:
@@ -194,31 +194,31 @@ def load_val01(
         # LOOKUPS
         # =====================================================
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
         if not client:
-            print(f"Missing client: {client_id}")
+            print(f"Missing client: {client_code}")
             skipped_count += 1
             continue
 
-        planning_location = planning_locations.get((client_id, planning_location_code))
+        planning_location = planning_locations.get((client_code, planning_location_code))
         if not planning_location:
-            print(f"Missing PlanningLocation: {client_id} / {planning_location_code}")
+            print(f"Missing PlanningLocation: {client_code} / {planning_location_code}")
             skipped_count += 1
             continue
 
         if not planning_location.is_leaf:
-            print(f"PlanningLocation is not a leaf: {client_id} / {planning_location_code}")
+            print(f"PlanningLocation is not a leaf: {client_code} / {planning_location_code}")
             skipped_count += 1
             continue
 
-        sales_node = sales_nodes.get((client_id, sales_node_code))
+        sales_node = sales_nodes.get((client_code, sales_node_code))
         if not sales_node:
-            print(f"Missing SalesNode: {client_id} / {sales_node_code}")
+            print(f"Missing SalesNode: {client_code} / {sales_node_code}")
             skipped_count += 1
             continue
 
         if sales_node.children.exists():
-            print(f"SalesNode is not a leaf: {client_id} / {sales_node_code}")
+            print(f"SalesNode is not a leaf: {client_code} / {sales_node_code}")
             skipped_count += 1
             continue
 
@@ -232,9 +232,9 @@ def load_val01(
 
         planning_customer = None
         if planning_customer_code:
-            planning_customer = planning_customers.get((client_id, planning_customer_code))
+            planning_customer = planning_customers.get((client_code, planning_customer_code))
             if not planning_customer:
-                print(f"Missing PlanningCustomer: {client_id} / {planning_customer_code}")
+                print(f"Missing PlanningCustomer: {client_code} / {planning_customer_code}")
                 skipped_count += 1
                 continue
 
@@ -259,7 +259,7 @@ def load_val01(
                 break
         if conflict:
             print(
-                f"Overlapping date range, skipping: {client_id} / {planning_location_code} "
+                f"Overlapping date range, skipping: {client_code} / {planning_location_code} "
                 f"/ dc={distribution_channel_code or '-'} / cust={planning_customer_code or '-'} "
                 f"({valid_from} - {valid_to or 'present'})"
             )
@@ -283,7 +283,7 @@ def load_val01(
             shape = 'a' if planning_customer else ('b' if distribution_channel else 'c')
             print(
                 f"[DRY RUN] shape={shape} "
-                f"{client_id} / {planning_location_code} "
+                f"{client_code} / {planning_location_code} "
                 f"/ dc={distribution_channel_code or '-'} "
                 f"/ cust={planning_customer_code or '-'} -> {sales_node_code} "
                 f"({valid_from} - {valid_to or 'present'})"

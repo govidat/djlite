@@ -245,8 +245,8 @@ class Taxonomy(models.Model):
         ]
 
     def __str__(self):
-        scope = getattr(self.client, 'client_id', '?') if self.client else 'GLOBAL' 
-        #scope = self.client.client_id if self.client else 'GLOBAL'
+        scope = getattr(self.client, 'client_code', '?') if self.client else 'GLOBAL' 
+        #scope = self.client.client_code if self.client else 'GLOBAL'
         return f"[{scope}] {self.slug}"
     
 
@@ -331,8 +331,8 @@ class TaxonomyNode(models.Model):
         ]
 
     def __str__(self):
-        scope = getattr(self.client, 'client_id', '?') if self.client else 'GLOBAL'
-        #scope = self.client.client_id if self.client else 'GLOBAL'
+        scope = getattr(self.client, 'client_code', '?') if self.client else 'GLOBAL'
+        #scope = self.client.client_code if self.client else 'GLOBAL'
         taxslug = getattr(self.taxonomy, 'slug', '?') if self.taxonomy else '?'
         return f"[{scope}] {taxslug} / {self.path} / {self.slug}"
 
@@ -517,7 +517,7 @@ class GlobalItem(models.Model):
     )
 
     # Identity
-    global_item_id = LowercaseCharField(max_length=100, unique=True, db_index=True)
+    global_item_code = LowercaseCharField(max_length=100, unique=True, db_index=True)
     domain         = models.CharField(
         max_length=20, choices=DOMAIN_CHOICES, default='generic', db_index=True
     )
@@ -559,7 +559,7 @@ class GlobalItem(models.Model):
     updated_at     = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering     = ['global_item_id']
+        ordering     = ['global_item_code']
         verbose_name = '01-05 Global Item'
         indexes      = [
             models.Index(fields=['domain', 'status']),
@@ -570,7 +570,7 @@ class GlobalItem(models.Model):
 
     def __str__(self):
         
-        return f"[GLOBAL] {self.global_item_id} — {self.name}"
+        return f"[GLOBAL] {self.global_item_code} — {self.name}"
 
 
 class GlobalItemTaxonomyNode(models.Model):
@@ -656,10 +656,10 @@ class GlobalItemMedia(models.Model):
         verbose_name = 'Global Item Media'
 
     def __str__(self):
-        global_item_id = getattr(self.global_item, 'global_item_id', '?')
+        global_item_id = getattr(self.global_item, 'global_item_code', '?')
            
         return f"[GLOBAL] {global_item_id} / {self.media_type} {self.order}"
-        #return f"[GLOBAL] {self.global_item.global_item_id} / {self.media_type} {self.order}"
+        #return f"[GLOBAL] {self.global_item.global_item_code} / {self.media_type} {self.order}"
 
 # ═══════════════════════════════════════════════════════════════════
 # PART C: CLIENT ITEM
@@ -721,7 +721,7 @@ class Item(I18nFallbackMixin, models.Model):
     gpc_brick_code = models.CharField(max_length=8, blank=True, db_index=True)
 
     # Identity
-    item_id        = LowercaseCharField(max_length=100, db_index=True)
+    item_code        = LowercaseCharField(max_length=100, db_index=True)
     domain         = models.CharField(
         max_length=20, choices=DOMAIN_CHOICES, default='generic', db_index=True
     )
@@ -766,8 +766,8 @@ class Item(I18nFallbackMixin, models.Model):
 
 
     class Meta:
-        unique_together = ('client', 'item_id')
-        ordering        = ['client', 'order', 'item_id']
+        unique_together = ('client', 'item_code')
+        ordering        = ['client', 'order', 'item_code']
         verbose_name    = '01-06 Item'
         indexes         = [
             models.Index(fields=['client', 'status', 'domain']),
@@ -777,9 +777,9 @@ class Item(I18nFallbackMixin, models.Model):
         ]
 
     def __str__(self):
-        scope = getattr(self.client, 'client_id', '?') if self.client else 'SHARED'       
-        #scope = self.client.client_id if self.client else 'SHARED'
-        return f"[{scope}] {self.item_id}"
+        scope = getattr(self.client, 'client_code', '?') if self.client else 'SHARED'       
+        #scope = self.client.client_code if self.client else 'SHARED'
+        return f"[{scope}] {self.item_code}"
 
     # ── Field resolution: client override → global fallback ──────────
     def resolved_name(self):

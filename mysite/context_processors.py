@@ -82,8 +82,8 @@ def client_context(request):
     """
     Single source of truth for client dict and theme in templates.
     Runs on every request. Uses request.client set by middleware
-    to avoid resolving client_id twice.
-    Key change: uses request.client (already resolved by middleware) instead of re-resolving client_id from URL/session. Now middleware and context processor share the work without duplicating it.
+    to avoid resolving client_code twice.
+    Key change: uses request.client (already resolved by middleware) instead of re-resolving client_code from URL/session. Now middleware and context processor share the work without duplicating it.
     """
     # Use client already resolved by middleware — no double lookup
     client_obj = getattr(request, 'client', None)
@@ -91,7 +91,7 @@ def client_context(request):
         return {'client': {}, 'theme': {}, 'page': {}}
 
     # fetch_clientstatic is cached — this is cheap
-    client_dict = fetch_clientstatic(lv_client_id=client_obj.client_id)
+    client_dict = fetch_clientstatic(lv_client_code=client_obj.client_code)
     client_dict.setdefault('pages', [])
     client_dict.setdefault('themes', [])
 
@@ -111,15 +111,15 @@ def client_context(request):
     theme = selected_theme['tokens'] if selected_theme else {}
 
     # ── Resolve page from URL kwargs ──────────────────────────────
-    page_id = None
+    page_code = None
     #page_dict = {}
     if hasattr(request, 'resolver_match') and request.resolver_match:
-        page_id = request.resolver_match.kwargs.get('page', 'home')
+        page_code = request.resolver_match.kwargs.get('page', 'home')
 
-    #if page_id != '':
+    #if page_code != '':
     page_dict = next(
         (p for p in client_dict.get('pages', [])
-        if p.get('page_id') == page_id),
+        if p.get('page_code') == page_code),
         {}
     )
 

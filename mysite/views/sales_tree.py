@@ -129,9 +129,9 @@ def _build_eager_subtree(client, node, expand_ids, selected_paths):
     return node_dict
 
 
-def sales_tree_panel(request, client_id=None):
+def sales_tree_panel(request, client_code=None):
     """
-    GET /{client_id}/demand/sales-tree/
+    GET /{client_code}/demand/sales-tree/
     Query params: sales_node_ids=1,6,20 (currently selected)
 
     Renders the sales hierarchy as a single tree group, roots lazily
@@ -159,7 +159,7 @@ def sales_tree_panel(request, client_id=None):
     }]
 
     context = {
-        'client_id': client_id,
+        'client_code': client_code,
         'taxonomy_groups': groups,
         'selected_ids': selected_ids,
         'checkbox_name': 'sales_node_ids',
@@ -169,9 +169,9 @@ def sales_tree_panel(request, client_id=None):
     return render(request, 'taxonomy_tree/partials/taxonomy_tree_panel.html', context)
 
 
-def sales_tree_children(request, client_id=None, node_id=None):
+def sales_tree_children(request, client_code=None, node_id=None):
     """
-    GET /{client_id}/demand/sales-tree/{node_id}/children/
+    GET /{client_code}/demand/sales-tree/{node_id}/children/
     Query params: sales_node_ids=1,6,20 (currently selected)
 
     htmx lazy-load endpoint: returns one node's direct children as
@@ -199,7 +199,7 @@ def sales_tree_children(request, client_id=None, node_id=None):
         request,
         'taxonomy_tree/partials/taxonomy_tree_children.html',
         {
-            'client_id': client_id,
+            'client_code': client_code,
             'nodes': nodes,
             'checkbox_name': 'sales_node_ids',
             'label_mode': 'code_name',

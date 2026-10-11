@@ -45,7 +45,7 @@ templates/
         {% endif %}
       </p>
 
-      <div hx-get="{% url 'demand_ui:outlier_detection_form' client_id=client.client_id %}"
+      <div hx-get="{% url 'demand_ui:outlier_detection_form' client_code=client.client_code %}"
            hx-trigger="load" hx-target="this" hx-swap="innerHTML">
         <!-- _detection_form.html loads here on page load -->
       </div>
@@ -56,15 +56,15 @@ templates/
   {# ── Status tabs ───────────────────────────────────────────────────────── #}
   <div class="tabs tabs-boxed w-fit mb-4">
     <a class="tab {% if current_status == 'CANDIDATE' %}tab-active{% endif %}"
-       hx-get="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}?status=CANDIDATE"
+       hx-get="{% url 'demand_ui:outlier_queue' client_code=client.client_code %}?status=CANDIDATE"
        hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
        hx-push-url="true">{% trans "Candidates" %}</a>
     <a class="tab {% if current_status == 'CONFIRMED' %}tab-active{% endif %}"
-       hx-get="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}?status=CONFIRMED"
+       hx-get="{% url 'demand_ui:outlier_queue' client_code=client.client_code %}?status=CONFIRMED"
        hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
        hx-push-url="true">{% trans "Confirmed" %}</a>
     <a class="tab {% if current_status == 'REJECTED' %}tab-active{% endif %}"
-       hx-get="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}?status=REJECTED"
+       hx-get="{% url 'demand_ui:outlier_queue' client_code=client.client_code %}?status=REJECTED"
        hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
        hx-push-url="true">{% trans "Rejected" %}</a>
   </div>
@@ -76,7 +76,7 @@ templates/
       {% trans "Discard unconfirmed proposals so the next detection run can propose afresh." %}
     </span>
     <div class="ms-auto flex gap-2">
-      <form hx-post="{% url 'demand_ui:outlier_bulk_delete' client_id=client.client_id %}"
+      <form hx-post="{% url 'demand_ui:outlier_bulk_delete' client_code=client.client_code %}"
             hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
             hx-include="[name='outlier_ids']"
             hx-confirm="{% trans 'Discard the selected proposed outlier(s)? They will be re-proposed by the next detection run.' %}">
@@ -84,7 +84,7 @@ templates/
         <input type="hidden" name="mode" value="selected">
         <button type="submit" class="btn btn-error btn-xs">{% trans "Discard selected" %}</button>
       </form>
-      <form hx-post="{% url 'demand_ui:outlier_bulk_delete' client_id=client.client_id %}"
+      <form hx-post="{% url 'demand_ui:outlier_bulk_delete' client_code=client.client_code %}"
             hx-target="#outlier-queue" hx-select="#outlier-queue" hx-swap="outerHTML"
             hx-confirm="{% blocktrans with count=outlier_candidate_count %}Discard ALL {{ count }} proposed outlier(s) for this client?{% endblocktrans %}">
         {% csrf_token %}

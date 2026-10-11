@@ -8,8 +8,8 @@ from mysite.forms import CustomerProfileForm, CustomerAddressForm
 
 
 @login_required
-def customer_onboarding(request, client_id):
-    client_obj = request.client or get_object_or_404(Client, client_id=client_id)
+def customer_onboarding(request, client_code):
+    client_obj = request.client or get_object_or_404(Client, client_code=client_code)
     profile = get_object_or_404(
         CustomerProfile, user=request.user, client=client_obj
     )
@@ -27,7 +27,7 @@ def customer_onboarding(request, client_id):
             profile.default_address = address
             profile.save(update_fields=['default_address'])
             messages.success(request, 'Welcome! Your profile is set up.')
-            return redirect('client_page', client_id=client_id)
+            return redirect('client_page', client_code=client_code)
     else:
         profile_form = CustomerProfileForm(instance=profile, client=client_obj)
         address_form = CustomerAddressForm()
@@ -40,8 +40,8 @@ def customer_onboarding(request, client_id):
 
 
 @login_required
-def customer_profile(request, client_id):
-    client_obj = request.client or get_object_or_404(Client, client_id=client_id)
+def customer_profile(request, client_code):
+    client_obj = request.client or get_object_or_404(Client, client_code=client_code)
     profile = get_object_or_404(
         CustomerProfile, user=request.user, client=client_obj
     )
@@ -52,7 +52,7 @@ def customer_profile(request, client_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Profile updated successfully.')
-            return redirect('customer_profile', client_id=client_id)
+            return redirect('customer_profile', client_code=client_code)
     else:
         form = CustomerProfileForm(instance=profile, client=client_obj)
 
@@ -65,8 +65,8 @@ def customer_profile(request, client_id):
 
 
 @login_required
-def customer_addresses(request, client_id):
-    client_obj = request.client or get_object_or_404(Client, client_id=client_id)
+def customer_addresses(request, client_code):
+    client_obj = request.client or get_object_or_404(Client, client_code=client_code)
     profile = get_object_or_404(
         CustomerProfile, user=request.user, client=client_obj
     )
@@ -79,8 +79,8 @@ def customer_addresses(request, client_id):
 
 
 @login_required
-def add_address(request, client_id):
-    client_obj = request.client or get_object_or_404(Client, client_id=client_id)
+def add_address(request, client_code):
+    client_obj = request.client or get_object_or_404(Client, client_code=client_code)
     profile = get_object_or_404(
         CustomerProfile, user=request.user, client=client_obj
     )
@@ -92,19 +92,19 @@ def add_address(request, client_id):
             address.is_default = not profile.addresses.exists()
             address.save()
             messages.success(request, 'Address added.')
-            return redirect('customer_addresses', client_id=client_id)
+            return redirect('customer_addresses', client_code=client_code)
         else:
             return render(request, 'customer/addresses.html', {
                 'addresses': profile.addresses.all(),
                 'form': form,
                 'profile': profile,
             })
-    return redirect('customer_addresses', client_id=client_id)
+    return redirect('customer_addresses', client_code=client_code)
 
 
 @login_required
-def set_default_address(request, client_id, address_id):
-    client_obj = request.client or get_object_or_404(Client, client_id=client_id)
+def set_default_address(request, client_code, address_id):
+    client_obj = request.client or get_object_or_404(Client, client_code=client_code)
     profile = get_object_or_404(CustomerProfile, user=request.user, client=client_obj)
     address = get_object_or_404(CustomerAddress, pk=address_id, customer=profile)
     if request.method == 'POST':
@@ -114,12 +114,12 @@ def set_default_address(request, client_id, address_id):
         profile.default_address = address
         profile.save(update_fields=['default_address'])
         messages.success(request, 'Default address updated.')
-    return redirect('customer_addresses', client_id=client_id)
+    return redirect('customer_addresses', client_code=client_code)
 
 
 @login_required
-def delete_address(request, client_id, address_id):
-    client_obj = request.client or get_object_or_404(Client, client_id=client_id)
+def delete_address(request, client_code, address_id):
+    client_obj = request.client or get_object_or_404(Client, client_code=client_code)
     profile = get_object_or_404(CustomerProfile, user=request.user, client=client_obj)
     address = get_object_or_404(CustomerAddress, pk=address_id, customer=profile)
     if request.method == 'POST':
@@ -128,11 +128,11 @@ def delete_address(request, client_id, address_id):
             profile.save(update_fields=['default_address'])
         address.delete()
         messages.success(request, 'Address deleted.')
-    return redirect('customer_addresses', client_id=client_id)
+    return redirect('customer_addresses', client_code=client_code)
 
 
 
-    client  = get_object_or_404(Client, client_id=client_id)
+    client  = get_object_or_404(Client, client_code=client_code)
     profile = get_object_or_404(
         CustomerProfile, user=request.user, client=client
     )
@@ -147,4 +147,4 @@ def delete_address(request, client_id, address_id):
         address.delete()
         messages.success(request, 'Address deleted.')
 
-    return redirect('customer_addresses', client_id=client_id)
+    return redirect('customer_addresses', client_code=client_code)

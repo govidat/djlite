@@ -13,15 +13,15 @@
   <div class="flex gap-2">
     {% if scheme.status == 'DRAFT' %}
       <button class="btn btn-success btn-sm"
-              hx-post="{% url 'demand_ui:scheme_activate' client_id=client.client_id pk=scheme.pk %}"
+              hx-post="{% url 'demand_ui:scheme_activate' client_code=client.client_code pk=scheme.pk %}"
               hx-confirm="{% trans 'Activate this scheme? Scope resolution will be triggered.' %}"
               hx-target="#scheme-detail" hx-swap="innerHTML">
         {% trans "Activate" %}
       </button>
-      <a href="{% url 'demand_ui:scheme_edit' client_id=client.client_id pk=scheme.pk %}"
+      <a href="{% url 'demand_ui:scheme_edit' client_code=client.client_code pk=scheme.pk %}"
          class="btn btn-outline btn-sm">{% trans "Edit" %}</a>
       <button class="btn btn-error btn-sm"
-              hx-post="{% url 'demand_ui:scheme_delete' client_id=client.client_id pk=scheme.pk %}"
+              hx-post="{% url 'demand_ui:scheme_delete' client_code=client.client_code pk=scheme.pk %}"
               hx-confirm="{% trans 'Delete this DRAFT scheme?' %}"
               hx-target="#scheme-detail" hx-swap="outerHTML">
         {% trans "Delete" %}
@@ -29,14 +29,14 @@
     {% endif %}
     {% if scheme.status == 'ACTIVE' %}
       <button class="btn btn-warning btn-sm"
-              hx-post="{% url 'demand_ui:scheme_archive' client_id=client.client_id pk=scheme.pk %}"
+              hx-post="{% url 'demand_ui:scheme_archive' client_code=client.client_code pk=scheme.pk %}"
               hx-confirm="{% trans 'Archive this ACTIVE scheme?' %}"
               hx-target="#scheme-detail" hx-swap="innerHTML">
         {% trans "Archive" %}
       </button>
     {% endif %}
     {% if scheme.occurrences.exists %}
-      <a href="{% url 'demand_ui:scheme_occurrences' client_id=client.client_id pk=scheme.pk %}"
+      <a href="{% url 'demand_ui:scheme_occurrences' client_code=client.client_code pk=scheme.pk %}"
          class="btn btn-outline btn-sm">{% trans "Occurrences" %}</a>
     {% endif %}
   </div>
@@ -183,6 +183,6 @@
 
 {# ── Back link ─────────────────────────────────────────────────────────── #}
 <div class="mt-6">
-  <a href="{% url 'demand_ui:scheme_list' client_id=client.client_id %}"
+  <a href="{% url 'demand_ui:scheme_list' client_code=client.client_code %}"
      class="btn btn-ghost btn-sm">{% trans "← Back to Schemes" %}</a>
 </div>

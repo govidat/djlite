@@ -19,7 +19,7 @@ from scripts.helpers import (
 
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
-# client_id,item_id,global_item_id,
+# client_code,item_code,global_item_code,
 # inherit_global_media,
 # gtin,gpc_brick_code,domain,status,
 # order,
@@ -51,33 +51,33 @@ def load_items(
 
     # ── Collect IDs ─────────────────────────────────────────
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     global_item_ids = {
-        clean(row.get("global_item_id"), lower=True)
+        clean(row.get("global_item_code"), lower=True)
         for row in rows
-        if clean(row.get("global_item_id"))
+        if clean(row.get("global_item_code"))
     }
 
     # ── Prefetch Clients ────────────────────────────────────
 
     clients = {
-        client.client_id: client
+        client.client_code: client
         for client in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # ── Prefetch GlobalItems ────────────────────────────────
 
     global_items = {
-        item.global_item_id: item
+        item.global_item_code: item
         for item in GlobalItem.objects.filter(
-            global_item_id__in=global_item_ids
+            global_item_code__in=global_item_ids
         )
     }
 
@@ -93,33 +93,33 @@ def load_items(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
-        item_id = clean(
-            row.get("item_id"),
+        item_code = clean(
+            row.get("item_code"),
             lower=True,
         )
 
-        if not client_id or not item_id:
+        if not client_code or not item_code:
 
             print(
                 "Skipping row with empty "
-                "client_id or item_id"
+                "client_code or item_code"
             )
 
             skipped_count += 1
             continue
 
-        key = (client_id, item_id)
+        key = (client_code, item_code)
 
         if key in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             skipped_count += 1
@@ -129,11 +129,11 @@ def load_items(
 
         # ── Resolve Client ────────────────────────────────
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
-            print(f"Missing client: {client_id}")
+            print(f"Missing client: {client_code}")
 
             skipped_count += 1
             continue
@@ -142,22 +142,22 @@ def load_items(
 
         global_item = None
 
-        global_item_id = clean(
-            row.get("global_item_id"),
+        global_item_code = clean(
+            row.get("global_item_code"),
             lower=True,
         )
 
-        if global_item_id:
+        if global_item_code:
 
             global_item = global_items.get(
-                global_item_id
+                global_item_code
             )
 
             if not global_item:
 
                 print(
                     f"Missing global item: "
-                    f"{global_item_id}"
+                    f"{global_item_code}"
                 )
 
                 skipped_count += 1
@@ -249,7 +249,7 @@ def load_items(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             if verbose:
@@ -263,7 +263,7 @@ def load_items(
             Item.objects.update_or_create(
 
                 client=client,
-                item_id=item_id,
+                item_code=item_code,
 
                 defaults=defaults,
             )
@@ -279,7 +279,7 @@ def load_items(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"Item: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
     # ── Summary ─────────────────────────────────────────────
@@ -361,59 +361,59 @@ def load_items():
     with open(file_path, newline="", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
 
-    client_ids = {
-        (r.get("client_id") or "").strip().lower()
+    client_codes = {
+        (r.get("client_code") or "").strip().lower()
         for r in rows
-        if (r.get("client_id") or "").strip()
+        if (r.get("client_code") or "").strip()
     }
 
     global_item_ids = {
-        (r.get("global_item_id") or "").strip().lower()
+        (r.get("global_item_code") or "").strip().lower()
         for r in rows
-        if (r.get("global_item_id") or "").strip()
+        if (r.get("global_item_code") or "").strip()
     }
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     global_items = {
-        g.global_item_id: g
+        g.global_item_code: g
         for g in GlobalItem.objects.filter(
-            global_item_id__in=global_item_ids
+            global_item_code__in=global_item_ids
         )
     }
 
     for row in rows:
 
-        client_id = (row.get("client_id") or "").strip().lower()
-        client = clients.get(client_id)
+        client_code = (row.get("client_code") or "").strip().lower()
+        client = clients.get(client_code)
 
         if not client:
-            print(f"Missing client: {client_id}")
+            print(f"Missing client: {client_code}")
             continue
 
         global_item = None
 
-        global_item_id = (
-            row.get("global_item_id") or ""
+        global_item_code = (
+            row.get("global_item_code") or ""
         ).strip().lower()
 
-        if global_item_id:
-            global_item = global_items.get(global_item_id)
+        if global_item_code:
+            global_item = global_items.get(global_item_code)
 
             if not global_item:
                 print(
                     f"Missing global item: "
-                    f"{global_item_id}"
+                    f"{global_item_code}"
                 )
                 continue
 
-        item_id = (
-            row.get("item_id") or ""
+        item_code = (
+            row.get("item_code") or ""
         ).strip().lower()
 
         defaults = {
@@ -497,14 +497,14 @@ def load_items():
         obj, created = Item.objects.update_or_create(
 
             client=client,
-            item_id=item_id,
+            item_code=item_code,
 
             defaults=defaults
         )
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"Item: {client_id} / {item_id}"
+            f"Item: {client_code} / {item_code}"
         )
 
     print("Loaded Items")

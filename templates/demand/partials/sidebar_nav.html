@@ -10,7 +10,7 @@ own folder, same as catalogue_filter_sidebar.
 
   <li class="menu-title">{% trans "Overview" %}</li>
   <li>
-    <a href="{% url 'demand_ui:dashboard' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:dashboard' client_code=client.client_code %}"
        class="{% if active == 'dashboard' %}active{% endif %}">
       📊 {% trans "Dashboard" %}
     </a>
@@ -19,19 +19,19 @@ own folder, same as catalogue_filter_sidebar.
 
   <li class="menu-title">{% trans "Actuals" %}</li>
   <li>
-    <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
        class="{% if active == 'actuals_upload' %}active{% endif %}">
       ⬆️ {% trans "Upload Actuals" %}
     </a>
   </li>
   <li>
-    <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:actuals_list' client_code=client.client_code %}"
        class="{% if active == 'actuals' %}active{% endif %}">
       📋 {% trans "View Actuals" %}
     </a>
   </li>
   <li>
-    <a href="{% url 'demand_ui:actuals_aggregates' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:actuals_aggregates' client_code=client.client_code %}"
        class="{% if active == 'actuals' %}active{% endif %}">
       📋 {% trans "View Actuals Aggregates" %}
     </a>
@@ -40,19 +40,19 @@ own folder, same as catalogue_filter_sidebar.
   {% if item_lifecycle_ui_visible %}
   <li class="menu-title">{% trans "Item Lifecycle" %}</li>
   <li>
-    <a href="{% url 'demand_ui:item_substitution_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:item_substitution_list' client_code=client.client_code %}"
        class="{% if active == 'item_lifecycle' %}active{% endif %}">
       🔄 {% trans "Substitutions" %}
     </a>
   </li>
   <li>
-    <a href="{% url 'demand_ui:item_discontinuation_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:item_discontinuation_list' client_code=client.client_code %}"
        class="{% if active == 'item_lifecycle' %}active{% endif %}">
       🚫 {% trans "Discontinuations" %}
     </a>
   </li>
   <li>
-    <a href="{% url 'demand_ui:item_introduction_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:item_introduction_list' client_code=client.client_code %}"
        class="{% if active == 'item_lifecycle' %}active{% endif %}">
       ✨ {% trans "Introductions" %}
     </a>
@@ -62,7 +62,7 @@ own folder, same as catalogue_filter_sidebar.
   {% if outlier_ui_visible %}
   <li class="menu-title">{% trans "Outliers" %}</li>
   <li>
-    <a href="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:outlier_queue' client_code=client.client_code %}"
        class="{% if active == 'outlier_queue' %}active{% endif %}">
       ⚠️ {% trans "Outlier Review Queue" %}
       {% if outlier_candidate_count %}
@@ -71,7 +71,7 @@ own folder, same as catalogue_filter_sidebar.
     </a>
   </li>
   <li>
-    <a href="{% url 'demand_ui:outlier_decisions_report' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:outlier_decisions_report' client_code=client.client_code %}"
        class="{% if active == 'outlier_decisions' %}active{% endif %}">
       🗂️ {% trans "Outlier Decisions Report" %}
     </a>
@@ -81,13 +81,13 @@ own folder, same as catalogue_filter_sidebar.
   {% if scheme_ui_visible %}
   <li class="menu-title">{% trans "Schemes" %}</li>
   <li>
-    <a href="{% url 'demand_ui:scheme_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:scheme_list' client_code=client.client_code %}"
        class="{% if active == 'schemes' %}active{% endif %}">
       📋 {% trans "All Schemes" %}
     </a>
   </li>
   <li>
-    <a href="{% url 'demand_ui:scheme_review_queue' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:scheme_review_queue' client_code=client.client_code %}"
        class="{% if active == 'scheme_review' %}active{% endif %}">
       🔍 {% trans "Review Queue" %}
       {% if scheme_draft_count %}
@@ -100,14 +100,14 @@ own folder, same as catalogue_filter_sidebar.
   <li class="menu-title">{% trans "Forecast" %}</li>
 
   <li>
-    <a href="{% url 'demand_ui:series_profile_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:series_profile_list' client_code=client.client_code %}"
        class="{% if active == 'series_profiles' %}active{% endif %}">
       🔍 {% trans "Series Classification" %}
     </a>
   </li>
 
   <li>
-    <a href="{% url 'demand_ui:version_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:version_list' client_code=client.client_code %}"
        class="{% if active == 'versions' %}active{% endif %}">
       📈 {% trans "Forecast Versions" %}
     </a>

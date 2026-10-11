@@ -8,7 +8,7 @@ Works both as a standalone card (accuracy page) and inside a table cell
 
 <div id="accuracy-run-panel"
      {% if version.accuracy_run_status == 'QUEUED' or version.accuracy_run_status == 'RUNNING' %}
-     hx-get="{% url 'demand_ui:version_accuracy_run_status' client_id=client.client_id pk=version.pk %}"
+     hx-get="{% url 'demand_ui:version_accuracy_run_status' client_code=client.client_code pk=version.pk %}"
      hx-trigger="every 2s" hx-swap="outerHTML"
      {% endif %}
      class="flex flex-wrap items-center gap-2">
@@ -31,7 +31,7 @@ Works both as a standalone card (accuracy page) and inside a table cell
     </details>
     {% if can_run_accuracy %}
     <button class="btn btn-xs btn-outline"
-            hx-post="{% url 'demand_ui:version_accuracy_run' client_id=client.client_id pk=version.pk %}"
+            hx-post="{% url 'demand_ui:version_accuracy_run' client_code=client.client_code pk=version.pk %}"
             hx-target="#accuracy-run-panel" hx-swap="outerHTML">
       {% trans "Retry" %}
     </button>
@@ -45,7 +45,7 @@ Works both as a standalone card (accuracy page) and inside a table cell
   {% else %}
     {% if can_run_accuracy %}
     <button class="btn btn-primary btn-xs"
-            hx-post="{% url 'demand_ui:version_accuracy_run' client_id=client.client_id pk=version.pk %}"
+            hx-post="{% url 'demand_ui:version_accuracy_run' client_code=client.client_code pk=version.pk %}"
             hx-target="#accuracy-run-panel" hx-swap="outerHTML">
       ⚡ {% trans "Run Accuracy" %}
     </button>

@@ -2,7 +2,7 @@
 {% for version in versions %}
 <tr>
   <td>
-    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+    <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=version.pk %}"
        class="link link-hover font-medium">{{ version.version_label }}</a>
   </td>
   <td>{{ version.get_period_type_display }} · {{ version.horizon_periods }} {% trans "periods" %}</td>
@@ -32,7 +32,7 @@
         {% include "demand/partials/accuracy_run_status.html" with can_run_accuracy=version.can_run_accuracy %}
       {% elif version.accuracy_run_status == 'COMPLETE' %}
         <span class="badge badge-success badge-outline">✓ {% trans "Done" %}</span>
-        <a href="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}"
+        <a href="{% url 'demand_ui:version_accuracy' client_code=client.client_code pk=version.pk %}"
            class="text-xs text-base-content/60 link link-hover">
           {{ version.last_accuracy_run_at|date:"d M" }} ·
           {{ version.last_accuracy_rows|default:0 }} {% trans "rows" %} ·
@@ -43,13 +43,13 @@
       {% else %}
         {% if version.can_run_accuracy %}
         <button class="btn btn-xs btn-primary"
-                hx-post="{% url 'demand_ui:version_accuracy_run' client_id=client.client_id pk=version.pk %}"
+                hx-post="{% url 'demand_ui:version_accuracy_run' client_code=client.client_code pk=version.pk %}"
                 hx-target="#accuracy-cell-{{ version.pk }}" hx-swap="outerHTML">
           ⚡ {% trans "Run Accuracy" %}
         </button>
         {% endif %}
         {% if version.last_accuracy_run_at %}
-        <a href="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}"
+        <a href="{% url 'demand_ui:version_accuracy' client_code=client.client_code pk=version.pk %}"
            class="text-xs text-base-content/40">{% trans "View" %}</a>
         {% endif %}
       {% endif %}
@@ -57,12 +57,12 @@
   </td>
   <td class="text-sm text-base-content/60">{{ version.created_at|date:"d M Y" }}</td>
   <td class="flex gap-1">
-    <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=version.pk %}"
+    <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=version.pk %}"
        class="btn btn-ghost btn-xs">{% trans "Open" %} →</a>
     {% if version.status == 'DRAFT' %}
       {% if demand_ui_role == 'admin' or demand_ui_role == 'planner' %}
     <form method="post"
-          action="{% url 'demand_ui:version_delete' client_id=client.client_id pk=version.pk %}"
+          action="{% url 'demand_ui:version_delete' client_code=client.client_code pk=version.pk %}"
           onsubmit="return confirm('{% trans "Delete this version? This cannot be undone." %}');">
       {% csrf_token %}
       <button type="submit" class="btn btn-ghost btn-xs text-error">{% trans "Delete" %}</button>

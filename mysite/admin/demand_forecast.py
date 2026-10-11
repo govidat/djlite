@@ -37,7 +37,7 @@ class ForecastLineInline(admin.TabularInline):
         return (
             super().get_queryset(request)
             .select_related('item', 'planning_location', 'planning_customer', 'distribution_channel')
-            .order_by('period_start', 'item__item_id')[:50]
+            .order_by('period_start', 'item__item_code')[:50]
         )
 
 
@@ -73,7 +73,7 @@ class ForecastVersionAdmin(ClientScopedMixin, admin.ModelAdmin):
         'status_badge', 'stale_actuals', 'created_by', 'created_at',
     ]
     list_filter  = ['client', 'status', 'period_type']
-    search_fields = ['version_label', 'client__client_id']
+    search_fields = ['version_label', 'client__client_code']
     autocomplete_fields = (
         'client',
     )     
@@ -150,7 +150,7 @@ class ForecastLineAdmin(admin.ModelAdmin):
     ]
     list_filter    = ['version__client', 'period_type', 'version__status']
     search_fields  = [
-        'item__item_id', 'item__name',
+        'item__item_code', 'item__name',
         'planning_location__code', 'planning_customer__code',
         'version__version_label',
     ]
@@ -179,7 +179,7 @@ class ForecastAccuracyAdmin(admin.ModelAdmin):
         'actual_qty', 'forecast_qty', 'mape', 'bias',
     ]
     list_filter   = ['version__client', 'period_type']
-    search_fields = ['item__item_id', 'version__version_label']
+    search_fields = ['item__item_code', 'version__version_label']
     readonly_fields = [
         'version', 'item', 'planning_customer', 'planning_location',
         'distribution_channel',
@@ -239,7 +239,7 @@ class ForecastingConfigAdmin(ClientScopedMixin, admin.ModelAdmin):
         'updated_at',
     ]
     list_filter  = ['client']
-    search_fields = ['client__client_id', 'client__name']
+    search_fields = ['client__client_code', 'client__name']
     autocomplete_fields = (
         'client',
     ) 
@@ -378,13 +378,13 @@ class SeriesLevelEvaluationAdmin(ClientScopedMixin, admin.ModelAdmin):
         ('grain', admin.AllValuesFieldListFilter),
     ]
     search_fields = [
-        'item__item_id',
+        'item__item_code',
         'item__name',
         'planning_customer__code',
         'rejection_reason',
     ]
     date_hierarchy = 'computed_at'
-    ordering = ['item__item_id', 'grain']
+    ordering = ['item__item_code', 'grain']
 
     # All fields are read-only — this is an audit log
     readonly_fields = [
@@ -431,9 +431,9 @@ class SeriesLevelEvaluationAdmin(ClientScopedMixin, admin.ModelAdmin):
 
     # ── Custom display columns ────────────────────────────────────────────────
 
-    @admin.display(description='Item', ordering='item__item_id')
+    @admin.display(description='Item', ordering='item__item_code')
     def item_code(self, obj):
-        return obj.item.item_id
+        return obj.item.item_code
 
     @admin.display(description='Grain')
     def grain_display(self, obj):
@@ -562,7 +562,7 @@ class SeriesProfileAdmin(ClientScopedMixin, admin.ModelAdmin):
         ('override_grain', admin.EmptyFieldListFilter),
     ]
     search_fields = [
-        'item__item_id',
+        'item__item_code',
         'item__name',
         'planning_location__code',
         'planning_customer__code',
@@ -655,9 +655,9 @@ class SeriesProfileAdmin(ClientScopedMixin, admin.ModelAdmin):
             url, count, 's' if count != 1 else '',
         )
     
-    @admin.display(description='Item', ordering='item__item_id')
+    @admin.display(description='Item', ordering='item__item_code')
     def item_code(self, obj):
-        return obj.item.item_id
+        return obj.item.item_code
 
     @admin.display(description='Location', ordering='planning_location__code')
     def location_code(self, obj):

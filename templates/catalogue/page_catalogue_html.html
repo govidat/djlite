@@ -81,7 +81,7 @@ code changes — just drop template files in their named folder.
         {# Search bar #}
         <div class="mb-4">
           <form id="filter-form"
-                hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+                hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
                 hx-target="#items-container"
                 hx-swap="innerHTML"
                 hx-push-url="true"
@@ -120,7 +120,7 @@ code changes — just drop template files in their named folder.
             {{ catalogue.filters.brands|length }} brand filter{{ catalogue.filters.brands|length|pluralize }}
           </span>
           {% endif %}
-          <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+          <a href="{% url 'catalogue_page' client_code=client.client_code %}"
              class="badge badge-lg badge-error gap-1">
             Clear all ✕
           </a>
@@ -254,7 +254,7 @@ blob (PageContent)        ← static HTML only (hero, headings, layout chrome)
           <div class="flex items-center justify-between">
             <h2 class="font-bold text-base-content text-lg">Filters</h2>
             {% if catalogue.filters.node_ids %}
-            <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+            <a href="{% url 'catalogue_page' client_code=client.client_code %}"
                class="text-sm text-error hover:underline">Clear all</a>
             {% endif %}
           </div>
@@ -267,7 +267,7 @@ blob (PageContent)        ← static HTML only (hero, headings, layout chrome)
 
         {# Search bar #}
         <div class="mb-4">
-          <form hx-get="{% url 'catalogue_filter' client_id=client.client_id %}"
+          <form hx-get="{% url 'catalogue_filter' client_code=client.client_code %}"
                 hx-target="#items-container"
                 hx-swap="innerHTML"
                 hx-trigger="submit, input delay:600ms from:#cat-search"
@@ -288,12 +288,12 @@ blob (PageContent)        ← static HTML only (hero, headings, layout chrome)
           {% if catalogue.filters.search %}
           <div class="badge badge-lg gap-2">
             🔍 "{{ catalogue.filters.search }}"
-            <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+            <a href="{% url 'catalogue_page' client_code=client.client_code %}"
                class="hover:text-error">✕</a>
           </div>
           {% endif %}
           {% if catalogue.filters.node_ids %}
-          <a href="{% url 'catalogue_page' client_id=client.client_id %}"
+          <a href="{% url 'catalogue_page' client_code=client.client_code %}"
              class="badge badge-lg badge-error gap-1">
             Clear all filters ✕
           </a>

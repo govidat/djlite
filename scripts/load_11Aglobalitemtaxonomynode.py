@@ -19,7 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 
-# global_item_id,taxonomy_slug,node_slug,is_primary
+# global_item_code,taxonomy_slug,node_slug,is_primary
 
 
 def load_val01(dry_run=False, verbose=False):
@@ -36,9 +36,9 @@ def load_val01(dry_run=False, verbose=False):
     # ── Collect lookup keys ─────────────────────────────────
 
     global_item_ids = {
-        clean(row.get("global_item_id"), lower=True)
+        clean(row.get("global_item_code"), lower=True)
         for row in rows
-        if clean(row.get("global_item_id"))
+        if clean(row.get("global_item_code"))
     }
 
     taxonomy_slugs = {
@@ -56,9 +56,9 @@ def load_val01(dry_run=False, verbose=False):
     # ── Prefetch GlobalItems ────────────────────────────────
 
     global_items = {
-        gi.global_item_id: gi
+        gi.global_item_code: gi
         for gi in GlobalItem.objects.filter(
-            global_item_id__in=global_item_ids
+            global_item_code__in=global_item_ids
         )
     }
 
@@ -86,8 +86,8 @@ def load_val01(dry_run=False, verbose=False):
 
     for row in rows:
 
-        global_item_id = clean(
-            row.get("global_item_id"),
+        global_item_code = clean(
+            row.get("global_item_code"),
             lower=True,
         )
 
@@ -103,21 +103,21 @@ def load_val01(dry_run=False, verbose=False):
 
         # ── Validation ────────────────────────────────────
 
-        if not global_item_id:
-            print("Skipping row with empty global_item_id")
+        if not global_item_code:
+            print("Skipping row with empty global_item_code")
             skipped_count += 1
             continue
 
         if not taxonomy_slug or not node_slug:
             print(
                 f"Skipping row with missing taxonomy/node: "
-                f"{global_item_id}"
+                f"{global_item_code}"
             )
             skipped_count += 1
             continue
 
         key = (
-            global_item_id,
+            global_item_code,
             taxonomy_slug,
             node_slug,
         )
@@ -131,13 +131,13 @@ def load_val01(dry_run=False, verbose=False):
 
         # ── Resolve GlobalItem ────────────────────────────
 
-        global_item = global_items.get(global_item_id)
+        global_item = global_items.get(global_item_code)
 
         if not global_item:
 
             print(
                 f"Missing GlobalItem: "
-                f"{global_item_id}"
+                f"{global_item_code}"
             )
 
             skipped_count += 1
@@ -171,7 +171,7 @@ def load_val01(dry_run=False, verbose=False):
 
             print(
                 f"[DRY RUN] "
-                f"{global_item_id} -> "
+                f"{global_item_code} -> "
                 f"{taxonomy_slug}/{node_slug}"
             )
 
@@ -202,7 +202,7 @@ def load_val01(dry_run=False, verbose=False):
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"GlobalItemTaxonomyNode: "
-                f"{global_item_id} -> "
+                f"{global_item_code} -> "
                 f"{taxonomy_slug}/{node_slug}"
             )
 
@@ -279,7 +279,7 @@ def load_val01():
     # ── collect keys ─────────────────────────────────────
 
     global_item_ids = {
-        (r.get("global_item_id") or "").strip().lower()
+        (r.get("global_item_code") or "").strip().lower()
         for r in rows
     }
 
@@ -296,9 +296,9 @@ def load_val01():
     # ── preload global items ─────────────────────────────
 
     global_items = {
-        gi.global_item_id: gi
+        gi.global_item_code: gi
         for gi in GlobalItem.objects.filter(
-            global_item_id__in=global_item_ids
+            global_item_code__in=global_item_ids
         )
     }
 
@@ -318,8 +318,8 @@ def load_val01():
 
     for row in rows:
 
-        global_item_id = (
-            row.get("global_item_id") or ""
+        global_item_code = (
+            row.get("global_item_code") or ""
         ).strip().lower()
 
         taxonomy_slug = (
@@ -330,12 +330,12 @@ def load_val01():
             row.get("node_slug") or ""
         ).strip().lower()
 
-        global_item = global_items.get(global_item_id)
+        global_item = global_items.get(global_item_code)
 
         if not global_item:
 
             print(
-                f"Missing GlobalItem: {global_item_id}"
+                f"Missing GlobalItem: {global_item_code}"
             )
             continue
 
@@ -367,7 +367,7 @@ def load_val01():
         print(
             f"{'Created' if created else 'Updated'} "
             f"GlobalItemTaxonomyNode: "
-            f"{global_item_id} -> "
+            f"{global_item_code} -> "
             f"{taxonomy_slug}/{node_slug}"
         )
 

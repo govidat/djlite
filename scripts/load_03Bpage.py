@@ -14,7 +14,7 @@ from scripts.helpers import (
 )
 
 
-# id,page_id,ltext,hidden,client_id
+# id,page_code,ltext,hidden,client_code
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,10 +44,10 @@ def load_val01(
 
     # ── Collect keys ────────────────────────────────────
 
-    client_ids = {
+    client_codes = {
 
         clean(
-            r.get("client_id"),
+            r.get("client_code"),
             lower=True,
         )
 
@@ -58,10 +58,10 @@ def load_val01(
 
     clients = {
 
-        c.client_id: c
+        c.client_code: c
 
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -77,31 +77,31 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
-        page_id = clean(
-            row.get("page_id"),
+        page_code = clean(
+            row.get("page_code"),
             lower=True,
         )
 
         # ── validation ────────────────────────────────
 
-        if not client_id or not page_id:
+        if not client_code or not page_code:
 
             print(
                 "Skipping row with empty "
-                "client_id/page_id"
+                "client_code/page_code"
             )
 
             skipped_count += 1
             continue
 
         key = (
-            client_id,
-            page_id,
+            client_code,
+            page_code,
         )
 
         if key in seen:
@@ -117,13 +117,13 @@ def load_val01(
 
         # ── resolve client ────────────────────────────
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
             print(
                 f"Missing client: "
-                f"{client_id}"
+                f"{client_code}"
             )
 
             skipped_count += 1
@@ -146,7 +146,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {page_id}"
+                f"{client_code} / {page_code}"
             )
 
             if verbose:
@@ -160,7 +160,7 @@ def load_val01(
                 Page.objects.update_or_create(
 
                     client=client,
-                    page_id=page_id,
+                    page_code=page_code,
 
                     defaults=defaults,
                 )
@@ -176,7 +176,7 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"Page: "
-                    f"{client_id} / {page_id}"
+                    f"{client_code} / {page_code}"
                 )
 
     # ── Summary ────────────────────────────────────────

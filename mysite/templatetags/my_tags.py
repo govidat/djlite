@@ -15,16 +15,16 @@ logger = logging.getLogger(__name__)
 
 # ── Client/Sector template resolution helpers ─────────────────────────
 
-def get_client_sector_chain(client_id):
+def get_client_sector_chain(client_code):
     """
     IDs of the client's sector node plus all its ancestors
     (e.g. AutoComponents → Automotive → Industrial).
 
-    Cached per client as 'sector_chain:{client_id}'.
+    Cached per client as 'sector_chain:{client_code}'.
     Invalidated by signals on Client save and on Taxonomy/TaxonomyNode saves
     (sector tree edits can change ancestry).
     """
-    cache_key = f"sector_chain:{client_id}"
+    cache_key = f"sector_chain:{client_code}"
     chain = cache.get(cache_key)
     if chain is not None:
         return chain
@@ -34,7 +34,7 @@ def get_client_sector_chain(client_id):
         from mysite.models import Client, TaxonomyNode
         sector_id = (
             Client.objects
-            .filter(client_id=client_id)
+            .filter(client_code=client_code)
             .values_list('sector_id', flat=True)
             .first()
         )
@@ -57,13 +57,13 @@ def get_client_sector_chain(client_id):
                         .values_list('id', flat=True)
                     )
     except Exception:
-        logger.exception("get_client_sector_chain failed for client=%s", client_id)
+        logger.exception("get_client_sector_chain failed for client=%s", client_code)
 
     cache.set(cache_key, chain, timeout=3600)
     return chain
 
 
-def _resolve_template_html(client_id, template_key, country_code=None):
+def _resolve_template_html(client_code, template_key, country_code=None):
     """
     Resolution order (first non-empty wins):
       1. ClientTemplate (client + country=X)
@@ -86,7 +86,7 @@ def _resolve_template_html(client_id, template_key, country_code=None):
         ct = (
             ClientTemplate.objects
             .filter(
-                client__client_id=client_id,
+                client__client_code=client_code,
                 template_key=template_key,
                 country__code=country_id,
                 is_active=True,
@@ -100,7 +100,7 @@ def _resolve_template_html(client_id, template_key, country_code=None):
     ct = (
         ClientTemplate.objects
         .filter(
-            client__client_id=client_id,
+            client__client_code=client_code,
             template_key=template_key,
             country__isnull=True,
             is_active=True,
@@ -110,7 +110,7 @@ def _resolve_template_html(client_id, template_key, country_code=None):
     if ct and ct.htmlblob and ct.htmlblob.strip():
         return ct.htmlblob
 
-    chain_ids = get_client_sector_chain(client_id)
+    chain_ids = get_client_sector_chain(client_code)
 
     # 3. SectorTemplate: sector chain + country=X
     if country_id and chain_ids:
@@ -471,19 +471,19 @@ def render_client_template(context, template_key, **extra_context):
     """
     request = context.get('request')
     client  = context.get('client', {})
-    client_id = client.get('client_id') if isinstance(client, dict) else getattr(client, 'client_id', None)
+    client_code = client.get('client_code') if isinstance(client, dict) else getattr(client, 'client_code', None)
 
-    if not client_id:
+    if not client_code:
         return ''
 
     # modeltranslation already resolves language automatically
     country_code = getattr(request, 'active_country_code', None)
-    cache_key = f"client_template:{client_id}:{template_key}:{country_code or 'global'}"
+    cache_key = f"client_template:{client_code}:{template_key}:{country_code or 'global'}"
 
     cached_html = cache.get(cache_key)
 
     if cached_html is None:
-        cached_html = _resolve_template_html(client_id, template_key, country_code=country_code)
+        cached_html = _resolve_template_html(client_code, template_key, country_code=country_code)
         cache.set(cache_key, cached_html, timeout=3600)
 
     if cached_html and cached_html.strip():
@@ -497,13 +497,13 @@ def render_client_template(context, template_key, **extra_context):
         except Exception:
             logger.exception(
                 "render_client_template: error rendering client=%s key=%s",
-                client_id, template_key,
+                client_code, template_key,
             )
             return ''  # fail silently — don't break the page
 
     logger.warning(
         "render_client_template: no template resolved for client=%s key=%s "
         "(missing global default row?)",
-        client_id, template_key,
+        client_code, template_key,
     )
     return ''

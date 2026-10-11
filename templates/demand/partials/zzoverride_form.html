@@ -34,7 +34,7 @@
   <div id="override-key-container">
     {# Default: SKU — pre-populate from the clicked line #}
     <input type="hidden" name="override_key"
-           value='{"item_id": "{{ line.item.item_id }}"}'>
+           value='{"item_id": "{{ line.item.item_code }}"}'>
   </div>
 
   {# Override value — exactly one must be filled in #}

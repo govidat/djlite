@@ -399,7 +399,7 @@ def _line_matches_child_key(line, child_key: dict) -> bool:
     non-null location/channel values.
     """
     field_map = {
-        'item_id': line.item.item_id,
+        'item_id': line.item.item_code,
         'location_code': line.planning_location.code if line.planning_location_id else None,
         'customer_code': line.planning_customer.code if line.planning_customer_id else None,
         'distribution_channel_id': line.distribution_channel_id,
@@ -456,7 +456,7 @@ def _resolve_override_queryset(qs, override, client_id: int, as_of):
     if level == 'sku':
         item_id_str = key.get('item_id')
         if item_id_str:
-            qs = qs.filter(item__item_id=item_id_str)
+            qs = qs.filter(item__item_code=item_id_str)
  
     elif level in ('subcategory', 'category'):
         node_id = key.get('taxon_node_id')

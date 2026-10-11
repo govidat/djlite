@@ -12,7 +12,7 @@ from scripts.helpers import (
     to_bool,
 )
 
-# slug,order,is_active,client_id,
+# slug,order,is_active,client_code,
 # name_en,name_fr,name_hi,name_ta,
 # description_en,description_fr,description_hi,description_ta,
 # gpc_segment_code,taxonomy_type
@@ -41,20 +41,20 @@ def load_val01(
         reader = csv.DictReader(f)
         rows = list(reader)
 
-    # ── Collect required client_ids ─────────────────────────
+    # ── Collect required client_codes ─────────────────────────
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     # ── Prefetch clients ────────────────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -70,8 +70,8 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True
         )
 
@@ -90,7 +90,7 @@ def load_val01(
             continue
 
         key = (
-            client_id,
+            client_code,
             slug,
         )
 
@@ -98,7 +98,7 @@ def load_val01(
 
             print(
                 f"Duplicate CSV row: "
-                f"{client_id or 'GLOBAL'} / {slug}"
+                f"{client_code or 'GLOBAL'} / {slug}"
             )
 
             skipped_count += 1
@@ -110,14 +110,14 @@ def load_val01(
 
         client = None
 
-        if client_id:
+        if client_code:
 
-            client = clients.get(client_id)
+            client = clients.get(client_code)
 
             if not client:
 
                 print(
-                    f"Missing client: {client_id}"
+                    f"Missing client: {client_code}"
                 )
 
                 skipped_count += 1
@@ -158,7 +158,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{slug}"
             )
 
@@ -189,7 +189,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"Taxonomy: "
-                f"{client_id or 'GLOBAL'} / "
+                f"{client_code or 'GLOBAL'} / "
                 f"{slug}"
             )
 
@@ -250,7 +250,7 @@ import csv
 from pathlib import Path
 
 from mysite.models import Client, Taxonomy
-#slug,order,is_active,client_id,name_en,name_fr,name_hi,name_ta,description_en,description_fr,description_hi,description_ta,gpc_segment_code,taxonomy_type
+#slug,order,is_active,client_code,name_en,name_fr,name_hi,name_ta,description_en,description_fr,description_hi,description_ta,gpc_segment_code,taxonomy_type
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
@@ -260,26 +260,26 @@ def load_val01():
 
     file_path = DATA_DIR / "06taxonomy.csv"
 
-    # ── First pass: collect client_ids from CSV ─────────────
+    # ── First pass: collect client_codes from CSV ─────────────
 
     with open(file_path, newline="", encoding="utf-8") as f:
 
         reader = csv.DictReader(f)
         rows = list(reader)   # if multiple passes are required, then this construct is required
 
-        client_ids = {
-            (row.get("client_id") or "").strip().lower()
+        client_codes = {
+            (row.get("client_code") or "").strip().lower()
             for row in rows
-            if (row.get("client_id") or "").strip()
+            if (row.get("client_code") or "").strip()
         }
 
 
     # ── Fetch only required clients  ─────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -292,8 +292,8 @@ def load_val01():
     #    reader = csv.DictReader(f)
 
     for row in rows:
-        client_id = (row.get("client_id") or "").strip().lower()
-        client = clients.get(client_id) if client_id else None    # None is expected for Global Values
+        client_code = (row.get("client_code") or "").strip().lower()
+        client = clients.get(client_code) if client_code else None    # None is expected for Global Values
         
         slug= row.get("slug", "")
 
@@ -325,7 +325,7 @@ def load_val01():
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"Taxonomy: {client_id if client_id else 'Global'} / {slug}"
+            f"Taxonomy: {client_code if client_code else 'Global'} / {slug}"
         )
 
     print("Loaded Taxonomy")

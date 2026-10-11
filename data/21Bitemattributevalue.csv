@@ -1,4 +1,4 @@
-client_id,item_id,taxonomy_slug,node_slug,attribute_client_id,attribute_slug,predefined_client_id,predefined_value_slug,value_text,value_number
+client_code,item_code,taxonomy_slug,node_slug,attribute_client_code,attribute_slug,predefined_client_code,predefined_value_slug,value_text,value_number
 bahushira,bosch-fr7dc,gpc,spark-plugs,,thread-size,,m14,,
 bahushira,bosch-fr7dc,gpc,spark-plugs,,plug-type,,standard,,
 bahushira,bosch-fr7dc,gpc,spark-plugs,,electrode-gap-mm,,,,0.7

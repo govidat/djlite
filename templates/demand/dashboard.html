@@ -45,13 +45,13 @@
           {% endif %}
         </div>
         <div class="card-actions justify-end mt-4">
-          <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=latest_version.pk %}"
+          <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=latest_version.pk %}"
              class="btn btn-primary btn-sm">{% trans "Open" %} →</a>
         </div>
       {% else %}
         <p class="text-base-content/60">{% trans "No forecast versions yet." %}</p>
         <div class="card-actions justify-end mt-4">
-          <a href="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+          <a href="{% url 'demand_ui:version_create' client_code=client.client_code %}"
              class="btn btn-primary btn-sm">{% trans "Create First Version" %}</a>
         </div>
       {% endif %}
@@ -80,7 +80,7 @@
         <p class="text-base-content/60">{% trans "No uploads yet." %}</p>
       {% endif %}
       <div class="card-actions justify-end mt-4">
-        <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
            class="btn btn-outline btn-sm">{% trans "Upload Actuals" %}</a>
       </div>
     </div>
@@ -109,9 +109,9 @@
         <p class="text-sm text-base-content/60">{% trans "Outlier detection has not been run yet." %}</p>
       {% endif %}
       <div class="card-actions justify-end mt-4">
-        <a href="{% url 'demand_ui:outlier_decisions_report' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:outlier_decisions_report' client_code=client.client_code %}"
            class="btn btn-outline btn-sm">{% trans "Decisions Report" %}</a>
-        <a href="{% url 'demand_ui:outlier_queue' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:outlier_queue' client_code=client.client_code %}"
            class="btn btn-primary btn-sm">{% trans "Review Queue" %} →</a>
       </div>
     </div>
@@ -170,13 +170,13 @@
           {% endif %}
         </div>
         <div class="card-actions justify-end mt-4">
-          <a href="{% url 'demand_ui:version_detail' client_id=client.client_id pk=latest_version.pk %}"
+          <a href="{% url 'demand_ui:version_detail' client_code=client.client_code pk=latest_version.pk %}"
              class="btn btn-primary btn-sm">{% trans "Open" %} →</a>
         </div>
       {% else %}
         <p class="text-base-content/60">{% trans "No forecast versions yet." %}</p>
         <div class="card-actions justify-end mt-4">
-          <a href="{% url 'demand_ui:version_create' client_id=client.client_id %}"
+          <a href="{% url 'demand_ui:version_create' client_code=client.client_code %}"
              class="btn btn-primary btn-sm">{% trans "Create First Version" %}</a>
         </div>
       {% endif %}
@@ -205,7 +205,7 @@
         <p class="text-base-content/60">{% trans "No uploads yet." %}</p>
       {% endif %}
       <div class="card-actions justify-end mt-4">
-        <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
            class="btn btn-outline btn-sm">{% trans "Upload Actuals" %}</a>
       </div>
     </div>

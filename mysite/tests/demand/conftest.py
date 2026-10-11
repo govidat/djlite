@@ -51,7 +51,7 @@ def default_distribution_channel(request):
 def client_obj(db):
     from mysite.models import Client
     return Client.objects.create(
-        client_id='TEST01',
+        client_code='TEST01',
         name='Test Client',
     )
 
@@ -61,7 +61,7 @@ def active_item(db, client_obj):
     from mysite.models import Item
     return Item.objects.create(
         client=client_obj,
-        item_id='item-001',
+        item_code='item-001',
         name='Brake Pad',
         status='active',
     )

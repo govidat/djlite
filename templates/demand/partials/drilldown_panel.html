@@ -14,13 +14,13 @@ table, and the override button all refresh together and stay consistent.
   <div class="breadcrumbs text-sm mb-4">
     <ul>
       <li>
-        <a hx-get="{% url 'demand_ui:drilldown' client_id=client.client_id pk=version.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}">
+        <a hx-get="{% url 'demand_ui:drilldown' client_code=client.client_code pk=version.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}">
           🏢 {% trans "Total" %}
         </a>
       </li>
       {% for node in breadcrumbs %}
       <li>
-        <a hx-get="{% url 'demand_ui:drilldown_location' client_id=client.client_id pk=version.pk location_id=node.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"> 
+        <a hx-get="{% url 'demand_ui:drilldown_location' client_code=client.client_code pk=version.pk location_id=node.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"> 
           {{ node.code }}
         </a>
       </li>
@@ -31,7 +31,7 @@ table, and the override button all refresh together and stay consistent.
   {# ── Period switcher ──────────────────────────────────────────────── #}
   <div class="flex items-center justify-between mb-4">
     <select class="select select-bordered select-sm"
-            hx-get="{% url 'demand_ui:drilldown' client_id=client.client_id pk=version.pk %}{% if current_location %}?location_id={{ current_location.pk }}{% endif %}"
+            hx-get="{% url 'demand_ui:drilldown' client_code=client.client_code pk=version.pk %}{% if current_location %}?location_id={{ current_location.pk }}{% endif %}"
             hx-trigger="change" name="agg_period"
             hx-include="this">
       {% for p in available_periods %}
@@ -43,7 +43,7 @@ table, and the override button all refresh together and stay consistent.
 
     {% if can_override_current %}
     <button class="btn btn-primary btn-sm"
-            hx-get="{% url 'demand_ui:drilldown_override_form' client_id=client.client_id pk=version.pk location_id=current_location.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"
+            hx-get="{% url 'demand_ui:drilldown_override_form' client_code=client.client_code pk=version.pk location_id=current_location.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"
             hx-target="#override-modal-content"
             onclick="document.getElementById('override-modal').showModal()">
       ✏ {% trans "Enter Override" %}
@@ -92,7 +92,7 @@ table, and the override button all refresh together and stay consistent.
       <tbody>
         {% for row in child_rows %}
         <tr class="hover cursor-pointer"
-            hx-get="{% url 'demand_ui:drilldown_location' client_id=client.client_id pk=version.pk location_id=row.location.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"
+            hx-get="{% url 'demand_ui:drilldown_location' client_code=client.client_code pk=version.pk location_id=row.location.pk %}?agg_period={{ agg_period|date:'Y-m-d' }}"
             hx-trigger="click">
           <td>
             {{ row.location.code }} — {{ row.location.name }}
@@ -119,7 +119,7 @@ table, and the override button all refresh together and stay consistent.
   <div class="alert">
     <span>{% trans "This is a leaf location. " %}</span>
     <a class="link link-primary"
-       href="{% url 'demand_ui:drilldown_items' client_id=client.client_id pk=version.pk location_id=current_location.pk %}">
+       href="{% url 'demand_ui:drilldown_items' client_code=client.client_code pk=version.pk location_id=current_location.pk %}">
       {% trans "View item-level forecast lines →" %}
     </a>
   </div>

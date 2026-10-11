@@ -3,7 +3,7 @@
 <div class="form-control">
     <label class="label"><span class="label-text">{% trans "Location" %}</span></label>
     <select name="location_code" class="select select-bordered"
-            hx-get="{% url 'demand_ui:encode_override_key' client_id=client.client_id pk=version.pk %}"
+            hx-get="{% url 'demand_ui:encode_override_key' client_code=client.client_code pk=version.pk %}"
             hx-trigger="change" hx-target="#override-key-hidden-container"
             hx-include="closest form">
         <option value="">{% trans "Select a location…" %}</option>

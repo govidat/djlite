@@ -35,7 +35,7 @@ pytestmark = pytest.mark.django_db
 
 def mk_item(client, iid):
     return Item.objects.create(
-        client=client, item_id=iid, domain='product', status='active',
+        client=client, item_code=iid, domain='product', status='active',
         name=iid,
     )
 
@@ -43,7 +43,7 @@ def mk_item(client, iid):
 @pytest.fixture
 def setup():
     cache.clear()
-    client = Client.objects.create(client_id='zlhs-client')
+    client = Client.objects.create(client_code='zlhs-client')
     tax = Taxonomy.objects.create(slug='gpc', name='GPC', is_active=True)
 
     def node(parent, order, slug):
@@ -66,9 +66,9 @@ def setup():
     ItemTaxonomyNode.objects.create(item=i3, node=B1)
 
     # Derived item: tagging lives only on the GlobalItem
-    gitem = GlobalItem.objects.create(global_item_id='g-lhs-1', status='active')
+    gitem = GlobalItem.objects.create(global_item_code='g-lhs-1', status='active')
     i4 = Item.objects.create(
-        client=client, item_id='i4', global_item=gitem,
+        client=client, item_code='i4', global_item=gitem,
         domain='product', status='active', name='i4',
     )
     GlobalItemTaxonomyNode.objects.create(global_item=gitem, node=A)

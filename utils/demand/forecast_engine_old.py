@@ -272,7 +272,7 @@ def build_actuals_dataframe(
         )
         .values(
             'item_id',
-            'item__item_id',
+            'item__item_code',
             'planning_location_id',
             'planning_location__code',
             'planning_location__parent_id',
@@ -297,13 +297,13 @@ def build_actuals_dataframe(
     df_pd['customer_code'] = df_pd['planning_customer__code'].fillna('NULL')
     df_pd['region_code']   = df_pd['planning_location__parent__code'].fillna('__NO_REGION__')
     df_pd['unique_id']     = (
-        df_pd['item__item_id'].astype(str) + '|' +
+        df_pd['item__item_code'].astype(str) + '|' +
         df_pd['customer_code'].astype(str) + '|' +
         df_pd['planning_location__code'].astype(str)
     )
     df_pd = (
         df_pd.groupby([
-            'unique_id', 'item_id', 'item__item_id',
+            'unique_id', 'item_id', 'item__item_code',
             'planning_customer_id', 'customer_code',
             'planning_location_id', 'planning_location__code',
             'region_code', 'period_start',
@@ -381,7 +381,7 @@ def load_series_decisions(
             if profile.planning_customer else 'NULL'
         )
         uid = (
-            f'{profile.item.item_id}|'
+            f'{profile.item.item_code}|'
             f'{cust_code}|'
             f'{profile.planning_location.code}'
         )
@@ -467,12 +467,12 @@ def build_aggregated_actuals(
         elif grain == 'item_location':
             agg = con.execute("""
                 SELECT
-                    item__item_id || '|ALL_CUST|' || "planning_location__code"
+                    item__item_code || '|ALL_CUST|' || "planning_location__code"
                         AS unique_id,
                     ds,
                     SUM(y) AS y
                 FROM actuals
-                GROUP BY item__item_id, "planning_location__code", ds
+                GROUP BY item__item_code, "planning_location__code", ds
             """).df()
             result[grain] = agg
 
@@ -483,11 +483,11 @@ def build_aggregated_actuals(
                 lambda code, d=depth: _location_ancestor_at_depth(df_pd, code, d)
             )
             agg = (
-                df_pd.groupby(['item__item_id', 'anc_code', 'ds'])
+                df_pd.groupby(['item__item_code', 'anc_code', 'ds'])
                 .agg({'y': 'sum'}).reset_index()
             )
             agg['unique_id'] = (
-                agg['item__item_id'].astype(str) + '|ALL_CUST|' +
+                agg['item__item_code'].astype(str) + '|ALL_CUST|' +
                 agg['anc_code'].astype(str)
             )
             result[grain] = agg[['unique_id', 'ds', 'y']]
@@ -496,11 +496,11 @@ def build_aggregated_actuals(
         elif grain == 'item_client':
             agg = con.execute("""
                 SELECT
-                    item__item_id || '|ALL_CUST|ALL_LOC' AS unique_id,
+                    item__item_code || '|ALL_CUST|ALL_LOC' AS unique_id,
                     ds,
                     SUM(y) AS y
                 FROM actuals
-                GROUP BY item__item_id, ds
+                GROUP BY item__item_code, ds
             """).df()
             result[grain] = agg
 
@@ -1603,9 +1603,9 @@ def write_forecast_lines(
 
     # FK lookup maps
     item_str_to_pk: dict[str, int] = {
-        row['item_id']: row['id']
+        row['item_code']: row['id']
         for row in Item.objects.filter(client=version.client)
-        .values('id', 'item_id')
+        .values('id', 'item_code')
     }
     loc_code_to_pk: dict[str, int] = {
         row['code']: row['id']
@@ -1719,7 +1719,7 @@ def write_forecast_aggregates(version_id: int) -> int:
         .filter(version=version)
         .select_related('item', 'planning_location', 'planning_customer')
         .values(
-            'item_id', 'item__item_id',
+            'item_id', 'item__item_code',
             'planning_location_id', 'planning_location__code',
             'planning_customer_id', 'planning_customer__code',
             'period_type', 'period_start',
@@ -1775,7 +1775,7 @@ def write_forecast_aggregates(version_id: int) -> int:
         'item': """
             SELECT
                 'item' AS agg_level,
-                CONCAT('{\"item_id\": \"', "item__item_id", '\"}') AS agg_key_json,
+                CONCAT('{\"item_id\": \"', "item__item_code", '\"}') AS agg_key_json,
                 period_type,
                 period_start,
                 SUM(statistical_qty)   AS statistical_qty,
@@ -1783,7 +1783,7 @@ def write_forecast_aggregates(version_id: int) -> int:
                 SUM(statistical_value) AS total_statistical_value,
                 SUM(final_value)       AS total_final_value
             FROM lines
-            GROUP BY "item__item_id", period_type, period_start
+            GROUP BY "item__item_code", period_type, period_start
         """,
         'customer': """
             SELECT

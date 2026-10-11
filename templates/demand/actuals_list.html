@@ -5,9 +5,9 @@
 <div class="flex items-center justify-between mb-6">
     <h2 class="text-xl font-bold">{% trans "Actual Sales" %}</h2>
     <div class="flex gap-2">
-        <a href="{% url 'demand_ui:actuals_aggregates' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_aggregates' client_code=client.client_code %}"
            class="btn btn-ghost btn-sm">Σ {% trans "View Summary" %}</a>
-        <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
            class="btn btn-primary btn-sm">↑ {% trans "Upload Actuals" %}</a>
     </div>
 </div>

@@ -20,7 +20,7 @@ from scripts.helpers import (
 # CSV FORMAT
 # =========================================================
 #
-# valid_from,valid_to,planning_customer_code,sales_node_code,client_id
+# valid_from,valid_to,planning_customer_code,sales_node_code,client_code
 # 2026-05-24,2027-05-31,tvsmountroad,rmchennai,bahushira
 # 2027-06-01,,tvsmountroad,rmcoimbatore,bahushira
 #
@@ -55,10 +55,10 @@ def load_val01(
     # COLLECT IDS
     # =========================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     planning_customer_codes = {
@@ -78,15 +78,15 @@ def load_val01(
     # =========================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     # =========================================================
     # PREFETCH PLANNING CUSTOMERS
-    # key = (client_id, code)
+    # key = (client_code, code)
     # =========================================================
 
     planning_customers = {}
@@ -95,13 +95,13 @@ def load_val01(
         PlanningCustomer.objects
         .filter(
             code__in=planning_customer_codes,
-            client__client_id__in=client_ids,
+            client__client_code__in=client_codes,
         )
         .select_related("client")
     ):
 
         key = (
-            obj.client.client_id,
+            obj.client.client_code,
             clean(obj.code, lower=True),
         )
 
@@ -109,7 +109,7 @@ def load_val01(
 
     # =========================================================
     # PREFETCH SALES NODES
-    # key = (client_id, code)
+    # key = (client_code, code)
     # =========================================================
 
     sales_nodes = {}
@@ -118,13 +118,13 @@ def load_val01(
         SalesNode.objects
         .filter(
             code__in=sales_node_codes,
-            client__client_id__in=client_ids,
+            client__client_code__in=client_codes,
         )
         .select_related("client")
     ):
 
         key = (
-            obj.client.client_id,
+            obj.client.client_code,
             clean(obj.code, lower=True),
         )
 
@@ -146,8 +146,8 @@ def load_val01(
         # BASIC VALUES
         # =====================================================
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
@@ -174,7 +174,7 @@ def load_val01(
         # =====================================================
 
         if (
-            not client_id or
+            not client_code or
             not planning_customer_code or
             not sales_node_code or
             not valid_from
@@ -190,7 +190,7 @@ def load_val01(
         # prevent duplicate rows inside CSV
 
         row_key = (
-            client_id,
+            client_code,
             planning_customer_code,
             sales_node_code,
             str(valid_from),
@@ -211,12 +211,12 @@ def load_val01(
         # CLIENT
         # =====================================================
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
             print(
-                f"Missing client: {client_id}"
+                f"Missing client: {client_code}"
             )
 
             skipped_count += 1
@@ -228,7 +228,7 @@ def load_val01(
 
         planning_customer = planning_customers.get(
             (
-                client_id,
+                client_code,
                 planning_customer_code,
             )
         )
@@ -237,7 +237,7 @@ def load_val01(
 
             print(
                 f"Missing PlanningCustomer: "
-                f"{client_id} / {planning_customer_code}"
+                f"{client_code} / {planning_customer_code}"
             )
 
             skipped_count += 1
@@ -249,7 +249,7 @@ def load_val01(
 
         sales_node = sales_nodes.get(
             (
-                client_id,
+                client_code,
                 sales_node_code,
             )
         )
@@ -258,7 +258,7 @@ def load_val01(
 
             print(
                 f"Missing SalesNode: "
-                f"{client_id} / {sales_node_code}"
+                f"{client_code} / {sales_node_code}"
             )
 
             skipped_count += 1
@@ -296,7 +296,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / "
+                f"{client_code} / "
                 f"{planning_customer_code} -> "
                 f"{sales_node_code} "
                 f"({valid_from} - {valid_to or 'present'})"

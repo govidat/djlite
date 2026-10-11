@@ -181,8 +181,8 @@
 
 <script>
 (function() {
-    var baseUrl   = '{% url "demand_ui:actuals_list" client_id=client.client_id %}';
-    var searchUrl = '{% url "demand_ui:item_search_global" client_id=client.client_id %}';
+    var baseUrl   = '{% url "demand_ui:actuals_list" client_code=client.client_code %}';
+    var searchUrl = '{% url "demand_ui:item_search_global" client_code=client.client_code %}';
     var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     var searchTimer = null;
 
@@ -313,10 +313,10 @@
         results.forEach(function(item) {
             var li = document.createElement('li');
             li.className = 'px-4 py-2 text-sm hover:bg-base-200 cursor-pointer';
-            li.textContent = item.item_id + ' — ' + item.name;
+            li.textContent = item.item_code + ' — ' + item.name;
             li.addEventListener('click', function() {
-                if (searchInput) searchInput.value = item.item_id;
-                if (valueInput)  valueInput.value  = item.item_id;
+                if (searchInput) searchInput.value = item.item_code;
+                if (valueInput)  valueInput.value  = item.item_code;
                 hideResults();
                 applyFilters();
             });

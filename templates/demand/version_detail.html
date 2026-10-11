@@ -29,36 +29,36 @@
 <div class="flex flex-wrap gap-2 mb-6">
   {% if version.is_editable %}
   <button class="btn btn-sm btn-outline"
-          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-post="{% url 'demand_ui:version_approve' client_code=client.client_code pk=version.pk %}"
           hx-vals='{"action": "submit"}' hx-confirm="{% trans 'Submit this version for review?' %}">
     {% trans "Submit for Review" %}
   </button>
   {% endif %}
   {% if version.status == 'IN_REVIEW' %}
   <button class="btn btn-sm btn-success"
-          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-post="{% url 'demand_ui:version_approve' client_code=client.client_code pk=version.pk %}"
           hx-vals='{"action": "approve"}' hx-confirm="{% trans 'Approve this version?' %}">
     {% trans "Approve" %}
   </button>
   <button class="btn btn-sm btn-warning"
-          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-post="{% url 'demand_ui:version_approve' client_code=client.client_code pk=version.pk %}"
           hx-vals='{"action": "reject"}' hx-confirm="{% trans 'Send back to Draft?' %}">
     {% trans "Send Back" %}
   </button>
   {% endif %}
   {% if version.status == 'APPROVED' %}
   <button class="btn btn-sm btn-primary"
-          hx-post="{% url 'demand_ui:version_approve' client_id=client.client_id pk=version.pk %}"
+          hx-post="{% url 'demand_ui:version_approve' client_code=client.client_code pk=version.pk %}"
           hx-vals='{"action": "lock"}' hx-confirm="{% trans 'Lock this version? This cannot be undone.' %}">
     {% trans "Lock" %}
   </button>
   {% endif %}
   <button class="btn btn-sm btn-outline"
-          hx-post="{% url 'demand_ui:version_copy' client_id=client.client_id pk=version.pk %}"
+          hx-post="{% url 'demand_ui:version_copy' client_code=client.client_code pk=version.pk %}"
           hx-prompt="{% trans 'Label for the new copy:' %}" hx-vals='js:{"new_label": event.detail.prompt}'>
     {% trans "Copy to New Draft" %}
   </button>
-  <a href="{% url 'demand_ui:version_export' client_id=client.client_id pk=version.pk %}"
+  <a href="{% url 'demand_ui:version_export' client_code=client.client_code pk=version.pk %}"
      class="btn btn-sm btn-outline ml-auto">⬇ {% trans "Export" %}</a>
 </div>
 
@@ -83,17 +83,17 @@
 
 {# ── Tab links ────────────────────────────────────────────────────────── #}
 <div class="tabs tabs-boxed mb-4">
-  <a href="{% url 'demand_ui:version_aggregates' client_id=client.client_id pk=version.pk %}"
+  <a href="{% url 'demand_ui:version_aggregates' client_code=client.client_code pk=version.pk %}"
      class="tab tab-active">{% trans "Value Summary" %}</a>
-  <a href="{% url 'demand_ui:version_lines' client_id=client.client_id pk=version.pk %}"
+  <a href="{% url 'demand_ui:version_lines' client_code=client.client_code pk=version.pk %}"
      class="tab">{% trans "Forecast Grid" %}</a>
   {% if show_scheme_tab %}
-  <a href="{% url 'demand_ui:version_scheme_numbers' client_id=client.client_id pk=version.pk %}"
+  <a href="{% url 'demand_ui:version_scheme_numbers' client_code=client.client_code pk=version.pk %}"
      class="tab">{% trans "Scheme Numbers" %}</a>
   {% endif %}
-  <a href="{% url 'demand_ui:override_list' client_id=client.client_id pk=version.pk %}"
+  <a href="{% url 'demand_ui:override_list' client_code=client.client_code pk=version.pk %}"
      class="tab">{% trans "Overrides" %}</a>
-  <a href="{% url 'demand_ui:version_accuracy' client_id=client.client_id pk=version.pk %}"
+  <a href="{% url 'demand_ui:version_accuracy' client_code=client.client_code pk=version.pk %}"
      class="tab">{% trans "Accuracy" %}</a>
 </div>
 

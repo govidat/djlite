@@ -1,7 +1,7 @@
 {% load i18n %}
 <div id="actuals-upload-panel"
      {% if job.status == 'pending' or job.status == 'processing' %}
-     hx-get="{% url 'demand_ui:actuals_upload_status' client_id=client.client_id job_id=job.pk %}"
+     hx-get="{% url 'demand_ui:actuals_upload_status' client_code=client.client_code job_id=job.pk %}"
      hx-trigger="every 2s"
      hx-swap="outerHTML"
      {% endif %}>
@@ -48,11 +48,11 @@
         {% endif %}
 
         <div class="flex gap-2">
-            <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+            <a href="{% url 'demand_ui:actuals_list' client_code=client.client_code %}"
                class="btn btn-sm btn-ghost">
                 {% trans "View actuals" %} →
             </a>
-            <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+            <a href="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
                class="btn btn-sm btn-outline">
                 {% trans "Upload another file" %}
             </a>
@@ -69,7 +69,7 @@
             {{ job.error_log }}
         </div>
         {% endif %}
-        <a href="{% url 'demand_ui:actuals_upload' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_upload' client_code=client.client_code %}"
            class="btn btn-sm btn-outline">
             {% trans "Try again" %}
         </a>
@@ -83,7 +83,7 @@
 {% load i18n %}
 <div id="upload-status"
      {% if job.status in 'pending processing' %}
-     hx-get="{% url 'demand_ui:actuals_upload_status' client_id=client.client_id job_id=job.pk %}"
+     hx-get="{% url 'demand_ui:actuals_upload_status' client_code=client.client_code job_id=job.pk %}"
      hx-trigger="every 3s"
      hx-swap="outerHTML"
      {% endif %}>
@@ -103,7 +103,7 @@
         </span>
     </div>
     <div class="mt-2">
-        <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_list' client_code=client.client_code %}"
            class="btn btn-sm btn-ghost">{% trans "View actuals" %} →</a>
     </div>
 

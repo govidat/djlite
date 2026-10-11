@@ -1,8 +1,8 @@
 {
-    "client_id": "bahushira",
+    "client_code": "bahushira",
     "pages": [
         {
-            "page_id": "home",
+            "page_code": "home",
             "parent_page_id": "",
             "ltext": "Home Page",
             "order": 1,
@@ -116,7 +116,7 @@
             ]
         },        
         {
-            "page_id": "about",
+            "page_code": "about",
             "parent_page_id": "",
             "ltext": "About Page",
             "order": 2,

@@ -336,7 +336,7 @@ class TestAccuracyViews:
         _run(version)
 
         c, _ = self._client()
-        resp = c.get(f"/{version.client.client_id}/demand/versions/{version.pk}/accuracy/")
+        resp = c.get(f"/{version.client.client_code}/demand/versions/{version.pk}/accuracy/")
         assert resp.status_code == 200
         body = resp.content.decode()
         assert 'Forecast Accuracy' in body
@@ -352,7 +352,7 @@ class TestAccuracyViews:
         from django.test import Client
         version, _ = approved_version
         c = Client()
-        resp = c.get(f"/{version.client.client_id}/demand/versions/{version.pk}/accuracy/")
+        resp = c.get(f"/{version.client.client_code}/demand/versions/{version.pk}/accuracy/")
         assert resp.status_code in (302, 403)
 
     def test_version_list_offers_run_button_when_stale(self, approved_version, matching_actual):
@@ -360,7 +360,7 @@ class TestAccuracyViews:
         matching_actual(qty=Decimal('80.000'), revenue=Decimal('8000.00'))
 
         c, _ = self._client()
-        resp = c.get(f"/{version.client.client_id}/demand/versions/")
+        resp = c.get(f"/{version.client.client_code}/demand/versions/")
         assert resp.status_code == 200
         body = resp.content.decode()
         assert 'Run Accuracy' in body       # enabled → button rendered
@@ -371,7 +371,7 @@ class TestAccuracyViews:
         _run(version)
 
         c, _ = self._client()
-        resp = c.get(f"/{version.client.client_id}/demand/versions/")
+        resp = c.get(f"/{version.client.client_code}/demand/versions/")
         assert resp.status_code == 200
         body = resp.content.decode()
         assert 'Run Accuracy' not in body    # up to date → no trigger
@@ -396,7 +396,7 @@ class TestAccuracyApi:
         _run(version)
 
         resp = client.get(
-            f"/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/accuracy/"
+            f"/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/accuracy/"
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -417,7 +417,7 @@ class TestAccuracyApi:
         _run(version)
 
         resp = client.get(
-            f"/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/accuracy/",
+            f"/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/accuracy/",
             {'group_by': 'location'},
         )
         assert resp.status_code == 200
@@ -433,7 +433,7 @@ class TestAccuracyApi:
         _run(version)
 
         resp = client.get(
-            f"/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/accuracy/hierarchy/locations/"
+            f"/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/accuracy/hierarchy/locations/"
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -450,7 +450,7 @@ class TestAccuracyApi:
         _run(version)
 
         resp = client.get(
-            f"/api/{version.client.client_id}/demand/forecast-versions/{version.pk}/accuracy/hierarchy/taxonomy/"
+            f"/api/{version.client.client_code}/demand/forecast-versions/{version.pk}/accuracy/hierarchy/taxonomy/"
         )
         assert resp.status_code == 200
         data = resp.json()

@@ -57,7 +57,7 @@ def feature_gate(request, feature: str):
 
 
 def _client_url_kwargs(request) -> dict:
-    return {'client_id': request.client.client_id}
+    return {'client_code': request.client.client_code}
 
 """
 def _require_location_view_access(request, location: PlanningLocation | None):
@@ -89,11 +89,11 @@ def _require_location_override_access(request, location: PlanningLocation):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def drilldown(request, pk, location_id=None, client_id=None):
+def drilldown(request, pk, location_id=None, client_code=None):
 #def drilldown(request, pk):
     """
-    GET /{client_id}/demand/versions/{id}/drilldown/
-    GET /{client_id}/demand/versions/{id}/drilldown/<int:location_id>/
+    GET /{client_code}/demand/versions/{id}/drilldown/
+    GET /{client_code}/demand/versions/{id}/drilldown/<int:location_id>/
 
     Shows the value-aggregate rollup at ONE location node, plus its
     immediate children as clickable drill-down rows.
@@ -123,7 +123,7 @@ def drilldown(request, pk, location_id=None, client_id=None):
 
     if authorized_ids is not None and not authorized_ids:
         messages.error(request, 'You have no Demand Planning location access. Contact your administrator.')
-        return redirect('demand_ui:version_detail', client_id=request.client.client_id, pk=pk)
+        return redirect('demand_ui:version_detail', client_code=request.client.client_code, pk=pk)
 
     #location_id = request.GET.get('location_id') or None
     # location_id comes from the URL path if present (drilldown_location),
@@ -273,9 +273,9 @@ def drilldown(request, pk, location_id=None, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def drilldown_items(request, pk, location_id, client_id=None):
+def drilldown_items(request, pk, location_id, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/drilldown/<location_id>/items/
+    GET /{client_code}/demand/versions/{id}/drilldown/<location_id>/items/
 
     Shown when a planner drills all the way to a LEAF location and wants
     to see the constituent SKU-level ForecastLine rows rather than another
@@ -301,7 +301,7 @@ def drilldown_items(request, pk, location_id, client_id=None):
         ForecastLine.objects
         .filter(version=version, planning_location=location)
         .select_related('item', 'planning_customer', 'distribution_channel')
-        .order_by('period_start', 'item__item_id')
+        .order_by('period_start', 'item__item_code')
     )
     paginator = Paginator(qs, 50)
     page_obj  = paginator.get_page(request.GET.get('page', 1))
@@ -310,7 +310,7 @@ def drilldown_items(request, pk, location_id, client_id=None):
     distinct_items = ForecastLine.objects.filter(
         version=version,
         planning_location=location,
-    ).values('item__item_id').distinct().count()
+    ).values('item__item_code').distinct().count()
     if version.client.is_distribution_channel_enabled():
         show_channel = qs.values('distribution_channel').distinct().count() > 1
     else:
@@ -332,10 +332,10 @@ def drilldown_items(request, pk, location_id, client_id=None):
 
 @login_required
 @require_http_methods(['GET', 'POST'])
-def drilldown_override_form(request, pk, location_id, client_id=None):
+def drilldown_override_form(request, pk, location_id, client_code=None):
     """
-    GET  /{client_id}/demand/versions/{id}/drilldown/<location_id>/override/
-    POST /{client_id}/demand/versions/{id}/drilldown/<location_id>/override/
+    GET  /{client_code}/demand/versions/{id}/drilldown/<location_id>/override/
+    POST /{client_code}/demand/versions/{id}/drilldown/<location_id>/override/
 
     The override form for the LOCATION currently being viewed in the
     drill-down. Pre-fills override_level='location' and the location_code,
@@ -365,7 +365,7 @@ def drilldown_override_form(request, pk, location_id, client_id=None):
 
     if not version.is_editable:
         messages.error(request, f'Version is {version.status}. Overrides require a DRAFT version.')
-        return redirect('demand_ui:drilldown', client_id=request.client.client_id, pk=pk)
+        return redirect('demand_ui:drilldown', client_code=request.client.client_code, pk=pk)
 
     agg_period_str = request.GET.get('agg_period') or request.POST.get('period_start', '')
 
@@ -473,7 +473,7 @@ def drilldown_override_form(request, pk, location_id, client_id=None):
             )
             return response
         return redirect(
-            reverse('demand_ui:drilldown', kwargs={'client_id': request.client.client_id, 'pk': pk})
+            reverse('demand_ui:drilldown', kwargs={'client_code': request.client.client_code, 'pk': pk})
             + f'?location_id={location.pk}&agg_period={agg_period_str}'
         )
 
@@ -498,9 +498,9 @@ def drilldown_override_form(request, pk, location_id, client_id=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @login_required
-def drilldown_override_preview(request, pk, location_id, client_id=None):
+def drilldown_override_preview(request, pk, location_id, client_code=None):
     """
-    GET /{client_id}/demand/versions/{id}/drilldown/<location_id>/override/preview/
+    GET /{client_code}/demand/versions/{id}/drilldown/<location_id>/override/preview/
 
     AJAX-style endpoint called by the override form (hx-get on input
     change) to show "if you set ₹X here, these N child branches/items

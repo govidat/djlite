@@ -8,7 +8,7 @@
 # to avoid an HTTP round-trip from server to itself.
 #
 # Mount in your project urls.py:
-#   path('<str:client_id>/demand/', include('mysite.demand_ui.urls')),
+#   path('<str:client_code>/demand/', include('mysite.demand_ui.urls')),
 
 from django.urls import path
 from mysite.demand_ui import views, views_drilldown, views_htmx

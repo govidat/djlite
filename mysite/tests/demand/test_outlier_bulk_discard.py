@@ -71,12 +71,12 @@ def outlier_setup(db, client_obj, leaf_location, active_item, planning_customer,
 def other_client_candidate(db, client_obj, distribution_channel_common):
     from mysite.models import Client, Item
     from mysite.models.demand.hierarchy import PlanningLocation, PlanningCustomer
-    other = Client.objects.create(client_id='TEST02', name='Other Client')
+    other = Client.objects.create(client_code='TEST02', name='Other Client')
     location = PlanningLocation.objects.create(
         client=other, code='ROOT2', name='Other Root', is_leaf=True,
     )
     item = Item.objects.create(
-        client=other, item_id='item-002', name='Wheel', status='active',
+        client=other, item_code='item-002', name='Wheel', status='active',
     )
     customer = PlanningCustomer.objects.create(
         client=other, code='CUST-02', name='Other Customer',
@@ -100,11 +100,11 @@ def other_client_candidate(db, client_obj, distribution_channel_common):
 
 
 def _bulk_url(client_obj):
-    return reverse('demand_ui:outlier_bulk_delete', kwargs={'client_id': client_obj.client_id})
+    return reverse('demand_ui:outlier_bulk_delete', kwargs={'client_code': client_obj.client_code})
 
 
 def _queue_url(client_obj, status):
-    return reverse('demand_ui:outlier_queue', kwargs={'client_id': client_obj.client_id}) + f'?status={status}'
+    return reverse('demand_ui:outlier_queue', kwargs={'client_code': client_obj.client_code}) + f'?status={status}'
 
 
 @pytest.mark.django_db

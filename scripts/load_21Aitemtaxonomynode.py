@@ -15,8 +15,8 @@ from scripts.helpers import (
     to_bool,
 )
 
-# item_id,client_id,taxonomy_slug,node_slug,
-# node_client_id,is_primary,order
+# item_code,client_code,taxonomy_slug,node_slug,
+# node_client_code,is_primary,order
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -42,16 +42,16 @@ def load_val01(
 
     # ── Collect keys ────────────────────────────────────────
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
     item_ids = {
-        clean(row.get("item_id"), lower=True)
+        clean(row.get("item_code"), lower=True)
         for row in rows
-        if clean(row.get("item_id"))
+        if clean(row.get("item_code"))
     }
 
     taxonomy_slugs = {
@@ -71,7 +71,7 @@ def load_val01(
     nodes = {
         (
             n.taxonomy.slug,
-            n.client.client_id if n.client else "",
+            n.client.client_code if n.client else "",
             n.slug,
         ): n
 
@@ -88,13 +88,13 @@ def load_val01(
 
     items = {
         (
-            i.client.client_id,
-            i.item_id,
+            i.client.client_code,
+            i.item_code,
         ): i
 
         for i in Item.objects.filter(
-            client__client_id__in=client_ids,
-            item_id__in=item_ids,
+            client__client_code__in=client_codes,
+            item_code__in=item_ids,
         ).select_related("client")
     }
 
@@ -110,13 +110,13 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
-        item_id = clean(
-            row.get("item_id"),
+        item_code = clean(
+            row.get("item_code"),
             lower=True,
         )
 
@@ -130,18 +130,18 @@ def load_val01(
             lower=True,
         )
 
-        node_client_id = clean(
-            row.get("node_client_id"),
+        node_client_code = clean(
+            row.get("node_client_code"),
             lower=True,
         )
 
         # ── Duplicate check ────────────────────────────────
 
         key = (
-            client_id,
-            item_id,
+            client_code,
+            item_code,
             taxonomy_slug,
-            node_client_id,
+            node_client_code,
             node_slug,
         )
 
@@ -158,8 +158,8 @@ def load_val01(
 
         item = items.get(
             (
-                client_id,
-                item_id,
+                client_code,
+                item_code,
             )
         )
 
@@ -167,7 +167,7 @@ def load_val01(
 
             print(
                 f"Missing item: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             skipped_count += 1
@@ -178,7 +178,7 @@ def load_val01(
         node = nodes.get(
             (
                 taxonomy_slug,
-                node_client_id,
+                node_client_code,
                 node_slug,
             )
         )
@@ -199,7 +199,7 @@ def load_val01(
             print(
                 f"Missing node: "
                 f"{taxonomy_slug} / "
-                f"{node_client_id or 'GLOBAL'} / "
+                f"{node_client_code or 'GLOBAL'} / "
                 f"{node_slug}"
             )
 
@@ -223,7 +223,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{item_id} → {node_slug}"
+                f"{item_code} → {node_slug}"
             )
 
             if verbose:
@@ -253,7 +253,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"ItemTaxonomyNode: "
-                f"{item_id} → {node_slug}"
+                f"{item_code} → {node_slug}"
             )
 
     # ── Summary ─────────────────────────────────────────────
@@ -367,13 +367,13 @@ def load_item_taxonomy_nodes():
 
     # ── collect keys ─────────────────────────
 
-    client_ids = {
-        clean_lower(r.get("client_id"))
+    client_codes = {
+        clean_lower(r.get("client_code"))
         for r in rows
     }
 
     item_ids = {
-        clean_lower(r.get("item_id"))
+        clean_lower(r.get("item_code"))
         for r in rows
     }
 
@@ -387,8 +387,8 @@ def load_item_taxonomy_nodes():
         for r in rows
     }
 
-    node_client_ids = {
-        clean_lower(r.get("node_client_id"))
+    node_client_codes = {
+        clean_lower(r.get("node_client_code"))
         for r in rows
     }
 
@@ -398,7 +398,7 @@ def load_item_taxonomy_nodes():
 
         (
             n.taxonomy.slug,
-            n.client.client_id if n.client else "",
+            n.client.client_code if n.client else "",
             n.slug
         ): n
 
@@ -418,14 +418,14 @@ def load_item_taxonomy_nodes():
     items = {
 
         (
-            i.client.client_id,
-            i.item_id
+            i.client.client_code,
+            i.item_code
         ): i
 
         for i in Item.objects.filter(
 
-            client__client_id__in=client_ids,
-            item_id__in=item_ids,
+            client__client_code__in=client_codes,
+            item_code__in=item_ids,
 
         ).select_related("client")
     }
@@ -438,12 +438,12 @@ def load_item_taxonomy_nodes():
 
     for row in rows:
 
-        client_id = clean_lower(
-            row.get("client_id")
+        client_code = clean_lower(
+            row.get("client_code")
         )
 
-        item_id = clean_lower(
-            row.get("item_id")
+        item_code = clean_lower(
+            row.get("item_code")
         )
 
         taxonomy_slug = clean_lower(
@@ -454,19 +454,19 @@ def load_item_taxonomy_nodes():
             row.get("node_slug")
         )
 
-        node_client_id = clean_lower(
-            row.get("node_client_id")
+        node_client_code = clean_lower(
+            row.get("node_client_code")
         )
 
         item = items.get(
-            (client_id, item_id)
+            (client_code, item_code)
         )
 
         if not item:
 
             print(
                 f"Missing item: "
-                f"{client_id} / {item_id}"
+                f"{client_code} / {item_code}"
             )
 
             skipped_count += 1
@@ -475,7 +475,7 @@ def load_item_taxonomy_nodes():
         node = nodes.get(
             (
                 taxonomy_slug,
-                node_client_id,
+                node_client_code,
                 node_slug
             )
         )
@@ -485,7 +485,7 @@ def load_item_taxonomy_nodes():
             print(
                 f"Missing node: "
                 f"{taxonomy_slug} / "
-                f"{node_client_id or 'GLOBAL'} / "
+                f"{node_client_code or 'GLOBAL'} / "
                 f"{node_slug}"
             )
 
@@ -519,7 +519,7 @@ def load_item_taxonomy_nodes():
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"{item_id} → {node_slug}"
+            f"{item_code} → {node_slug}"
         )
 
     print()

@@ -166,7 +166,7 @@ def _parse_filters(request):
 
 # ── A. Full catalogue page ────────────────────────────────────────────
  
-def catalogue_page(request, client_id, page_id='catalogue'):
+def catalogue_page(request, client_code, page_code='catalogue'):
 
     #Full page render for the catalogue.
     #Supports both Track A (PageContent HTML blob) and
@@ -194,7 +194,7 @@ def catalogue_page(request, client_id, page_id='catalogue'):
         PageContent.objects
         .filter(
             page__client=client_obj,
-            page__page_id=page_id
+            page__page_code=page_code
         )
         .values_list('htmlblob', flat=True)
         .first()
@@ -203,7 +203,7 @@ def catalogue_page(request, client_id, page_id='catalogue'):
     context = {
         'catalogue': payload,
         'raw_html':  raw_html,
-        'page_id':   page_id,
+        'page_code':   page_code,
     }
  
     if request.headers.get('HX-Request'):
@@ -219,7 +219,7 @@ def catalogue_page(request, client_id, page_id='catalogue'):
 """
 # ── A. Full catalogue page ────────────────────────────────────────────
 
-def catalogue_page(request, client_id, page_id='catalogue'):
+def catalogue_page(request, client_code, page_code='catalogue'):
     
     #Full page render for the catalogue.
     #Supports both Track A (PageContent HTML blob) and
@@ -247,7 +247,7 @@ def catalogue_page(request, client_id, page_id='catalogue'):
         PageContent.objects
         .filter(
             page__client=client_obj,
-            page__page_id=page_id
+            page__page_code=page_code
         )
         .values_list('htmlblob', flat=True)
         .first()
@@ -256,7 +256,7 @@ def catalogue_page(request, client_id, page_id='catalogue'):
     context = {
         'catalogue':  payload,
         'raw_html':   raw_html,
-        'page_id':    page_id,
+        'page_code':    page_code,
         # 'client', 'theme' come from context processor
     }
 
@@ -275,7 +275,7 @@ def catalogue_page(request, client_id, page_id='catalogue'):
 
 # ── B. HTMX filter endpoint ──────────────────────────────────────────
 
-def catalogue_filter(request, client_id):
+def catalogue_filter(request, client_code):
     
     #HTMX endpoint — returns items list partial after filter change.
     #Called by hx-get on filter checkboxes.
@@ -303,7 +303,7 @@ def catalogue_filter(request, client_id):
 # ── C. Item detail page ───────────────────────────────────────────────
 
  
-def item_detail(request, client_id, item_id):
+def item_detail(request, client_code, item_code):
     """
     Detail page for a single item.
     Resolves all display fields through the GlobalItem derivation chain.
@@ -395,7 +395,7 @@ def item_detail(request, client_id, item_id):
                 to_attr='prefetched_taxonomy_mappings'
             ),
         ),
-        item_id=item_id
+        item_code=item_code
     )
 
 
@@ -488,7 +488,7 @@ def item_detail(request, client_id, item_id):
     }
  
     logger.debug(
-        f"item_detail: item={item_id}, "
+        f"item_detail: item={item_code}, "
         f"name={context['name']}, "
         f"price={price}, sku={sku}, "
         f"images={len(images)}, audios={len(audios)}, videos={len(videos)}, "

@@ -12,7 +12,7 @@ from mysite.models import (
 
 from scripts.helpers import clean
 
-# client_id,page_id,
+# client_code,page_code,
 # htmlblob_en,htmlblob_hi,
 # htmlblob_fr,htmlblob_ta
 
@@ -42,16 +42,16 @@ def load_val01(
     # COLLECT IDS
     # =====================================================
 
-    client_ids = {
-        clean(row.get("client_id"), lower=True)
+    client_codes = {
+        clean(row.get("client_code"), lower=True)
         for row in rows
-        if clean(row.get("client_id"))
+        if clean(row.get("client_code"))
     }
 
-    page_ids = {
-        clean(row.get("page_id"), lower=True)
+    page_codes = {
+        clean(row.get("page_code"), lower=True)
         for row in rows
-        if clean(row.get("page_id"))
+        if clean(row.get("page_code"))
     }
 
     # =====================================================
@@ -59,9 +59,9 @@ def load_val01(
     # =====================================================
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -71,13 +71,13 @@ def load_val01(
 
     pages = {
         (
-            p.client.client_id,
-            p.page_id
+            p.client.client_code,
+            p.page_code
         ): p
 
         for p in Page.objects.filter(
-            client__client_id__in=client_ids,
-            page_id__in=page_ids,
+            client__client_code__in=client_codes,
+            page_code__in=page_codes,
         ).select_related("client")
     }
 
@@ -97,13 +97,13 @@ def load_val01(
         # BASIC VALUES
         # -------------------------------------------------
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True
         )
 
-        page_id = clean(
-            row.get("page_id"),
+        page_code = clean(
+            row.get("page_code"),
             lower=True
         )
 
@@ -111,19 +111,19 @@ def load_val01(
         # VALIDATION
         # -------------------------------------------------
 
-        if not client_id or not page_id:
+        if not client_code or not page_code:
 
             print(
                 "Skipping row with missing "
-                "client_id / page_id"
+                "client_code / page_code"
             )
 
             skipped_count += 1
             continue
 
         row_key = (
-            client_id,
-            page_id,
+            client_code,
+            page_code,
         )
 
         if row_key in seen:
@@ -142,13 +142,13 @@ def load_val01(
         # CLIENT
         # -------------------------------------------------
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
             print(
                 f"Missing client: "
-                f"{client_id}"
+                f"{client_code}"
             )
 
             skipped_count += 1
@@ -159,14 +159,14 @@ def load_val01(
         # -------------------------------------------------
 
         page = pages.get(
-            (client_id, page_id)
+            (client_code, page_code)
         )
 
         if not page:
 
             print(
                 f"Missing page: "
-                f"{client_id} / {page_id}"
+                f"{client_code} / {page_code}"
             )
 
             skipped_count += 1
@@ -194,8 +194,8 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / "
-                f"{page_id}"
+                f"{client_code} / "
+                f"{page_code}"
             )
 
             if verbose:
@@ -226,8 +226,8 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"PageContent: "
-                f"{client_id} / "
-                f"{page_id}"
+                f"{client_code} / "
+                f"{page_code}"
             )
 
     # =====================================================
@@ -291,7 +291,7 @@ import csv
 from pathlib import Path
 
 from mysite.models import Client, Page, PageContent
-#client_id, page_id, htmlblob_en, htmlblob_fr, htmlblob_hi
+#client_code, page_code, htmlblob_en, htmlblob_fr, htmlblob_hi
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
@@ -301,40 +301,40 @@ def load_val01():
 
     file_path = DATA_DIR / "03Dpagecontent.csv"
 
-    # ── First pass: collect client_ids from CSV ─────────────
+    # ── First pass: collect client_codes from CSV ─────────────
 
     with open(file_path, newline="", encoding="utf-8") as f:
 
         reader = csv.DictReader(f)
         rows = list(reader)   # if multiple passes are required, then this construct is required
 
-        client_ids = {
-            (row.get("client_id") or "").strip().lower()
+        client_codes = {
+            (row.get("client_code") or "").strip().lower()
             for row in rows
-            if (row.get("client_id") or "").strip()
+            if (row.get("client_code") or "").strip()
         }
 
 
-        page_ids = {
-            (row.get("page_id") or "").strip().lower()
+        page_codes = {
+            (row.get("page_code") or "").strip().lower()
             for row in rows
-            if (row.get("page_id") or "").strip()
+            if (row.get("page_code") or "").strip()
         }
 
     # ── Fetch only required clients and pages ─────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
     pages = {
-        (p.client.client_id, p.page_id): p
+        (p.client.client_code, p.page_code): p
         for p in Page.objects.filter(
-            client__client_id__in=client_ids,
-            page_id__in=page_ids,
+            client__client_code__in=client_codes,
+            page_code__in=page_codes,
         ).select_related("client")
     }
 
@@ -348,20 +348,20 @@ def load_val01():
 
     for row in rows:
 
-        client_id = row["client_id"]
-        client = clients.get(client_id)
+        client_code = row["client_code"]
+        client = clients.get(client_code)
         if not client:
-            print(f"Missing client: {client_id}")
+            print(f"Missing client: {client_code}")
             continue
 
         # ── page ───────────────────────────────────────
 
         page = None
-        page_id = row.get("page_id")
-        if page_id:
-            page = pages.get((client_id, page_id))
+        page_code = row.get("page_code")
+        if page_code:
+            page = pages.get((client_code, page_code))
             if not page:
-                print(f"Missing page: {client_id} / {page_id}")
+                print(f"Missing page: {client_code} / {page_code}")
                 continue
 
 
@@ -380,7 +380,7 @@ def load_val01():
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"PageContent: {client_id} / {page_id}"
+            f"PageContent: {client_code} / {page_code}"
         )
 
     print("Loaded PageContent")

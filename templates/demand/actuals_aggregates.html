@@ -9,7 +9,7 @@
         <h2 class="text-xl font-bold">{% trans "Actuals Summary" %}</h2>
         <p class="text-sm text-base-content/60">{% trans "Actual Sales" %}</p>
     </div>
-    <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+    <a href="{% url 'demand_ui:actuals_list' client_code=client.client_code %}"
        class="btn btn-ghost btn-sm">← {% trans "Back to detail view" %}</a>
 </div>
 
@@ -18,7 +18,7 @@
     {% for level, label in agg_level_choices %}
     <a class="tab {% if agg_level == level %}tab-active{% endif %}"
        id="actuals-agg-tab-{{ level }}"
-       hx-get="{% url 'demand_ui:actuals_aggregates' client_id=client.client_id %}?agg_level={{ level }}"
+       hx-get="{% url 'demand_ui:actuals_aggregates' client_code=client.client_code %}?agg_level={{ level }}"
        hx-target="#actuals-aggregates-container"
        hx-swap="innerHTML"
        hx-headers='{"HX-Request": "true"}'

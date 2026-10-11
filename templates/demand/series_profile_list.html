@@ -7,11 +7,11 @@
     <div class="flex items-center gap-3">
         <div id="recompute-status"></div>
         <form method="post"
-            action="{% url 'demand_ui:series_profile_recompute' client_id=client.client_id %}">
+            action="{% url 'demand_ui:series_profile_recompute' client_code=client.client_code %}">
             {% csrf_token %}
             <button id="recompute-btn"
                     class="btn btn-warning btn-sm"
-                    hx-post="{% url 'demand_ui:series_profile_recompute' client_id=client.client_id %}"
+                    hx-post="{% url 'demand_ui:series_profile_recompute' client_code=client.client_code %}"
                     hx-target="#recompute-status"
                     hx-swap="innerHTML"
                     hx-on:click="
@@ -36,7 +36,7 @@
     <div class="flex gap-2 items-center">
         <div id="recompute-status"></div>
         <button class="btn btn-warning btn-sm"
-                hx-post="{% url 'demand_ui:series_profile_recompute' client_id=client.client_id %}"
+                hx-post="{% url 'demand_ui:series_profile_recompute' client_code=client.client_code %}"
                 hx-target="#recompute-status"
                 hx-swap="innerHTML"
                 hx-indicator="#recompute-spinner">

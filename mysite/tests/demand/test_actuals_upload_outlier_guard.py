@@ -63,7 +63,7 @@ def media_tmp(tmp_path, settings):
 
 
 def _upload_url(client_obj):
-    return reverse('demand_ui:actuals_upload', kwargs={'client_id': client_obj.client_id})
+    return reverse('demand_ui:actuals_upload', kwargs={'client_code': client_obj.client_code})
 
 
 def _delete_payload(client_obj, confirmed=False):

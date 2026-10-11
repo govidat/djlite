@@ -10,7 +10,7 @@
   </p>
 
   <form
-    hx-put="{% url 'demand_api:override_split_weights' client_id=client.client_id pk=override.version_id override_id=override.pk %}"
+    hx-put="{% url 'demand_api:override_split_weights' client_code=client.client_code pk=override.version_id override_id=override.pk %}"
     hx-target="#split-weight-editor"
     hx-swap="outerHTML"
     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'

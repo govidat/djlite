@@ -33,7 +33,7 @@ from django.db import models as django_models
 
 def run():
     #print(connection.queries)    
-    #result = ClientNavbar.objects.filter(client_id=lv_client_id).values('id', 'page_id', 'parent', 'order').order_by('order')
+    #result = ClientNavbar.objects.filter(client_code=lv_client_id).values('id', 'page_id', 'parent', 'order').order_by('order')
     #print(result)
     #print(result.exists())
     #print(client.first())
@@ -179,36 +179,36 @@ def run():
     
     CLIENT_DATA = [
         {
-        "client_id": "bahushira"
+        "client_code": "bahushira"
         }
     ]
     for row in CLIENT_DATA:
         Client.objects.update_or_create(
-            client_id=row["client_id"]
+            client_code=row["client_code"]
         )    
 
     THEME_DATA = [
         {
-        "client_id": "bahushira",
+        "client_code": "bahushira",
         "themepreset_code" : "light",
         "theme_code": "light",
         "is_default": False
         },        
         {
-        "client_id": "bahushira",
+        "client_code": "bahushira",
         "themepreset_code" : "dark",
         "theme_code": "dark",
         "is_default": True
         },
     ]
 
-    clients = {c.client_id: c for c in Client.objects.all()}
+    clients = {c.client_code: c for c in Client.objects.all()}
     themepresets = {c.themepreset_code: c for c in ThemePreset.objects.all()}
-    #layouts = {(c.client.client_id, c.page.page_id, c.slug, c.level): c for c in Layout.objects.all()}
+    #layouts = {(c.client.client_code, c.page.page_code, c.slug, c.level): c for c in Layout.objects.all()}
 
     for row in THEME_DATA:
 
-        client_value = clients[row["client_id"]]
+        client_value = clients[row["client_code"]]
         themepreset_value = themepresets[row["themepreset_code"]]
 
         Theme.objects.update_or_create(
@@ -370,7 +370,7 @@ def upload_slots(slots_data, component):
 def upload_layouts(layouts_data, page, slug_map=None):
     """
     Recursively create Layout records — generic field extraction.
-    slug_map is keyed by (page_id, slug) to ensure uniqueness per page
+    slug_map is keyed by (page_code, slug) to ensure uniqueness per page
     not across the whole client.
     """
     if slug_map is None:
@@ -380,7 +380,7 @@ def upload_layouts(layouts_data, page, slug_map=None):
 
         # Resolve parent using (page, slug) as key
         parent_slug = layout_data.get("parent_slug")
-        parent_layout = slug_map.get((page.page_id, parent_slug)) if parent_slug else None
+        parent_layout = slug_map.get((page.page_code, parent_slug)) if parent_slug else None
 
         # Extract lookup fields
         level = layout_data["level"]
@@ -402,8 +402,8 @@ def upload_layouts(layouts_data, page, slug_map=None):
             defaults=defaults
         )
 
-        # Register using (page_id, slug) as key — unique per page not client
-        slug_map[(page.page_id, slug)] = layout
+        # Register using (page_code, slug) as key — unique per page not client
+        slug_map[(page.page_code, slug)] = layout
 
         # Upload component if level=40 and component data present
         if level == 40 and layout_data.get("component"):
@@ -426,7 +426,7 @@ def upload_pages(pages_data, client):
 
         page, created = Page.objects.get_or_create(
             client=client,
-            page_id=page_data["page_id"],
+            page_code=page_data["page_code"],
             defaults={
                 "ltext":  page_data.get("ltext", ""),
                 "order":  page_data.get("order", 0),
@@ -434,7 +434,7 @@ def upload_pages(pages_data, client):
                 "parent": parent_page,
             }
         )
-        page_map[page_data["page_id"]] = page
+        page_map[page_data["page_code"]] = page
 
 
         upload_layouts(page_data.get("layouts", []), page)
@@ -453,21 +453,21 @@ def bulk_upload(json_data):
     if isinstance(json_data, str):
         json_data = json.loads(json_data)
 
-    client_id = json_data["client_id"]
+    client_code = json_data["client_code"]
 
     try:
-        client = Client.objects.get(client_id=client_id)
+        client = Client.objects.get(client_code=client_code)
     except Client.DoesNotExist:
-        raise ValueError(f"Client '{client_id}' does not exist. Create it first.")
+        raise ValueError(f"Client '{client_code}' does not exist. Create it first.")
 
-    print(f"Uploading data for client: {client_id}")
+    print(f"Uploading data for client: {client_code}")
 
     # Client level gentextblocks
  
     # Pages + layouts + components
     upload_pages(json_data.get("pages", []), client)
 
-    print(f"Upload complete for client: {client_id}")
+    print(f"Upload complete for client: {client_code}")
 
 
 # ── Management command wrapper ────────────────────────────────

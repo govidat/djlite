@@ -8,7 +8,7 @@ from mysite.models import Client, ClientTemplate
 from scripts.helpers import clean, to_bool
 
 
-# client_id,template_key,is_active,
+# client_code,template_key,is_active,
 # htmlblob_en,htmlblob_hi,htmlblob_fr,htmlblob_ta
 
 LANGS = [lang[0] for lang in settings.LANGUAGES]
@@ -31,25 +31,25 @@ def load_val01(
         reader = csv.DictReader(f)
         rows = list(reader)
 
-    # ── Collect required client_ids ──────────────────────
+    # ── Collect required client_codes ──────────────────────
 
-    client_ids = {
+    client_codes = {
 
-        clean(row.get("client_id"), lower=True)
+        clean(row.get("client_code"), lower=True)
 
         for row in rows
 
-        if clean(row.get("client_id"), lower=True)
+        if clean(row.get("client_code"), lower=True)
     }
 
     # ── Prefetch clients ──────────────────────────────────
 
     clients = {
 
-        c.client_id: c
+        c.client_code: c
 
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -65,8 +65,8 @@ def load_val01(
 
     for row in rows:
 
-        client_id = clean(
-            row.get("client_id"),
+        client_code = clean(
+            row.get("client_code"),
             lower=True,
         )
 
@@ -74,17 +74,17 @@ def load_val01(
             row.get("template_key")
         )
 
-        if not client_id or not template_key:
+        if not client_code or not template_key:
 
             print(
                 "Skipping row with empty "
-                "client_id/template_key"
+                "client_code/template_key"
             )
 
             skipped_count += 1
             continue
 
-        key = (client_id, template_key)
+        key = (client_code, template_key)
 
         if key in seen:
 
@@ -97,11 +97,11 @@ def load_val01(
 
         # ── Resolve client ──────────────────────────────
 
-        client = clients.get(client_id)
+        client = clients.get(client_code)
 
         if not client:
 
-            print(f"Missing client: {client_id}")
+            print(f"Missing client: {client_code}")
 
             skipped_count += 1
             continue
@@ -128,7 +128,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / "
+                f"{client_code} / "
                 f"{template_key}"
             )
 
@@ -159,7 +159,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"ClientTemplate: "
-                f"{client_id} / "
+                f"{client_code} / "
                 f"{template_key}"
             )
 
@@ -219,7 +219,7 @@ import csv
 from pathlib import Path
 
 from mysite.models import Client, ClientTemplate
-#client_id, page_id, htmlblob_en, htmlblob_fr, htmlblob_hi
+#client_code, page_code, htmlblob_en, htmlblob_fr, htmlblob_hi
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
@@ -229,26 +229,26 @@ def load_val01():
 
     file_path = DATA_DIR / "03Eclienttemplate.csv"
 
-    # ── First pass: collect client_ids from CSV ─────────────
+    # ── First pass: collect client_codes from CSV ─────────────
 
     with open(file_path, newline="", encoding="utf-8") as f:
 
         reader = csv.DictReader(f)
         rows = list(reader)   # if multiple passes are required, then this construct is required
 
-        client_ids = {
-            (row.get("client_id") or "").strip().lower()
+        client_codes = {
+            (row.get("client_code") or "").strip().lower()
             for row in rows
-            if (row.get("client_id") or "").strip()
+            if (row.get("client_code") or "").strip()
         }
 
 
     # ── Fetch only required clients and pages ─────────────────────────
 
     clients = {
-        c.client_id: c
+        c.client_code: c
         for c in Client.objects.filter(
-            client_id__in=client_ids
+            client_code__in=client_codes
         )
     }
 
@@ -262,10 +262,10 @@ def load_val01():
 
     for row in rows:
 
-        client_id = row["client_id"]
-        client = clients.get(client_id)
+        client_code = row["client_code"]
+        client = clients.get(client_code)
         if not client:
-            print(f"Missing client: {client_id}")
+            print(f"Missing client: {client_code}")
             continue
         
         template_key= row.get("template_key", "")
@@ -287,7 +287,7 @@ def load_val01():
 
         print(
             f"{'Created' if created else 'Updated'} "
-            f"ClientTemplate: {client_id} / {template_key}"
+            f"ClientTemplate: {client_code} / {template_key}"
         )
 
     print("Loaded ClientTemplate")

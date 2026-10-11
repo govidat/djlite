@@ -31,10 +31,10 @@ class CustomerProfileMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
-    def _get_url_client_id(self, request):
+    def _get_url_client_code(self, request):
         """
-        Extract client_id from the URL path directly.
-        Handles paths of the form /{client_id}/ and /{client_id}/{anything}/
+        Extract client_code from the URL path directly.
+        Handles paths of the form /{client_code}/ and /{client_code}/{anything}/
         Does not rely on resolver_match which may not be populated yet.
         """
         # Strip leading slash, split on '/'
@@ -53,7 +53,7 @@ class CustomerProfileMiddleware:
             #'demand',    # ← ADD THIS — safety net for any /demand/ prefixed routes            
         }
         if candidate == 'api':
-            # /api/<client_id>/...
+            # /api/<client_code>/...
             if len(parts) > 1 and parts[1] not in RESERVED and parts[1]:
                 return parts[1]
             return None
@@ -72,26 +72,26 @@ class CustomerProfileMiddleware:
         request.active_role = None
         request.active_country_code = None
 
-        # ── Resolve client_id (URL → session fallback) ───────────
-        #── Resolve client_id ─────────────────────────────────────
+        # ── Resolve client_code (URL → session fallback) ───────────
+        #── Resolve client_code ─────────────────────────────────────
 
-        # ── Resolve client_id from URL path ───────────────────────
-        url_client_id = self._get_url_client_id(request)
+        # ── Resolve client_code from URL path ───────────────────────
+        url_client_code = self._get_url_client_code(request)
 
-        if url_client_id:
+        if url_client_code:
             try:
-                request.client = Client.objects.get(client_id=url_client_id)
-                request.session['client_id'] = url_client_id
+                request.client = Client.objects.get(client_code=url_client_code)
+                request.session['client_code'] = url_client_code
             except Client.DoesNotExist:
-                raise Http404(f"Client '{url_client_id}' does not exist.")
+                raise Http404(f"Client '{url_client_code}' does not exist.")
         else:
-            # No client_id in URL — try session (allauth pages, set-theme, etc.)
-            session_client_id = request.session.get('client_id')
-            if session_client_id:
+            # No client_code in URL — try session (allauth pages, set-theme, etc.)
+            session_client_code = request.session.get('client_code')
+            if session_client_code:
                 try:
-                    request.client = Client.objects.get(client_id=session_client_id)
+                    request.client = Client.objects.get(client_code=session_client_code)
                 except Client.DoesNotExist:
-                    request.session.pop('client_id', None)
+                    request.session.pop('client_code', None)
 
         # ── Resolve active country from session ──────────────────
         if request.client and request.client.is_country_enabled():

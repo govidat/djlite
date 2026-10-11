@@ -120,12 +120,12 @@ class TestDisaggregateToAtomic:
         for ds in dates:
             rows += [
                 {'unique_id': 'ITEM-A|CUST-A|00|LOC-1', 'ds': ds, 'y': 200.0,
-                'item_id': 1, 'item__item_id': 'ITEM-A',
+                'item_id': 1, 'item__item_code': 'ITEM-A',
                 'planning_customer_id': 1, 'customer_code': 'CUST-A',
                 'planning_location_id': 1, 'planning_location__code': 'LOC-1',
                 'region_code': 'REG-1', 'revenue': 400.0},
                 {'unique_id': 'ITEM-A|CUST-B|00|LOC-1', 'ds': ds, 'y': 100.0,
-                'item_id': 1, 'item__item_id': 'ITEM-A',
+                'item_id': 1, 'item__item_code': 'ITEM-A',
                 'planning_customer_id': 2, 'customer_code': 'CUST-B',
                 'planning_location_id': 1, 'planning_location__code': 'LOC-1',
                 'region_code': 'REG-1', 'revenue': 150.0},
@@ -176,12 +176,12 @@ class TestDisaggregateToAtomic:
         for ds in dates:
             rows += [
                 {'unique_id': 'ITEM-X|NULL|00|LOC-1', 'ds': ds, 'y': 100.0,
-                 'item_id': 10, 'item__item_id': 'ITEM-X',
+                 'item_id': 10, 'item__item_code': 'ITEM-X',
                  'planning_customer_id': None, 'customer_code': 'NULL',
                  'planning_location_id': 1, 'planning_location__code': 'LOC-1',
                  'region_code': 'REG-1', 'revenue': 1000.0},
                 {'unique_id': 'ITEM-Y|NULL|00|LOC-1', 'ds': ds, 'y': 100.0,
-                 'item_id': 11, 'item__item_id': 'ITEM-Y',
+                 'item_id': 11, 'item__item_code': 'ITEM-Y',
                  'planning_customer_id': None, 'customer_code': 'NULL',
                  'planning_location_id': 1, 'planning_location__code': 'LOC-1',
                  'region_code': 'REG-1', 'revenue': 500.0},
@@ -231,7 +231,7 @@ class TestDisaggregateToAtomic:
 
         uid = 'ITEM-A|NULL|00|LOC-1'
         rows = [{'unique_id': uid, 'ds': pd.Timestamp('2022-01-01'),
-                 'y': 100.0, 'item_id': 1, 'item__item_id': 'ITEM-A',
+                 'y': 100.0, 'item_id': 1, 'item__item_code': 'ITEM-A',
                  'planning_customer_id': None, 'customer_code': 'NULL',
                  'planning_location_id': 1, 'planning_location__code': 'LOC-1',
                  'region_code': 'REG-1', 'revenue': 500.0}]

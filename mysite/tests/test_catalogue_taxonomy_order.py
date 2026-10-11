@@ -29,7 +29,7 @@ def tax_setup():
 
 
 def make_client(**kwargs):
-    return Client.objects.create(client_id='zztax-client', **kwargs)
+    return Client.objects.create(client_code='zztax-client', **kwargs)
 
 
 def slugs(client):
@@ -88,7 +88,7 @@ def test_client_override_beats_global_for_retained_slug(tax_setup):
 
 def form_data(client, **overrides):
     data = {
-        'client_id': client.client_id,
+        'client_code': client.client_code,
         'parent': '',
         'name': 'Test Client',
         'nb_title': '',

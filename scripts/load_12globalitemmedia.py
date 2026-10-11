@@ -196,21 +196,21 @@ def load_val01(
     global_item_ids = {
 
         clean(
-            row.get("global_item_id"),
+            row.get("global_item_code"),
             lower=True,
         )
 
         for row in main_rows
 
-        if row.get("global_item_id")
+        if row.get("global_item_code")
     }
 
     global_items = {
 
-        g.global_item_id: g
+        g.global_item_code: g
 
         for g in GlobalItem.objects.filter(
-            global_item_id__in=global_item_ids
+            global_item_code__in=global_item_ids
         )
     }
 
@@ -249,8 +249,8 @@ def load_val01(
 
     for row in main_rows:
 
-        global_item_id = clean(
-            row.get("global_item_id"),
+        global_item_code = clean(
+            row.get("global_item_code"),
             lower=True,
         )
 
@@ -268,17 +268,17 @@ def load_val01(
         # Validation
         # -------------------------------------------------
 
-        if not global_item_id:
+        if not global_item_code:
 
             print(
-                "Skipping row with empty global_item_id"
+                "Skipping row with empty global_item_code"
             )
 
             skipped_count += 1
             continue
 
         key = (
-            global_item_id,
+            global_item_code,
             media_type,
             order,
         )
@@ -299,14 +299,14 @@ def load_val01(
         # -------------------------------------------------
 
         global_item = global_items.get(
-            global_item_id
+            global_item_code
         )
 
         if not global_item:
 
             print(
                 f"Missing GlobalItem: "
-                f"{global_item_id}"
+                f"{global_item_code}"
             )
 
             skipped_count += 1
@@ -390,7 +390,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{global_item_id} / "
+                f"{global_item_code} / "
                 f"{media_type} / "
                 f"{order}"
             )
@@ -425,7 +425,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"GlobalItemMedia: "
-                f"{global_item_id} / "
+                f"{global_item_code} / "
                 f"{media_type} / "
                 f"{order}"
             )
@@ -687,22 +687,22 @@ def load_val01():
     global_item_ids = {
 
         (
-            row.get("global_item_id", "")
+            row.get("global_item_code", "")
             .strip()
             .lower()
         )
 
         for row in main_rows
 
-        if row.get("global_item_id")
+        if row.get("global_item_code")
     }
 
     global_items = {
 
-        g.global_item_id: g
+        g.global_item_code: g
 
         for g in GlobalItem.objects.filter(
-            global_item_id__in=global_item_ids
+            global_item_code__in=global_item_ids
         )
     }
 
@@ -732,8 +732,8 @@ def load_val01():
 
     for row in main_rows:
 
-        global_item_id = (
-            row.get("global_item_id", "")
+        global_item_code = (
+            row.get("global_item_code", "")
             .strip()
             .lower()
         )
@@ -749,14 +749,14 @@ def load_val01():
         )
 
         global_item = global_items.get(
-            global_item_id
+            global_item_code
         )
 
         if not global_item:
 
             print(
                 f"Missing GlobalItem: "
-                f"{global_item_id}"
+                f"{global_item_code}"
             )
 
             continue
@@ -859,7 +859,7 @@ def load_val01():
 
             f"GlobalItemMedia: "
 
-            f"{global_item_id} / "
+            f"{global_item_code} / "
 
             f"{media_type} / "
 

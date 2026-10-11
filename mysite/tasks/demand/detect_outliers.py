@@ -49,7 +49,7 @@ def _horizon_end(version):
 
  
 @shared_task
-def run_outlier_detection(client_id, target_period_start, target_period_end, triggered_by_user_id=None):
+def run_outlier_detection(client_code, target_period_start, target_period_end, triggered_by_user_id=None):
     """
     Planner-triggered. target_period_start/target_period_end are REQUIRED —
     this task never scans a client's full actuals history in one run.
@@ -70,7 +70,7 @@ def run_outlier_detection(client_id, target_period_start, target_period_end, tri
     target_period_end = as_date(target_period_end)
  
     from mysite.models import Client
-    client = Client.objects.select_related("forecasting_config").get(client_id=client_id)
+    client = Client.objects.select_related("forecasting_config").get(client_code=client_code)
     config = getattr(client, "forecasting_config", None)
     if config is None:
         return  # nothing configured yet — nothing to do
@@ -102,7 +102,7 @@ def run_outlier_detection(client_id, target_period_start, target_period_end, tri
     if len(target_range_period_types) > 1:
         raise ValueError(
             f"Mixed period_type values found in target range for client "
-            f"{client_id}: {target_range_period_types}. ActualSale rows in "
+            f"{client_code}: {target_range_period_types}. ActualSale rows in "
             f"one run are expected to share a single period_type."
         )
     period_type = target_range_period_types[0]
@@ -141,7 +141,7 @@ def run_outlier_detection(client_id, target_period_start, target_period_end, tri
     if use_sub:
         from mysite.models.demand.lifecycle import ItemSubstitution
         retired_item_ids = set(
-            ItemSubstitution.objects.filter(client_id=client_id)
+            ItemSubstitution.objects.filter(client_id=client_code)
             .values_list("old_item_id", flat=True)
         )
 

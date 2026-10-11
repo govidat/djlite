@@ -5,12 +5,12 @@
 <div class="max-w-lg mx-auto">
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-bold">{% trans "Upload Actuals" %}</h2>
-        <a href="{% url 'demand_ui:actuals_list' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_list' client_code=client.client_code %}"
            class="btn btn-ghost btn-sm">← {% trans "Back to actuals" %}</a>
     </div>
     {% comment %}
     <div class="mb-4">
-        <a href="{% url 'demand_ui:actuals_template' client_id=client.client_id %}"
+        <a href="{% url 'demand_ui:actuals_template' client_code=client.client_code %}"
            class="btn btn-ghost btn-sm">📥 {% trans "Download template" %}</a>
     </div>
     {% endcomment %}

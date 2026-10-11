@@ -1,6 +1,6 @@
 {% load i18n %}
     {% comment %}
-    <form hx-post="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+    <form hx-post="{% url 'demand_ui:override_create' client_code=client.client_code pk=version.pk %}"
         hx-target="#override-table-container"
         hx-swap="innerHTML"
         novalidate
@@ -15,7 +15,7 @@
         ✕
     </button>
 </div>    
-<form hx-post="{% url 'demand_ui:override_create' client_id=client.client_id pk=version.pk %}"
+<form hx-post="{% url 'demand_ui:override_create' client_code=client.client_code pk=version.pk %}"
     hx-target="this" hx-swap="outerHTML" novalidate class="space-y-4">
          
     {% csrf_token %}
@@ -29,7 +29,7 @@
                 id="override-level-select">
         {% comment %}
         <select name="override_level" class="select select-bordered"
-                hx-get="{% url 'demand_ui:override_key_field' client_id=client.client_id pk=version.pk %}"
+                hx-get="{% url 'demand_ui:override_key_field' client_code=client.client_code pk=version.pk %}"
                 hx-trigger="change" hx-target="#override-create-modal-content #override-key-container"
                 hx-on:change="
                     const qtyTab = document.getElementById('otab-qty');
@@ -125,7 +125,7 @@
 
     <div class="flex gap-2">
         <button type="submit" class="btn btn-primary">{% trans "Save Override" %}</button>
-        <a href="{% url 'demand_ui:override_list' client_id=client.client_id pk=version.pk %}"
+        <a href="{% url 'demand_ui:override_list' client_code=client.client_code pk=version.pk %}"
            class="btn btn-ghost">{% trans "Cancel" %}</a>
     </div>
 </form>
@@ -157,7 +157,7 @@ function showOverrideMode(mode) {
         updateTabsForLevel(level);
 
         // 2. Fetch the key partial via plain fetch — no HTMX involved
-        var url = '{% url "demand_ui:override_key_field" client_id=client.client_id pk=version.pk %}?override_level=' + encodeURIComponent(level);
+        var url = '{% url "demand_ui:override_key_field" client_code=client.client_code pk=version.pk %}?override_level=' + encodeURIComponent(level);
 
         fetch(url, {
             headers: {

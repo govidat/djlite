@@ -228,7 +228,7 @@ class ClientGroupPermissionInline(admin.TabularInline):
 #class ClientLocationInline(nested_admin.NestedTabularInline):
 #    model  = ClientLocation
 #    extra  = 0
-#    fields = ('location_id', 'name', 'location_type', 'is_active')
+#    fields = ('location_code', 'name', 'location_type', 'is_active')
 
 
 class ClientUserMembershipInline(admin.TabularInline):
@@ -313,7 +313,7 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
     inlines       = [ClientGroupPermissionInline, ClientUserMembershipInline]
     list_display  = ('name', 'client', 'role', 'is_active')
     list_filter   = ('role', 'is_active')
-    search_fields = ('name', 'client__client_id')
+    search_fields = ('name', 'client__client_code')
     filter_horizontal = ('locations',)
     admin_role_only = True
 
@@ -325,7 +325,7 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
         if request.user.is_superuser:
             return qs
         return qs.filter(
-            client__client_id__in=self._permitted_client_ids(request)
+            client__client_code__in=self._permitted_client_codes(request)
         )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -348,7 +348,7 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
                     kwargs['queryset'] = ClientLocation.objects.filter(
                         client=group.client,
                         is_active=True,
-                    ).order_by('location_id')
+                    ).order_by('location_code')
                 except ClientGroup.DoesNotExist:
                     from mysite.models.users import ClientLocation
                     kwargs['queryset'] = ClientLocation.objects.none()
@@ -360,7 +360,7 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
                     kwargs['queryset'] = ClientLocation.objects.filter(
                         client__in=self._permitted_clients(request),
                         is_active=True,
-                    ).order_by('client__client_id', 'location_id')
+                    ).order_by('client__client_code', 'location_code')
         return super().formfield_for_manytomany(db_field, request, **kwargs)
     
     def get_inlines(self, request, obj=None):
@@ -370,9 +370,9 @@ class ClientGroupAdmin(ClientScopedMixin, admin.ModelAdmin, BaseAdminInlinecss):
 
 class ClientLocationAdmin(ClientScopedMixin, admin.ModelAdmin):
     form = ClientLocationAdminForm
-    list_display  = ('location_id', 'name', 'client', 'location_type', 'is_active', 'parent')
+    list_display  = ('location_code', 'name', 'client', 'location_type', 'is_active', 'parent')
     list_filter   = ('location_type', 'is_active')
-    search_fields = ('location_id', 'name', 'client__client_id')
+    search_fields = ('location_code', 'name', 'client__client_code')
 
     def has_module_permission(self, request):   #chatgpt permission instead of perms in Django5
         return _user_has_admin_role(request.user)   # ← admin role only
@@ -381,7 +381,7 @@ class ClientLocationAdmin(ClientScopedMixin, admin.ModelAdmin):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
-        return qs.filter(client__client_id__in=self._permitted_client_ids(request))
+        return qs.filter(client__client_code__in=self._permitted_client_codes(request))
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'client':
