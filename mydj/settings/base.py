@@ -227,7 +227,6 @@ LANGUAGE_CODE = 'en'
 TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
-USE_L10N = True  # Enable localization of formats (dates, numbers, etc.) ' L10N
 
 USE_TZ = True
 

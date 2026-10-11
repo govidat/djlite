@@ -83,7 +83,7 @@ class ItemSubstitution(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=Q(conversion_factor__gt=0), name="itemsubst_factor_positive"),
+                condition=Q(conversion_factor__gt=0), name="itemsubst_factor_positive"),
         ]
         verbose_name = _("02-05D Item Substitution")
 
@@ -207,7 +207,7 @@ class ItemIntroduction(models.Model):
             models.Index(fields=["client", "reference_item"], name="ix_itemintro_ref"),
         ]
         constraints = [
-            models.CheckConstraint(check=Q(ratio__gt=0), name="itemintro_ratio_positive"),
+            models.CheckConstraint(condition=Q(ratio__gt=0), name="itemintro_ratio_positive"),
         ]
         verbose_name = _("02-05D Item Introduction")
 
