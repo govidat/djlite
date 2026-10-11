@@ -106,17 +106,17 @@ Wrapped in `cached.Loader`. `APP_DIRS = False` (required by cotton — overrides
 
 ### Primary Key Strategy
 - Models use Django's default `BigAutoField` (`DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'`).
-- `LowercaseCharField` is used for natural-key ID fields (`client_id`, `page_id`, `theme_id`, etc.) — auto-lowercased on save via `get_prep_value`.
+- `LowercaseCharField` is used for natural-key ID fields (`client_code`, `page_code`, `theme_code`, etc.) — auto-lowercased on save via `get_prep_value`.
 
 ### The `fetch_clientstatic()` Pattern
 The central data delivery mechanism. On every page request:
 1. `CustomerProfileMiddleware` resolves `request.client` from URL path (one DB query or none if cached).
-2. `client_context` context processor calls `fetch_clientstatic(client_id)`.
-3. `fetch_clientstatic` checks cache first (`clientstatic:{client_id}`). On miss, runs a single deeply-prefetched query across `Client → Page → Layout → Component → ComponentSlot → ComptextBlock → TextstbItem → SvgtextbadgeValue`.
+2. `client_context` context processor calls `fetch_clientstatic(client_code)`.
+3. `fetch_clientstatic` checks cache first (`clientstatic:{client_code}`). On miss, runs a single deeply-prefetched query across `Client → Page → Layout → Component → ComponentSlot → ComptextBlock → TextstbItem → SvgtextbadgeValue`.
 4. Result is serialised to a plain Python dict by `build_client_payload()` and cached.
 5. Templates consume `{{ client }}`, `{{ page_dict }}`, `{{ theme }}` — never raw ORM calls.
 6. `header_nav` and `footer_nav` are built from `NavItem` records prefetched
-  alongside pages and themes. `build_nav_item()` calls `item.get_url(client_id)`
+  alongside pages and themes. `build_nav_item()` calls `item.get_url(client_code)`
   to resolve the full path for `page` nav_types, storing it as `item.href`
   (separate from the raw `item.url` field used for active-state matching).
   Nav labels use modeltranslation (`name_en`, `name_hi` etc.) and are grouped
@@ -155,9 +155,9 @@ A reusable helper in `utils/common_functions.py` that serialises a model instanc
 ```
 
 
-Client (client_id, parent→self, language_list, theme_list)
-  ├── Theme (theme_id, themepreset→ThemePreset, overrides JSON)
-  ├── Page (page_id, parent→self, order)
+Client (client_code, parent→self, language_list, theme_list)
+  ├── Theme (theme_code, themepreset→ThemePreset, overrides JSON)
+  ├── Page (page_code, parent→self, order)
   │     ├── PageContent (language_code, html)          ← Track A: raw HTML per language
   │     └── Layout (level 10/20/30/40, parent→self, slug, order)   ← Track B: component tree
   │           └── Component [OneToOne, level=40 only]
@@ -168,15 +168,15 @@ Client (client_id, parent→self, language_list, theme_list)
   ├── NavItem (name[translatable], location, nav_type, page→Page[optional],
   │            url, order, open_in_new_tab, parent→self)
   │     └── NavItem children (same shape, one level deep)
-  ├── ClientLocation (location_id, location_type)
-  ├── ClientGroup (group_id, role, locations M2M)
+  ├── ClientLocation (location_code, location_type)
+  ├── ClientGroup (clientgroup_code, role, locations M2M)
   │     ├── ClientGroupPermission (module, action)
   │     └── ClientUserMembership (user→User)
   ├── ClientUserProfile (user→User [OneToOne])
   └── CustomerProfile (user→User [FK], unique_together user+client)
         └── CustomerAddress (street, city, zip, country, is_default)
 
-ThemePreset (themepreset_id, colours, typography, spacing, radius, shadow)
+ThemePreset (themepreset_code, colours, typography, spacing, radius, shadow)
 GlobalValCat → GlobalVal (key, keyval — modeltranslation expands keyval_*)
 ```
 
@@ -319,10 +319,10 @@ theme/                           ← django-tailwind theme app
 Client
   ├── Taxonomy (slug, global or client-scoped)
   │     └── TaxonomyNode (materialized path, parent→self)
-  ├── Item (item_id, status, attributes JSONB, global or client-scoped)
+  ├── Item (item_code, status, attributes JSONB, global or client-scoped)
   │     ├── ItemTaxonomyNode → TaxonomyNode (M2M)
   │     ├── ItemImage (order, is_primary)
-  │     └── ItemVariant (variant_id, price, stock, attributes)
+  │     └── ItemVariant (variant_code, price, stock, attributes)
   └── ... (existing models unchanged)
 
 Item (base — id, name, description, status, image, order, client)
@@ -340,10 +340,10 @@ Item (base — id, name, description, status, image, order, client)
 
 | Cache key | Content | TTL | Invalidated by |
 |-----------|---------|-----|---------------|
-| `clientstatic:{client_id} - {lang}` | Full CMS payload | 1 hour | post_save on CMS models |
+| `clientstatic:{client_code} - {lang}` | Full CMS payload | 1 hour | post_save on CMS models |
 | `taxonomy_tree:{client}:{slug}` | Taxonomy node tree | 1 hour | post_save on TaxonomyNode |
 | `catalogue_base_ids:{client}:{status}` | Base item ID set | 5 min | post_save on Item |
-| `client_templates:{client_id}` | Template resolution dict | 1 hour | post_save on ClientTemplate |
+| `client_templates:{client_code}` | Template resolution dict | 1 hour | post_save on ClientTemplate |
 
 ### Admin Performance
 
@@ -554,10 +554,10 @@ mysite/tasks/demand/
   │                                #   compute_accuracy(client_id)
   ├── import_actuals.py            # process_actuals_import(import_id),
   │                                #   process_summary_actuals_import(import_id)
-  ├── detect_outliers.py           # run_outlier_detection(client_id, target_period_start,
+  ├── detect_outliers.py           # run_outlier_detection(client_code, target_period_start,
   │                                #   target_period_end, triggered_by_user_id) — reads SCHEME-NETTED
   │                                #   series; flag_stale_forecast_versions(actual_sale_id)
-  ├── detect_scheme_candidates.py  # detect_scheme_candidates(client_id, target_period_start,
+  ├── detect_scheme_candidates.py  # detect_scheme_candidates(client_code, target_period_start,
   │                                #   target_period_end, triggered_by_user_id) — raw product-group
   │                                #   spike detection, implied-qty-uplift suggestion
   ├── resolve_scheme_scope.py      # resolve_scheme_scope(scheme_id) — materializes
@@ -649,7 +649,7 @@ utils/demand/
   - Writes errors to `ActualSaleImport.error_log`
   - Updates status: `pending → processing → done / failed`
 
-run_outlier_detection(client_id, target_period_start, target_period_end, triggered_by_user_id=None)
+run_outlier_detection(client_code, target_period_start, target_period_end, triggered_by_user_id=None)
   Triggered by: planner submission of the Outlier Detection range form (HTMX), NOT import completion
   1. Load ForecastingConfig for client (lazily create with system defaults if absent)
   2. Pull ActualSale rows for the client within [target_period_start, target_period_end]
@@ -702,7 +702,7 @@ resolve_scheme_scope(scheme_id)
      warning, deterministic most-specific-wins (ITEM > TAXONOMY > OVERALL). A grain+period being a
      window for one scheme and a shadow for another is expected and composes additively
 
-detect_scheme_candidates(client_id, target_period_start, target_period_end, triggered_by_user_id=None)
+detect_scheme_candidates(client_code, target_period_start, target_period_end, triggered_by_user_id=None)
   Triggered by: planner submission of the Scheme Detection range form (HTMX), before outlier detection
   1. Aggregate RAW actuals to the product-group (TAXON_*) grain for the window + lookback
   2. Run MAD + persistence spike detection per series; skip periods already covered by an ACTIVE
@@ -755,7 +755,7 @@ Hierarchy nodes (PlanningLocation / PlanningCustomer / SalesNode) use the `Mater
  
 ### Frontend (Phase 3B)
 
-The demand planning UI is **Django Templates + Tailwind + HTMX**, served under `/{client_id}/planning/` via the `mysite/demand_ui/` app — the same stack as Phase 1/2/3A. It is **not** a React SPA. Planners drive the workflow through server-rendered pages whose interactive parts (filters, run progress, outlier confirm/reject/revise/undo, bulk discard, overlap confirmations) are HTMX fragments returned as partials. A **DRF JSON API** (`mysite/api/demand/`) coexists for programmatic access (hierarchy trees, actuals queries, forecast version CRUD/run/approve) — see the endpoint table below.
+The demand planning UI is **Django Templates + Tailwind + HTMX**, served under `/{client_code}/planning/` via the `mysite/demand_ui/` app — the same stack as Phase 1/2/3A. It is **not** a React SPA. Planners drive the workflow through server-rendered pages whose interactive parts (filters, run progress, outlier confirm/reject/revise/undo, bulk discard, overlap confirmations) are HTMX fragments returned as partials. A **DRF JSON API** (`mysite/api/demand/`) coexists for programmatic access (hierarchy trees, actuals queries, forecast version CRUD/run/approve) — see the endpoint table below.
 
 **Key UI views (`mysite/demand_ui/views.py`, templates under `templates/demand/`):**
 1. **Actuals Dashboard** — actuals list + aggregates, filter bar with an `exclude_outliers` toggle (net vs raw).
@@ -1132,10 +1132,10 @@ concern, as in Phase 3B).
 
 | Cache key | Content | TTL | Invalidated by |
 |-----------|---------|-----|----------------|
-| `resolved_supply_source:{client_id}` | Materialized supply-source cache | Until nightly job / rule change | Celery beat job; post_save on `SupplyNetworkRule` |
-| `resolved_vendor_scheme:{client_id}` | Materialized vendor-scheme resolution | Until scheme change | post_save on `VendorScheme`/`VendorSchemeSlab` |
-| `policy_matrix:{client_id}` | 12-cell policy matrix | 1 hour | post_save on `PolicyMatrix` |
-| `carrying_cost_rate:{client_id}` | `InventoryCarryingCostRate` + penalty tiers | 1 hour | post_save on either model |
+| `resolved_supply_source:{client_code}` | Materialized supply-source cache | Until nightly job / rule change | Celery beat job; post_save on `SupplyNetworkRule` |
+| `resolved_vendor_scheme:{client_code}` | Materialized vendor-scheme resolution | Until scheme change | post_save on `VendorScheme`/`VendorSchemeSlab` |
+| `policy_matrix:{client_code}` | 12-cell policy matrix | 1 hour | post_save on `PolicyMatrix` |
+| `carrying_cost_rate:{client_code}` | `InventoryCarryingCostRate` + penalty tiers | 1 hour | post_save on either model |
 
 ---
 
@@ -1143,14 +1143,14 @@ concern, as in Phase 3B).
 
 | Task | Trigger | Notes |
 |------|---------|-------|
-| `resolve_supply_network(client_id)` | Nightly beat + `SupplyNetworkRule` post_save | Materializes `ResolvedSupplySource`; runs the `Σ allocation_pct == 100%` integrity check |
-| `resolve_vendor_schemes(client_id)` | Nightly beat + `VendorScheme` post_save | Materializes `ResolvedVendorScheme` |
+| `resolve_supply_network(client_code)` | Nightly beat + `SupplyNetworkRule` post_save | Materializes `ResolvedSupplySource`; runs the `Σ allocation_pct == 100%` integrity check |
+| `resolve_vendor_schemes(client_code)` | Nightly beat + `VendorScheme` post_save | Materializes `ResolvedVendorScheme` |
 | `cascade_operating_plan(version_id)` | Planner sets `ForecastNormalizationFactor` | Applies factor at anchor node, cascades via revenue-share disaggregation, writes `ForecastReconciliationException` for non-additive manual overrides |
-| `propagate_replenishment_demand(client_id, version_id)` | Scheduled per client review cadence (`MAX(policy_frequency, data_refresh_frequency)`) | Runs the NetOwnDemand/RR algorithm; writes `NodeReplenishmentRequirement`; runs conservation-invariant check |
+| `propagate_replenishment_demand(client_code, version_id)` | Scheduled per client review cadence (`MAX(policy_frequency, data_refresh_frequency)`) | Runs the NetOwnDemand/RR algorithm; writes `NodeReplenishmentRequirement`; runs conservation-invariant check |
 | `ingest_supply_position_snapshot(snapshot_id)` | Snapshot POST | Validates structurally; rejects whole snapshot on any row failure; materializes denormalized netting-ready structure on success |
-| `run_netting(client_id, snapshot_id)` | Snapshot `APPLIED` + propagation complete | Computes `Net Requirement` per item×node; writes `InventoryPosition` |
+| `run_netting(client_code, snapshot_id)` | Snapshot `APPLIED` + propagation complete | Computes `Net Requirement` per item×node; writes `InventoryPosition` |
 | `evaluate_vendor_breakpoints(recommendation_id)` | Netting produces `base_qty` > 0 for a PURCHASE candidate | Runs the breakpoint trade-off; attaches chosen qty + reasoning to the recommendation |
-| `generate_recommendations(client_id)` | After netting + breakpoint evaluation | Applies `PolicyMatrix` cell logic per SKU-location; writes `ReplenishmentRecommendation` with full explainability payload |
+| `generate_recommendations(client_code)` | After netting + breakpoint evaluation | Applies `PolicyMatrix` cell logic per SKU-location; writes `ReplenishmentRecommendation` with full explainability payload |
 | `compute_rebate_accrual_estimate(scheme_id)` | Scheduled (period close cadence) | Recomputes `estimated_effective_discount_pct` as median of last 3–4 settled periods |
 
 ---
@@ -1318,9 +1318,9 @@ A `promote_document(source_instance, target_model)` service function handles all
 
 | Cache key | Content | TTL | Invalidated by |
 |-----------|---------|-----|----------------|
-| `pricing_procedure:{client_id}` | Serialised PricingProcedure + steps | 1 hour | post_save on PricingProcedure / PricingStep |
-| `condition_records:{client_id}:{condition_type}` | ConditionRecord lookup table | 15 min | post_save on ConditionRecord |
-| `currency_rules:{client_id}` | ClientCurrencyRule list | 1 hour | post_save on ClientCurrencyRule |
+| `pricing_procedure:{client_code}` | Serialised PricingProcedure + steps | 1 hour | post_save on PricingProcedure / PricingStep |
+| `condition_records:{client_code}:{condition_type}` | ConditionRecord lookup table | 15 min | post_save on ConditionRecord |
+| `currency_rules:{client_code}` | ClientCurrencyRule list | 1 hour | post_save on ClientCurrencyRule |
 
 ### Background Tasks (Celery)
 
@@ -1495,8 +1495,8 @@ chain, not plain `Template()` rendering. Seeded defaults that need cotton wrap
 the include instead, e.g. `{% include 'cotton/navbar_v001.html' %}`.
 
 ### Caching & invalidation
-- `client_template:{client_id}:{key}:{country}` → resolved HTML (LocMemCache fallback clears everything).
-- `sector_chain:{client_id}` → list of ancestor node ids (deepest-first), exception-safe.
+- `client_template:{client_code}:{key}:{country}` → resolved HTML (LocMemCache fallback clears everything).
+- `sector_chain:{client_code}` → list of ancestor node ids (deepest-first), exception-safe.
 - Invalidation (`mysite/signals.py`): SectorTemplate save/delete clears
   `client_template:*`; any `TaxonomyNode` move busts all chains; Client save
   refreshes its own chain + templates.

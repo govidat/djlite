@@ -13,7 +13,7 @@ The platform starts as a page-builder CMS and grows incrementally into a full-fe
 ### 1. Multi-Tenant Client Onboarding
 - The platform hosts multiple SME clients under a single deployment.
 - Each client operates in a fully isolated context: their own pages, users, content, themes, and settings.
-- Clients are accessed via path prefix routing: `/{client_id}/`.
+- Clients are accessed via path prefix routing: `/{client_code}/`.
 - Tenant identity is resolved on every request by `CustomerProfileMiddleware`, which attaches `request.client` (a `Client` instance) from URL kwargs, with a session fallback. Context processors consume `request.client` without re-querying.
 - Clients support a **parent-child hierarchy** (`Client.parent` self-FK) enabling sub-client or franchise structures.
 
@@ -110,7 +110,7 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
 - Items are domain-agnostic (`Item` model) — can represent products, projects,
   songs, or documents. Domain-specific fields go in a `attributes` JSONB field.
 - Items can be **global** (available to all clients) or **client-specific**.
-  Client-specific items override global items of the same `item_id`.
+  Client-specific items override global items of the same `item_code`.
 - Multiple independent hierarchies (Category, Geography, Department, etc.)
   are supported via a `Taxonomy` / `TaxonomyNode` model using **materialized
   path** for efficient subtree queries.

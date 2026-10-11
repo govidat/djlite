@@ -25,13 +25,13 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] Deploy skeleton app to Railway/Render (establish pipeline early)
 
 ### Milestone 1.2 — Multi-Tenancy Core ✅ Done
-- [x] `Client` model: `client_id` (LowercaseCharField), `parent` (self-FK for hierarchy), `language_list` (JSONField), `theme_list` (JSONField), translatable `name` / `nb_title`
-- [x] `CustomerProfileMiddleware`: resolves `/{client_id}/` → `request.client`; URL kwargs → session fallback
+- [x] `Client` model: `client_code` (LowercaseCharField), `parent` (self-FK for hierarchy), `language_list` (JSONField), `theme_list` (JSONField), translatable `name` / `nb_title`
+- [x] `CustomerProfileMiddleware`: resolves `/{client_code}/` → `request.client`; URL kwargs → session fallback
 - [x] `client_context` context processor: consumes `request.client`, calls `fetch_clientstatic()`, delivers `client`, `theme`, `page_dict` to all templates
-- [x] `ClientLocation` model: `location_id`, `location_type` (store/branch/warehouse/office), FK to `Client`
+- [x] `ClientLocation` model: `location_code`, `location_type` (store/branch/warehouse/office), FK to `Client`
 - [x] `LowercaseCharField` custom field for all natural-key IDs
 - [x] Explicit `AppConfig` for `mysite` (verify app label matches in all migrations)
-- [x] URL namespace: confirm `/{client_id}/` prefix routes are fully wired in `urls.py`
+- [x] URL namespace: confirm `/{client_code}/` prefix routes are fully wired in `urls.py`
 - [x] `NavItem` model: `name` (translatable), `location` (header/footer/sidebar),
       `nav_type` (page/url/anchor/label), optional FK to `Page`, `url`,
       `order`, `open_in_new_tab`, `parent` self-FK for one level of nesting.
@@ -77,12 +77,12 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] Language switcher UI wired end-to-end (session-based language preference per customer per client)
 
 ### Milestone 1.5 — Page Builder Models ✅ Done
-- [x] `Page`: `page_id`, `parent` (self-FK), `order`, `hidden`, translatable `name`; `unique_together (client, page_id)`
+- [x] `Page`: `page_code`, `parent` (self-FK), `order`, `hidden`, translatable `name`; `unique_together (client, page_code)`
 - [x] `Layout`: single self-referential model with `level` (10/20/30/40), `parent`, `slug`, `order`, `css_class`, `style`, `hidden`; `unique_together (page, level, slug)`; `clean()` validates parent-level integrity
-- [x] `Component`: `OneToOneField(Layout)`, `comp_id` (hero/card/accordion/carousel), styling fields per component type, `config` JSONField; `level=40` only
+- [x] `Component`: `OneToOneField(Layout)`, `component_type` (hero/card/accordion/carousel), styling fields per component type, `config` JSONField; `level=40` only
 - [x] `ComponentSlot`: FK to `Component`, `slot_type` (figure/text), `order`; figure fields (`image_url`, `alt`); `comptextblocks` GenericRelation
-- [x] `ComptextBlock`: GenericForeignKey parent, `block_id` (title/content/actbut), `order`, `css_class`, `href_page`; `textstbitems` GenericRelation
-- [x] `TextstbItem`: GenericForeignKey parent, `item_id` (text/svg/badge), `order`, `css_class`, `svg_text`
+- [x] `ComptextBlock`: GenericForeignKey parent, `block_type` (title/content/actbut), `order`, `css_class`, `href_page`; `textstbitems` GenericRelation
+- [x] `TextstbItem`: GenericForeignKey parent, `item_type` (text/svg/badge), `order`, `css_class`, `svg_text`
 - [x] `SvgtextbadgeValue`: FK to `TextstbItem`, `language_code`, `stext`, `ltext`
 - [x] `ThemePreset`: full design token model (colours, typography, spacing, radius, shadow)
 - [x] `Theme`: FK to `Client` + `ThemePreset`, `overrides` JSONField, `is_default`
@@ -101,7 +101,7 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] Signal: `post_save` / `post_delete` on `PageContent` invalidates `clientstatic` cache
 - [x] `|safe` filter in template — developer-authored HTML only; sanitiser deferred to Phase 2
 - [ ] Document the HTML authoring workflow in README (which tools work, how to paste)
-- [x] `fetch_clientstatic(client_id, use_cache, timeout)` — single deeply-prefetched query + cache
+- [x] `fetch_clientstatic(client_code, use_cache, timeout)` — single deeply-prefetched query + cache
 - [x] `build_client_payload()` — builds full client dict (languages, themes, pages, page_tree)
 - [x] `build_page()` / `build_layout()` / `build_component()` / `build_slot()` — recursive tree builders
 - [x] `build_blocks()` / `build_stb_item()` / `build_values()` — text content serialisers
@@ -110,7 +110,7 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] `resolve_theme()` — merges ThemePreset base tokens with Theme.overrides
 - [x] `THEME_PRESET_FIELDS` cached at import time
 - [x] `LocMemCache` configured (`translations-cache`)
-- [x] **Cache invalidation signals** — `post_save` on `Client`, `Page`, `Layout`, `Component`, `ComponentSlot`, `Theme` must call `cache.delete(f"clientstatic:{client_id}")`. Not yet implemented. Without this, content edits don't reflect until cache expires or server restarts.
+- [x] **Cache invalidation signals** — `post_save` on `Client`, `Page`, `Layout`, `Component`, `ComponentSlot`, `Theme` must call `cache.delete(f"clientstatic:{client_code}")`. Not yet implemented. Without this, content edits don't reflect until cache expires or server restarts.
 - [ ] Switch to Redis cache in production (config is commented in settings — uncomment and wire to env var)
 - [ ] `use_cache=True` — currently hardcoded `False` in some call sites for debugging; restore before production
 
@@ -120,10 +120,10 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [x] `set_theme` view — POST handler, stores `active_theme_id` in session
 - [x] `landing_page` view — root URL with no client context
 - [x] `django-cotton` component templates wired for component types
-- [ ] Cotton component templates for all `comp_id` types: `hero`, `card`, `accordion`, `carousel` — confirm all are implemented
-- [ ] 404 handling for unknown `client_id` slugs (currently raises `Client.DoesNotExist`, not a clean 404)
+- [ ] Cotton component templates for all `component_type` types: `hero`, `card`, `accordion`, `carousel` — confirm all are implemented
+- [ ] 404 handling for unknown `client_code` slugs (currently raises `Client.DoesNotExist`, not a clean 404)
 - [ ] 404 handling for unpublished / hidden pages
-- [ ] Homepage routing: `/{client_id}/` → first published page or configurable homepage
+- [ ] Homepage routing: `/{client_code}/` → first published page or configurable homepage
 - [x] Split `models.py` into `models/` package:
       base.py, global_config.py, client.py, nav.py,
       page.py, component.py, users.py
@@ -169,7 +169,7 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 - [ ] `Category` model: hierarchical (adjacency list or MPTT), tenant-scoped, translatable
 - [ ] `Product` model: `name`, `description`, `SKU`, images, `price`, `stock_status` — translatable
 - [ ] `ProductVariant`: size, colour, or custom attribute variants
-- [ ] Product list and detail pages (as new `comp_id` types in the component system, or dedicated URL patterns)
+- [ ] Product list and detail pages (as new `component_type` types in the component system, or dedicated URL patterns)
 - [ ] Client admin: product CRUD with image upload
 - [ ] Media file migration: PaaS volume → S3 / Cloudflare R2
 - [ ] Celery + Redis: background jobs for bulk product import (CSV)
@@ -199,14 +199,14 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
       `get_resolved_taxonomies()`, `get_taxonomy_tree()`,
       `get_item_queryset()`, `build_catalogue_payload()`,
       `get_facet_counts()`, `paginate_items()`
-- [ ] Unit test: global item overridden by client item of same `item_id`
+- [ ] Unit test: global item overridden by client item of same `item_code`
 - [ ] Unit test: subtree filter includes descendants
 - [ ] Unit test: JSONB attribute filter
 ### Sprint 2.4 — Views and URLs
 - [ ] Create `mysite/views/catalogue.py`:
       `catalogue_page`, `catalogue_filter`, `item_detail`
 - [ ] Add to `mysite/views/__init__.py`
-- [ ] Wire URLs in `mydj/urls.py` BEFORE `<str:client_id>/<str:page>/` catch-all
+- [ ] Wire URLs in `mydj/urls.py` BEFORE `<str:client_code>/<str:page>/` catch-all
 - [ ] Add `django-htmx` to `requirements.txt` and `MIDDLEWARE`
 ### Sprint 2.5 — Templates
 - [ ] `templates/catalogue/page_catalogue.html` (Track B full page)
@@ -226,10 +226,10 @@ Each phase delivers a fully working, deployable product. No phase depends on unb
 ### Sprint 2.7 — Sample Data and Testing
 - [ ] Create `management/commands/load_sample_products.py`
 - [ ] Run: `python manage.py load_sample_products bahushira`
-- [ ] End-to-end test: visit `/{client_id}/catalogue/`
+- [ ] End-to-end test: visit `/{client_code}/catalogue/`
 - [ ] Test HTMX filter: click category checkbox → items update without reload
 - [ ] Test pagination: next/prev updates items without reload
-- [ ] Test item detail: `/{client_id}/catalogue/tshirt-001/`
+- [ ] Test item detail: `/{client_code}/catalogue/tshirt-001/`
 - [ ] Test language switch: item names render in active language
 - [ ] Test global/client override: global item suppressed by client item
 ### Sprint 2.8 — Production Hardening
@@ -262,7 +262,7 @@ demand sidebar nav, etc.) moved from filesystem fallbacks into the database.
       cotton tags only compile through the loader chain)
 - [x] `render_client_template` templatetag rewritten around DB resolution;
       `_resolve_client_templates()` / `template_info` payload removed from `utils/catalogue_queries.py`
-- [x] Cache: `client_template:{client_id}:{key}`, `sector_chain:{client_id}`;
+- [x] Cache: `client_template:{client_code}:{key}`, `sector_chain:{client_code}`;
       invalidated on SectorTemplate save/delete, TaxonomyNode moves, Client saves
 - [x] Admin: standalone `SectorTemplateAdmin`; `sector` field on Client admin;
       SectorTemplate is superuser-only (`ADMIN_ONLY_MODELS`)
@@ -348,7 +348,7 @@ Phase 3B builds standalone demand-planning master data (`PlanningLocation`,
 `PlanningCustomer`, `SalesNode`, `SalesForecastLink`, `DistributionChannel`) on
 top of the existing `Item` catalogue, and adds a `demand/` model package. The
 frontend is the existing **Django Template + HTMX** stack (`mysite/demand_ui/`)
-served under `/{client_id}/planning/`, alongside a DRF JSON API
+served under `/{client_code}/planning/`, alongside a DRF JSON API
 (`mysite/api/demand/`).
  
 ---
@@ -415,7 +415,7 @@ Query-time netting helper
 - [x] Unit tests: no adjustment / CANDIDATE / REJECTED → net == raw; CONFIRMED → net correctly subtracted; `use_net=False` → raw regardless (`test_actuals_net.py`)
 
 Detection engine
-- [x] Celery task `run_outlier_detection(client_id, target_period_start, target_period_end, triggered_by_user_id=None)` in `mysite/tasks/demand/detect_outliers.py`:
+- [x] Celery task `run_outlier_detection(client_code, target_period_start, target_period_end, triggered_by_user_id=None)` in `mysite/tasks/demand/detect_outliers.py`:
   Reads thresholds from `ForecastingConfig` (lazily created with system defaults if absent); pulls `ActualSale` rows in `[target_period_start, target_period_end]`; groups series by (planning_location, item, distribution_channel, planning_customer); skips series with fewer than `min_history_periods`; runs residual MAD detection on `mad_threshold`; persistence check via `persistence_periods` (sustained elevation = level shift, not flagged); proposes **CANDIDATE only** (never auto-confirms); one `ActualSaleOutlierAdjustment` per flagged row, skipping rows that already have an adjustment (1:1 — a row is never re-proposed, so re-runs are idempotent); notifies planners of the candidate count; records run identity/range on `ForecastingConfig`
 - [x] Trigger: planner submission of the Outlier Detection range form (HTMX) — **not** the import-completion path
 - [x] Unit tests: single-period spike → flagged; sustained increase of `persistence_periods` → not flagged; different `mad_threshold` per Client → different candidate sets; short history → skipped (`test_outlier_detection.py`)
@@ -565,7 +565,7 @@ Forecast-horizon uplift (output)
       `pre_scheme_statistical_qty` (`test_scheme_forecast_uplift.py`)
 
 Detection + review queue (Django Template + HTMX, `mysite/demand_ui/`)
-- [ ] Celery task `detect_scheme_candidates(client_id, target_period_start, target_period_end,
+- [ ] Celery task `detect_scheme_candidates(client_code, target_period_start, target_period_end,
       triggered_by_user_id=None)` — RAW product-group aggregates, MAD + persistence spike detection,
       skip periods covered by an ACTIVE scheme (window OR shadow), implied
       `qty_uplift = period/median(neighbours) − 1`, DRAFT candidates only; records run identity on
@@ -906,7 +906,7 @@ into a 3A `Order` — that is the only point of contact between the two phases.
     coverage_policy FK, safety_stock_logic, stocking_policy FK, transfer_policy FK,
     service_level_policy FK, forecast_trust_pct, planner_approval_rule)` — unique on
     `(client, abc_class, demand_pattern_class)`, 12 rows per client
-- [ ] Seed migration / management command: `seed_default_policy_matrix(client_id)` — loads the
+- [ ] Seed migration / management command: `seed_default_policy_matrix(client_code)` — loads the
       reference matrix from the spec (A×Smooth = Continuous/Min-Max/30d ... C×Lumpy = Buy-to-Order/
       Emergency Stock at HO) as the out-of-box default, editable per client
 - [ ] Effective review frequency resolver: `resolve_review_frequency(policy, data_refresh_frequency)`
@@ -954,9 +954,9 @@ into a 3A `Order` — that is the only point of contact between the two phases.
     match (reuses the Phase 2 taxonomy materialized-path walk)
   - `validate_split_sourcing(rules_for_key)` — enforces same-scope-level-only legs and
     `Σ allocation_pct == 100%`
-  - `materialize_resolved_supply_source(client_id)` — bulk resolves all item×location combinations,
+  - `materialize_resolved_supply_source(client_code)` — bulk resolves all item×location combinations,
     writes `ResolvedSupplySource`
-- [ ] Celery task `resolve_supply_network(client_id)`: nightly beat + triggered on
+- [ ] Celery task `resolve_supply_network(client_code)`: nightly beat + triggered on
       `SupplyNetworkRule` post_save
 - [ ] Periodic integrity job: catches rules whose `valid_to` has lapsed and silently broken a
       previously-100%-summing split, without requiring any row edit to surface it
@@ -976,11 +976,11 @@ into a 3A `Order` — that is the only point of contact between the two phases.
   - `compute_net_own_demand(node, period)` — `FCST(N) − Σ bypass legs of children not sourced from N`
   - `compute_replenishment_requirement(node, source, period)` — recursive `RR(N, via X)` per the spec
     algorithm, generalized to arbitrary depth and bypass patterns
-  - `run_propagation(client_id, operating_plan_version_id)` — orchestrates full-network propagation,
+  - `run_propagation(client_code, operating_plan_version_id)` — orchestrates full-network propagation,
     writes `NodeReplenishmentRequirement`
-  - `check_conservation_invariant(client_id, version_id)` — `Σ RR at every vendor-facing leg == Σ FCST
+  - `check_conservation_invariant(client_code, version_id)` — `Σ RR at every vendor-facing leg == Σ FCST
     at every end node`; raises (does not warn-and-continue) on violation
-- [ ] Celery task `propagate_replenishment_demand(client_id, version_id)`, scheduled per client at
+- [ ] Celery task `propagate_replenishment_demand(client_code, version_id)`, scheduled per client at
       `resolve_review_frequency()` cadence
 - [ ] Regression test suite: encode the worked example from the spec (HO 300 / DC1 200 split 60/40 /
       DC2 100 Vendor-only → RR(DC1,HO)=120, RR(DC1,Vendor)=80, RR(DC2,Vendor)=100,
@@ -1016,7 +1016,7 @@ into a 3A `Order` — that is the only point of contact between the two phases.
     NodeReplenishmentRequirement) − on_hand_available − scheduled_receipts + uncommitted_open_demand`
   - Time-fencing: full detail only inside `lead_time + review_period + safety_margin`; aggregated
     total beyond the fence
-- [ ] Celery task `run_netting(client_id, snapshot_id)` — writes `InventoryPosition`
+- [ ] Celery task `run_netting(client_code, snapshot_id)` — writes `InventoryPosition`
 - [ ] Sparse-transmission support: ingestion endpoint tolerates omitted zero-position rows without
       treating them as data-quality errors
 - [ ] Feed manifest filter: expected-feed generator consults `ItemPlanningProfile.is_active_for_ide`
@@ -1101,7 +1101,7 @@ into a 3A `Order` — that is the only point of contact between the two phases.
     low, erratic local demand better served by a DC/HO buffer
   - Every generator writes the full explainability payload (`inputs`, `policy_cell`, `formula_used`,
     `trigger_reason`, `alternatives`, `expected_outcome`) at creation time, not reconstructed later
-- [ ] Celery task `generate_recommendations(client_id)` — orchestrates all generators after netting +
+- [ ] Celery task `generate_recommendations(client_code)` — orchestrates all generators after netting +
       breakpoint evaluation complete for a review cycle
 - [ ] REST endpoints: `GET /api/ide/recommendations/`, `POST /api/ide/recommendations/{id}/decide/`
 - [ ] Unit tests: each rec_type generator produces a populated explainability payload; planner
@@ -1378,7 +1378,7 @@ Phase 3 commerce models are Beckn v2.0 schema-aligned. Full Beckn network partic
   - `resolve_condition_record(step, context)` — walks access sequence, returns ConditionRecord or None
   - `evaluate_scale(condition_record, context_value)` — returns step rate/amount from ConditionScale
   - `execute_pricing_procedure(document)` — runs all steps sequentially, writes PricingResultLine records, updates document totals
-- [ ] Cache: `pricing_procedure:{client_id}` (1hr), `condition_records:{client_id}:{type}` (15min)
+- [ ] Cache: `pricing_procedure:{client_code}` (1hr), `condition_records:{client_code}:{type}` (15min)
 - [ ] Admin: `PricingProcedureAdmin` with inline `PricingStepInline`; `ConditionRecordAdmin` with inline `ConditionScaleInline`
 - [ ] Unit tests: % condition on derived base; slab step function; header condition apportionment; statistical condition exclusion from total; access sequence fallthrough
 
