@@ -18,15 +18,15 @@ class GlobalValInline(TranslationBaseModelAdmin, nested_admin.NestedTabularInlin
 
 class GlobalValCatAdmin(nested_admin.NestedModelAdmin, BaseAdminInlinecss):
     inlines     = [GlobalValInline]
-    list_display = ('globalvalcat_id',)
-    search_fields = ('globalvalcat_id',)
+    list_display = ('globalvalcat_code',)
+    search_fields = ('globalvalcat_code',)
 
 # VERY IMPORTANT Any content_type model should be of NestedGenericTabularInline
 
 class ThemePresetAdmin(admin.ModelAdmin):
     #list_display = ("language_id", "label_obj")
     #fields = ["language_id", "label_obj"]
-    search_fields = ("themepreset_id",)
+    search_fields = ("themepreset_code",)
 
 class CountryAdmin(TranslationBaseModelAdmin, admin.ModelAdmin, ClientLanguageMixinV2):
     list_display = ('code', 'flag_emoji', 'name', 'order', 'is_active')

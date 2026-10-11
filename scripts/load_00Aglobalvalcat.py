@@ -44,37 +44,37 @@ def load_globalvalcats(
 
     for row in rows:
 
-        globalvalcat_id = clean(
-            row.get("globalvalcat_id"),
+        globalvalcat_code = clean(
+            row.get("globalvalcat_code"),
             lower=True,
         )
 
-        if not globalvalcat_id:
+        if not globalvalcat_code:
 
             print(
-                "Skipping empty globalvalcat_id"
+                "Skipping empty globalvalcat_code"
             )
 
             skipped_count += 1
             continue
 
-        if globalvalcat_id in seen:
+        if globalvalcat_code in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{globalvalcat_id}"
+                f"{globalvalcat_code}"
             )
 
             skipped_count += 1
             continue
 
-        seen.add(globalvalcat_id)
+        seen.add(globalvalcat_code)
 
         if dry_run:
 
             print(
                 f"[DRY RUN] "
-                f"{globalvalcat_id}"
+                f"{globalvalcat_code}"
             )
 
         else:
@@ -82,7 +82,7 @@ def load_globalvalcats(
             obj, created = (
                 GlobalValCat.objects.update_or_create(
 
-                    globalvalcat_id=globalvalcat_id,
+                    globalvalcat_code=globalvalcat_code,
                 )
             )
 
@@ -96,7 +96,7 @@ def load_globalvalcats(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"GlobalValCat: "
-                    f"{globalvalcat_id}"
+                    f"{globalvalcat_code}"
                 )
 
     print()

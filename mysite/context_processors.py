@@ -99,7 +99,7 @@ def client_context(request):
     selected_theme_id = request.session.get('active_theme_id')
     selected_theme = next(
         (t for t in client_dict.get('themes', [])
-         if t['theme_id'] == selected_theme_id),
+         if t['theme_code'] == selected_theme_id),
         None
     )
     if not selected_theme:

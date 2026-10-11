@@ -36,7 +36,7 @@ This gives you:
 ## `data/globalvalcat.csv`
 
 ```csv
-globalvalcat_id
+globalvalcat_code
 account
 language
 testcat
@@ -47,7 +47,7 @@ testcat
 ## `data/globalval.csv`
 
 ```csv
-globalvalcat_id,key,keyval_en,keyval_hi,keyval_fr
+globalvalcat_code,key,keyval_en,keyval_hi,keyval_fr
 account,logout,Logout,hiLogout,frLogout
 account,signIn,SignIn,hiSignIn,frSignIn
 account,signin_up,Signin/Signup,hiSignin/Signup,frSignin/Signup
@@ -94,7 +94,7 @@ def load_globalvalcats():
         for row in reader:
 
             GlobalValCat.objects.update_or_create(
-                globalvalcat_id=row["globalvalcat_id"]
+                globalvalcat_code=row["globalvalcat_code"]
             )
 
     print("Loaded GlobalValCat")
@@ -105,7 +105,7 @@ def load_globalvals():
     file_path = DATA_DIR / "globalval.csv"
 
     globalvalcats = {
-        c.globalvalcat_id: c
+        c.globalvalcat_code: c
         for c in GlobalValCat.objects.all()
     }
 
@@ -116,7 +116,7 @@ def load_globalvals():
         for row in reader:
 
             GlobalVal.objects.update_or_create(
-                globalvalcat=globalvalcats[row["globalvalcat_id"]],
+                globalvalcat=globalvalcats[row["globalvalcat_code"]],
                 key=row["key"],
 
                 defaults={

@@ -23,7 +23,7 @@ DATA_DIR = BASE_DIR / "data"
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 
-# item_id,variant_id,sku,gtin,
+# item_id,variant_code,sku,gtin,
 # name_en,name_hi,name_fr,name_ta,
 # price,stock,is_active,image_url,
 # order,attributes,client_id
@@ -127,8 +127,8 @@ def load_val01(
             lower=True,
         )
 
-        variant_id = clean(
-            row.get("variant_id"),
+        variant_code = clean(
+            row.get("variant_code"),
             lower=True,
         )
 
@@ -154,10 +154,10 @@ def load_val01(
             skipped_count += 1
             continue
 
-        if not variant_id:
+        if not variant_code:
 
             print(
-                "Skipping row with empty variant_id"
+                "Skipping row with empty variant_code"
             )
 
             skipped_count += 1
@@ -166,7 +166,7 @@ def load_val01(
         key = (
             client_id,
             item_id,
-            variant_id,
+            variant_code,
         )
 
         if key in seen:
@@ -263,7 +263,7 @@ def load_val01(
                 f"[DRY RUN] "
                 f"{client_id} / "
                 f"{item_id} / "
-                f"{variant_id}"
+                f"{variant_code}"
             )
 
             if verbose:
@@ -279,7 +279,7 @@ def load_val01(
             ItemVariant.objects.update_or_create(
 
                 item=item,
-                variant_id=variant_id,
+                variant_code=variant_code,
 
                 defaults=defaults,
             )
@@ -297,7 +297,7 @@ def load_val01(
                 f"ItemVariant: "
                 f"{client_id} / "
                 f"{item_id} / "
-                f"{variant_id}"
+                f"{variant_code}"
             )
 
     # -----------------------------------------------------
@@ -500,8 +500,8 @@ def load_item_variants():
             row.get("item_id")
         ).lower()
 
-        variant_id = clean(
-            row.get("variant_id")
+        variant_code = clean(
+            row.get("variant_code")
         ).lower()
 
         item = items.get(
@@ -554,7 +554,7 @@ def load_item_variants():
             ItemVariant.objects.update_or_create(
 
                 item=item,
-                variant_id=variant_id,
+                variant_code=variant_code,
 
                 defaults=defaults,
             )
@@ -564,7 +564,7 @@ def load_item_variants():
             f"{'Created' if created else 'Updated'} "
             f"{client_id} / "
             f"{item_id} / "
-            f"{variant_id}"
+            f"{variant_code}"
         )
 
     print("Loaded ItemVariant")

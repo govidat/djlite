@@ -172,7 +172,7 @@ class Client(models.Model):
 
 class Theme(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='themes')    
-    theme_id = LowercaseCharField(max_length=10)  
+    theme_code = LowercaseCharField(max_length=10)  
     themepreset = models.ForeignKey('mysite.ThemePreset', on_delete=models.SET_NULL, null=True)
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators, null=True)   # Optional
     order = models.PositiveIntegerField(default=0)
@@ -186,14 +186,14 @@ class Theme(models.Model):
 
     def __str__(self):
         client_id = getattr(self.client, 'client_id', '?')
-        return f"{client_id} / {self.theme_id}"        
-        #return f"{self.client.client_id} / {self.theme_id}"
+        return f"{client_id} / {self.theme_code}"        
+        #return f"{self.client.client_id} / {self.theme_code}"
       
     # for usage in Admin Panel
     class Meta:
         #verbose_name = "00-04 Project Page"
         #verbose_name_plural = "My Custom Models"
-        unique_together = ("client", "theme_id")
+        unique_together = ("client", "theme_code")
         ordering = ["order"]
         indexes = [
             models.Index(fields=["client", "order"]),

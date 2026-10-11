@@ -755,14 +755,14 @@ class ItemVariantInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInl
     extra               = 0
     classes             = ['collapse']
     #TRANSLATED_FIELDS = ('name', )
-    #fields = ('variant_id', 'sku', 'gtin', 'price', 'stock', 'is_active', 'attributes')
+    #fields = ('variant_code', 'sku', 'gtin', 'price', 'stock', 'is_active', 'attributes')
     def get_fieldsets(self, request, obj=None):
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request, ['name'], obj
         )
         fieldsets = [
             ('General', {
-                'fields': ('variant_id', 'sku', 'gtin', 'price', 'stock', 'is_active', 'attributes'),
+                'fields': ('variant_code', 'sku', 'gtin', 'price', 'stock', 'is_active', 'attributes'),
                 'classes': ('collapse',),
             }),            
             ('Main Language', {
@@ -788,7 +788,7 @@ class ItemVariantInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInl
         )
         return (
             ('General', {
-                'fields': ('variant_id', 'sku', 'gtin', 'price', 'stock', 'is_active', 'attributes'),
+                'fields': ('variant_code', 'sku', 'gtin', 'price', 'stock', 'is_active', 'attributes'),
                 'classes': ('collapse',),
             }),
             ('Main Language', {

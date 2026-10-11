@@ -410,7 +410,7 @@ Context variables (all pre-resolved in view):
           {% for variant in variants %}
           <label class="cursor-pointer">
             <input type="radio" name="variant"
-                   value="{{ variant.variant_id }}"
+                   value="{{ variant.variant_code }}"
                    class="sr-only peer"
                    {% if forloop.first %}checked{% endif %}>
             <span class="btn btn-sm btn-outline peer-checked:btn-primary
@@ -884,7 +884,7 @@ Context variables (all pre-resolved in view):
           <label class="cursor-pointer">
             <input type="radio"
                    name="variant"
-                   value="{{ variant.variant_id }}"
+                   value="{{ variant.variant_code }}"
                    class="sr-only peer"
                    {% if forloop.first %}checked{% endif %}>
             <span class="btn btn-sm btn-outline

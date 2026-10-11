@@ -39,10 +39,10 @@ def load_globalvals(
 
     # ── preload GlobalValCat ─────────────────────────
 
-    globalvalcat_ids = {
+    globalvalcat_codes = {
 
         clean(
-            r.get("globalvalcat_id"),
+            r.get("globalvalcat_code"),
             lower=True,
         )
 
@@ -51,10 +51,10 @@ def load_globalvals(
 
     globalvalcats = {
 
-        c.globalvalcat_id: c
+        c.globalvalcat_code: c
 
         for c in GlobalValCat.objects.filter(
-            globalvalcat_id__in=globalvalcat_ids
+            globalvalcat_code__in=globalvalcat_codes
         )
     }
 
@@ -66,8 +66,8 @@ def load_globalvals(
 
     for row in rows:
 
-        globalvalcat_id = clean(
-            row.get("globalvalcat_id"),
+        globalvalcat_code = clean(
+            row.get("globalvalcat_code"),
             lower=True,
         )
 
@@ -76,18 +76,18 @@ def load_globalvals(
             lower=True,
         )
 
-        if not globalvalcat_id or not key:
+        if not globalvalcat_code or not key:
 
             print(
                 "Skipping row with empty "
-                "globalvalcat_id/key"
+                "globalvalcat_code/key"
             )
 
             skipped_count += 1
             continue
 
         duplicate_key = (
-            globalvalcat_id,
+            globalvalcat_code,
             key,
         )
 
@@ -104,14 +104,14 @@ def load_globalvals(
         seen.add(duplicate_key)
 
         globalvalcat = globalvalcats.get(
-            globalvalcat_id
+            globalvalcat_code
         )
 
         if not globalvalcat:
 
             print(
                 f"Missing GlobalValCat: "
-                f"{globalvalcat_id}"
+                f"{globalvalcat_code}"
             )
 
             skipped_count += 1
@@ -129,7 +129,7 @@ def load_globalvals(
 
             print(
                 f"[DRY RUN] "
-                f"{globalvalcat_id} / "
+                f"{globalvalcat_code} / "
                 f"{key}"
             )
 
@@ -158,7 +158,7 @@ def load_globalvals(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"GlobalVal: "
-                    f"{globalvalcat_id} / {key}"
+                    f"{globalvalcat_code} / {key}"
                 )
 
     print()

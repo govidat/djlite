@@ -26,12 +26,12 @@ def upload_stb_items(items_data, parent_obj):
         item, created = TextstbItem.objects.update_or_create(
             content_type=ct,
             object_id=parent_obj.id,
-            item_id=item_data["item_id"],
+            item_type=item_data["item_type"],
             order=item_data.get("order", 1),
             defaults=defaults
         )
 
-        #print(f"  TextstbItem: item_id={item_data['item_id']} "
+        #print(f"  TextstbItem: item_type={item_data['item_type']} "
         #      f"parent={parent_obj.__class__.__name__}:{parent_obj.id} "
         #      f"created={created} id={item.id}")
 
@@ -85,11 +85,11 @@ def upload_comptextblocks(blocks_data, parent_obj):
         block, created = ComptextBlock.objects.update_or_create(
             content_type=ct,
             object_id=parent_obj.id,
-            block_id=block_data["block_id"],
+            block_type=block_data["block_type"],
             order=block_data.get("order", 1),
             defaults=defaults
         )
-        #print(f"  ComptextBlock: block_id={block_data['block_id']} "
+        #print(f"  ComptextBlock: block_type={block_data['block_type']} "
         #      f"created={created} id={block.id}")
         upload_stb_items(block_data.get("items", []), block)
 
@@ -100,7 +100,7 @@ def upload_gentextblocks(blocks_data, parent_obj):
         block, created = GentextBlock.objects.update_or_create(
             content_type=ct,
             object_id=parent_obj.id,
-            block_id=block_data["block_id"],
+            block_type=block_data["block_type"],
             order=block_data.get("order", 1),
             defaults={
                 "ltext":     block_data.get("ltext", ""),

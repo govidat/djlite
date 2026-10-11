@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        var $compId = $(row).find('select[name$="-comp_id"]');
+        var $compId = $(row).find('select[name$="-component_type"]');
         if ($compId.length) {
             toggleCompFields($compId[0]);
             $compId.on('change', function () {
@@ -187,8 +187,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
 
-            // L0 comp_id
-            const $compId = $(row).find('select[name$="-comp_id"]');
+            // L0 component_type
+            const $compId = $(row).find('select[name$="-component_type"]');
             if ($compId.length) {
                 toggleCompFields($compId[0]);
                 $compId.on('change', function () {

@@ -4,7 +4,7 @@
 {% comment %}
 
   {
-      "theme_id": "dark",
+      "theme_code": "dark",
       "ltext": "None",
       "is_default": "False",
       "translations": {
@@ -17,7 +17,7 @@
       },
       "textblocks": [
         {
-          "block_id": "name",
+          "block_type": "name",
           "order": 1,
           "css_class": "None",
           "ltext": "None",
@@ -52,8 +52,8 @@
   {% csrf_token %}
   <select name="theme" onchange="this.form.submit()" class="select select-sm">
     {% for t in client.themes %}
-      <option value="{{ t.theme_id }}"
-        {% if t.theme_id == request.session.active_theme_id %}selected{% endif %}>
+      <option value="{{ t.theme_code }}"
+        {% if t.theme_code == request.session.active_theme_id %}selected{% endif %}>
         {%  mytextv2 t.textblocks.name.0.items.0.values 'stext' %}
       </option>
     {% endfor %}
@@ -90,9 +90,9 @@
         <button
           type="submit"
           name="theme"
-          value="{{ t.theme_id }}"
+          value="{{ t.theme_code }}"
           class="btn btn-sm btn-block justify-start
-                 {% if t.theme_id == request.session.active_theme_id %}
+                 {% if t.theme_code == request.session.active_theme_id %}
                  btn-active
                  {% endif %}">
           <c-svgtextsvg  :text="t.name" :svg_pre="t.svg_pre" :svg_suf="t.svg_suf"></c-svgtextsvg>
@@ -135,9 +135,9 @@ Datastar way. This code is NOT WORKING
           data-swap="outerHTML"
           data-target="#theme-vars"
           name="theme"
-          value="{{ t.theme_id }}"
+          value="{{ t.theme_code }}"
           class="btn btn-sm btn-block justify-start
-                {% if t.theme_id == request.session.active_theme_id %}
+                {% if t.theme_code == request.session.active_theme_id %}
                 btn-active
                 {% endif %}"
         >

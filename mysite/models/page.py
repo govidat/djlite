@@ -181,14 +181,14 @@ class Layout(models.Model):
     #    ("accordion", "Comp Accordion"),
     #    ("carousel", "Comp Carousel"),
     #)
-    #comp_id = models.CharField(max_length=30, choices=COMPONENT_TYPES, blank=True, null=True )
+    #component_type = models.CharField(max_length=30, choices=COMPONENT_TYPES, blank=True, null=True )
     class Meta:
         ordering = ("page", "level", "order")
         unique_together = ("page", "level", "slug")
         verbose_name = "01-03 Layout"
 
     def clean(self):
-        #if self.level != 40 and self.comp_id:
+        #if self.level != 40 and self.component_type:
         #    raise ValidationError("Component has to be at Level = 40")
         
         if self.level != 10 and not self.parent:

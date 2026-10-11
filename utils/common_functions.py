@@ -276,12 +276,12 @@ def build_stb_item(item):
         return None
 
     data = {
-        "type": item.item_id,
+        "type": item.item_type,
         "order": item.order,
         "css_class": item.css_class,
     }
 
-    if item.item_id == "svg":
+    if item.item_type == "svg":
         data["svg"] = item.svg_text
     else:
         # ✅ Use optimized function
@@ -316,7 +316,7 @@ def build_blocks(blocks_queryset):
 
         # ---- normal blocks ----
         result.append({
-            "block_id": block.block_id,
+            "block_type": block.block_type,
             "order": block.order,
             "css_class": block.css_class,
             "ltext": block.ltext,
@@ -331,17 +331,17 @@ def build_blocks(blocks_queryset):
     """
     "textblocks": [
       {
-        "block_id": "title",
+        "block_type": "title",
         "order": 1,
         "items": [...]
       },
       {
-        "block_id": "content",
+        "block_type": "content",
         "order": 2,
         "items": [...]
       },
       {
-        "block_id": "actbut",
+        "block_type": "actbut",
         "order": 3,
         "items": [...]
       }
@@ -441,10 +441,10 @@ def build_layout(layout, layout_map, client):
         "slug":      layout.slug,
         "order":     layout.order,
         "css_class": layout.css_class,
-        #"comp_id":   layout.comp_id,
+        #"component_type":   layout.component_type,
     }
 
-    #if layout.comp_id and layout.level == 40:
+    #if layout.component_type and layout.level == 40:
     if layout.level == 40:        
         component = build_component(layout, client)
         if component:
@@ -794,7 +794,7 @@ THEME_PRESET_FIELDS = [
     for f in ThemePreset._meta.get_fields()
     if f.concrete
     and not f.is_relation
-    and f.name not in ["id", "themepreset_id", "ltext", "is_system"]
+    and f.name not in ["id", "themepreset_code", "ltext", "is_system"]
 ]
 
 def resolve_theme(theme):
@@ -836,7 +836,7 @@ def resolve_theme(theme):
    "themes":[
       {
          "client":1,
-         "theme_id":"light",
+         "theme_code":"light",
          "themepreset":1,
          "ltext":"",
          "order":1,
@@ -887,7 +887,7 @@ def resolve_theme(theme):
       },
       {
          "client":1,
-         "theme_id":"dark",
+         "theme_code":"dark",
          "themepreset":2,
          "ltext":"",
          "order":2,
@@ -978,7 +978,7 @@ def resolve_theme(theme):
                                  "css_class":"",
                                  "component":{
                                     "layout":4,
-                                    "comp_id":"hero",
+                                    "component_type":"hero",
                                     "ltext":"Home Hero",
                                     "css_class":"",
                                     "card_body_class":"",
@@ -1003,7 +1003,7 @@ def resolve_theme(theme):
                                           "accordion_checked":false,
                                           "textblocks":[
                                              {
-                                                "block_id":"title",
+                                                "block_type":"title",
                                                 "order":1,
                                                 "css_class":"",
                                                 "ltext":"Home Title",
@@ -1027,7 +1027,7 @@ def resolve_theme(theme):
                                                 ]
                                              },
                                              {
-                                                "block_id":"content",
+                                                "block_type":"content",
                                                 "order":2,
                                                 "css_class":"",
                                                 "ltext":"Home content",
@@ -1116,7 +1116,7 @@ def resolve_theme(theme):
                                  "css_class":"",
                                  "component":{
                                     "layout":8,
-                                    "comp_id":"hero",
+                                    "component_type":"hero",
                                     "ltext":"About Hero",
                                     "css_class":"hero min-h-screen",
                                     "card_body_class":"",
@@ -1154,7 +1154,7 @@ def resolve_theme(theme):
                                           "accordion_checked":false,
                                           "textblocks":[
                                              {
-                                                "block_id":"title",
+                                                "block_type":"title",
                                                 "order":1,
                                                 "css_class":"",
                                                 "ltext":"About Title",
@@ -1178,7 +1178,7 @@ def resolve_theme(theme):
                                                 ]
                                              },
                                              {
-                                                "block_id":"content",
+                                                "block_type":"content",
                                                 "order":2,
                                                 "css_class":"",
                                                 "ltext":"About content",
@@ -1283,7 +1283,7 @@ def resolve_theme(theme):
   "themes": [
     {
       "client": 1,
-      "theme_id": "light",
+      "theme_code": "light",
       "themepreset": 1,
       "order": 1,
       "hidden": false,
@@ -1326,7 +1326,7 @@ def resolve_theme(theme):
     },
     {
       "client": 1,
-      "theme_id": "dark",
+      "theme_code": "dark",
       "themepreset": 2,
       "order": 2,
       "hidden": false,
@@ -1400,7 +1400,7 @@ def resolve_theme(theme):
                       "css_class": "",
                       "component": {
                         "layout": 4,
-                        "comp_id": "hero",
+                        "component_type": "hero",
                         "ltext": "Home Hero",
                         "hero_overlay": true,
                         "config": {},
@@ -1415,7 +1415,7 @@ def resolve_theme(theme):
                             "accordion_checked": false,
                             "textblocks": [
                               {
-                                "block_id": "title",
+                                "block_type": "title",
                                 "order": 1,
                                 "css_class": "",
                                 "ltext": "Home Title",
@@ -1430,7 +1430,7 @@ def resolve_theme(theme):
                                 ]
                               },
                               {
-                                "block_id": "content",
+                                "block_type": "content",
                                 "order": 2,
                                 "css_class": "",
                                 "ltext": "Home content",
@@ -1498,7 +1498,7 @@ def resolve_theme(theme):
                       "css_class": "",
                       "component": {
                         "layout": 8,
-                        "comp_id": "hero",
+                        "component_type": "hero",
                         "ltext": "About Hero",
                         "css_class": "hero min-h-screen",
                         "hero_overlay": true,
@@ -1524,7 +1524,7 @@ def resolve_theme(theme):
                             "accordion_checked": false,
                             "textblocks": [
                               {
-                                "block_id": "title",
+                                "block_type": "title",
                                 "order": 1,
                                 "css_class": "",
                                 "ltext": "About Title",
@@ -1539,7 +1539,7 @@ def resolve_theme(theme):
                                 ]
                               },
                               {
-                                "block_id": "content",
+                                "block_type": "content",
                                 "order": 2,
                                 "css_class": "",
                                 "ltext": "About content",

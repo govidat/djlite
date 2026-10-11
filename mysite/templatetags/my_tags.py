@@ -182,13 +182,13 @@ def _resolve_template_html(client_id, template_key, country_code=None):
 
 # this is to be used for getting the gentext like name, nb_title for further passing to svgtextbadge
 @register.simple_tag(takes_context=True)
-def mylist_bykey(context, lv_list=[], lv_val0="name", lv_key0="block_id"):
+def mylist_bykey(context, lv_list=[], lv_val0="name", lv_key0="block_type"):
      
     """ 
     Input:
       "textblocks": [
             {
-            "block_id": "name",
+            "block_type": "name",
             "order": 1,
             "css_class": "None",
             "ltext": "None",
@@ -216,7 +216,7 @@ def mylist_bykey(context, lv_list=[], lv_val0="name", lv_key0="block_id"):
             ]
             },
             {
-            "block_id": "nb_title",
+            "block_type": "nb_title",
             "order": 1,
             "css_class": "None",
             "ltext": "None",
@@ -248,7 +248,7 @@ def mylist_bykey(context, lv_list=[], lv_val0="name", lv_key0="block_id"):
         Output expected is:
         [   
             {
-            "block_id": "name",
+            "block_type": "name",
             "order": 1,
             "css_class": "None",
             "ltext": "None",

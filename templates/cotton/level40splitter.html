@@ -56,16 +56,16 @@ input type is :
         "alt": "Spiderman"
     }
     ],
-    "comp_id": "hero"
+    "component_type": "hero"
 }
 {% endcomment %}
     
-    {% if component.comp_id == "card" %}  
+    {% if component.component_type == "card" %}  
         <c-card :component="component"></c-card>                               
-    {% elif component.comp_id == "hero" %} 
+    {% elif component.component_type == "hero" %} 
         <c-hero :component="component"></c-hero>
-    {% elif component.comp_id == "accordion" %} 
+    {% elif component.component_type == "accordion" %} 
         <c-accordion :component="component"></c-accordion>
-    {% elif component.comp_id == "carousal" %} 
+    {% elif component.component_type == "carousal" %} 
         <c-carousal :carousal="component"></c-carousal>
     {% endif %}

@@ -6,7 +6,7 @@ from .base import (
 from django.utils.translation import gettext_lazy as _
 
 class ThemePreset(models.Model):
-    themepreset_id = LowercaseCharField(max_length=25, unique=True, db_index=True)
+    themepreset_code = LowercaseCharField(max_length=25, unique=True, db_index=True)
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
 
     # === COLORS ===
@@ -57,23 +57,23 @@ class ThemePreset(models.Model):
 
     is_system = models.BooleanField(default=True)
     def __str__(self):
-        return f"{self.themepreset_id} / {self.ltext}"
+        return f"{self.themepreset_code} / {self.ltext}"
 
     # for usage in Admin Panel
     class Meta:
         verbose_name = "00-02 Project ThemePreset"
-        ordering = ["themepreset_id"]    
+        ordering = ["themepreset_code"]    
 
 class GlobalValCat(models.Model):
-    globalvalcat_id = LowercaseCharField(max_length=25, primary_key=True)
+    globalvalcat_code = LowercaseCharField(max_length=25, primary_key=True)
 
     class Meta:
         verbose_name        = "00-01 Project Global Value Category"
         verbose_name_plural = "00-01 Project Global Value Categories"
-        ordering            = ['globalvalcat_id']
+        ordering            = ['globalvalcat_code']
 
     def __str__(self):
-        return self.globalvalcat_id
+        return self.globalvalcat_code
 
 class GlobalVal(models.Model):
     globalvalcat = models.ForeignKey(
@@ -86,10 +86,10 @@ class GlobalVal(models.Model):
 
     class Meta:
         unique_together = ('globalvalcat', 'key')
-        ordering        = ['globalvalcat__globalvalcat_id', 'key']
+        ordering        = ['globalvalcat__globalvalcat_code', 'key']
 
     def __str__(self):
-        cat_id = getattr(self.globalvalcat, 'globalvalcat_id', '?')
+        cat_id = getattr(self.globalvalcat, 'globalvalcat_code', '?')
         return f"{cat_id}.{self.key}"
     
 class Country(models.Model):

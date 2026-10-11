@@ -12,7 +12,7 @@ input type is : one of the list items
     "actions_position_id": "end",
     "textblocks": [
       {
-        "block_id": "title",
+        "block_type": "title",
         "order": 1,
         "css_class": "None",
         "ltext": "None",
@@ -40,7 +40,7 @@ input type is : one of the list items
         ]
       },
       {
-        "block_id": "content",
+        "block_type": "content",
         "order": 2,
         "css_class": "None",
         "ltext": "None",
@@ -68,7 +68,7 @@ input type is : one of the list items
         ]
       },
       {
-        "block_id": "actbut",
+        "block_type": "actbut",
         "order": 3,
         "css_class": "btn-primary",
         "ltext": "None",
@@ -121,17 +121,17 @@ input type is : one of the list items
     {% endif %}
     {% if compslot.slot_type == 'text' %}
       {% for block in compslot.textblocks %} 
-        {% if block.block_id == 'title' %}
+        {% if block.block_type == 'title' %}
           <h1 class="flex text-5xl font-bold mb-6 {{ block.css_class|default:"" }}">
             <c-svgtextbadge :items="block.items"></c-svgtextbadge>
           </h1>       
         {% endif %}
-        {% if block.block_id == 'content' %}
+        {% if block.block_type == 'content' %}
           <div class="flex flex-col text-2xl mb-6 {{ block.css_class|default:"" }}">
             <c-svgtextbadge :items="block.items"></c-svgtextbadge>
           </div>       
         {% endif %}
-        {% if block.block_id == 'actbut' %}
+        {% if block.block_type == 'actbut' %}
           <div class="justify-end {{ compslot.actions_class|default:"" }}">    
               <c-button :button="block"></c-button>
           </div>

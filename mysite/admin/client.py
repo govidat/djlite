@@ -23,7 +23,7 @@ class ThemeInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInline, C
         )
         fieldsets = [
             ('General', {
-                'fields': ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default'),
+                'fields': ('theme_code', 'themepreset', 'ltext', 'order', 'hidden', 'is_default'),
                 'classes': ('collapse',),
             }),            
             ('Main Language', {
@@ -51,7 +51,7 @@ class ThemeInline(TranslationBaseModelAdmin, nested_admin.NestedStackedInline, C
         )
         return (
             ('General', {
-                'fields': ('theme_id', 'themepreset', 'ltext', 'order', 'hidden', 'is_default'),
+                'fields': ('theme_code', 'themepreset', 'ltext', 'order', 'hidden', 'is_default'),
                 'classes': ('collapse',),
             }),
             ('Main Language', {

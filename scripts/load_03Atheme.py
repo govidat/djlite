@@ -21,8 +21,8 @@ from scripts.helpers import (
 LANGS = [lang[0] for lang in settings.LANGUAGES]
 
 
-# id,theme_id,order,hidden,overrides,is_default,
-# client_id,themepreset_id,
+# id,theme_code,order,hidden,overrides,is_default,
+# client_id,themepreset_code,
 # name,name_en,name_fr,name_hi,name_ta,ltext
 
 
@@ -63,10 +63,10 @@ def load_val01(
         for r in rows
     }
 
-    themepreset_ids = {
+    themepreset_codes = {
 
         clean(
-            r.get("themepreset_id"),
+            r.get("themepreset_code"),
             lower=True,
         )
 
@@ -88,10 +88,10 @@ def load_val01(
 
     themepresets = {
 
-        tp.themepreset_id: tp
+        tp.themepreset_code: tp
 
         for tp in ThemePreset.objects.filter(
-            themepreset_id__in=themepreset_ids
+            themepreset_code__in=themepreset_codes
         )
     }
 
@@ -112,23 +112,23 @@ def load_val01(
             lower=True,
         )
 
-        theme_id = clean(
-            row.get("theme_id"),
+        theme_code = clean(
+            row.get("theme_code"),
             lower=True,
         )
 
-        themepreset_id = clean(
-            row.get("themepreset_id"),
+        themepreset_code = clean(
+            row.get("themepreset_code"),
             lower=True,
         )
 
         # ── validation ────────────────────────────────
 
-        if not client_id or not theme_id:
+        if not client_id or not theme_code:
 
             print(
                 "Skipping row with empty "
-                "client_id/theme_id"
+                "client_id/theme_code"
             )
 
             skipped_count += 1
@@ -136,7 +136,7 @@ def load_val01(
 
         key = (
             client_id,
-            theme_id,
+            theme_code,
         )
 
         if key in seen:
@@ -168,17 +168,17 @@ def load_val01(
 
         themepreset = None
 
-        if themepreset_id:
+        if themepreset_code:
 
             themepreset = themepresets.get(
-                themepreset_id
+                themepreset_code
             )
 
             if not themepreset:
 
                 print(
                     f"Missing ThemePreset: "
-                    f"{themepreset_id}"
+                    f"{themepreset_code}"
                 )
 
                 skipped_count += 1
@@ -221,7 +221,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {theme_id}"
+                f"{client_id} / {theme_code}"
             )
 
             if verbose:
@@ -235,7 +235,7 @@ def load_val01(
                 Theme.objects.update_or_create(
 
                     client=client,
-                    theme_id=theme_id,
+                    theme_code=theme_code,
 
                     defaults=defaults,
                 )
@@ -251,7 +251,7 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"Theme: "
-                    f"{client_id} / {theme_id}"
+                    f"{client_id} / {theme_code}"
                 )
 
     # ── Summary ────────────────────────────────────────

@@ -45,27 +45,27 @@ def run():
 
     GLOBALVALCAT_DATA = [
         {
-        "globalvalcat_id": "testcat"
+        "globalvalcat_code": "testcat"
         }
     ]
     for row in GLOBALVALCAT_DATA:
         GlobalValCat.objects.update_or_create(
-            globalvalcat_id=row["globalvalcat_id"]
+            globalvalcat_code=row["globalvalcat_code"]
         )
 
     # STEP 2
     GLOBALVAL_DATA = [
         {
-        "globalvalcat_id": "testcat",
+        "globalvalcat_code": "testcat",
         "Key": "testkey",
         "keyval_en": "test_en", "keyval_hi": "test_hi", "keyval_fr": "test_fr"
         }
 
     ]
 
-    globalvalcats = {c.globalvalcat_id: c for c in globalvalcat.objects.all()}
+    globalvalcats = {c.globalvalcat_code: c for c in globalvalcat.objects.all()}
     for row in GLOBALVAL_DATA:
-        globalvalcat_value = globalvalcats[row["globalvalcat_id"]]
+        globalvalcat_value = globalvalcats[row["globalvalcat_code"]]
         GlobalVal.objects.update_or_create(
             globalvalcat = globalvalcat_value,
             key=row["key"],
@@ -75,7 +75,7 @@ def run():
 
     THEMEPRESET_DATA = [
         {
-        "themepreset_id": "light",
+        "themepreset_code": "light",
         "ltext": "a",
         "primary": "#570df8",
         "primary_content": "#ffffff",
@@ -107,7 +107,7 @@ def run():
         "info_content": "#ffffff"
         },   
         {
-        "themepreset_id": "dark",
+        "themepreset_code": "dark",
         "ltext": "b",
         "primary": "#661ae6",
         "primary_content": "#ffffff",
@@ -143,7 +143,7 @@ def run():
     for row in THEMEPRESET_DATA:
 
         ThemePreset.objects.update_or_create(
-            themepreset_id=row["themepreset_id"],
+            themepreset_code=row["themepreset_code"],
             ltext=row["ltext"],
             primary=row["primary"],
             primary_content=row["primary_content"],
@@ -190,31 +190,31 @@ def run():
     THEME_DATA = [
         {
         "client_id": "bahushira",
-        "themepreset_id" : "light",
-        "theme_id": "light",
+        "themepreset_code" : "light",
+        "theme_code": "light",
         "is_default": False
         },        
         {
         "client_id": "bahushira",
-        "themepreset_id" : "dark",
-        "theme_id": "dark",
+        "themepreset_code" : "dark",
+        "theme_code": "dark",
         "is_default": True
         },
     ]
 
     clients = {c.client_id: c for c in Client.objects.all()}
-    themepresets = {c.themepreset_id: c for c in ThemePreset.objects.all()}
+    themepresets = {c.themepreset_code: c for c in ThemePreset.objects.all()}
     #layouts = {(c.client.client_id, c.page.page_id, c.slug, c.level): c for c in Layout.objects.all()}
 
     for row in THEME_DATA:
 
         client_value = clients[row["client_id"]]
-        themepreset_value = themepresets[row["themepreset_id"]]
+        themepreset_value = themepresets[row["themepreset_code"]]
 
         Theme.objects.update_or_create(
             client = client_value,
             themepreset = themepreset_value,
-            theme_id=row["theme_id"],
+            theme_code=row["theme_code"],
             #overrides=row["overrides"],
             is_default=row["is_default"]
         )   
@@ -235,7 +235,7 @@ def upload_stb_items(items_data, parent_obj):
         item, created = TextstbItem.objects.get_or_create(
             content_type=ct,
             object_id=parent_obj.id,
-            item_id=item_data["item_id"],
+            item_type=item_data["item_type"],
             order=item_data.get("order", 1),
             defaults={
                 "ltext":     item_data.get("ltext", ""),
@@ -268,7 +268,7 @@ def upload_comptextblocks(blocks_data, parent_obj):
         block, created = ComptextBlock.objects.get_or_create(
             content_type=ct,
             object_id=parent_obj.id,
-            block_id=block_data["block_id"],
+            block_type=block_data["block_type"],
             order=block_data.get("order", 1),
             defaults={
                 "ltext":     block_data.get("ltext", ""),

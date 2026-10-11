@@ -196,7 +196,7 @@ class ClientGroup(models.Model):
     ]
 
     client      = models.ForeignKey('mysite.Client', on_delete=models.CASCADE, related_name='groups')
-    group_id    = LowercaseCharField(max_length=50)
+    clientgroup_code = LowercaseCharField(max_length=50)
     name        = models.CharField(max_length=100)
     role        = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
     description = models.CharField(max_length=300, blank=True, null=True)
@@ -211,8 +211,8 @@ class ClientGroup(models.Model):
     )
 
     class Meta:
-        unique_together = ('client', 'group_id')
-        ordering        = ['client', 'group_id']
+        unique_together = ('client', 'clientgroup_code')
+        ordering        = ['client', 'clientgroup_code']
         verbose_name = "00-04 Client Group"
     def __str__(self):
         client_id = getattr(self.client, 'client_id', '?')

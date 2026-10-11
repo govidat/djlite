@@ -361,7 +361,7 @@ def item_detail(request, client_id, item_id):
                 'variants',
                 queryset=ItemVariant.objects.filter(
                     is_active=True
-                ).order_by('variant_id'),
+                ).order_by('variant_code'),
                 to_attr='prefetched_variants'
             ),
             # Item attribute values

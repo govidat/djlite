@@ -15,7 +15,7 @@
                     "css_class": "",
                     "style": "",
                     "hidden": false,
-                    "comp_id": null,
+                    "component_type": null,
                     "parent_slug": null,
                     "children": [
                         {
@@ -24,7 +24,7 @@
                             "order": 1,
                             "css_class": "",
                             "hidden": false,
-                            "comp_id": null,
+                            "component_type": null,
                             "parent_slug": "a",
                             "children": [
                                 {
@@ -33,7 +33,7 @@
                                     "order": 1,
                                     "css_class": "",
                                     "hidden": false,
-                                    "comp_id": null,
+                                    "component_type": null,
                                     "parent_slug": "a",
                                     "children": [
                                         {
@@ -42,10 +42,10 @@
                                             "order": 1,
                                             "css_class": "",
                                             "hidden": false,
-                                            "comp_id": "hero",
+                                            "component_type": "hero",
                                             "parent_slug": "a",
                                             "component": {
-                                                "comp_id": "hero",
+                                                "component_type": "hero",
                                                 "ltext": "Home Hero",
                                                 "css_class": "",
                                                 "hero_overlay": true,
@@ -71,13 +71,13 @@
                                                         "checked": false,
                                                         "comptextblocks": [
                                                             {
-                                                                "block_id": "title",
+                                                                "block_type": "title",
                                                                 "order": 1,
                                                                 "css_class": "",
                                                                 "ltext": "Home Title",
                                                                 "items": [
                                                                     {
-                                                                        "item_id": "text",
+                                                                        "item_type": "text",
                                                                         "order": 1,
                                                                         "values": {
                                                                             "en": {"stext": "Home Title", "ltext": ""},
@@ -87,13 +87,13 @@
                                                                 ]
                                                             },
                                                             {
-                                                                "block_id": "content",
+                                                                "block_type": "content",
                                                                 "order": 2,
                                                                 "css_class": "",
                                                                 "ltext": "Home content",
                                                                 "items": [
                                                                     {
-                                                                        "item_id": "text",
+                                                                        "item_type": "text",
                                                                         "order": 1,
                                                                         "values": {
                                                                             "en": {"stext": "Home Content", "ltext": ""},
@@ -129,7 +129,7 @@
                     "css_class": "",
                     "style": "",
                     "hidden": false,
-                    "comp_id": null,
+                    "component_type": null,
                     "parent_slug": null,
                     "children": [
                         {
@@ -138,7 +138,7 @@
                             "order": 1,
                             "css_class": "",
                             "hidden": false,
-                            "comp_id": null,
+                            "component_type": null,
                             "parent_slug": "a",
                             "children": [
                                 {
@@ -147,7 +147,7 @@
                                     "order": 1,
                                     "css_class": "",
                                     "hidden": false,
-                                    "comp_id": null,
+                                    "component_type": null,
                                     "parent_slug": "a",
                                     "children": [
                                         {
@@ -156,10 +156,10 @@
                                             "order": 1,
                                             "css_class": "",
                                             "hidden": false,
-                                            "comp_id": "hero",
+                                            "component_type": "hero",
                                             "parent_slug": "a",
                                             "component": {
-                                                "comp_id": "hero",
+                                                "component_type": "hero",
                                                 "ltext": "About Hero",
                                                 "css_class": "hero min-h-screen",
                                                 "hero_overlay": true,
@@ -185,13 +185,13 @@
                                                         "checked": false,
                                                         "comptextblocks": [
                                                             {
-                                                                "block_id": "title",
+                                                                "block_type": "title",
                                                                 "order": 1,
                                                                 "css_class": "",
                                                                 "ltext": "About Title",
                                                                 "items": [
                                                                     {
-                                                                        "item_id": "text",
+                                                                        "item_type": "text",
                                                                         "order": 1,
                                                                         "values": {
                                                                             "en": {"stext": "About Title", "ltext": ""},
@@ -201,13 +201,13 @@
                                                                 ]
                                                             },
                                                             {
-                                                                "block_id": "content",
+                                                                "block_type": "content",
                                                                 "order": 2,
                                                                 "css_class": "",
                                                                 "ltext": "About content",
                                                                 "items": [
                                                                     {
-                                                                        "item_id": "text",
+                                                                        "item_type": "text",
                                                                         "order": 1,
                                                                         "values": {
                                                                             "en": {"stext": "About Content", "ltext": ""},

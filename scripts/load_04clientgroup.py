@@ -10,7 +10,7 @@ from scripts.helpers import (
     to_bool,
 )
 
-# group_id,name,role,description,is_active,client_id
+# clientgroup_code,name,role,description,is_active,client_id
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -62,28 +62,28 @@ def load_val01(
             lower=True
         )
 
-        group_id = clean(
-            row.get("group_id"),
+        clientgroup_code = clean(
+            row.get("clientgroup_code"),
             lower=True
         )
 
-        if not client_id or not group_id:
+        if not client_id or not clientgroup_code:
 
             print(
                 "Skipping row with empty "
-                "client_id/group_id"
+                "client_id/clientgroup_code"
             )
 
             skipped_count += 1
             continue
 
-        key = (client_id, group_id)
+        key = (client_id, clientgroup_code)
 
         if key in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{client_id} / {group_id}"
+                f"{client_id} / {clientgroup_code}"
             )
 
             skipped_count += 1
@@ -131,7 +131,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{client_id} / {group_id}"
+                f"{client_id} / {clientgroup_code}"
             )
 
             if verbose:
@@ -145,7 +145,7 @@ def load_val01(
             ClientGroup.objects.update_or_create(
 
                 client=client,
-                group_id=group_id,
+                clientgroup_code=clientgroup_code,
 
                 defaults=defaults
             )
@@ -161,7 +161,7 @@ def load_val01(
             print(
                 f"{'Created' if created else 'Updated'} "
                 f"ClientGroup: "
-                f"{client_id} / {group_id}"
+                f"{client_id} / {clientgroup_code}"
             )
 
     # ── Summary ──────────────────────────────────────────

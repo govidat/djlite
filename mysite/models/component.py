@@ -21,7 +21,7 @@ class TextstbItem(models.Model):
         ("svg", "SVG"),
         ("badge", "Badge"),
     )    
-    item_id = models.CharField(max_length=20, choices=STB_ITEM_TYPES, blank=False, null=False) 
+    item_type = models.CharField(max_length=20, choices=STB_ITEM_TYPES, blank=False, null=False) 
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
     hidden = models.BooleanField(default=False)
     order = models.PositiveIntegerField(default=1)
@@ -30,14 +30,14 @@ class TextstbItem(models.Model):
     #translations = GenericRelation(TextItemValue)
     
     def clean(self):
-        if self.svg_text and not self.item_id == 'svg':
-            raise ValidationError("SVG text is relevanr only if item_id is SVG")
-        #if self.item_id == 'svg' and self.translations.exists():
+        if self.svg_text and not self.item_type == 'svg':
+            raise ValidationError("SVG text is relevanr only if item_type is SVG")
+        #if self.item_type == 'svg' and self.translations.exists():
         #    raise ValidationError("SVG items must not have translations")
     def __str__(self):
-        return f"{self.item_id} {self.ltext}"   
+        return f"{self.item_type} {self.ltext}"   
     class Meta:
-        unique_together = ("content_type", "object_id", "item_id", "order")
+        unique_together = ("content_type", "object_id", "item_type", "order")
         indexes = [
             models.Index(fields=["content_type", "object_id"]),
         ]        
@@ -68,23 +68,23 @@ class ComptextBlock(models.Model):
         ("content", "Content"),
         ("actbut", "ActionButtons"),
     )    
-    block_id = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
+    block_type = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
     hidden = models.BooleanField(default=False)
-    order = models.PositiveIntegerField(default=1)  # same block_id can be repeated
+    order = models.PositiveIntegerField(default=1)  # same block_type can be repeated
     css_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
     textstbitems = GenericRelation(TextstbItem)
     # ideally this should be a dropdown of page of this client, but have kept it as a simple text for the timebeing. This value is passed as <a link in the Button component
     href_page=models.CharField(max_length=25, blank=True, null=True)
     class Meta:
-        unique_together = ("content_type", "object_id", "block_id", "order")
+        unique_together = ("content_type", "object_id", "block_type", "order")
         verbose_name = "01-06a Component Text Block" 
         indexes = [
             models.Index(fields=["content_type", "object_id"]),
             models.Index(fields=["content_type", "object_id", "order"]),
         ]        
     def __str__(self):
-        return f"{self.block_id} {self.ltext}"    
+        return f"{self.block_type} {self.ltext}"    
 
 """  DEPRECATED             
 class GentextBlock(models.Model):
@@ -98,21 +98,21 @@ class GentextBlock(models.Model):
         ("nb_title", "Navbar Title"),
         ("nb_subtitle", "Navbar SubTitle"),
     )    
-    block_id = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
+    block_type = models.CharField(max_length=20, choices=BLOCK_TYPES, blank=False, null=False)    
     ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
     hidden = models.BooleanField(default=False)
-    order = models.PositiveIntegerField(default=1)  # same block_id can be repeated
+    order = models.PositiveIntegerField(default=1)  # same block_type can be repeated
     css_class = models.CharField(max_length=255, blank=True, validators=text_field_validators)
     textstbitems = GenericRelation(TextstbItem)
     class Meta:
-        unique_together = ("content_type", "object_id", "block_id", "order")
+        unique_together = ("content_type", "object_id", "block_type", "order")
         verbose_name = "01-06a General Text Block"  
         indexes = [
             models.Index(fields=["content_type", "object_id"]),
             models.Index(fields=["content_type", "object_id", "order"]),
         ]        
     def __str__(self):
-        return f"{self.block_id} {self.ltext}" 
+        return f"{self.block_type} {self.ltext}" 
 """   
 class Component(models.Model):
     """L0 — one per Layout cell (level=40)"""
@@ -128,7 +128,7 @@ class Component(models.Model):
         ("accordion", "Accordion"),
         ("carousel",  "Carousel"),
     )
-    comp_id       = models.CharField(max_length=30, choices=COMP_TYPES)
+    component_type       = models.CharField(max_length=30, choices=COMP_TYPES)
     ltext         = models.CharField(max_length=50, blank=True, validators=text_field_validators)
     css_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)
     card_body_class     = models.CharField(max_length=255, blank=True, validators=text_field_validators)    # card    
@@ -142,7 +142,7 @@ class Component(models.Model):
     order         = models.PositiveIntegerField(default=1)  # This is not relevant and can be removed. As at cell lelvel there will be only one component
 
     def __str__(self):
-        return f"{self.layout} / {self.comp_id}"
+        return f"{self.layout} / {self.component_type}"
 
     class Meta:
         verbose_name = "01-04 Component L0"

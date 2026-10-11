@@ -50,7 +50,7 @@ def get_globalval():
         .only(
             'key',
             'keyval',
-            'globalvalcat__globalvalcat_id',
+            'globalvalcat__globalvalcat_code',
         )
     )
 
@@ -58,7 +58,7 @@ def get_globalval():
 
     for obj in qs:
 
-        cat = obj.globalvalcat.globalvalcat_id
+        cat = obj.globalvalcat.globalvalcat_code
 
         data.setdefault(cat, {})
 

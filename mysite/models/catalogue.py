@@ -1278,7 +1278,7 @@ class ItemVariant(models.Model):
     item         = models.ForeignKey(
         Item, on_delete=models.CASCADE, related_name='variants'
     )
-    variant_id   = LowercaseCharField(max_length=50)
+    variant_code = LowercaseCharField(max_length=50)
     name         = models.CharField(max_length=100, blank=True) # modeltranslation blank=True to be present
     sku          = models.CharField(max_length=100, blank=True, db_index=True)
     gtin         = models.CharField(max_length=14, blank=True,
@@ -1297,13 +1297,13 @@ class ItemVariant(models.Model):
     image_url = models.URLField(blank=True)    
 
     class Meta:
-        unique_together = ('item', 'variant_id')
-        ordering        = ['item', 'variant_id']
+        unique_together = ('item', 'variant_code')
+        ordering        = ['item', 'variant_code']
         verbose_name    = 'Item Variant'
 
     def __str__(self):
         itemname = getattr(self.item, 'name', '?')        
-        return f"{itemname} / {self.variant_id}"
+        return f"{itemname} / {self.variant_code}"
 
     def effective_price(self):
         """Variant price overrides item-level price."""

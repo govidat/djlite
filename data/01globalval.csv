@@ -1,4 +1,4 @@
-globalvalcat_id,key,keyval_en,keyval_hi,keyval_fr
+globalvalcat_code,key,keyval_en,keyval_hi,keyval_fr
 account,logout,Logout,hiLogout,frLogout
 account,signIn,SignIn,hiSignIn,frSignIn
 account,signin_up,Signin/Signup,hiSignin/Signup,frSignin/Signup

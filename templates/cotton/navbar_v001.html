@@ -29,7 +29,7 @@
       
 
       {% comment %}
-      {% mylist_bykey client.textblocks 'nb_title' 'block_id' as result_var %}
+      {% mylist_bykey client.textblocks 'nb_title' 'block_type' as result_var %}
         <h1 class="text-xl font-bold {{result_var.css_class|default:""}}">
         <c-svgtextbadge :items="result_var.0.items"></c-svgtextbadge>      
       {% endcomment %}

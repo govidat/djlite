@@ -39,31 +39,31 @@ def load_val01(
 
     for row in rows:
 
-        themepreset_id = clean(
-            row.get("themepreset_id"),
+        themepreset_code = clean(
+            row.get("themepreset_code"),
             lower=True,
         )
 
-        if not themepreset_id:
+        if not themepreset_code:
 
             print(
-                "Skipping empty themepreset_id"
+                "Skipping empty themepreset_code"
             )
 
             skipped_count += 1
             continue
 
-        if themepreset_id in seen:
+        if themepreset_code in seen:
 
             print(
                 f"Duplicate CSV row: "
-                f"{themepreset_id}"
+                f"{themepreset_code}"
             )
 
             skipped_count += 1
             continue
 
-        seen.add(themepreset_id)
+        seen.add(themepreset_code)
 
         defaults = {
 
@@ -103,7 +103,7 @@ def load_val01(
 
             print(
                 f"[DRY RUN] "
-                f"{themepreset_id}"
+                f"{themepreset_code}"
             )
 
             if verbose:
@@ -114,7 +114,7 @@ def load_val01(
             obj, created = (
                 ThemePreset.objects.update_or_create(
 
-                    themepreset_id=themepreset_id,
+                    themepreset_code=themepreset_code,
 
                     defaults=defaults,
                 )
@@ -130,7 +130,7 @@ def load_val01(
                 print(
                     f"{'Created' if created else 'Updated'} "
                     f"ThemePreset: "
-                    f"{themepreset_id}"
+                    f"{themepreset_code}"
                 )
 
     print()

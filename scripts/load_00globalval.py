@@ -19,7 +19,7 @@ def load_globalvalcats():
         for row in reader:
 
             GlobalValCat.objects.update_or_create(
-                globalvalcat_id=row["globalvalcat_id"]
+                globalvalcat_code=row["globalvalcat_code"]
             )
 
     print("Loaded GlobalValCat")
@@ -30,7 +30,7 @@ def load_globalvals():
     file_path = DATA_DIR / "01globalval.csv"
 
     globalvalcats = {
-        c.globalvalcat_id: c
+        c.globalvalcat_code: c
         for c in GlobalValCat.objects.all()
     }
 
@@ -41,7 +41,7 @@ def load_globalvals():
         for row in reader:
 
             GlobalVal.objects.update_or_create(
-                globalvalcat=globalvalcats[row["globalvalcat_id"]],
+                globalvalcat=globalvalcats[row["globalvalcat_code"]],
                 key=row["key"],
 
                 defaults={

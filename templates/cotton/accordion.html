@@ -6,8 +6,8 @@
 {% for compslot in result_var %}
 
     {# pre-extract blocks to avoid loop inserting nodes in wrong place #}
-    {% mylist_bykey compslot.textblocks 'title' 'block_id' as title_blocks %}
-    {% mylist_bykey compslot.textblocks 'content' 'block_id' as content_blocks %}
+    {% mylist_bykey compslot.textblocks 'title' 'block_type' as title_blocks %}
+    {% mylist_bykey compslot.textblocks 'content' 'block_type' as content_blocks %}
 
     <div class="collapse collapse-arrow bg-base-100 border border-base-300 {{ component.css_class|default:'' }}">
         
@@ -42,7 +42,7 @@
                         "css_class": "collapse-arrow",
                         "type": "radio",
                         "name": "myaccordion_01",
-                        "comp_id": "accordion",
+                        "component_type": "accordion",
                         "slots": [
                           {
                             "accordion": 1,
@@ -53,7 +53,7 @@
                             "slot_type": "text",
                             "textblocks": [
                               {
-                                "block_id": "title",
+                                "block_type": "title",
                                 "order": 1,
                                 "css_class": "None",
                                 "ltext": "None",
@@ -81,7 +81,7 @@
                                 ]
                               },
                               {
-                                "block_id": "content",
+                                "block_type": "content",
                                 "order": 2,
                                 "css_class": "None",
                                 "ltext": "None",
@@ -119,7 +119,7 @@
                             "slot_type": "text",
                             "textblocks": [
                               {
-                                "block_id": "title",
+                                "block_type": "title",
                                 "order": 1,
                                 "css_class": "None",
                                 "ltext": "None",
@@ -147,7 +147,7 @@
                                 ]
                               },
                               {
-                                "block_id": "content",
+                                "block_type": "content",
                                 "order": 2,
                                 "css_class": "None",
                                 "ltext": "None",
@@ -185,7 +185,7 @@
                             "slot_type": "text",
                             "textblocks": [
                               {
-                                "block_id": "title",
+                                "block_type": "title",
                                 "order": 1,
                                 "css_class": "None",
                                 "ltext": "None",
@@ -213,7 +213,7 @@
                                 ]
                               },
                               {
-                                "block_id": "content",
+                                "block_type": "content",
                                 "order": 2,
                                 "css_class": "None",
                                 "ltext": "None",
@@ -256,7 +256,7 @@ Revised output:
                             "accordion_checked": false,
                             "textblocks": [
                               {
-                                "block_id": "title",
+                                "block_type": "title",
                                 "order": 1,
                                 "css_class": "",
                                 "ltext": "Home Title",

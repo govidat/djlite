@@ -39,7 +39,7 @@ class SvgtextbadgeValueInline(ClientLanguageMixinV2, TranslationBaseModelAdmin, 
 
 class TextstbItemInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = TextstbItem
-    fields = ("item_id", "ltext", "hidden", "order", "css_class", "svg_text")
+    fields = ("item_type", "ltext", "hidden", "order", "css_class", "svg_text")
     extra = 0
     inlines = [SvgtextbadgeValueInline]
     classes = ['collapse']
@@ -53,7 +53,7 @@ class TextstbItemInline(nested_admin.NestedGenericStackedInline, BaseAdminInline
 
 class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = ComptextBlock
-    #fields = ("block_id", "ltext", "hidden", "order", "css_class")
+    #fields = ("block_type", "ltext", "hidden", "order", "css_class")
     extra = 0
     inlines = [TextstbItemInline]
     classes = ['collapse']
@@ -64,7 +64,7 @@ class ComptextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInli
 """
 class GentextBlockInline(nested_admin.NestedGenericStackedInline, BaseAdminInlinecss):
     model = GentextBlock
-    fields = ("block_id", "ltext", "hidden", "order", "css_class")
+    fields = ("block_type", "ltext", "hidden", "order", "css_class")
     extra = 0
     inlines = [TextstbItemInline]
     classes = ['collapse']
@@ -113,7 +113,7 @@ class ComponentInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
     extra = 0
     classes = ['collapse']
     fields = [
-        "comp_id", "order", "hidden", "ltext", "css_class",
+        "component_type", "order", "hidden", "ltext", "css_class",
         "card_body_class", # card
         "hero_content_class", "hero_overlay", "hero_overlay_style",            # hero
         "accordion_type", "accordion_name",    # accordion
