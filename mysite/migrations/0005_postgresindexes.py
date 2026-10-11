@@ -40,8 +40,8 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS ix_fcstagg_ver_level ON mysite_forecastaggregate (version_id, agg_level, period_start)",
     "CREATE INDEX IF NOT EXISTS ix_fcstacc_ver_period ON mysite_forecastaccuracy (version_id, period_start)",
     # actual sales partial unique indexes: include ONLY if step 1 shows 0063 did not replace them
-    # "CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_with_customer ON mysite_actualsale (client_id, planning_location_id, item_id, planning_customer_id, period_type, period_start) WHERE planning_customer_id IS NOT NULL",
-    # "CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_no_customer ON mysite_actualsale (client_id, planning_location_id, item_id, period_type, period_start) WHERE planning_customer_id IS NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_with_customer ON mysite_actualsale (client_id, planning_location_id, item_id, planning_customer_id, period_type, period_start) WHERE planning_customer_id IS NOT NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_actualsale_no_customer ON mysite_actualsale (client_id, planning_location_id, item_id, period_type, period_start) WHERE planning_customer_id IS NULL",
 ]
 
 

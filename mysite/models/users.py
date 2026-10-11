@@ -199,7 +199,7 @@ class ClientGroup(models.Model):
     group_id    = LowercaseCharField(max_length=50)
     name        = models.CharField(max_length=100)
     role        = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
-    description = models.CharField(max_length=300, blank=True)
+    description = models.CharField(max_length=300, blank=True, null=True)
     is_active   = models.BooleanField(default=True)
 
     # Location scope — empty means access to ALL locations

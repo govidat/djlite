@@ -174,7 +174,7 @@ class Theme(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='themes')    
     theme_id = LowercaseCharField(max_length=10)  
     themepreset = models.ForeignKey('mysite.ThemePreset', on_delete=models.SET_NULL, null=True)
-    ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators)   # Optional
+    ltext = models.CharField(max_length=50, blank=True, validators=text_field_validators, null=True)   # Optional
     order = models.PositiveIntegerField(default=0)
     hidden = models.BooleanField(default=False)
 

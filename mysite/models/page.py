@@ -60,7 +60,7 @@ class NavItem(models.Model):
                                     related_name='nav_items')
 
     # If nav_type = 'url' or 'anchor'
-    url         = models.CharField(max_length=500, blank=True)
+    url         = models.CharField(max_length=500, blank=True, null=True)
 
     # Display
     name       = models.CharField(max_length=100, blank=True)   # modeltranslation blank=True to be present
