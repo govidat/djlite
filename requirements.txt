@@ -1,21 +1,21 @@
-Django==5.2.4
-django-allauth==65.10.0
-django-tailwind==4.2.0 # tailwind
-django-browser-reload==1.18.0 # tailwind
+Django==6.1.2
+django-allauth==65.19.7
+django-tailwind==4.5.0 # tailwind
+django-browser-reload==1.21.0 # tailwind
 cookiecutter>=1.7.0 # tailwind
 honcho==2.0.0   # tailwind
-django-cotton==2.1.3 # cotton
+django-cotton==2.7.2 # cotton
 # jinja2==3.1.6
-django-debug-toolbar==6.0.0 # debug-toolbar
-django-admin-sortable2==2.2.8 #admin-sortable2
+django-debug-toolbar==8.0.0 # debug-toolbar
+django-admin-sortable2==2.3.1 #admin-sortable2
 django-extensions==4.1 # this is for things like orm query
 django-nested-admin==4.1.6 # this is for multi level nested inline
 # datastar-py==0.8.0 # this is for datastar BUT NOT WORKING PROPERLY DROPPED FOR THE TIME BEING
-django-modeltranslation==0.20.2 # this is for adding _en fileds in the same table
+django-modeltranslation==0.20.6 # this is for adding _en fileds in the same table
 django-allauth-ui==1.8.1  # this is to provide additional ui for allauth
 #django-unfold==0.88.0  #for modern admin ui - NOT WORKING WELL WITH nested-admin
-django-guardian==3.3.1 # for client level authorization
-django-htmx==1.27.0
+django-guardian==3.5.0 # for client level authorization
+django-htmx==1.29.0
 statsforecast>=2.0.3
 hierarchicalforecast>=1.5.1
 polars>=1.40.1
