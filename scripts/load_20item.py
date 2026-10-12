@@ -38,9 +38,11 @@ DATA_DIR = BASE_DIR / "data"
 def load_items(
     dry_run=False,
     verbose=False,
+    data_dir=None,
 ):
+    data_dir = Path(data_dir) if data_dir else DATA_DIR
 
-    file_path = DATA_DIR / "20item.csv"
+    file_path = data_dir / "20item.csv"
 
     # ── Read CSV once ───────────────────────────────────────
 
@@ -306,7 +308,7 @@ def load_items(
 
 
 @transaction.atomic
-def run(*args):
+def run(*args, data_dir=None):
 
     args = [arg.lower() for arg in args]
 
@@ -319,6 +321,7 @@ def run(*args):
     load_items(
         dry_run=DRY_RUN,
         verbose=VERBOSE,
+        data_dir=data_dir,
     )
 
     print("Done")

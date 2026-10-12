@@ -47,6 +47,9 @@ urlpatterns = [
     # ── Demand Planning — HTML UI (NEW: separate app, client-prefixed) ────
     path('<str:client_code>/demand/', include('mysite.demand_ui.urls')),
 
+    # ── Master Data — HTML upload UI (client-prefixed) ─────────────────────
+    path('<str:client_code>/masterdata/', include('mysite.masterdata_ui.urls')),
+
 
     # ── Demand Planning — forecast grid page ──────────────────────────────
     #path('demand/forecast-versions/<int:pk>/grid/', views.forecast_grid, name='demand-forecast-grid'),

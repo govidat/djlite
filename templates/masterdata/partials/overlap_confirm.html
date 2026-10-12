@@ -1,0 +1,50 @@
+{% load i18n %}
+<div id="masterdata-upload-panel" class="space-y-4">
+
+    <div class="alert alert-error">
+        <div>
+            <p class="font-bold">{% trans "This delete will cascade" %}</p>
+            <p class="text-sm mt-1">
+                {% trans "Deleting rows for “" %}{{ dataset.title }}{% trans "” will also permanently delete related records in:" %}
+            </p>
+            <ul class="list-disc list-inside text-sm mt-2">
+                {% for dep in dependents %}
+                <li>{{ dep.title }} <code class="text-[10px]">{{ dep.key }}</code></li>
+                {% endfor %}
+            </ul>
+            <p class="text-xs text-base-content/60 mt-2">
+                {% trans "This cannot be undone. Re-uploading the related datasets will restore them." %}
+            </p>
+        </div>
+    </div>
+
+    <div class="flex flex-col gap-2">
+        <form hx-post="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}"
+              hx-target="#masterdata-upload-panel"
+              hx-swap="outerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_and_reload">
+            <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+            <input type="hidden" name="pending_file" value="{{ pending_file }}">
+            <input type="hidden" name="pending_file_b" value="{{ pending_file_b }}">
+            <input type="hidden" name="confirmed" value="1">
+            <button type="submit" class="btn btn-error btn-sm w-full">
+                🗑 {% trans "Yes, delete and reload" %}
+            </button>
+        </form>
+
+        <form hx-post="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}"
+              hx-target="#masterdata-upload-panel"
+              hx-swap="outerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="cancel">
+            <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+            <input type="hidden" name="pending_file" value="{{ pending_file }}">
+            <input type="hidden" name="pending_file_b" value="{{ pending_file_b }}">
+            <button type="submit" class="btn btn-ghost btn-sm w-full">
+                ← {% trans "Keep existing data — cancel" %}
+            </button>
+        </form>
+    </div>
+
+</div>

@@ -17,6 +17,11 @@
           <li><a href="{% url 'demand_ui:dashboard' client_code=client.client_code %}">
             📈 {% trans "Demand Planning" %}
           </a></li>
+        {% endif %}
+        {% if master_data_ui_visible %}
+          <li><a href="{% url 'masterdata_ui:masterdata_list' client_code=client.client_code %}">
+            🗄 {% trans "Master Data" %}
+          </a></li>
         {% endif %}        
         
       </ul>
@@ -45,6 +50,11 @@
       {% if demand_ui_visible %}
       <li><a href="{% url 'demand_ui:dashboard' client_code=client.client_code %}">
         📈 {% trans "Demand Planning" %}
+      </a></li>
+      {% endif %}
+      {% if master_data_ui_visible %}
+      <li><a href="{% url 'masterdata_ui:masterdata_list' client_code=client.client_code %}">
+        🗄 {% trans "Master Data" %}
       </a></li>
       {% endif %}      
     </ul>

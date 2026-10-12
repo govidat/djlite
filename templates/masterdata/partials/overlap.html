@@ -1,0 +1,84 @@
+{% load i18n %}
+<div id="masterdata-upload-panel" class="space-y-4">
+
+    <div class="alert alert-warning">
+        <div>
+            <p class="font-bold">{% trans "Overlapping records detected" %}</p>
+            <p class="text-sm mt-1">
+                {% blocktrans with count=overlap_count %}
+                The file matches {{ count }} existing record(s) that already
+                contain this data for this client.
+                {% endblocktrans %}
+            </p>
+        </div>
+    </div>
+
+    {% if dependents %}
+    <div class="alert alert-error">
+        <div>
+            <p class="font-bold">{% trans "Deleting will cascade to related data" %}</p>
+            <p class="text-sm mt-1">
+                {% trans "Choosing “Delete & reload” will also permanently delete records in:" %}
+            </p>
+            <ul class="list-disc list-inside text-sm mt-2">
+                {% for dep in dependents %}
+                <li>{{ dep.title }} <code class="text-[10px]">{{ dep.key }}</code></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <p class="text-sm text-base-content/70">{% trans "How would you like to proceed?" %}</p>
+
+    {# Option 1 — Cancel #}
+    <form hx-post="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}"
+          hx-target="#masterdata-upload-panel"
+          hx-swap="outerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="cancel">
+        <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+        <input type="hidden" name="pending_file" value="{{ pending_file }}">
+        <input type="hidden" name="pending_file_b" value="{{ pending_file_b }}">
+        <button type="submit" class="btn btn-ghost btn-sm w-full">
+            ✕ {% trans "Cancel — do not upload" %}
+        </button>
+    </form>
+
+    {# Option 2 — Override (upsert) #}
+    <form hx-post="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}"
+          hx-target="#masterdata-upload-panel"
+          hx-swap="outerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="override">
+        <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+        <input type="hidden" name="pending_file" value="{{ pending_file }}">
+        <input type="hidden" name="pending_file_b" value="{{ pending_file_b }}">
+        <button type="submit" class="btn btn-warning btn-sm w-full">
+            ↑ {% trans "Override — overwrite matching records" %}
+        </button>
+        <p class="text-xs text-base-content/40 mt-1 text-center">
+            {% trans "Matching records are updated in place; new rows are added. Nothing is deleted." %}
+        </p>
+    </form>
+
+    {# Option 3 — Delete & reload #}
+    <form hx-post="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}"
+          hx-target="#masterdata-upload-panel"
+          hx-swap="outerHTML"
+          {% if not dependents %}hx-confirm="{% trans 'Delete the matching records and replace them with this file?' %}"{% endif %}>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_and_reload">
+        <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+        <input type="hidden" name="pending_file" value="{{ pending_file }}">
+        <input type="hidden" name="pending_file_b" value="{{ pending_file_b }}">
+        <button type="submit" class="btn btn-error btn-sm w-full">
+            {% if dependents %}
+            🗑 {% trans "Review impact of delete, then reload" %}
+            {% else %}
+            🗑 {% trans "Delete matching records, then reload" %}
+            {% endif %}
+        </button>
+    </form>
+
+</div>

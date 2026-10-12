@@ -81,6 +81,10 @@ from .catalogue import (
     ItemVariant
 )
 
+from .masterdata import (
+    MasterDataImport,
+)
+
 from .demand import (
     PlanningLocation,
     PlanningCustomer,

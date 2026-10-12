@@ -847,6 +847,51 @@ channel-less client whose every `ActualSale`/`ForecastLine` defaults to `'00'` (
 mean "any channel allowed". The helpers `is_distribution_channel_enabled()` and
 `get_allowed_distribution_channel_codes()` on `Client` drive the drop-downs and the `'00'` default.
 
+### Master Data Upload Stack (client-facing)
+
+A client-facing **Master Data** tool lets client admins upload their own master data
+files (CSV / Excel) through the existing `scripts/load_*.py` loader programs:
+
+- **Loader `data_dir` API** — every loader's `load_*` fn (and `run(*args, data_dir=None)`)
+  accepts an explicit `data_dir` path, so an uploaded file can be routed straight to the
+  loader without filesystem moves. `scripts/helpers.py` gains `to_datetime`.
+- **Orphan-loader gap filled** — `load_00Aclientblock` / `load_00Bclientfeaturecontrol`
+  added, and their CSVs normalised (sample `1` → `bahushira`).
+- **Dataset registry** `mysite/masterdata/datasets.py` — 32 `Dataset` dataclasses
+  (`key, title, script, scope, files, columns, group, order, model_label, natural_key,
+  client_columns, multi_file, description`) plus `coerce()`, `get_dataset()`,
+  `grouped_for_scope()` and `dependent_datasets()` (FK introspection, e.g. 20item →
+  21A/21B/22/23/24/25/26; 07taxonomynode → 11A/08B/21A). `client_columns` default
+  `("client_code",)`; overridden for `08B`/`09B` to
+  `("node_client_code","attribute_client_code"[,"value_client_code"])`.
+- **Job model** `MasterDataImport` (`mysite/models/masterdata.py`, migration `0005`):
+  `client` (nullable), `dataset_key`, `scope`, `uploaded_by`, `uploaded_at`,
+  `file_name` / `file_name_b`, `delete_existing`, `row_count`, `status`, `summary`,
+  `error_log`. (Frontend imports: actuals + master data both ride Celery/Redis.)
+- **Celery task** `run_masterdata_import` (`mysite/tasks/masterdata/run_loader.py`):
+  `_read_uploads`, `_normalise` (XLSX→CSV), `_validate_columns`, `_validate_scope`
+  (lowercased CSV value vs `client.client_code`), `build_lookups`, `count_overlaps`,
+  `_delete_overlaps`. Delete + loader run inside **one** `transaction.atomic()` — a
+  loader failure rolls back the deletions. Loader `summary` parsed via
+  `SUMMARY_RE = \(created=(\d+),\s*updated=(\d+),\s*skipped=(\d+)\)`.
+- **UI app** `mysite/masterdata_ui/` — routes `""`, `upload/`, `upload/<int:job_id>/status/`,
+  `history/`, `template/`, mounted at `path('<str:client_code>/masterdata/', include(...))`;
+  `ALLOWED_EXT = (".csv", ".xlsx", ".xls")`. Fresh upload peeks overlaps (`count_overlaps`)
+  and shows an Override (upsert, default) / Delete-&-reload (requires `confirmed=1` when
+  dependents exist via `dependent_datasets()`) / Cancel choice. Media datasets
+  (`24itemmedia`, `12globalitemmedia`) take two file inputs (A+B); media `media_url` are
+  URLField strings — binaries explicitly out of scope.
+- **Gating + nav** — `master_data` top-level key in `_FEATURE_HIERARCHY`
+  (`utils/feature_control.py`) and in `ClientFeatureControl.FEATURE_CHOICES`
+  (`mysite/models/client.py`, migration `0006`); navbar link (mobile + desktop, cotton)
+  behind the `master_data_nav` context processor (`mysite/context_processors.py`,
+  registered in the active `TEMPLATES` block). Client scope for every CMS admin role
+  (`_user_has_admin_role`); the global `00*`–`02*` + `10*`–`12*` section only when
+  `client_code == 'bahushira'` and the user is a superuser — only a superuser writes
+  `client = NULL`.
+- **Tests** — `mysite/tests/masterdata/` (`conftest.py` + `test_masterdata_upload.py`,
+  26 tests); full suite green.
+
 ## Phase 3C — Inventory Decision Engine Stack
 
 ### New Python Packages

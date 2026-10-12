@@ -126,6 +126,7 @@ TEMPLATES = [
                 'mysite.context_processors.settings_constants', # context_processors
                 'mysite.context_processors.globalval',      # context_processors for globalval
                 'mysite.context_processors.client_context', # context_processors for usage of client val in account
+                'mysite.context_processors.master_data_nav',  # master data upload UI visibility
             ],
             'loaders': _BASE_LOADERS if DEBUG else [
                 ('django.template.loaders.cached.Loader', _BASE_LOADERS)
@@ -175,6 +176,7 @@ def _make_templates(debug):
                     'mysite.context_processors.globalval',
                     'mysite.context_processors.client_context',
                     'mysite.context_processors.demand_planning_nav',
+                    'mysite.context_processors.master_data_nav',
                 ],
                 'loaders': loaders,
                 'builtins': [

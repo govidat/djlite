@@ -52,9 +52,11 @@ DATA_DIR = BASE_DIR / "data"
 def load_val01(
     dry_run=False,
     verbose=False,
+    data_dir=None,
 ):
+    data_dir = Path(data_dir) if data_dir else DATA_DIR
 
-    file_path = DATA_DIR / "32salesnode.csv"
+    file_path = data_dir / "32salesnode.csv"
 
     # ========================================================
     # READ CSV
@@ -401,7 +403,7 @@ def load_val01(
 # ============================================================
 
 @transaction.atomic
-def run(*args):
+def run(*args, data_dir=None):
 
     args = [a.lower() for a in args]
 
@@ -414,6 +416,7 @@ def run(*args):
     load_val01(
         dry_run=DRY_RUN,
         verbose=VERBOSE,
+        data_dir=data_dir,
     )
 
     print("Done")

@@ -816,7 +816,23 @@ actuals drill-down, nav candidate-count badge, `stale_actuals` badge, `Forecasti
 - [ ] Load test: actuals upload of 50K rows completes < 60 seconds
 - [ ] End-to-end test: upload → run → override → approve → order suggestion visible
 ---
- 
+
+### Sprint 3B.10 — Client Master Data Upload UI ✅ Done
+A client-facing **Master Data** tool that routes uploaded CSV/Excel files (per-client
+`03*`-and-later and, for a bahushira superuser, global `00*`–`02*` + `10*`–`12*`)
+through the existing `scripts/load_*.py` loaders, with an Actuals-style overlap workflow.
+- [x] Loader `data_dir` API: `load_*()` and `run(*args, data_dir=None)` accept an explicit data dir across all `scripts/load_*.py`; `scripts/helpers.py` gains `to_datetime`
+- [x] Orphan loaders `load_00Aclientblock` / `load_00Bclientfeaturecontrol` + normalised CSVs (`1` → `bahushira`); `data/10Bglobalitemattributevalue.csv` stays unexposed; `30*`–`34*` excluded
+- [x] Dataset registry `mysite/masterdata/datasets.py`: 32 `Dataset` dataclasses (key, title, script, scope, files, columns, group, order, model_label, natural_key, client_columns, multi_file, description) + `coerce()` / `get_dataset` / `grouped_for_scope` / `dependent_datasets(dependent FK introspection)`
+- [x] `MasterDataImport` job model (`mysite/models/masterdata.py`, registered in `mysite/models/__init__.py`; migration `0005_masterdataimport`) + `master_data` top-level `ClientFeatureControl` key (migration `0006_alter_clientfeaturecontrol_feature`)
+- [x] Celery task `run_masterdata_import` (`mysite/tasks/masterdata/run_loader.py`): `_read_uploads`, `_normalise` (XLSX→CSV), `_validate_columns`, `_validate_scope` (lowercased vs `client.client_code`), `build_lookups`, `count_overlaps`, `_delete_overlaps`; delete + loader run in one `transaction.atomic()`
+- [x] UI app `mysite/masterdata_ui/` (`""`, `upload/`, `upload/<id>/status/`, `history/`, `template/`) mounted at `/{client_code}/masterdata/`; HTMX overlap partials (Override default / Delete-&-reload with `confirmed=1` when dependents exist / Cancel); `ALLOWED_EXT = (".csv", ".xlsx", ".xls")`
+- [x] Gating: client scope for CMS admin roles via `_user_has_admin_role(client, user)`; global `00*`–`02*` + `10*`–`12*` section only when `client_code == 'bahushira'` and superuser; only superuser writes `client = NULL`; media datasets (`24itemmedia`, `12globalitemmedia`) dual file inputs (A+B), media URLs are URLField strings (binaries out of scope)
+- [x] Navbar link (mobile + desktop) via `master_data_nav` context processor (`mysite/context_processors.py`) registered in the active `TEMPLATES` block
+- [x] Tests: `mysite/tests/masterdata/` (26 tests); full suite 344 passed; `manage.py check` clean; `makemigrations --check --dry-run` → no changes
+
+---
+
 ## Phase 3B Dependency Map
  
 ```
@@ -862,7 +878,8 @@ Sprint 3B.7b (React SPA) was superseded by 3B.7a — the entire UI shipped in th
 | 3B.7 HTMX demand_ui (incl. outlier queue) | 4–6 days |
 | 3B.8 Phase 3A Integration | 2–3 days |
 | 3B.9 Production Hardening | 2–3 days |
-| **Total** | **48–69 days** |
+| 3B.10 Master Data Upload UI | 3–4 days |
+| **Total** | **51–73 days** |
 
 Sprints 3B.4 and 3B.5 can run in parallel once 3B.3 is complete.
 Sprint 3B.7 (HTMX demand_ui) can begin in parallel with 3B.4/3B.5 once 3B.3 endpoints are stubbed.

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-xl font-bold">{% trans "Master Data import history" %}</h2>
+    <a href="{% url 'masterdata_ui:masterdata_list' client_code=client.client_code %}"
+       class="btn btn-ghost btn-sm">← {% trans "Back to Master Data" %}</a>
+  </div>
+
+  {% if not history %}
+  <div class="alert alert-warning py-2 text-sm">
+    <span>{% trans "No imports yet for this client." %}</span>
+  </div>
+  {% else %}
+  <div class="overflow-x-auto">
+    <table class="table table-sm table-zebra">
+      <thead>
+        <tr>
+          <th>{% trans "Dataset" %}</th>
+          <th>{% trans "Scope" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Rows" %}</th>
+          <th>{% trans "Uploaded by" %}</th>
+          <th>{% trans "When" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in history %}
+        <tr>
+          <td><code>{{ job.dataset_key }}</code></td>
+          <td>{{ job.scope }}</td>
+          <td>
+            <span class="badge badge-sm
+              {% if job.status == 'done' %}badge-success
+              {% elif job.status == 'failed' %}badge-error
+              {% else %}badge-info{% endif %}">
+              {{ job.status }}
+            </span>
+          </td>
+          <td>{{ job.row_count }}</td>
+          <td>{{ job.uploaded_by|default:"—" }}</td>
+          <td>{{ job.uploaded_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+        {% if job.summary %}
+        <tr class="!bg-transparent">
+          <td colspan="6" class="!pt-0">
+            <pre class="text-[10px] text-base-content/50 whitespace-pre-wrap">{{ job.summary }}</pre>
+            {% if job.error_log %}
+            <pre class="text-[10px] text-error whitespace-pre-wrap">{{ job.error_log }}</pre>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock content %}

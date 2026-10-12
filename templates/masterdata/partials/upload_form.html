@@ -1,0 +1,86 @@
+{% load i18n %}
+<div id="masterdata-upload-panel">
+<form hx-post="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}"
+      hx-target="#masterdata-upload-panel"
+      hx-swap="outerHTML"
+      hx-encoding="multipart/form-data"
+      hx-indicator="#upload-submit-btn"
+      novalidate
+      class="space-y-4">
+
+    {% csrf_token %}
+    <input type="hidden" name="action" value="upload">
+    <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+
+    <div class="text-sm text-base-content/70">
+        <code class="text-primary">{{ dataset.key }}</code>
+        {% if dataset.description %}— {{ dataset.description }}{% endif %}
+    </div>
+
+    {% if errors.file %}
+    <div class="alert alert-error py-2 text-sm"><span>{{ errors.file }}</span></div>
+    {% endif %}
+    {% if errors.file_b %}
+    <div class="alert alert-error py-2 text-sm"><span>{{ errors.file_b }}</span></div>
+    {% endif %}
+
+    {# ── Main file ────────────────────────────────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">
+                {% if dataset.multi_file %}{% trans "Main file (.csv or .xlsx)" %}{% else %}{% trans "File (.csv or .xlsx)" %}{% endif %}
+            </span>
+        </label>
+        <input type="file" name="file"
+               accept=".csv,.xlsx,.xls"
+               class="file-input file-input-bordered
+                      {% if errors.file %}file-input-error{% endif %}">
+    </div>
+
+    {% if dataset.multi_file %}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">{% trans "Text / translations file (.csv or .xlsx)" %}</span>
+        </label>
+        <input type="file" name="file_b"
+               accept=".csv,.xlsx,.xls"
+               class="file-input file-input-bordered
+                      {% if errors.file_b %}file-input-error{% endif %}">
+    </div>
+    {% endif %}
+
+    {# ── Templates ────────────────────────────────────────────────── #}
+    <div class="text-xs text-base-content/50 space-y-0.5">
+        {% if dataset.multi_file %}
+            <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&part=0"
+               class="link link-primary">↓ {% trans "Download template (main)" %}</a>
+            <span class="block">
+                <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&part=1"
+                   class="link link-primary">↓ {% trans "Download template (text)" %}</a>
+            </span>
+        {% else %}
+            <span>
+                <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}"
+                   class="link link-primary">↓ {% trans "Download template" %}</a>
+                — {% trans "Use it to keep the column format correct" %}
+            </span>
+        {% endif %}
+    </div>
+
+    <button type="submit"
+            class="btn btn-primary btn-sm w-full"
+            id="upload-submit-btn">
+        <span class="htmx-indicator loading loading-spinner loading-xs mr-2"></span>
+        <span id="upload-btn-text">{% trans "Upload" %}</span>
+    </button>
+</form>
+</div>
+<script>
+document.querySelector('[hx-post*="masterdata"]') &&
+document.querySelector('[hx-post*="masterdata"]').addEventListener('submit', function() {
+    var btn = document.getElementById('upload-submit-btn');
+    var txt = document.getElementById('upload-btn-text');
+    if (btn) btn.disabled = true;
+    if (txt) txt.textContent = '{% trans "Uploading…" %}';
+});
+</script>

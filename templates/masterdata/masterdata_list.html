@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold">{% trans "Master Data" %}</h2>
+    <a href="{% url 'masterdata_ui:masterdata_history' client_code=client.client_code %}"
+       class="btn btn-ghost btn-sm">{% trans "Import history" %} →</a>
+  </div>
+
+  {% if shows_global_master_data %}
+  <div class="alert alert-info py-2 text-sm mb-4">
+    <span>{% trans "You see the Global Data section because you are a superuser under bahushira." %}</span>
+  </div>
+  {% endif %}
+
+  {# ── Global datasets ─────────────────────────────────────────────── #}
+  {% if shows_global_master_data %}
+  <h3 class="text-lg font-semibold mt-6 mb-3">{% trans "Global Data" %}</h3>
+  {% for group, datasets in global_datasets %}
+    <h4 class="text-sm font-medium text-base-content/60 mt-4 mb-2">{{ group }}</h4>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {% for d in datasets %}
+      <div class="card bg-base-200 shadow-sm">
+        <div class="card-body p-4 gap-1">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="font-medium text-sm">{{ d.title }}</div>
+              <code class="text-[10px] text-base-content/50">{{ d.key }}</code>
+            </div>
+            <a href="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}?dataset={{ d.key }}"
+               class="btn btn-primary btn-xs">{% trans "Upload" %}</a>
+          </div>
+          {% if d.description %}<p class="text-xs text-base-content/60">{{ d.description }}</p>{% endif %}
+          <div class="mt-1 space-y-0.5">
+            {% if d.multi_file %}
+              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">↓ {% trans "Template (main)" %}</a>
+              <a class="link link-primary text-xs block" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1">↓ {% trans "Template (text)" %}</a>
+            {% else %}
+              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}">↓ {% trans "Template" %}</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+  {% endif %}
+
+  {# ── Client datasets ─────────────────────────────────────────────── #}
+  <h3 class="text-lg font-semibold mt-6 mb-1">
+    {% blocktrans %}Data for <span class="text-primary">{{ client.name }}</span>{% endblocktrans %}
+  </h3>
+  <p class="text-xs text-base-content/50 mb-3">
+    {% trans "Uploaded rows are scoped to this client. Client admins can only write rows for this client." %}
+  </p>
+  {% for group, datasets in client_datasets %}
+    <h4 class="text-sm font-medium text-base-content/60 mt-4 mb-2">{{ group }}</h4>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {% for d in datasets %}
+      <div class="card bg-base-200 shadow-sm">
+        <div class="card-body p-4 gap-1">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="font-medium text-sm">{{ d.title }}</div>
+              <code class="text-[10px] text-base-content/50">{{ d.key }}</code>
+            </div>
+            <a href="{% url 'masterdata_ui:masterdata_upload' client_code=client.client_code %}?dataset={{ d.key }}"
+               class="btn btn-primary btn-xs">{% trans "Upload" %}</a>
+          </div>
+          {% if d.description %}<p class="text-xs text-base-content/60">{{ d.description }}</p>{% endif %}
+          <div class="mt-1 space-y-0.5">
+            {% if d.multi_file %}
+              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">↓ {% trans "Template (main)" %}</a>
+              <a class="link link-primary text-xs block" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1">↓ {% trans "Template (text)" %}</a>
+            {% else %}
+              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}">↓ {% trans "Template" %}</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+
+  {# ── Recent imports ───────────────────────────────────────────────── #}
+  {% if history %}
+  <h3 class="text-lg font-semibold mt-8 mb-3">{% trans "Recent imports" %}</h3>
+  <div class="overflow-x-auto">
+    <table class="table table-sm table-zebra">
+      <thead>
+        <tr>
+          <th>{% trans "Dataset" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Rows" %}</th>
+          <th>{% trans "Uploaded by" %}</th>
+          <th>{% trans "When" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in history %}
+        <tr>
+          <td><code>{{ job.dataset_key }}</code></td>
+          <td>
+            <span class="badge badge-sm
+              {% if job.status == 'done' %}badge-success
+              {% elif job.status == 'failed' %}badge-error
+              {% else %}badge-info{% endif %}">
+              {{ job.status }}
+            </span>
+          </td>
+          <td>{{ job.row_count }}</td>
+          <td>{{ job.uploaded_by|default:"—" }}</td>
+          <td>{{ job.uploaded_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock content %}

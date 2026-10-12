@@ -221,4 +221,39 @@ def demand_planning_nav(request):
     return {'demand_ui_visible': False, 'demand_ui_role': None}
 
 
+def master_data_nav(request):
+    """
+    Exposes two variables to every template:
+
+        master_data_ui_visible   bool — show the "Master Data" navbar link?
+        shows_global_master_data bool — (bahushira superuser) show the global
+                                        data section + allow client=null writes
+
+    Visibility rules:
+      1. User must be authenticated.
+      2. A client context must be active (request.client).
+      3. The `master_data` feature flag must not be disabled for this client.
+      4. User must have an admin role in this client's ClientGroup
+         (or be a superuser, who always sees it).
+    """
+    user = getattr(request, 'user', None)
+    if user is None or not user.is_authenticated:
+        return {'master_data_ui_visible': False, 'shows_global_master_data': False}
+
+    client = getattr(request, 'client', None)
+    if client is None:
+        return {'master_data_ui_visible': False, 'shows_global_master_data': False}
+
+    from utils.feature_control import is_feature_disabled
+    if is_feature_disabled(client, 'master_data')['disabled']:
+        return {'master_data_ui_visible': False, 'shows_global_master_data': False}
+
+    from mysite.admin.base import _user_has_admin_role
+    if not _user_has_admin_role(user, client):
+        return {'master_data_ui_visible': False, 'shows_global_master_data': False}
+
+    shows_global = bool(user.is_superuser and client.client_code == 'bahushira')
+    return {'master_data_ui_visible': True, 'shows_global_master_data': shows_global}
+
+
 

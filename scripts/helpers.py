@@ -104,6 +104,23 @@ def to_decimal(value):
 
     return Decimal(value)
 """
+def to_datetime(value, default=None):
+
+    value = (value or "").strip()
+
+    if not value:
+        return default
+
+    # Normalise the space separator used by Excel/DB dumps to ISO 'T'
+    normalised = value.replace(" ", "T", 1)
+
+    try:
+        return datetime.fromisoformat(normalised)
+
+    except (ValueError, TypeError):
+        return default
+
+
 def to_date(
     value,
     fmt="%Y-%m-%d",

@@ -29,9 +29,10 @@ DATA_DIR = BASE_DIR / "data"
 # value_text,value_number
 
 
-def load_val01(dry_run=False, verbose=False):
+def load_val01(dry_run=False, verbose=False, data_dir=None):
+    data_dir = Path(data_dir) if data_dir else DATA_DIR
 
-    file_path = DATA_DIR / "11Bglobalitemattributevalue.csv"
+    file_path = data_dir / "11Bglobalitemattributevalue.csv"
 
     # ── Read CSV once ───────────────────────────────────────
 
@@ -356,7 +357,7 @@ def load_val01(dry_run=False, verbose=False):
 
 
 @transaction.atomic
-def run(*args):
+def run(*args, data_dir=None):
 
     args = [a.lower() for a in args]
 
@@ -369,6 +370,7 @@ def run(*args):
     load_val01(
         dry_run=dry_run,
         verbose=verbose,
+        data_dir=data_dir,
     )
 
     print("Done")

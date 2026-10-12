@@ -417,6 +417,7 @@ class ClientFeatureControl(models.Model):
         ('forecast_approval',    'Forecast Approval Workflow'),
         ('scheme_management',    'Sales Promotion Scheme Management'),
         ('item_lifecycle',       'Item Substitution / Discontinuation / Introduction'),
+        ('master_data',          'Master Data Upload UI'),
     ]
 
     client = models.ForeignKey(

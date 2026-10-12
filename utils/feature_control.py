@@ -25,6 +25,7 @@ _FEATURE_HIERARCHY = {
     }),
     "inventory":  frozenset(),   # populate in Phase 2
     "ecommerce":  frozenset(),   # populate in Phase 3
+    "master_data": frozenset(),  # client Master Data upload UI
 }
 
 # Reverse lookup: sub-feature → parent

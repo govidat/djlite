@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-xl font-bold">{% trans "Master Data upload" %} — {{ dataset.title }}</h2>
+    <a href="{% url 'masterdata_ui:masterdata_list' client_code=client.client_code %}"
+       class="btn btn-ghost btn-sm">← {% trans "Back to Master Data" %}</a>
+  </div>
+
+  {% include "masterdata/partials/upload_form.html" %}
+</div>
+{% endblock content %}

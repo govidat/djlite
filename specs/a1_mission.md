@@ -220,6 +220,30 @@ Both `ActualSale` and `ActualSaleLocation` are written by an **idempotent bulk u
 
 `ActualSale` unique constraint on `(client, planning_location, item, planning_customer, distribution_channel, period_type, period_start)` — enforced at DB level. A supporting composite index `ix_actualsale_grain_lookup` covers the same key for the forecast engine's natural-key lookups. `planning_customer = NULL` is allowed (demand for "unspecified customers"); `distribution_channel` defaults to `'00'` (Common).
 
+#### Client Master Data Upload UI
+
+Client staff upload their own master data files (CSV or Excel) through the existing
+loader programs (`scripts/load_*.py`), which now accept an explicit `data_dir`
+argument. A client-facing **Master Data** tool lives in the top navbar, gated by the
+`master_data` `ClientFeatureControl` key plus the CMS admin-role check. It exposes:
+
+- **Client section** (all client-admin roles): upload of the `data/03*`-and-later
+  per-client files (client blocks, item catalogue, pricing, taxonomies, attributes,
+  demand-planning master data, media).
+- **Global section** (only when `client_code == 'bahushira'` and the user is a
+  superuser): upload of the global `00*`–`02*` and `10*`–`12*` files; only a
+  superuser may write rows with `client = NULL`.
+- A `MasterDataImport` job model mirrors `ActualSaleImport`: one scheduled Celery
+  task (`run_masterdata_import`) validates columns and scope, idempotently runs the
+  loader against the uploaded file, and records `row_count` / `summary` / `error_log`;
+  the HTMX upload form polls status via a partial.
+- An **overlap workflow** mirrors the Actuals upload guard: when uploaded rows already
+  exist the UI offers Override (upsert, default) / Delete-&-reload (later
+  confirmation when dependent datasets are known via `dependent_datasets()`) / Cancel.
+- The dataset registry (`mysite/masterdata/datasets.py`) declares each dataset's scope
+  rule, files, natural key, and dependents, so scope validation and overlap detection
+  are declarative rather than per-loader concerns.
+
 #### Outlier Management (Actuals Exception Handling)
 
 Real actuals occasionally contain one-off events (bulk sales, data-entry errors, partial-period anomalies) that should not shape the statistical baseline. This is handled as a hybrid system/planner workflow, not a pure automated filter and not a pure manual review queue.
