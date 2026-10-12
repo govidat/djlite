@@ -294,6 +294,18 @@ demand sidebar nav, etc.) moved from filesystem fallbacks into the database.
 - [x] Tests: `mysite/tests/test_country.py` (20 tests: model, client fields, set_country view, template resolution)
 - [x] Migrations: `0085_country_model`, `0086_seed_countries`, `0087_client_country_fields`, `0088_sectortemplate_country_dim`, `0089_clienttemplate_country_dim`
 
+### Sprint 2.11 — Reusable Attribute Definitions ✅ Done
+Attribute definitions were decoupled from the taxonomy tree so a type or value is
+authored once and reused across many nodes (and clients) via explicit joins.
+- [x] `AttributeType` (`01-03 Attribute Type`) & `AttributeValue` (`01-04 Attribute Value`): standalone, `client` NULL = global, `slug` + translated `name` + `gpc_code`; node/order/flags removed
+- [x] Uniqueness: `UniqueConstraint(client, slug, nulls_distinct=False)` and `UniqueConstraint(client, gpc_code, nulls_distinct=False, condition=~Q(gpc_code=''))` on both (empty `gpc_code` allowed; PG 17 required for `nulls_distinct`)
+- [x] `TaxonomyNodeAttribute`: node ↔ type join carrying node-scoped `is_required` / `is_filterable` / `order`; `unique_together (node, attribute_type)`
+- [x] `TaxonomyNodeAttributeValue`: node+type ↔ value join carrying `order`; `unique_together (node_attribute, attribute_value)` — value rows reusable across pairings
+- [x] `GlobalItemAttributeValue` / `ItemAttributeValue` repointed to `AttributeType` / `AttributeValue`
+- [x] Consumers updated: `utils/catalogue_queries.py`, admin inlines/admins, `translation.py`, `signals.py` cache lists, loaders `load_08` / `load_09` / `load_11B` / `load_21B`
+- [x] Migration `0010_*` (old empty tables dropped/recreated, no data migration)
+- [x] Tests: `mysite/tests/test_catalogue_lhs_facets.py`; full suite 318 passed; `check` clean; catalogue + filter render 200
+
 ---
  
 ## Open Decisions (Phase 2)

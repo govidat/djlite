@@ -122,7 +122,13 @@ Both `Page` and `Client` support a self-referential parent-child hierarchy for n
   `CartItem` and `OrderItem` will FK to `Item` / `ItemVariant` in Phase 3.
 - Two-tier item catalogue: GlobalItem (superuser, GS1-aligned) + Item (client-derived)
 - GS1 GPC 4-level hierarchy: Segment → Family → Class → Brick
-- Attribute inheritance: TaxonomyNode attrs inherited by items, overridable at item level
+- Attribute definitions are **standalone and reusable**: `AttributeType` / `AttributeValue`
+  carry only the definition (slug, name, `gpc_code`), independent of any node. A node
+  opts into a type via `TaxonomyNodeAttribute` (node-scoped `is_required` /
+  `is_filterable` / `order`); values attach through `TaxonomyNodeAttributeValue`, so
+  the same value row can be reused across many node+type pairings.
+- Attribute inheritance: node attributes inherited by items, overridable at item level
+  (`AttributeType` → `AttributeValue` → `GlobalItemAttributeValue` → `ItemAttributeValue`)
 - Client can reference and derive from global items and global taxonomy nodes  
 
 ### 8a. Client Sector Classification

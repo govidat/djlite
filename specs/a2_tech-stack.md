@@ -287,10 +287,11 @@ theme/                           ← django-tailwind theme app
 | `ItemVariant` | Optional variants (size, colour). Phase 3 eCommerce hook. |
 
   New models: GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue,
-              NodeAttributeType, NodeAttributeValue, ItemAttributeValue
+              AttributeType, AttributeValue, TaxonomyNodeAttribute,
+              TaxonomyNodeAttributeValue, ItemAttributeValue
   GS1 fields: gtin (GTIN-8/12/13/14), gpc_brick_code (8-digit)
   Derivation pattern: Item.global_item FK, resolved_name()/resolved_attributes() methods
-  Attribute inheritance: NodeAttributeType → NodeAttributeValue → GlobalItemAttributeValue
+  Attribute inheritance: AttributeType → AttributeValue → GlobalItemAttributeValue
                          → ItemAttributeValue (deepest wins)
                           
 ### Query Pattern — Catalogue vs clientstatic
@@ -375,7 +376,9 @@ Item (base — id, name, description, status, image, order, client)
 
 ```
 GlobalItem → GlobalItemTaxonomyNode, GlobalItemAttributeValue, GlobalItemMedia
-Taxonomy → TaxonomyNode → NodeAttributeType → NodeAttributeValue
+Taxonomy → TaxonomyNode → TaxonomyNodeAttribute → TaxonomyNodeAttributeValue
+                                        ↓                       ↓
+                                  AttributeType          AttributeValue
 Item → ItemTaxonomyNode, ItemAttributeValue, ItemMedia, ItemVariant
        → ProductItem, SongItem, DocumentItem, ServiceItem
 ClientTemplate (client-specific template fragments stored in DB)
@@ -1573,3 +1576,38 @@ drawer), replacing the plain checkbox list.
 - **Tests**: `mysite/tests/test_catalogue_lhs_facets.py` (rollup + dedupe of
   counts, tri-state annotations, own-facet-excluded facets, brand suppression,
   markup contract).
+
+## Catalogue Attributes — Reusable Definition / per-Node Association (implemented)
+
+Attribute definitions were decoupled from the tree so a type or value can be
+authored once and reused across many nodes (and clients).
+
+- **`AttributeType`** (`01-03 Attribute Type`): `client` (NULL = global), `slug`,
+  translated `name`, `field_type`, `gpc_code`. No node/order/flags.
+  - `UniqueConstraint(client, slug, nulls_distinct=False)` → `uniq_attributetype_client_slug`
+  - `UniqueConstraint(client, gpc_code, nulls_distinct=False, condition=~Q(gpc_code=''))`
+    → `uniq_attributetype_client_gpc` (empty `gpc_code` allowed, non-empty unique per client)
+- **`AttributeValue`** (`01-04 Attribute Value`): `client` (NULL = global), `slug`,
+  translated `name`, `gpc_code`. Same two constraints (`uniq_attributevalue_client_*`).
+- **`TaxonomyNodeAttribute`**: node ↔ type join (`related_name='node_attributes'` /
+  `'node_links'`) carrying the node-scoped `is_required`, `is_filterable`
+  (default True), `order`; `unique_together (node, attribute_type)`.
+- **`TaxonomyNodeAttributeValue`**: `node_attribute` ↔ `attribute_value` join
+  (`'value_links'` / `'node_attribute_links'`) carrying `order`;
+  `unique_together (node_attribute, attribute_value)`. A value row is reusable
+  because association is to the node+type link, not to the type.
+- **`GlobalItemAttributeValue` / `ItemAttributeValue`** repointed to `AttributeType`
+  (`related_name='global_item_values'` / `'item_values'`) and `AttributeValue`
+  (`'global_item_usages'` / `'item_usages'`).
+- **`nulls_distinct=False`** relies on PostgreSQL 17 (dev + prod) so a NULL
+  `client` still participates in the uniqueness constraint.
+- **Consumers updated**: `utils/catalogue_queries.py`
+  (`_get_attr_types_by_node`, `get_filterable_attribute_types`,
+  `get_taxonomy_tree` prefetch → `node_attributes__value_links__attribute_value`,
+  `build_catalogue_payload`), admin inlines/admins, `translation.py`,
+  `signals.py` cache-invalidation model lists, and loaders `load_08` / `load_09`
+  / `load_11B` / `load_21B`.
+- **Migration**: `mysite/migrations/0010_alter_nodeattributetype_unique_together_and_more.py`
+  (old `NodeAttributeType` / `NodeAttributeValue` tables were empty; dropped and
+  recreated as the standalone models + joins, no data migration).
+- **Tests**: `mysite/tests/test_catalogue_lhs_facets.py`.
