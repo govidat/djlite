@@ -1,0 +1,12 @@
+node_client_code,taxonomy_slug,node_slug,attribute_client_code,attribute_slug,value_client_code,value_slug,order
+,gpc,spark-plugs,,thread-size,,m14,1
+,gpc,spark-plugs,,thread-size,,m18,2
+,gpc,spark-plugs,,thread-size,,m10,3
+,gpc,spark-plugs,,plug-type,,standard,1
+,gpc,spark-plugs,,plug-type,,iridium,2
+,gpc,spark-plugs,,plug-type,,platinum,3
+,gpc,spark-plugs,,plug-type,,double-platinum,4
+,gpc,spark-plugs,,heat-range,,cold-5,1
+,gpc,spark-plugs,,heat-range,,medium-6,2
+,gpc,spark-plugs,,heat-range,,hot-7,3
+,gpc,spark-plugs,,heat-range,,hot-8,4

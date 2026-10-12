@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',   # required for GinIndex / jsonb ops on Postgres
     "allauth_ui", # allauth ui
     'django.contrib.sites', # allauth
     'allauth', # allauth

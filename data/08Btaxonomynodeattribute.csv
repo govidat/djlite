@@ -1,0 +1,5 @@
+node_client_code,taxonomy_slug,node_slug,attribute_client_code,attribute_slug,is_required,is_filterable,order
+,gpc,spark-plugs,,thread-size,1,1,1
+,gpc,spark-plugs,,electrode-gap-mm,1,1,2
+,gpc,spark-plugs,,plug-type,1,1,3
+,gpc,spark-plugs,,heat-range,0,1,4

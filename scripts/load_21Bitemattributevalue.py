@@ -235,13 +235,50 @@ def load_val01(
             skipped_count += 1
             continue
 
+        # ── Scope Enforcement ──────────────────────────────
+        # an item may use global or its own client's
+        # attribute types / predefined values only
+
+        allowed = {None, item.client.client_code}
+
+        if (
+            attribute_client_code
+            and attribute_client_code not in allowed
+        ):
+
+            print(
+                f"Scope violation: AttributeType "
+                f"{attribute_client_code} / {attribute_slug} "
+                f"not allowed on item "
+                f"{client_code} / {item_code}"
+            )
+
+            skipped_count += 1
+            continue
+
+        if (
+            predefined_client_code
+            and predefined_client_code not in allowed
+        ):
+
+            print(
+                f"Scope violation: AttributeValue "
+                f"{predefined_client_code} / "
+                f"{predefined_value_slug} "
+                f"not allowed on item "
+                f"{client_code} / {item_code}"
+            )
+
+            skipped_count += 1
+            continue
+
         # ── Resolve Attribute Type ────────────────────────
 
         attribute_type = attribute_types.get(
             (
                 taxonomy_slug,
                 node_slug,
-                attribute_client_code,
+                attribute_client_code or "",
                 attribute_slug,
             )
         )
@@ -282,9 +319,9 @@ def load_val01(
                 (
                     taxonomy_slug,
                     node_slug,
-                    attribute_client_code,
+                    attribute_client_code or "",
                     attribute_slug,
-                    predefined_client_code,
+                    predefined_client_code or "",
                     predefined_value_slug,
                 )
             )
@@ -297,7 +334,7 @@ def load_val01(
                     (
                         taxonomy_slug,
                         node_slug,
-                        attribute_client_code,
+                        attribute_client_code or "",
                         attribute_slug,
                         "",
                         predefined_value_slug,
@@ -318,7 +355,7 @@ def load_val01(
 
         value_text = clean(
             row.get("value_text")
-        )
+        ) or ""
 
         value_number = to_decimal(
             row.get("value_number")

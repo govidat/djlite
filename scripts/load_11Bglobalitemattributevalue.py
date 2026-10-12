@@ -95,8 +95,10 @@ def load_val01(dry_run=False, verbose=False):
             "node__taxonomy",
         ).filter(
             attribute_type__slug__in=attribute_slugs,
+            attribute_type__client__isnull=True,
             node__slug__in=node_slugs,
             node__taxonomy__slug__in=taxonomy_slugs,
+            node__client__isnull=True,
         )
     }
 
@@ -116,7 +118,9 @@ def load_val01(dry_run=False, verbose=False):
             "node_attribute__node",
             "node_attribute__node__taxonomy",
         ).filter(
-            attribute_value__slug__in=predefined_slugs
+            attribute_value__slug__in=predefined_slugs,
+            attribute_value__client__isnull=True,
+            node_attribute__node__client__isnull=True,
         )
     }
 
@@ -251,19 +255,43 @@ def load_val01(dry_run=False, verbose=False):
                 skipped_count += 1
                 continue
 
+        # ── Values ───────────────────────────────────────
+
+        value_text = clean(
+            row.get("value_text")
+        ) or ""
+
+        value_number = to_decimal(
+            row.get("value_number")
+        )
+
+        # ── Validation ───────────────────────────────────
+
+        if (
+            predefined_value
+            and (
+                value_text
+                or value_number is not None
+            )
+        ):
+
+            print(
+                f"Conflicting values: "
+                f"{global_item_code} / {attribute_slug}"
+            )
+
+            skipped_count += 1
+            continue
+
         # ── Defaults ─────────────────────────────────────
 
         defaults = {
 
             "predefined_value": predefined_value,
 
-            "value_text": clean(
-                row.get("value_text")
-            ),
+            "value_text": value_text,
 
-            "value_number": to_decimal(
-                row.get("value_number")
-            ),
+            "value_number": value_number,
         }
 
         # ── Dry Run ───────────────────────────────────────

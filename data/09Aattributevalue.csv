@@ -1,0 +1,12 @@
+client_code,slug,name_en,name_hi,name_fr,name_ta,gpc_code
+,m14,M14 x 1.25,,,,
+,m18,M18 x 1.5,,,,
+,m10,M10 x 1.0,,,,
+,standard,Standard (Copper),स्टैंडर्ड (कॉपर),,,,
+,iridium,Iridium,इरिडियम,,,,
+,platinum,Platinum,प्लैटिनम,,,,
+,double-platinum,Double Platinum,डबल प्लैटिनम,,,,
+,cold-5,5 (Cold),,,,,
+,medium-6,6 (Medium),,,,,
+,hot-7,7 (Hot),,,,,
+,hot-8,8 (Very Hot),,,,,

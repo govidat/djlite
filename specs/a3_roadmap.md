@@ -302,8 +302,9 @@ authored once and reused across many nodes (and clients) via explicit joins.
 - [x] `TaxonomyNodeAttribute`: node ↔ type join carrying node-scoped `is_required` / `is_filterable` / `order`; `unique_together (node, attribute_type)`
 - [x] `TaxonomyNodeAttributeValue`: node+type ↔ value join carrying `order`; `unique_together (node_attribute, attribute_value)` — value rows reusable across pairings
 - [x] `GlobalItemAttributeValue` / `ItemAttributeValue` repointed to `AttributeType` / `AttributeValue`
-- [x] Consumers updated: `utils/catalogue_queries.py`, admin inlines/admins, `translation.py`, `signals.py` cache lists, loaders `load_08` / `load_09` / `load_11B` / `load_21B`
-- [x] Migration `0010_*` (old empty tables dropped/recreated, no data migration)
+- [x] Consumers updated: `utils/catalogue_queries.py`, admin inlines/admins, `translation.py`, `signals.py` cache lists
+- [x] Loaders split definition/association: `load_08Aattributetype` / `load_09Aattributevalue` (standalone definitions) and `load_08Btaxonomynodeattribute` / `load_09Btaxonomynodeattributevalue` (node joins, scope-enforced); `load_11A` / `load_11B` global-only; `load_21B` enforces `{global, item.client}`
+- [x] Migrations squashed into `0001_initial` (old empty tables dropped/recreated, no data migration)
 - [x] Tests: `mysite/tests/test_catalogue_lhs_facets.py`; full suite 318 passed; `check` clean; catalogue + filter render 200
 
 ---

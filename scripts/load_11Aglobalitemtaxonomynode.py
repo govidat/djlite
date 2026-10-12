@@ -73,6 +73,7 @@ def load_val01(dry_run=False, verbose=False):
         for n in TaxonomyNode.objects.filter(
             taxonomy__slug__in=taxonomy_slugs,
             slug__in=node_slugs,
+            client__isnull=True,
         ).select_related("taxonomy")
     }
 
@@ -311,6 +312,7 @@ def load_val01():
         for n in TaxonomyNode.objects.filter(
             taxonomy__slug__in=taxonomy_slugs,
             slug__in=node_slugs,
+            client__isnull=True,
         ).select_related("taxonomy")
     }
 

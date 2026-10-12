@@ -1605,9 +1605,17 @@ authored once and reused across many nodes (and clients).
   (`_get_attr_types_by_node`, `get_filterable_attribute_types`,
   `get_taxonomy_tree` prefetch → `node_attributes__value_links__attribute_value`,
   `build_catalogue_payload`), admin inlines/admins, `translation.py`,
-  `signals.py` cache-invalidation model lists, and loaders `load_08` / `load_09`
-  / `load_11B` / `load_21B`.
-- **Migration**: `mysite/migrations/0010_alter_nodeattributetype_unique_together_and_more.py`
-  (old `NodeAttributeType` / `NodeAttributeValue` tables were empty; dropped and
-  recreated as the standalone models + joins, no data migration).
+  `signals.py` cache-invalidation model lists, and loaders.
+- **Loaders** (split definition from association):
+  - `load_08Aattributetype` / `load_09Aattributevalue` — upsert the standalone
+    `AttributeType` / `AttributeValue` rows (`client_code` blank = global).
+  - `load_08Btaxonomynodeattribute` / `load_09Btaxonomynodeattributevalue` —
+    attach types/values to nodes; enforce scope (a global node may only use
+    global types/values; a client node may use global or its own).
+  - `load_11A` / `load_11B` are global-only (global nodes + global types/values);
+    `load_21B` enforces `{global, item.client}` for client items.
+- **Migrations**: attribute models + joins are part of the squashed
+  `mysite/migrations/0001_initial.py` (old `NodeAttributeType` /
+  `NodeAttributeValue` tables were empty; dropped and recreated as the standalone
+  models + joins, no data migration).
 - **Tests**: `mysite/tests/test_catalogue_lhs_facets.py`.

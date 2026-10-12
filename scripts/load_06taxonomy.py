@@ -134,10 +134,10 @@ def load_val01(
                 to_int(row.get("order")) or 0,
 
             "gpc_segment_code":
-                clean(row.get("gpc_segment_code")),
+                clean(row.get("gpc_segment_code")) or "",
 
             "taxonomy_type":
-                clean(row.get("taxonomy_type")),
+                clean(row.get("taxonomy_type")) or "",
         }
 
         # ── multilingual fields ──────────────────────────
@@ -146,11 +146,11 @@ def load_val01(
 
             defaults[f"name_{lang}"] = clean(
                 row.get(f"name_{lang}")
-            )
+            ) or ""
 
             defaults[f"description_{lang}"] = clean(
                 row.get(f"description_{lang}")
-            )
+            ) or ""
 
         # ── DRY RUN ──────────────────────────────────────
 
