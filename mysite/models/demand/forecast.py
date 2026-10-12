@@ -836,6 +836,20 @@ class ForecastLine(models.Model):
         ordering    = ['period_start', 'planning_location', 'item']
         verbose_name        = _('02-16 Forecast Line')
         verbose_name_plural = _('02-16 Forecast Lines')
+        indexes = [
+            models.Index(
+                fields=['version', 'period_start'],
+                name='ix_fcstline_ver',
+            ),
+            models.Index(
+                fields=['version', 'item', 'period_start'],
+                name='ix_fcstline_item_period',
+            ),
+            models.Index(
+                fields=['version', 'planning_location', 'period_start'],
+                name='ix_fcstline_loc_period',
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         # Compute period_end
@@ -1027,6 +1041,12 @@ class ForecastAggregate(models.Model):
         ordering  = ['agg_level', 'period_start']
         verbose_name        = _('02-17 Forecast Aggregate')
         verbose_name_plural = _('02-17 Forecast Aggregates')
+        indexes = [
+            models.Index(
+                fields=['version', 'agg_level', 'period_start'],
+                name='ix_fcstagg_ver_level',
+            ),
+        ]
 
 
 

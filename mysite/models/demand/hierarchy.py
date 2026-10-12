@@ -224,6 +224,11 @@ class PlanningLocation(MaterializedPathMixin):
         verbose_name_plural = _("02-01 Planning Locations")
         indexes = [
             models.Index(fields=["client", "is_leaf"], name="ix_planloc_client_leaf"),
+            models.Index(
+                fields=["path"],
+                name="planloc_path_tpo_idx",
+                opclasses=["text_pattern_ops"],
+            ),
         ]
         permissions = [
             ('override_at_location', 'Can create/edit forecast overrides at this location and below'),
@@ -316,6 +321,11 @@ class PlanningCustomer(MaterializedPathMixin):
                 fields=["client", "customer_type"],
                 name="ix_plancust_client_type",
             ),
+            models.Index(
+                fields=["path"],
+                name="plancust_path_tpo_idx",
+                opclasses=["text_pattern_ops"],
+            ),
         ]
 
     def __str__(self):
@@ -381,6 +391,13 @@ class SalesNode(MaterializedPathMixin):
         ordering = ["path"]
         verbose_name = _("02-03 Sales Node")
         verbose_name_plural = _("02-03 Sales Nodes")
+        indexes = [
+            models.Index(
+                fields=["path"],
+                name="salesnode_path_tpo_idx",
+                opclasses=["text_pattern_ops"],
+            ),
+        ]
 
     def __str__(self):
         return f"{self.code} — {self.name}"

@@ -441,6 +441,26 @@ class ActualSale(models.Model):
                         name="ix_actualsale_grain_lookup"
             ),            
         ]
+        constraints = [
+            # Partial unique indexes replace the Postgres-only RunSQL that used
+            # to live in migration 0005. Split on whether a customer is set.
+            models.UniqueConstraint(
+                fields=[
+                    "client", "planning_location", "item",
+                    "planning_customer", "period_type", "period_start",
+                ],
+                condition=models.Q(planning_customer__isnull=False),
+                name="uq_actualsale_with_customer",
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "client", "planning_location", "item",
+                    "period_type", "period_start",
+                ],
+                condition=models.Q(planning_customer__isnull=True),
+                name="uq_actualsale_no_customer",
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         from django.utils import timezone

@@ -13,6 +13,7 @@ Key design decisions:
 
 from django.db import models
 from django.db.models import Q
+from django.contrib.postgres.indexes import GinIndex
 #from django.contrib.contenttypes.fields import GenericRelation
 from .base import LowercaseCharField, text_field_validators
 
@@ -329,6 +330,16 @@ class TaxonomyNode(models.Model):
             models.Index(fields=['taxonomy', 'client', 'path']),
             models.Index(fields=['taxonomy', 'client', 'is_active', 'depth']),
             models.Index(fields=['gpc_code']),
+            models.Index(
+                fields=['taxonomy', 'path'],
+                name='taxonomy_node_path_idx',
+                opclasses=['', 'text_pattern_ops'],
+            ),
+            models.Index(
+                fields=['gpc_code'],
+                name='taxonomynode_gpc_idx',
+                condition=~Q(gpc_code=''),
+            ),
         ]
 
     def __str__(self):
@@ -628,6 +639,21 @@ class GlobalItem(models.Model):
             models.Index(fields=['domain', 'status']),
             models.Index(fields=['gtin']),
             models.Index(fields=['gpc_brick_code']),
+            models.Index(
+                fields=['gtin'],
+                name='globalitem_gtin_idx',
+                condition=~Q(gtin=''),
+            ),
+            models.Index(
+                fields=['gpc_brick_code'],
+                name='globalitem_gpc_idx',
+                condition=~Q(gpc_brick_code=''),
+            ),
+            GinIndex(
+                fields=['attributes'],
+                name='globalitem_attributes_gin_idx',
+                opclasses=['jsonb_path_ops'],
+            ),
             #models.Index(fields=['brand', 'status']),
         ]
 
@@ -676,6 +702,12 @@ class GlobalItemAttributeValue(models.Model):
     class Meta:
         unique_together = ('global_item', 'attribute_type')
         verbose_name    = 'Global Item Attribute Value'
+        indexes         = [
+            models.Index(
+                fields=['attribute_type', 'predefined_value'],
+                name='globalitemattrvalue_lookup_idx',
+            ),
+        ]
 
     def resolved_value(self):
         if self.predefined_value:
@@ -837,6 +869,20 @@ class Item(I18nFallbackMixin, models.Model):
             models.Index(fields=['client', 'status', 'order']),
             models.Index(fields=['global_item', 'client']),
             models.Index(fields=['gtin']),
+            models.Index(
+                fields=['client', 'domain', 'status'],
+                name='item_client_domain_status_idx',
+            ),
+            models.Index(
+                fields=['gtin'],
+                name='item_gtin_idx',
+                condition=~Q(gtin=''),
+            ),
+            GinIndex(
+                fields=['attributes'],
+                name='item_attributes_gin_idx',
+                opclasses=['jsonb_path_ops'],
+            ),
         ]
 
     def __str__(self):
@@ -1166,6 +1212,12 @@ class ItemAttributeValue(models.Model):
     class Meta:
         unique_together = ('item', 'attribute_type')
         verbose_name    = 'Item Attribute Value'
+        indexes         = [
+            models.Index(
+                fields=['attribute_type', 'predefined_value'],
+                name='itemattributevalue_lookup_idx',
+            ),
+        ]
 
     def resolved_value(self):
         if self.predefined_value:
@@ -1212,6 +1264,23 @@ class ProductItem(models.Model):
 
     class Meta:
         verbose_name = 'Product Detail'
+        indexes      = [
+            GinIndex(
+                fields=['attributes'],
+                name='productitem_attributes_gin_idx',
+                opclasses=['jsonb_path_ops'],
+            ),
+            models.Index(
+                fields=['sku'],
+                name='productitem_sku_idx',
+                condition=~Q(sku=''),
+            ),
+            models.Index(
+                fields=['price'],
+                name='productitem_price_idx',
+                condition=Q(price__isnull=False),
+            ),
+        ]
 
     def __str__(self):
         itemname = getattr(self.item, 'name', '?')
@@ -1244,6 +1313,23 @@ class SongItem(models.Model):
 
     class Meta:
         verbose_name = 'Song Detail'
+        indexes      = [
+            GinIndex(
+                fields=['attributes'],
+                name='songitem_attributes_gin_idx',
+                opclasses=['jsonb_path_ops'],
+            ),
+            models.Index(
+                fields=['artist'],
+                name='songitem_artist_idx',
+                condition=~Q(artist=''),
+            ),
+            models.Index(
+                fields=['album'],
+                name='songitem_album_idx',
+                condition=~Q(album=''),
+            ),
+        ]
 
     def to_beckn_tags(self):
         return {'artist': self.artist, 'album': self.album,
@@ -1267,6 +1353,18 @@ class DocumentItem(models.Model):
 
     class Meta:
         verbose_name = 'Document Detail'
+        indexes      = [
+            GinIndex(
+                fields=['attributes'],
+                name='documentitem_attr_gin_idx',
+                opclasses=['jsonb_path_ops'],
+            ),
+            models.Index(
+                fields=['format'],
+                name='documentitem_format_idx',
+                condition=~Q(format=''),
+            ),
+        ]
 
     def to_beckn_tags(self):
         return {'format': self.format, 'pages': str(self.page_count or ''),
@@ -1290,6 +1388,18 @@ class ServiceItem(models.Model):
 
     class Meta:
         verbose_name = 'Service Detail'
+        indexes      = [
+            GinIndex(
+                fields=['attributes'],
+                name='serviceitem_attributes_gin_idx',
+                opclasses=['jsonb_path_ops'],
+            ),
+            models.Index(
+                fields=['fulfillment_type'],
+                name='serviceitem_fulfill_type_idx',
+                condition=~Q(fulfillment_type=''),
+            ),
+        ]
 
     def to_beckn_tags(self):
         return {'duration_minutes': str(self.duration_minutes or ''),

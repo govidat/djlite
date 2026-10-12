@@ -135,7 +135,7 @@ class ClientLocation(models.Model):
         max_length=500,
         blank=True,
         default='',
-        db_index=False,   # index added manually via RunSQL below (text_pattern_ops)
+        db_index=False,   # covered by the text_pattern_ops index in Meta
         help_text='Materialized path: dot-separated PKs from root to this node. e.g. "1.4.17"',
     )
 
@@ -159,6 +159,13 @@ class ClientLocation(models.Model):
         unique_together = ('client', 'location_code')
         ordering        = ['client', 'location_code']
         verbose_name = "00-05 Client Location"
+        indexes      = [
+            models.Index(
+                fields=['path'],
+                name='clientlocation_path_idx',
+                opclasses=['text_pattern_ops'],
+            ),
+        ]
     def __str__(self):
         client_code = getattr(self.client, 'client_code', '?')       
         return f"{client_code} / {self.location_code} ({self.location_type})"
