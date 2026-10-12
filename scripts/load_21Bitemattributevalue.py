@@ -11,8 +11,10 @@ from scripts.helpers import (
 
 from mysite.models import (
     Item,
-    NodeAttributeType,
-    NodeAttributeValue,
+    AttributeType,
+    AttributeValue,
+    TaxonomyNodeAttribute,
+    TaxonomyNodeAttributeValue,
     ItemAttributeValue,
 )
 
@@ -93,18 +95,20 @@ def load_val01(
     attribute_types = {
 
         (
-            at.node.taxonomy.slug,
-            at.node.slug,
-            at.client.client_code if at.client else "",
-            at.slug,
-        ): at
+            na.node.taxonomy.slug,
+            na.node.slug,
+            na.attribute_type.client.client_code
+            if na.attribute_type.client else "",
+            na.attribute_type.slug,
+        ): na.attribute_type
 
-        for at in NodeAttributeType.objects.filter(
-            slug__in=attribute_slugs,
+        for na in TaxonomyNodeAttribute.objects.filter(
+            attribute_type__slug__in=attribute_slugs,
         ).select_related(
+            "attribute_type",
+            "attribute_type__client",
             "node",
             "node__taxonomy",
-            "client",
         )
     }
 
@@ -113,28 +117,30 @@ def load_val01(
     predefined_values = {
 
         (
-            pv.attribute_type.node.taxonomy.slug,
-            pv.attribute_type.node.slug,
+            nav.node_attribute.node.taxonomy.slug,
+            nav.node_attribute.node.slug,
 
-            pv.attribute_type.client.client_code
-            if pv.attribute_type.client else "",
+            nav.node_attribute.attribute_type.client.client_code
+            if nav.node_attribute.attribute_type.client else "",
 
-            pv.attribute_type.slug,
+            nav.node_attribute.attribute_type.slug,
 
-            pv.client.client_code
-            if pv.client else "",
+            nav.attribute_value.client.client_code
+            if nav.attribute_value.client else "",
 
-            pv.slug,
-        ): pv
+            nav.attribute_value.slug,
+        ): nav.attribute_value
 
-        for pv in NodeAttributeValue.objects.filter(
-            slug__in=predefined_slugs,
+        for nav in TaxonomyNodeAttributeValue.objects.filter(
+            attribute_value__slug__in=predefined_slugs,
         ).select_related(
-            "attribute_type",
-            "attribute_type__node",
-            "attribute_type__node__taxonomy",
-            "attribute_type__client",
-            "client",
+            "attribute_value",
+            "attribute_value__client",
+            "node_attribute",
+            "node_attribute__attribute_type",
+            "node_attribute__attribute_type__client",
+            "node_attribute__node",
+            "node_attribute__node__taxonomy",
         )
     }
 

@@ -12,7 +12,7 @@ from mysite.admin.users import (
     ClientUserProfileInline, CustomUserAdmin, ClientGroupPermissionInline, 
     ClientUserMembershipInline, ClientGroupAdmin, ClientLocationAdmin, 
 )
-from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, TaxonomyNodeAdmin, NodeAttributeTypeAdmin, NodeAttributeValueAdmin
+from mysite.admin.catalogue import GlobalItemAdmin, TaxonomyAdmin, ItemAdmin, TaxonomyNodeAdmin, AttributeTypeAdmin, AttributeValueAdmin
 
 from mysite.admin.demand import PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, SalesForecastLinkAdmin, ActualSaleAdmin, ItemPlanningProfileAdmin
 
@@ -41,7 +41,7 @@ from mysite.models import (
     Layout, Component,
     ClientUserProfile, CustomerProfile, ClientUserMembership,
     GlobalItem, Taxonomy, Item,
-    TaxonomyNode, NodeAttributeType, NodeAttributeValue,
+    TaxonomyNode, AttributeType, AttributeValue,
     # Demand Planning
     PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, ActualSaleImport, ActualSale, ItemPlanningProfile,
     ForecastVersion, ForecastLine, ForecastAccuracy, 
@@ -85,8 +85,8 @@ admin.site.register(Taxonomy,             TaxonomyAdmin)
 admin.site.register(GlobalItem,           GlobalItemAdmin)
 admin.site.register(Item,                 ItemAdmin)
 admin.site.register(TaxonomyNode,         TaxonomyNodeAdmin)
-admin.site.register(NodeAttributeType,    NodeAttributeTypeAdmin)
-admin.site.register( NodeAttributeValue,  NodeAttributeValueAdmin)
+admin.site.register(AttributeType,    AttributeTypeAdmin)
+admin.site.register( AttributeValue,  AttributeValueAdmin)
 
 # Demand Planning PlanningLocationAdmin, PlanningCustomerAdmin, SalesNodeAdmin, CustomerSalesAssignmentAdmin, ActualSaleAdmin
 admin.site.register( PlanningLocation,  PlanningLocationAdmin)

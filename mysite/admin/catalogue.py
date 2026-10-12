@@ -7,7 +7,8 @@ from django.conf import settings
 
 from django.contrib import admin
 from mysite.models.catalogue import (
-    TaxonomyNode, NodeAttributeType, NodeAttributeValue,
+    TaxonomyNode, AttributeType, AttributeValue,
+    TaxonomyNodeAttribute, TaxonomyNodeAttributeValue,
     GlobalItemTaxonomyNode, GlobalItemAttributeValue, GlobalItemMedia,
     ItemTaxonomyNode, ItemAttributeValue, ItemMedia, ItemVariant,
     ProductItem, SongItem, DocumentItem, ServiceItem,
@@ -19,8 +20,8 @@ Model	            Global rows	        Client rows
 GlobalItem	        View only	        N/A
 Taxonomy	        View	            CRUD
 TaxonomyNode	    View	            CRUD
-NodeAttributeType	View	            CRUD
-NodeAttributeValue	View	            CRUD
+AttributeType	    View	            CRUD
+AttributeValue	    View	            CRUD
 Item* models	    N/A	                CRUD
 
 ClientScopedMixin
@@ -47,28 +48,44 @@ This is a very clean separation.
 
 
 
-class NodeAttributeValueInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline, ClientLanguageMixinV2):
-    model  = NodeAttributeValue
-    extra  = 0
+class TaxonomyNodeAttributeValueInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
+    model   = TaxonomyNodeAttributeValue
+    extra   = 0
     classes = ['collapse']
-    #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
-    #non_translated_fields = ('client', 'slug', 'order', 'gpc_value_code')    # adjust to your actual fields    
+    fields  = ('attribute_value', 'order')
+    autocomplete_fields = ['attribute_value']
+
+
+class TaxonomyNodeAttributeInline(nested_admin.NestedStackedInline, BaseAdminInlinecss):
+    model   = TaxonomyNodeAttribute
+    extra   = 0
+    classes = ['collapse']
     show_change_link = True
+    fields  = ('attribute_type', 'is_required', 'is_filterable', 'order')
+    autocomplete_fields = ['attribute_type']
+    inlines = [TaxonomyNodeAttributeValueInline]
+
+
+class AttributeValueAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2):
+    model = AttributeValue
+    list_select_related = ('client',)
+    search_fields = ('slug', 'name', 'gpc_code')
+    list_filter   = ('client',)
+
     def get_fieldsets(self, request, obj=None):
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request, ['name'], obj
         )
         fieldsets = [
             ('General', {
-                'fields': ('client', 'slug', 'order', 'gpc_value_code'),
+                'fields': ('client', 'slug', 'gpc_code'),
                 'classes': ('collapse',),
-            }),            
+            }),
             ('Main Language', {
                 'fields': main_ln_fields,
                 'classes': ('collapse',),
             }),
         ]
-        # Only add Other Languages section if client has more than one language
         if other_ln_fields:
             fieldsets.append((
                 'Other Languages', {
@@ -77,87 +94,10 @@ class NodeAttributeValueInline(SharedOrClientScopedMixin, TranslationBaseModelAd
                 }
             ))
         return tuple(fieldsets)
-    """
-    def get_fieldsets(self, request, obj=None):
 
-        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-            request,
-            ['name'],
-            obj
-        )
-
-        return (
-            ('General', {
-                'fields': ('client', 'slug', 'order', 'gpc_value_code'),
-                'classes': ('collapse',),
-            }),
-            ('Main Language', {
-                'fields': main_ln_fields,
-                'classes': ('collapse',),
-            }),
-            ('Other Languages', {
-                'fields': other_ln_fields,
-                'classes': ('collapse',),
-            }),
-        )
-    #fieldsets = ()       
-    """
-class NodeAttributeValueAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2):
-    list_select_related = ('client', 'attribute_type')
-    search_fields = ('slug', 'name', 'gpc_value_code')
-    #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
-    #non_translated_fields = ('client', 'slug', 'order', 'gpc_value_code')    # adjust to your actual fields
-    list_filter   = ('client', 'attribute_type')
-    def get_fieldsets(self, request, obj=None):
-            main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-                request, ['name'], obj
-            )
-            fieldsets = [
-                ('General', {
-                    'fields': ('client', 'slug', 'order', 'gpc_value_code'),
-                    'classes': ('collapse',),
-                }),            
-                ('Main Language', {
-                    'fields': main_ln_fields,
-                    'classes': ('collapse',),
-                }),
-            ]
-            # Only add Other Languages section if client has more than one language
-            if other_ln_fields:
-                fieldsets.append((
-                    'Other Languages', {
-                        'fields': other_ln_fields,
-                        'classes': ('collapse',),
-                    }
-                ))
-            return tuple(fieldsets)
-    """
-    def get_fieldsets(self, request, obj=None):
-
-        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-            request,
-            ['name'],
-            obj
-        )
-        return (
-            ('General', {
-                'fields': ('client', 'slug', 'order', 'gpc_value_code'),
-                'classes': ('collapse',),
-            }),
-            ('Main Language', {
-                'fields': main_ln_fields,
-                'classes': ('collapse',),
-            }),
-            ('Other Languages', {
-                'fields': other_ln_fields,
-                'classes': ('collapse',),
-            }),
-        )
-    #fieldsets = () 
-    """
     def has_module_perms(self, request):
         return request.user.is_superuser or _user_has_admin_role(request.user)
-    
+
     def has_view_permission(self, request, obj=None):
         return request.user.is_superuser or _user_has_admin_role(request.user)
 
@@ -169,119 +109,40 @@ class NodeAttributeValueAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdm
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser or _user_has_admin_role(request.user)
-        
-class NodeAttributeTypeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline, ClientLanguageMixinV2):
-    model  = NodeAttributeType
-    extra  = 0
-    classes = ['collapse']
-    #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
-    #non_translated_fields = ('client', 'slug', 'field_type', 'is_required', 'is_filterable', 'order', 'gpc_attribute_code')    # adjust to your actual fields    
-    show_change_link = True
-    inlines         = [NodeAttributeValueInline]
-    def get_fieldsets(self, request, obj=None):
-                main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-                    request, ['name'], obj
-                )
-                fieldsets = [
-                    ('General', {
-                        'fields': ('client', 'slug', 'field_type', 'is_required', 'is_filterable', 'order', 'gpc_attribute_code'),
-                        'classes': ('collapse',),
-                    }),            
-                    ('Main Language', {
-                        'fields': main_ln_fields,
-                        'classes': ('collapse',),
-                    }),
-                ]
-                # Only add Other Languages section if client has more than one language
-                if other_ln_fields:
-                    fieldsets.append((
-                        'Other Languages', {
-                            'fields': other_ln_fields,
-                            'classes': ('collapse',),
-                        }
-                    ))
-                return tuple(fieldsets)
-    """
-    def get_fieldsets(self, request, obj=None):
 
+
+class AttributeTypeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
+    model = AttributeType
+    list_select_related = ('client',)
+    search_fields = ('slug', 'name', 'gpc_code')
+    list_filter   = ('client', 'field_type')
+
+    def get_fieldsets(self, request, obj=None):
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-            request,
-            ['name'],
-            obj
+            request, ['name'], obj
         )
-        return (
+        fieldsets = [
             ('General', {
-                'fields': ('client', 'slug', 'field_type', 'is_required', 'is_filterable', 'order', 'gpc_attribute_code'),
+                'fields': ('client', 'slug', 'field_type', 'gpc_code'),
                 'classes': ('collapse',),
             }),
             ('Main Language', {
                 'fields': main_ln_fields,
                 'classes': ('collapse',),
             }),
-            ('Other Languages', {
-                'fields': other_ln_fields,
-                'classes': ('collapse',),
-            }),
-        )
-    #fieldsets = ()   
-    """ 
+        ]
+        if other_ln_fields:
+            fieldsets.append((
+                'Other Languages', {
+                    'fields': other_ln_fields,
+                    'classes': ('collapse',),
+                }
+            ))
+        return tuple(fieldsets)
 
-class NodeAttributeTypeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedModelAdmin, ClientLanguageMixinV2, BaseAdminInlinecss):
-    list_select_related = ('client', 'node')
-    search_fields = ('slug', 'name', 'gpc_attribute_code')
-    #TRANSLATED_FIELDS = ('name',)                   # add more if you have translated fields
-    #non_translated_fields = ('client', 'slug', 'field_type', 'is_required', 'is_filterable', 'order', 'gpc_attribute_code'                       )    # adjust to your actual fields  
-    list_filter   = ('client', 'field_type', 'is_filterable')
-    inlines       = [NodeAttributeValueInline]
-    def get_fieldsets(self, request, obj=None):
-                main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-                    request, ['name'], obj
-                )
-                fieldsets = [
-                    ('General', {
-                        'fields': ('client', 'slug', 'field_type', 'is_required', 'is_filterable', 'order', 'gpc_attribute_code'),
-                        'classes': ('collapse',),
-                    }),            
-                    ('Main Language', {
-                        'fields': main_ln_fields,
-                        'classes': ('collapse',),
-                    }),
-                ]
-                # Only add Other Languages section if client has more than one language
-                if other_ln_fields:
-                    fieldsets.append((
-                        'Other Languages', {
-                            'fields': other_ln_fields,
-                            'classes': ('collapse',),
-                        }
-                    ))
-                return tuple(fieldsets)
-    """
-    def get_fieldsets(self, request, obj=None):
-        main_ln_fields, other_ln_fields = self.get_translated_field_groups(
-            request,
-            ['name'],
-            obj
-        )
-        return (
-            ('General', {
-                'fields': ('client', 'slug', 'field_type', 'is_required', 'is_filterable', 'order', 'gpc_attribute_code'),
-                'classes': ('collapse',),
-            }),
-            ('Main Language', {
-                'fields': main_ln_fields,
-                'classes': ('collapse',),
-            }),
-            ('Other Languages', {
-                'fields': other_ln_fields,
-                'classes': ('collapse',),
-            }),
-        )
-        #fieldsets = () 
-    """
     def has_module_perms(self, request):
         return request.user.is_superuser or _user_has_admin_role(request.user)
-    
+
     def has_view_permission(self, request, obj=None):
         return request.user.is_superuser or _user_has_admin_role(request.user)
 
@@ -293,7 +154,8 @@ class NodeAttributeTypeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmi
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser or _user_has_admin_role(request.user)
-    
+
+
 class TaxonomyNodeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, nested_admin.NestedStackedInline, ClientLanguageMixinV2, BaseAdminInlinecss):
     model = TaxonomyNode
     def get_queryset(self, request):
@@ -312,7 +174,7 @@ class TaxonomyNodeInline(SharedOrClientScopedMixin, TranslationBaseModelAdmin, n
     show_change_link = True
     readonly_fields = ('path', 'depth')
     raw_id_fields = ['parent', 'global_node']
-    inlines         = [NodeAttributeTypeInline]
+    inlines         = [TaxonomyNodeAttributeInline]
     def get_fieldsets(self, request, obj=None):
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request, ['name'], obj
@@ -371,7 +233,7 @@ class TaxonomyNodeAdmin(SharedOrClientScopedMixin, TranslationBaseModelAdmin, ne
     # Note: no autocomplete_fields on parent/global_node here
     # since those also reference TaxonomyNode — handled via raw_id_fields instead
     raw_id_fields   = ('parent', 'global_node')
-    inlines         = [NodeAttributeTypeInline]
+    inlines         = [TaxonomyNodeAttributeInline]
     def get_fieldsets(self, request, obj=None):
         main_ln_fields, other_ln_fields = self.get_translated_field_groups(
             request, ['name'], obj

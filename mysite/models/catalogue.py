@@ -12,6 +12,7 @@ Key design decisions:
 """
 
 from django.db import models
+from django.db.models import Q
 #from django.contrib.contenttypes.fields import GenericRelation
 from .base import LowercaseCharField, text_field_validators
 
@@ -392,13 +393,14 @@ Beckn: item.to_beckn() checks which sub-model exists and adds domain-specific ta
 
 """
 
-class NodeAttributeType(models.Model):
+class AttributeType(models.Model):
     """
-    Defines an attribute TYPE applicable to a TaxonomyNode and its descendants.
-    GS1 alignment: Brick Attributes (e.g. "Flavour", "Pack Size", "Material").
+    A reusable attribute TYPE (e.g. "Length", "Colour", "Pack Size").
+    GS1 alignment: Brick Attributes.
 
     Scope: global (client=None) or client-specific.
-    Inherited by: all items under this node (and child nodes).
+    Decoupled from TaxonomyNode: attach it to any number of nodes via
+    TaxonomyNodeAttribute, and its values are reusable across types/nodes.
     """
     FIELD_TYPES = [
         ('text',     'Text'),
@@ -408,9 +410,6 @@ class NodeAttributeType(models.Model):
         ('multiselect', 'Multi-select'),
     ]
 
-    node        = models.ForeignKey(
-        TaxonomyNode, on_delete=models.CASCADE, related_name='attribute_types'
-    )
     client      = models.ForeignKey(
         Client, null=True, blank=True, on_delete=models.CASCADE,
         help_text="Null = global attribute type"
@@ -418,55 +417,119 @@ class NodeAttributeType(models.Model):
     slug        = LowercaseCharField(max_length=50)
     name        = models.CharField(max_length=100, blank=True)    # modeltranslation blank=True to be present
     field_type  = models.CharField(max_length=20, choices=FIELD_TYPES, default='text')
-    is_required = models.BooleanField(default=False)
-    is_filterable = models.BooleanField(
-        default=True,
-        help_text="Show in catalogue filter sidebar"
-    )
-    order       = models.PositiveIntegerField(default=0)
 
     # GS1 GPC Brick Attribute code (optional)
-    gpc_attribute_code = models.CharField(max_length=20, blank=True)
+    gpc_code    = models.CharField(max_length=20, blank=True)
 
     class Meta:
-        unique_together = ('node', 'client', 'slug')
-        ordering        = ['node', 'order']
-        verbose_name    = '01-03 Node Attribute Type'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['client', 'slug'],
+                nulls_distinct=False,
+                name='uniq_attributetype_client_slug',
+            ),
+            models.UniqueConstraint(
+                fields=['client', 'gpc_code'],
+                nulls_distinct=False,
+                condition=~Q(gpc_code=''),
+                name='uniq_attributetype_client_gpc',
+            ),
+        ]
+        ordering        = ['slug']
+        verbose_name    = '01-03 Attribute Type'
 
     def __str__(self):
-        return f"{self.node} / {self.slug}"
+        return self.slug
 
 
-class NodeAttributeValue(models.Model):
+class AttributeValue(models.Model):
     """
-    A predefined VALUE for a NodeAttributeType (for select/multiselect types).
-    GS1 alignment: Brick Attribute Values (e.g. Flavour → "Chocolate", "Vanilla").
+    A reusable predefined VALUE (e.g. "Chocolate", "Red", "25"). 
+    GS1 alignment: Brick Attribute Values.
 
-    These values are INHERITED by items under this node.
-    Client can add their own values on top of global values.
+    Scope: global (client=None) or client-specific.
+    Decoupled from AttributeType: the same value can be linked under many
+    node+type pairings via TaxonomyNodeAttributeValue.
     """
-    attribute_type = models.ForeignKey(
-        NodeAttributeType, on_delete=models.CASCADE, related_name='predefined_values'
-    )
     client      = models.ForeignKey(
         Client, null=True, blank=True, on_delete=models.CASCADE,
         help_text="Null = global value"
     )
     slug        = LowercaseCharField(max_length=50)
     name        = models.CharField(max_length=200, blank=True)    # modeltranslation blank=True to be present
-    order       = models.PositiveIntegerField(default=0)
 
     # GS1 GPC Brick Attribute Value code (optional)
-    gpc_value_code = models.CharField(max_length=20, blank=True)
+    gpc_code    = models.CharField(max_length=20, blank=True)
 
     class Meta:
-        unique_together = ('attribute_type', 'client', 'slug')
-        ordering        = ['attribute_type', 'order']
-        verbose_name    = '01-04 Node Attribute Value'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['client', 'slug'],
+                nulls_distinct=False,
+                name='uniq_attributevalue_client_slug',
+            ),
+            models.UniqueConstraint(
+                fields=['client', 'gpc_code'],
+                nulls_distinct=False,
+                condition=~Q(gpc_code=''),
+                name='uniq_attributevalue_client_gpc',
+            ),
+        ]
+        ordering        = ['slug']
+        verbose_name    = '01-04 Attribute Value'
 
     def __str__(self):
-        attslug = getattr(self.attribute_type, 'slug', '?') if self.attribute_type else '?'
-        return f"{attslug} = {self.name}"
+        return self.name or self.slug
+
+
+class TaxonomyNodeAttribute(models.Model):
+    """
+    Brings an AttributeType together with a TaxonomyNode.
+    Holds the node-scoped settings (required/filterable/order) that used to
+    live on NodeAttributeType, so the same type can behave differently per node.
+    """
+    node           = models.ForeignKey(
+        TaxonomyNode, on_delete=models.CASCADE, related_name='node_attributes'
+    )
+    attribute_type = models.ForeignKey(
+        AttributeType, on_delete=models.CASCADE, related_name='node_links'
+    )
+    is_required    = models.BooleanField(default=False)
+    is_filterable  = models.BooleanField(
+        default=True,
+        help_text="Show in catalogue filter sidebar"
+    )
+    order          = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ('node', 'attribute_type')
+        ordering        = ['node', 'order']
+        verbose_name    = 'Taxonomy Node Attribute'
+
+    def __str__(self):
+        return f"{self.node} / {self.attribute_type.slug}"
+
+
+class TaxonomyNodeAttributeValue(models.Model):
+    """
+    Allowed AttributeValue for a TaxonomyNodeAttribute (a node+type pairing).
+    The same AttributeValue row can be linked under many node+type pairings.
+    """
+    node_attribute  = models.ForeignKey(
+        TaxonomyNodeAttribute, on_delete=models.CASCADE, related_name='value_links'
+    )
+    attribute_value = models.ForeignKey(
+        AttributeValue, on_delete=models.CASCADE, related_name='node_attribute_links'
+    )
+    order           = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ('node_attribute', 'attribute_value')
+        ordering        = ['node_attribute', 'order']
+        verbose_name    = 'Taxonomy Node Attribute Value'
+
+    def __str__(self):
+        return f"{self.node_attribute} = {self.attribute_value}"
 
  
 # ═══════════════════════════════════════════════════════════════════
@@ -597,11 +660,11 @@ class GlobalItemAttributeValue(models.Model):
         GlobalItem, on_delete=models.CASCADE, related_name='attribute_values'
     )
     attribute_type = models.ForeignKey(
-        NodeAttributeType, on_delete=models.CASCADE, related_name='global_item_values'
+        AttributeType, on_delete=models.CASCADE, related_name='global_item_values'
     )
     # For select types: FK to predefined value
     predefined_value = models.ForeignKey(
-        NodeAttributeValue, null=True, blank=True,
+        AttributeValue, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='global_item_usages'
     )
     # For free-text / number types
@@ -910,15 +973,15 @@ class Item(I18nFallbackMixin, models.Model):
             nodes = TaxonomyNode.objects.filter(
                 id__in=node_ids
             ).prefetch_related(
-                'attribute_types__predefined_values',
+                'node_attributes__value_links__attribute_value',
             ).order_by('depth')
 
             for node in nodes:
                 # Walk ancestors first (shallower depth = lower priority)
-                for attr_type in node.attribute_types.all():
+                for link in node.node_attributes.all():
                     # Node-level default value is not stored here —
                     # it comes from GlobalItemAttributeValue or ItemAttributeValue
-                    pass  # attribute types define WHAT exists; values set by items
+                    _ = link.attribute_type  # attribute types define WHAT exists
 
         # 3. GlobalItem attribute values
         if self.global_item:
@@ -1089,10 +1152,10 @@ class ItemAttributeValue(models.Model):
         Item, on_delete=models.CASCADE, related_name='attribute_values'
     )
     attribute_type = models.ForeignKey(
-        NodeAttributeType, on_delete=models.CASCADE, related_name='item_values'
+        AttributeType, on_delete=models.CASCADE, related_name='item_values'
     )
     predefined_value = models.ForeignKey(
-        NodeAttributeValue, null=True, blank=True,
+        AttributeValue, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='item_usages'
     )
     value_text     = models.CharField(max_length=500, blank=True)

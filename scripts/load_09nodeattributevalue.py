@@ -6,8 +6,11 @@ from django.db import transaction
 
 from mysite.models import (
     Client,
-    NodeAttributeType,
-    NodeAttributeValue,
+    TaxonomyNode,
+    AttributeType,
+    AttributeValue,
+    TaxonomyNodeAttribute,
+    TaxonomyNodeAttributeValue,
 )
 
 from scripts.helpers import (
@@ -85,37 +88,57 @@ def load_val01(
     }
 
     # =========================================================
+    # PREFETCH NODES
+    # key = (client_code_or_none, taxonomy_slug, node_slug)
+    # =========================================================
+
+    nodes = {
+
+        (
+            n.client.client_code if n.client else None,
+            n.taxonomy.slug,
+            n.slug,
+        ): n
+
+        for n in (
+            TaxonomyNode.objects
+            .filter(
+                slug__in=node_slugs,
+                taxonomy__slug__in=taxonomy_slugs,
+            )
+            .select_related("client", "taxonomy")
+        )
+    }
+
+    # =========================================================
     # PREFETCH ATTRIBUTE TYPES
-    # key = (
-    #   client_code_or_none,
-    #   taxonomy_slug,
-    #   node_slug,
-    #   type_slug
-    # )
+    # key = (client_code_or_none, type_slug)
     # =========================================================
 
     attribute_types = {
 
         (
             at.client.client_code if at.client else None,
-            at.node.taxonomy.slug,
-            at.node.slug,
             at.slug,
         ): at
 
         for at in (
-            NodeAttributeType.objects
-            .filter(
-                slug__in=type_slugs,
-                node__slug__in=node_slugs,
-                node__taxonomy__slug__in=taxonomy_slugs,
-            )
-            .select_related(
-                "client",
-                "node",
-                "node__taxonomy",
-            )
+            AttributeType.objects
+            .filter(slug__in=type_slugs)
+            .select_related("client")
         )
+    }
+
+    # =========================================================
+    # PREFETCH NODE ↔ TYPE LINKS
+    # key = (node_id, attribute_type_id)
+    # =========================================================
+
+    node_attributes = {
+
+        (na.node_id, na.attribute_type_id): na
+
+        for na in TaxonomyNodeAttribute.objects.all()
     }
 
     # =========================================================
@@ -206,16 +229,37 @@ def load_val01(
         )
 
         # =====================================================
+        # NODE
+        # =====================================================
+
+        node = nodes.get(
+            (client_code, taxonomy_slug, node_slug)
+        )
+
+        if not node:
+
+            node = nodes.get(
+                (None, taxonomy_slug, node_slug)
+            )
+
+        if not node:
+
+            print(
+                f"Missing node: "
+                f"{client_code or 'GLOBAL'} / "
+                f"{taxonomy_slug} / "
+                f"{node_slug}"
+            )
+
+            skipped_count += 1
+            continue
+
+        # =====================================================
         # ATTRIBUTE TYPE
         # =====================================================
 
         attribute_type = attribute_types.get(
-            (
-                client_code,
-                taxonomy_slug,
-                node_slug,
-                type_slug,
-            )
+            (client_code, type_slug)
         )
 
         # fallback to global attribute type
@@ -223,12 +267,7 @@ def load_val01(
         if not attribute_type:
 
             attribute_type = attribute_types.get(
-                (
-                    None,
-                    taxonomy_slug,
-                    node_slug,
-                    type_slug,
-                )
+                (None, type_slug)
             )
 
         if not attribute_type:
@@ -236,9 +275,25 @@ def load_val01(
             print(
                 f"Missing attribute type: "
                 f"{client_code or 'GLOBAL'} / "
-                f"{taxonomy_slug} / "
-                f"{node_slug} / "
                 f"{type_slug}"
+            )
+
+            skipped_count += 1
+            continue
+
+        # =====================================================
+        # NODE ↔ TYPE LINK
+        # =====================================================
+
+        node_attribute = node_attributes.get(
+            (node.id, attribute_type.id)
+        )
+
+        if not node_attribute:
+
+            print(
+                f"Missing node attribute link: "
+                f"{taxonomy_slug} / {node_slug} / {type_slug}"
             )
 
             skipped_count += 1
@@ -248,14 +303,9 @@ def load_val01(
         # DEFAULTS
         # =====================================================
 
-        defaults = {
+        value_defaults = {
 
-            "order":
-                to_int(
-                    row.get("order")
-                ) or 0,
-
-            "gpc_value_code":
+            "gpc_code":
                 clean(
                     row.get("gpc_value_code")
                 ),
@@ -263,9 +313,17 @@ def load_val01(
 
         for lang in LANGS:
 
-            defaults[f"name_{lang}"] = clean(
+            value_defaults[f"name_{lang}"] = clean(
                 row.get(f"name_{lang}")
             )
+
+        link_defaults = {
+
+            "order":
+                to_int(
+                    row.get("order")
+                ) or 0,
+        }
 
         # =====================================================
         # DRY RUN
@@ -283,7 +341,7 @@ def load_val01(
             )
 
             if verbose:
-                print(defaults)
+                print(value_defaults, link_defaults)
 
             continue
 
@@ -291,16 +349,21 @@ def load_val01(
         # UPSERT
         # =====================================================
 
-        obj, created = (
-            NodeAttributeValue.objects
+        attribute_value, created = (
+            AttributeValue.objects
             .update_or_create(
 
-                attribute_type=attribute_type,
                 client=client,
                 slug=slug,
 
-                defaults=defaults,
+                defaults=value_defaults,
             )
+        )
+
+        TaxonomyNodeAttributeValue.objects.update_or_create(
+            node_attribute=node_attribute,
+            attribute_value=attribute_value,
+            defaults=link_defaults,
         )
 
         if created:
@@ -312,7 +375,7 @@ def load_val01(
 
             print(
                 f"{'Created' if created else 'Updated'} "
-                f"NodeAttributeValue: "
+                f"AttributeValue: "
                 f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "

@@ -6,8 +6,10 @@ from django.db import transaction
 
 from mysite.models import (
     GlobalItem,
-    NodeAttributeType,
-    NodeAttributeValue,
+    AttributeType,
+    AttributeValue,
+    TaxonomyNodeAttribute,
+    TaxonomyNodeAttributeValue,
     GlobalItemAttributeValue,
 )
 
@@ -83,15 +85,16 @@ def load_val01(dry_run=False, verbose=False):
 
     attribute_types = {
         (
-            obj.node.taxonomy.slug,
-            obj.node.slug,
-            obj.slug,
-        ): obj
-        for obj in NodeAttributeType.objects.select_related(
+            na.node.taxonomy.slug,
+            na.node.slug,
+            na.attribute_type.slug,
+        ): na.attribute_type
+        for na in TaxonomyNodeAttribute.objects.select_related(
+            "attribute_type",
             "node",
             "node__taxonomy",
         ).filter(
-            slug__in=attribute_slugs,
+            attribute_type__slug__in=attribute_slugs,
             node__slug__in=node_slugs,
             node__taxonomy__slug__in=taxonomy_slugs,
         )
@@ -101,17 +104,19 @@ def load_val01(dry_run=False, verbose=False):
 
     predefined_values = {
         (
-            obj.attribute_type.node.taxonomy.slug,
-            obj.attribute_type.node.slug,
-            obj.attribute_type.slug,
-            obj.slug,
-        ): obj
-        for obj in NodeAttributeValue.objects.select_related(
-            "attribute_type",
-            "attribute_type__node",
-            "attribute_type__node__taxonomy",
+            nav.node_attribute.node.taxonomy.slug,
+            nav.node_attribute.node.slug,
+            nav.node_attribute.attribute_type.slug,
+            nav.attribute_value.slug,
+        ): nav.attribute_value
+        for nav in TaxonomyNodeAttributeValue.objects.select_related(
+            "attribute_value",
+            "node_attribute",
+            "node_attribute__attribute_type",
+            "node_attribute__node",
+            "node_attribute__node__taxonomy",
         ).filter(
-            slug__in=predefined_slugs
+            attribute_value__slug__in=predefined_slugs
         )
     }
 

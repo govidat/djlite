@@ -9,7 +9,7 @@ from mysite.models.client import Client, Theme, ClientTemplate, SectorTemplate
 from mysite.models.admin_proxies import ClientContentStructured, ClientContentHtml, ClientStaff, ClientTemplatewrapper
 from mysite.models.page import NavItem, PageContent #Page, 
 from mysite.models.catalogue import (
-    Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, 
+    Taxonomy, TaxonomyNode, AttributeType, AttributeValue, 
     GlobalItem, GlobalItemMedia, Item, ItemMedia, ProductItem, SongItem, ItemVariant
 )
 from mysite.models.component import SvgtextbadgeValue
@@ -72,10 +72,10 @@ class TaxonomyTranslationOptions(TranslationOptions):
 class TaxonomyNodeTranslationOptions(TranslationOptions):
     fields = ('name',)
 
-class NodeAttributeTypeTranslationOptions(TranslationOptions):
+class AttributeTypeTranslationOptions(TranslationOptions):
     fields = ('name',)
 
-class NodeAttributeValueTranslationOptions(TranslationOptions):
+class AttributeValueTranslationOptions(TranslationOptions):
     fields = ('name',)
 
 class GlobalItemTranslationOptions(TranslationOptions):
@@ -138,8 +138,8 @@ translator.register(NavItem,   NavItemTranslationOptions)
 
 translator.register(Taxonomy,      TaxonomyTranslationOptions)
 translator.register(TaxonomyNode,  TaxonomyNodeTranslationOptions)
-translator.register(NodeAttributeType,   NodeAttributeTypeTranslationOptions)
-translator.register(NodeAttributeValue,  NodeAttributeValueTranslationOptions)
+translator.register(AttributeType,   AttributeTypeTranslationOptions)
+translator.register(AttributeValue,  AttributeValueTranslationOptions)
 translator.register(GlobalItem,          GlobalItemTranslationOptions)
 translator.register(GlobalItemMedia,          GlobalItemMediaTranslationOptions)
 translator.register(Item,          ItemTranslationOptions)

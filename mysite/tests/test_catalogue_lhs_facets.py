@@ -12,15 +12,17 @@ from django.core.cache import cache
 
 from mysite.models import Client, Taxonomy
 from mysite.models.catalogue import (
+    AttributeType,
+    AttributeValue,
     GlobalItem,
     GlobalItemAttributeValue,
     GlobalItemTaxonomyNode,
     Item,
     ItemAttributeValue,
     ItemTaxonomyNode,
-    NodeAttributeType,
-    NodeAttributeValue,
     TaxonomyNode,
+    TaxonomyNodeAttribute,
+    TaxonomyNodeAttributeValue,
 )
 from utils.catalogue_queries import (
     _facet_value_counts,
@@ -173,21 +175,25 @@ def test_selecting_node_keeps_sibling_badges(setup):
 
 @pytest.fixture
 def attr_setup(setup):
-    T_color = NodeAttributeType.objects.create(
-        node=setup['R'], slug='color', name='Color', is_filterable=True,
+    T_color = AttributeType.objects.create(slug='color', name='Color')
+    link_color = TaxonomyNodeAttribute.objects.create(
+        node=setup['R'], attribute_type=T_color, is_filterable=True,
     )
-    red = NodeAttributeValue.objects.create(
-        attribute_type=T_color, slug='red', name='Red',
+    red = AttributeValue.objects.create(slug='red', name='Red')
+    blue = AttributeValue.objects.create(slug='blue', name='Blue')
+    TaxonomyNodeAttributeValue.objects.create(
+        node_attribute=link_color, attribute_value=red)
+    TaxonomyNodeAttributeValue.objects.create(
+        node_attribute=link_color, attribute_value=blue)
+
+    T_size = AttributeType.objects.create(slug='size', name='Size')
+    link_size = TaxonomyNodeAttribute.objects.create(
+        node=setup['R'], attribute_type=T_size, is_filterable=True,
     )
-    blue = NodeAttributeValue.objects.create(
-        attribute_type=T_color, slug='blue', name='Blue',
-    )
-    T_size = NodeAttributeType.objects.create(
-        node=setup['R'], slug='size', name='Size', is_filterable=True,
-    )
-    big = NodeAttributeValue.objects.create(
-        attribute_type=T_size, slug='big', name='Big',
-    )
+    big = AttributeValue.objects.create(slug='big', name='Big')
+    TaxonomyNodeAttributeValue.objects.create(
+        node_attribute=link_size, attribute_value=big)
+
     ItemAttributeValue.objects.create(
         item=setup['i1'], attribute_type=T_color, predefined_value=red)
     ItemAttributeValue.objects.create(
@@ -244,12 +250,13 @@ def test_flat_brand_taxonomy_suppresses_duplicates(attr_setup):
     ItemTaxonomyNode.objects.create(item=attr_setup['i2'], node=br2)
 
     # Duplicate facet: a 'brand'-slugged attribute type on the gpc root
-    dup = NodeAttributeType.objects.create(
-        node=attr_setup['R'], slug='brand', name='Brand', is_filterable=True,
+    dup = AttributeType.objects.create(slug='brand', name='Brand')
+    link_dup = TaxonomyNodeAttribute.objects.create(
+        node=attr_setup['R'], attribute_type=dup, is_filterable=True,
     )
-    bv = NodeAttributeValue.objects.create(
-        attribute_type=dup, slug='acme-attr', name='Acme',
-    )
+    bv = AttributeValue.objects.create(slug='acme-attr', name='Acme')
+    TaxonomyNodeAttributeValue.objects.create(
+        node_attribute=link_dup, attribute_value=bv)
     ItemAttributeValue.objects.create(
         item=attr_setup['i1'], attribute_type=dup, predefined_value=bv)
 

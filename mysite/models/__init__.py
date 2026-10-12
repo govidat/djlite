@@ -58,8 +58,10 @@ from .users import (
 )
 
 from .catalogue import (
-    NodeAttributeType,
-    NodeAttributeValue,
+    AttributeType,
+    AttributeValue,
+    TaxonomyNodeAttribute,
+    TaxonomyNodeAttributeValue,
     GlobalItem,
     GlobalItemTaxonomyNode,
     GlobalItemAttributeValue,

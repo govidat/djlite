@@ -16,7 +16,8 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 
 from mysite.models.catalogue import (
-    Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue,
+    Taxonomy, TaxonomyNode, AttributeType, AttributeValue,
+    TaxonomyNodeAttribute, TaxonomyNodeAttributeValue,
     GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue,
     Item, ItemTaxonomyNode, ItemAttributeValue,
     ItemVariant,
@@ -127,35 +128,41 @@ def _get_attr_types_by_node(client, node_ids, base_ids):
     )
     used_attr_type_ids |= text_number_attr_type_ids
 
-    # ── Resolve client-overridden NodeAttributeType, scoped to used ──
-    qs = NodeAttributeType.objects.filter(
-        Q(client=None) | Q(client=client),
+    # ── Resolve node→type links, scoped to used + filterable ───────
+    qs = TaxonomyNodeAttribute.objects.filter(
+        Q(attribute_type__client=None) | Q(attribute_type__client=client),
         node_id__in=node_ids,
         is_filterable=True,
-        id__in=used_attr_type_ids,
-    ).select_related('node').prefetch_related('predefined_values').order_by(
-        'node_id', 'slug', '-client_id'
-    )
+        attribute_type_id__in=used_attr_type_ids,
+    ).select_related('attribute_type').prefetch_related(
+        'value_links__attribute_value'
+    ).order_by('node_id', 'order', '-attribute_type__client_id')
 
     seen_per_node = {}
-    for at in qs:
-        node_seen = seen_per_node.setdefault(at.node_id, {})
+    for link in qs:
+        at = link.attribute_type
+        node_seen = seen_per_node.setdefault(link.node_id, {})
         if at.slug not in node_seen or at.client is not None:
-            node_seen[at.slug] = at
+            node_seen[at.slug] = link
 
     by_node = {}
     for node_id, slug_map in seen_per_node.items():
         entries = []
-        for at in sorted(slug_map.values(), key=lambda a: a.order):
+        for link in sorted(slug_map.values(), key=lambda l: l.order):
+            at = link.attribute_type
             used_value_ids = used_value_ids_by_attr_type.get(at.id, set())
             values = [
-                {'id': v.id, 'slug': v.slug, 'name': v.name}
-                for v in at.predefined_values.all()
-                if v.id in used_value_ids
+                {
+                    'id':   vl.attribute_value_id,
+                    'slug': vl.attribute_value.slug,
+                    'name': vl.attribute_value.name,
+                }
+                for vl in link.value_links.all()
+                if vl.attribute_value_id in used_value_ids
             ]
             entries.append({
                 'id': at.id, 'slug': at.slug, 'name': at.name,
-                'field_type': at.field_type, 'is_filterable': at.is_filterable,
+                'field_type': at.field_type, 'is_filterable': link.is_filterable,
                 'values': values,
             })
         by_node[node_id] = entries
@@ -206,7 +213,7 @@ def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None,
     ).filter(
         Q(client=None) | Q(client=client)
     ).prefetch_related(
-        'attribute_types__predefined_values'
+        'node_attributes__value_links__attribute_value'
     ).order_by('path')
 
 
@@ -224,7 +231,7 @@ def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None,
     ).filter(
         Q(client=None) | Q(client=client)
     ).prefetch_related(
-        'attribute_types__predefined_values'
+        'node_attributes__attribute_type__value_links__attribute_value'
     ).order_by('path')
     """
 
@@ -438,53 +445,11 @@ def get_taxonomy_tree(client, taxonomy_slug, include_counts=False, base_qs=None)
         cache.set(cache_key, tree, timeout=3600)
 
     return tree
-
-def _build_tree(nodes, counts=None):
-    #Convert flat ordered list to nested dict tree.
-    counts   = counts or {}
-    node_map = {}
-    roots    = []
-
-    for node in nodes:
-        attr_types = []
-        for at in node.attribute_types.all():
-            attr_types.append({
-                'id':            at.id,
-                'slug':          at.slug,
-                'name':          at.name,
-                'field_type':    at.field_type,
-                'is_filterable': at.is_filterable,
-                'values': [
-                    {'id': v.id, 'slug': v.slug, 'name': v.name}
-                    for v in at.predefined_values.all()
-                ],
-            })
-
-        entry = {
-            'id':        node.id,
-            'slug':      node.slug,
-            'name':      node.name,
-            'depth':     node.depth,
-            'path':      node.path,
-            'gpc_code':  node.gpc_code,
-            'is_global': node.client is None,
-            'attr_types': attr_types,
-            'count':     counts.get(node.id, 0),
-            'children':  [],
-        }
-        node_map[node.id] = entry
-
-        if node.parent_id and node.parent_id in node_map:
-            node_map[node.parent_id]['children'].append(entry)
-        else:
-            roots.append(entry)
-
-    return roots
 """
 def get_filterable_attribute_types(client, taxonomy_slug, qs, active_node_ids=None):
     """
-    Returns filterable NodeAttributeTypes for a taxonomy, restricted to
-    attribute types (and predefined values) actually used by items in qs.
+    Returns filterable TaxonomyNodeAttribute links for a taxonomy, restricted
+    to attribute types (and values) actually used by items in qs.
     Scoped to selected nodes + ancestors if active_node_ids provided.
     """
     base_ids = list(qs.values_list('id', flat=True))
@@ -517,16 +482,16 @@ def get_filterable_attribute_types(client, taxonomy_slug, qs, active_node_ids=No
         .values_list('predefined_value_id', flat=True)
     )
 
-    qs_attr = NodeAttributeType.objects.filter(
-        Q(client=None) | Q(client=client),
+    qs_attr = TaxonomyNodeAttribute.objects.filter(
+        Q(attribute_type__client=None) | Q(attribute_type__client=client),
         is_filterable=True,
         node__taxonomy__slug=taxonomy_slug,
-        id__in=used_attr_type_ids,
+        attribute_type_id__in=used_attr_type_ids,
     ).filter(
         Q(node__client=None) | Q(node__client=client)
-    ).select_related('node').prefetch_related('predefined_values').order_by(
-        'node__depth', 'order'
-    )
+    ).select_related('attribute_type').prefetch_related(
+        'value_links__attribute_value'
+    ).order_by('node__depth', 'order')
 
     if active_node_ids:
         selected_nodes = TaxonomyNode.objects.filter(id__in=active_node_ids)
@@ -636,7 +601,7 @@ def get_item_queryset(client, filters=None):
             'attribute_values',
             queryset=ItemAttributeValue.objects.select_related(
                 'attribute_type', 'predefined_value'
-            ).order_by('attribute_type__order'),
+            ).order_by('attribute_type__slug'),
             to_attr='prefetched_attribute_values'
         ),
         # ── GlobalItem attribute values (bulk — fixes N+1) ─────────
@@ -645,7 +610,7 @@ def get_item_queryset(client, filters=None):
             'global_item__attribute_values',
             queryset=GlobalItemAttributeValue.objects.select_related(
                 'attribute_type', 'predefined_value'
-            ).order_by('attribute_type__order'),
+            ).order_by('attribute_type__slug'),
             to_attr='prefetched_global_attr_values'
         ),
         # ── Primary media only (image for card display) ────────────
@@ -963,7 +928,8 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
             active_node_ids if active_node_ids else None
         )
         attr_types = []
-        for at in attr_type_qs:
+        for link in attr_type_qs:
+            at = link.attribute_type
             # Taxonomy wins — an attribute type duplicating a resolved
             # taxonomy (e.g. flat 'brand' tree + 'brand' attribute) would
             # render the same facet twice.
@@ -973,14 +939,15 @@ def build_catalogue_payload(client, filters=None, page_number=1, per_page=24):
             fcounts = _facet_value_counts(qs_no_attr, attr_selections, at.id)
             values = [
                 {
-                    'id':       v.id,
-                    'slug':     v.slug,
-                    'name':     v.name,
-                    'count':    fcounts.get(v.id, 0),
-                    'selected': v.id in own_selected,
+                    'id':       vl.attribute_value_id,
+                    'slug':     vl.attribute_value.slug,
+                    'name':     vl.attribute_value.name,
+                    'count':    fcounts.get(vl.attribute_value_id, 0),
+                    'selected': vl.attribute_value_id in own_selected,
                 }
-                for v in at.predefined_values.all()
-                if fcounts.get(v.id, 0) > 0 or v.id in own_selected
+                for vl in link.value_links.all()
+                if fcounts.get(vl.attribute_value_id, 0) > 0
+                or vl.attribute_value_id in own_selected
             ]
             attr_types.append({
                 'id':         at.id,

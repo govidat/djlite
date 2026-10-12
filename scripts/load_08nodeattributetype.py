@@ -8,7 +8,8 @@ from mysite.models import (
     Client,
     Taxonomy,
     TaxonomyNode,
-    NodeAttributeType,
+    AttributeType,
+    TaxonomyNodeAttribute,
 )
 
 from scripts.helpers import (
@@ -276,12 +277,26 @@ def load_val01(
         # DEFAULTS
         # =====================================================
 
-        defaults = {
+        type_defaults = {
 
             "field_type":
                 clean(
                     row.get("field_type")
                 ) or "text",
+
+            "gpc_code":
+                clean(
+                    row.get("gpc_attribute_code")
+                ),
+        }
+
+        for lang in LANGS:
+
+            type_defaults[f"name_{lang}"] = clean(
+                row.get(f"name_{lang}")
+            )
+
+        link_defaults = {
 
             "is_required":
                 to_bool(
@@ -298,18 +313,7 @@ def load_val01(
                 to_int(
                     row.get("order")
                 ) or 0,
-
-            "gpc_attribute_code":
-                clean(
-                    row.get("gpc_attribute_code")
-                ),
         }
-
-        for lang in LANGS:
-
-            defaults[f"name_{lang}"] = clean(
-                row.get(f"name_{lang}")
-            )
 
         # =====================================================
         # DRY RUN
@@ -326,7 +330,7 @@ def load_val01(
             )
 
             if verbose:
-                print(defaults)
+                print(type_defaults, link_defaults)
 
             continue
 
@@ -334,16 +338,21 @@ def load_val01(
         # UPSERT
         # =====================================================
 
-        obj, created = (
-            NodeAttributeType.objects
+        attr_type, created = (
+            AttributeType.objects
             .update_or_create(
 
-                node=node,
                 client=client,
                 slug=slug,
 
-                defaults=defaults,
+                defaults=type_defaults,
             )
+        )
+
+        TaxonomyNodeAttribute.objects.update_or_create(
+            node=node,
+            attribute_type=attr_type,
+            defaults=link_defaults,
         )
 
         if created:
@@ -355,7 +364,7 @@ def load_val01(
 
             print(
                 f"{'Created' if created else 'Updated'} "
-                f"NodeAttributeType: "
+                f"AttributeType: "
                 f"{client_code or 'GLOBAL'} / "
                 f"{taxonomy_slug} / "
                 f"{node_slug} / "

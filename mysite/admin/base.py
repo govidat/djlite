@@ -1,6 +1,6 @@
 # admin_mixins.py
 from guardian.shortcuts import get_objects_for_user
-from mysite.models import Client, ClientGroup, GlobalItem, Item, Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue
+from mysite.models import Client, ClientGroup, GlobalItem, Item, Taxonomy, TaxonomyNode, AttributeType, AttributeValue
 from django.conf import settings
 from django.db.models import Q
 from django import forms
@@ -765,16 +765,17 @@ class SharedOrClientScopedMixin(ClientScopedMixin):
                 Q(client__in=permitted_clients)
             )
 
-        # NodeAttributeType dropdowns
+        # AttributeType dropdowns
         elif db_field.name == "attribute_type":
-            kwargs["queryset"] = NodeAttributeType.objects.filter(
+            kwargs["queryset"] = AttributeType.objects.filter(
                 Q(client__isnull=True) |
                 Q(client__in=permitted_clients)
             )
 
-        # NodeAttributeValue dropdowns
-        elif db_field.name == "predefined_value":
-            kwargs["queryset"] = NodeAttributeValue.objects.filter(
+        # AttributeValue dropdowns (node-type links use 'attribute_value';
+        # item-level tables use 'predefined_value')
+        elif db_field.name in ("attribute_value", "predefined_value"):
+            kwargs["queryset"] = AttributeValue.objects.filter(
                 Q(client__isnull=True) |
                 Q(client__in=permitted_clients)
             )

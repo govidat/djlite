@@ -11,7 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from .models import ClientGroup, ClientLocation, ClientUserProfile, CustomerProfile, ClientUserMembership, ClientGroupPermission, Client, ClientFeatureControl, Theme, Page, NavItem, PageContent, ClientTemplate, SectorTemplate, Layout, Component, ComponentSlot, ComptextBlock, SvgtextbadgeValue, TextstbItem
 from django.contrib.auth.models import User
 
-from .models import Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
+from .models import Taxonomy, TaxonomyNode, AttributeType, AttributeValue, TaxonomyNodeAttribute, TaxonomyNodeAttributeValue, GlobalItem, GlobalItemTaxonomyNode, GlobalItemAttributeValue, Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant
 from .models import PlanningLocation, PlanningCustomer, SalesNode, SalesForecastLink, ActualSaleImport, ActualSale, ActualSaleOutlierAdjustment, ActualSaleLocation, ItemPlanningProfile
 from .models import ForecastVersion, ForecastLine, ForecastAggregate, ForecastOverride, OverrideSplitWeight, ForecastAccuracy, AbcClassDefinition, ForecastingConfig, SeriesLevelEvaluation, SeriesProfile
 from .models.demand.schemes import (
@@ -60,8 +60,10 @@ ADMIN_ONLY_MODELS = [
     ClientUserProfile,    # ← add — clientadmin can manage staff profiles
     Taxonomy,
     TaxonomyNode,
-    NodeAttributeType,
-    NodeAttributeValue,
+    AttributeType,
+    AttributeValue,
+    TaxonomyNodeAttribute,
+    TaxonomyNodeAttributeValue,
     Item, ItemTaxonomyNode, ItemAttributeValue, ProductItem, SongItem, DocumentItem, ServiceItem, ItemMedia, ItemVariant,
 
     # Demand Planning
@@ -644,7 +646,7 @@ def register_signals():
         post_delete.connect(invalidate_client_cache, sender=model)
 
     # ── Taxonomy models → invalidate taxonomy tree cache ─────────────
-    TAXONOMY_MODELS = [Taxonomy, TaxonomyNode, NodeAttributeType, NodeAttributeValue]
+    TAXONOMY_MODELS = [Taxonomy, TaxonomyNode, AttributeType, AttributeValue, TaxonomyNodeAttribute, TaxonomyNodeAttributeValue]
     for model in TAXONOMY_MODELS:
         post_save.connect(invalidate_taxonomy_cache, sender=model)
         post_delete.connect(invalidate_taxonomy_cache, sender=model)
