@@ -452,6 +452,23 @@ class TestSuperuserTargetUpload:
         resp = self._operator(superuser).get(_status_url(bahushira_obj, job))
         assert resp.status_code == 200
 
+    def test_operator_target_remembered_in_session(self, superuser, bahushira_obj,
+                                                   client_obj, theme_csv, media_tmp):
+        operator = self._operator(superuser)
+        with mock.patch("mysite.masterdata_ui.views._dispatch"):
+            self._upload(operator, bahushira_obj, {
+                "action": "upload",
+                "dataset_key": "03Atheme",
+                "target_client": client_obj.client_code,
+                "file": SimpleUploadedFile("themes.csv", theme_csv, content_type="text/csv"),
+            })
+        resp = operator.get(reverse("masterdata_ui:masterdata_upload",
+                                    kwargs={"client_code": bahushira_obj.client_code}),
+                            {"dataset": "03Atheme"})
+        content = resp.content.decode()
+        assert 'name="target_client"' in content
+        assert 'value="test01"' in content
+
     def test_operator_history_lists_all_clients(self, superuser, bahushira_obj,
                                                client_obj, admin_user, media_tmp):
         job = MasterDataImport.objects.create(
@@ -467,10 +484,24 @@ class TestSuperuserTargetUpload:
         assert "test01" in content
         assert f'<code>{job.dataset_key}</code>' in content
 
+    def test_operator_list_renders_global_imports(self, superuser, bahushira_obj,
+                                                  client_obj, admin_user, media_tmp):
+        MasterDataImport.objects.create(
+            client=None, target_client_code="", dataset_key="01globalval",
+            scope="global", uploaded_by=admin_user, file_name="x.csv", status="done",
+        )
+        operator = self._operator(superuser)
+        resp = operator.get(reverse("masterdata_ui:masterdata_list",
+                                    kwargs={"client_code": bahushira_obj.client_code}))
+        assert resp.status_code == 200
+        assert "global" in resp.content.decode()
+
     def test_client_admin_target_forced_and_picker_hidden(self, web_client, client_obj,
                                                          theme_csv, media_tmp):
         resp = web_client.get(_upload_url(client_obj), {"dataset": "03Atheme"})
-        assert "masterdata-client-list" not in resp.content.decode()
+        content = resp.content.decode()
+        assert "masterdata-client-list" not in content
+        assert 'name="target_client"' not in content  # no target field at all
 
         resp = web_client.post(_upload_url(client_obj), {
             "action": "override",
@@ -482,3 +513,138 @@ class TestSuperuserTargetUpload:
         job = MasterDataImport.objects.latest("pk")
         assert job.client_id == client_obj.pk
         assert job.target_client_code == job.client.client_code
+
+
+# ── 03Cnavitem re-upload dedup (regression) ──────────────────────────────────
+
+def _nav_csv(client_code):
+    header = ("location,nav_type,url,name_en,name_hi,name_fr,order,hidden,open_in_new_tab,"
+              "client_code,page_code,svg_pre,svg_suf,name_ta,parent_name_en")
+    row = f"header,page,/home,Home,,,1,0,0,{client_code},,,,," 
+    return (header + "\n" + row + "\n").encode("utf-8")
+
+
+@pytest.mark.django_db
+class TestNavItemDuplicates:
+
+    def _nav_client(self):
+        from mysite.models import Client
+        return Client.objects.create(client_code="navco", name="Nav Co")
+
+    def _run_import(self, client, admin_user, idx, media_tmp):
+        from django.core.files.storage import default_storage
+        from django.core.files.base import ContentFile
+        stored = f"masterdata_imports/{client.client_code}/nav{idx}.csv"
+        default_storage.save(stored, ContentFile(_nav_csv(client.client_code)))
+        job = MasterDataImport.objects.create(
+            client=client, target_client_code=client.client_code,
+            dataset_key="03Cnavitem", scope="client",
+            uploaded_by=admin_user, file_name=stored, status="pending",
+        )
+        from mysite.tasks.masterdata.run_loader import run_masterdata_import
+        run_masterdata_import.run(job.pk)
+        job.refresh_from_db()
+        return job
+
+    def test_reupload_updates_in_place_no_duplicates(self, admin_user, media_tmp):
+        from mysite.models import NavItem
+        client = self._nav_client()
+        j1 = self._run_import(client, admin_user, 1, media_tmp)
+        assert j1.status == "done"
+        assert NavItem.objects.filter(client=client).count() == 1
+
+        j2 = self._run_import(client, admin_user, 2, media_tmp)
+        assert j2.status == "done"
+        rows = NavItem.objects.filter(client=client)
+        assert rows.count() == 1  # updated, not duplicated
+
+    def test_stored_display_case_still_matches_overlap(self, admin_user, media_tmp):
+        from mysite.models import NavItem
+        from mysite.masterdata.datasets import get_dataset
+        from mysite.tasks.masterdata.run_loader import count_overlaps
+        client = self._nav_client()
+        self._run_import(client, admin_user, 1, media_tmp)
+        row = NavItem.objects.get(client=client)
+        assert row.name_en == "Home"  # display case preserved
+
+        ds = get_dataset("03Cnavitem")
+        payload = _nav_csv(client.client_code)
+        assert count_overlaps(ds, ds.scope, client, payload) == 1  # case-insensitive match
+
+
+# ── List-page cards: "last updated by you" ───────────────────────────────────
+
+@pytest.mark.django_db
+class TestCardLastImport:
+
+    def _job(self, client_obj, user, dataset_key, status="done"):
+        return MasterDataImport.objects.create(
+            client=client_obj, target_client_code=client_obj.client_code,
+            dataset_key=dataset_key, scope="client",
+            uploaded_by=user, file_name="x.csv", status=status,
+        )
+
+    def test_card_shows_last_import_by_this_user(self, web_client, client_obj, admin_user, media_tmp):
+        from django.utils.timezone import localtime
+        job = self._job(client_obj, admin_user, "03Atheme")
+        resp = web_client.get(_list_url(client_obj))
+        content = resp.content.decode()
+        assert "Last by you:" in content
+        assert localtime(job.uploaded_at).strftime("%Y-%m-%d %H:%M") in content
+
+    def test_card_hidden_when_only_other_users_imported(self, web_client, client_obj,
+                                                         django_user_model, media_tmp):
+        other = django_user_model.objects.create(username="someone-else", is_staff=True)
+        self._job(client_obj, other, "03Atheme")
+        resp = web_client.get(_list_url(client_obj))
+        assert "Last by you:" not in resp.content.decode()
+
+    def test_card_shows_target_only_for_operator(self, superuser, bahushira_obj, client_obj,
+                                                 media_tmp):
+        from django.test import Client
+        MasterDataImport.objects.create(
+            client=client_obj, target_client_code="test01",
+            dataset_key="03Atheme", scope="client",
+            uploaded_by=superuser, file_name="x.csv", status="done",
+        )
+        c = Client()
+        c.force_login(superuser)
+        resp = c.get(reverse("masterdata_ui:masterdata_list",
+                             kwargs={"client_code": bahushira_obj.client_code}))
+        content = resp.content.decode()
+        assert "Last by you:" in content
+        assert "→ test01" in content
+
+
+# ── 03Dpagecontent: utf-8-sig (BOM) handling (regression) ────────────────────
+
+@pytest.mark.django_db
+class TestPageContentBom:
+
+    def test_pagecontent_rows_imported_not_skipped(self, admin_user, media_tmp):
+        from django.core.files.storage import default_storage
+        from django.core.files.base import ContentFile
+        from mysite.models import Client, Page, PageContent
+        from mysite.tasks.masterdata.run_loader import run_masterdata_import
+
+        client = Client.objects.create(client_code="pageco", name="PageCo")
+        Page.objects.create(client=client, page_code="home")
+
+        header = "client_code,page_code,htmlblob_en,htmlblob_fr,htmlblob_hi,htmlblob_ta"
+        row = 'pageco,home,"<div>, hello</div>",,,'
+        payload = (header + "\n" + row + "\n").encode("utf-8")
+
+        stored = "masterdata_imports/pageco/pc.csv"
+        default_storage.save(stored, ContentFile(payload))
+        job = MasterDataImport.objects.create(
+            client=client, target_client_code=client.client_code,
+            dataset_key="03Dpagecontent", scope="client",
+            uploaded_by=admin_user, file_name=stored, status="pending",
+        )
+        run_masterdata_import.run(job.pk)
+        job.refresh_from_db()
+
+        assert job.status == "done"
+        assert "skipped=0" in job.summary
+        pc = PageContent.objects.get(page__client=client, page__page_code="home")
+        assert pc.htmlblob_en == "<div>, hello</div>"

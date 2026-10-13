@@ -21,7 +21,7 @@
   {% for group, datasets in global_datasets %}
     <h4 class="text-sm font-medium text-base-content/60 mt-4 mb-2">{{ group }}</h4>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {% for d in datasets %}
+      {% for d, li in datasets %}
       <div class="card bg-base-200 shadow-sm">
         <div class="card-body p-4 gap-1">
           <div class="flex items-start justify-between gap-2">
@@ -33,6 +33,22 @@
                class="btn btn-primary btn-xs">{% trans "Upload" %}</a>
           </div>
           {% if d.description %}<p class="text-xs text-base-content/60">{{ d.description }}</p>{% endif %}
+          {% if li %}
+          <div class="mt-1 flex items-center gap-2">
+            <span class="badge badge-xs
+              {% if li.status == 'done' %}badge-success
+              {% elif li.status == 'failed' %}badge-error
+              {% else %}badge-info{% endif %}">
+              {{ li.status }}
+            </span>
+            <span class="text-xs text-base-content/70">
+              {% trans "Last by you:" %} {{ li.uploaded_at|date:"Y-m-d H:i" }}
+            </span>
+            {% if shows_global_master_data and li.target_client_code and li.target_client_code != client.client_code %}
+            <span class="text-xs text-primary">→ {{ li.target_client_code }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
           <div class="mt-1 space-y-0.5">
             {% if d.multi_file %}
               <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">↓ {% trans "Template (main)" %}</a>
@@ -58,7 +74,7 @@
   {% for group, datasets in client_datasets %}
     <h4 class="text-sm font-medium text-base-content/60 mt-4 mb-2">{{ group }}</h4>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {% for d in datasets %}
+      {% for d, li in datasets %}
       <div class="card bg-base-200 shadow-sm">
         <div class="card-body p-4 gap-1">
           <div class="flex items-start justify-between gap-2">
@@ -70,6 +86,22 @@
                class="btn btn-primary btn-xs">{% trans "Upload" %}</a>
           </div>
           {% if d.description %}<p class="text-xs text-base-content/60">{{ d.description }}</p>{% endif %}
+          {% if li %}
+          <div class="mt-1 flex items-center gap-2">
+            <span class="badge badge-xs
+              {% if li.status == 'done' %}badge-success
+              {% elif li.status == 'failed' %}badge-error
+              {% else %}badge-info{% endif %}">
+              {{ li.status }}
+            </span>
+            <span class="text-xs text-base-content/70">
+              {% trans "Last by you:" %} {{ li.uploaded_at|date:"Y-m-d H:i" }}
+            </span>
+            {% if shows_global_master_data and li.target_client_code and li.target_client_code != client.client_code %}
+            <span class="text-xs text-primary">→ {{ li.target_client_code }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
           <div class="mt-1 space-y-0.5">
             {% if d.multi_file %}
               <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">↓ {% trans "Template (main)" %}</a>
@@ -103,7 +135,7 @@
         {% for job in history %}
         <tr>
           <td><code>{{ job.dataset_key }}</code></td>
-          {% if shows_global_master_data %}<td>{{ job.target_client_code|default:job.client.client_code|default:"global" }}</td>{% endif %}
+          {% if shows_global_master_data %}<td>{% if job.target_client_code %}{{ job.target_client_code }}{% elif job.client %}{{ job.client.client_code }}{% else %}global{% endif %}</td>{% endif %}
           <td>
             <span class="badge badge-sm
               {% if job.status == 'done' %}badge-success

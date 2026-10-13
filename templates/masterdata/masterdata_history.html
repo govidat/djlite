@@ -32,7 +32,7 @@
         <tr>
           <td><code>{{ job.dataset_key }}</code></td>
           <td>{{ job.scope }}</td>
-          {% if shows_global_master_data %}<td>{{ job.target_client_code|default:job.client.client_code|default:"global" }}</td>{% endif %}
+          {% if shows_global_master_data %}<td>{% if job.target_client_code %}{{ job.target_client_code }}{% elif job.client %}{{ job.client.client_code }}{% else %}global{% endif %}</td>{% endif %}
           <td>
             <span class="badge badge-sm
               {% if job.status == 'done' %}badge-success

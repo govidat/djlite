@@ -43,9 +43,8 @@
             </span>
         </label>
     </div>
-    {% else %}
-    <input type="hidden" name="target_client" value="{{ client.client_code }}">
     {% endif %}
+    {# Other admins are always scoped to their own client — handled in the view. #}
 
     {% if errors.file %}
     <div class="alert alert-error py-2 text-sm"><span>{{ errors.file }}</span></div>

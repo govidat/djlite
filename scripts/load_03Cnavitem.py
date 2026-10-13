@@ -301,19 +301,25 @@ def load_val01(
 
         else:
 
-            obj, created = (
-                NavItem.objects.update_or_create(
-
-                    client=client,
-                    name_en=name_en,
-
-                    defaults=defaults,
-                )
+            obj = (
+                NavItem.objects
+                .filter(client=client, name_en__iexact=name_en)
+                .order_by("id").first()
             )
 
-            if created:
+            if obj is None:
+
+                obj = NavItem(client=client, **defaults)
+                obj.save()
+
                 created_count += 1
+
             else:
+
+                for field, value in defaults.items():
+                    setattr(obj, field, value)
+
+                obj.save()
                 updated_count += 1
 
             # ── update parents cache ────────────────

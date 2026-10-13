@@ -340,7 +340,7 @@ DATASETS = [
         group=_GROUP_CLIENT_SETUP,
         order=30,
         model_label="mysite.NavItem",
-        natural_key=(CLIENT, NK("name_en", "name_en", "lower")),
+        natural_key=(CLIENT, NK("name_en", "name_en__iexact", "lower")),
     ),
     Dataset(
         key="03Dpagecontent",

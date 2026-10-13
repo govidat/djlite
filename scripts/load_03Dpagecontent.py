@@ -35,7 +35,7 @@ def load_val01(
     # READ CSV
     # =====================================================
 
-    with open(file_path, newline="", encoding="utf-8") as f:
+    with open(file_path, newline="", encoding="utf-8-sig") as f:
 
         reader = csv.DictReader(f)
         rows = list(reader)

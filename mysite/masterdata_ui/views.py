@@ -89,11 +89,21 @@ def _job_for_user(request, job_id):
     return job
 
 
+SESSION_TARGET_KEY = "masterdata_target_client"
+
+
 def _posted_target_code(request, dataset, shows_global) -> str:
-    """Client code the form says to target (or the acting client by default)."""
+    """Client code the form says to target.
+
+    Falls back to the last client the operator targeted this session, then to
+    the acting client (bahushira) on first visit.
+    """
     if dataset.is_global or not shows_global:
         return request.client.client_code
-    return (request.POST.get("target_client") or request.client.client_code).strip().lower()
+    posted = (request.POST.get("target_client") or "").strip().lower()
+    if posted:
+        return posted
+    return request.session.get(SESSION_TARGET_KEY) or request.client.client_code
 
 
 def _resolve_target(request, dataset, client, shows_global):
@@ -102,6 +112,8 @@ def _resolve_target(request, dataset, client, shows_global):
     A client admin (or superuser outside bahushira) always targets the acting
     client. The bahushira superuser may target any existing client, or type a
     brand-new code — allowed only for the 03client dataset that provisions it.
+    The resolved code is remembered in the session so later uploads default to
+    the same client.
     """
     if dataset.is_global or not shows_global:
         return client, client.client_code, ""
@@ -109,11 +121,13 @@ def _resolve_target(request, dataset, client, shows_global):
     target = Client.objects.filter(client_code=code).first()
     if target is None:
         if dataset.key == "03client":
+            request.session[SESSION_TARGET_KEY] = code
             return None, code, ""
         return None, "", (
             f'Unknown client code "{code}". '
             "Create it first via the Client (03client) dataset."
         )
+    request.session[SESSION_TARGET_KEY] = target.client_code
     return target, target.client_code, ""
 
 
@@ -130,6 +144,25 @@ def _upload_form_ctx(dataset, shows_global, request, **extra):
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
+def _grouped_last_imports(scope, user):
+    """[(group, [(dataset, last_import|None), ...]), ...].
+
+    `last_import` is this user's most recent MasterDataImport for the dataset,
+    used by the list-page cards to show when the user last touched each dataset.
+    """
+    latest = {}
+    for job in (
+        MasterDataImport.objects.filter(uploaded_by=user)
+        .order_by("dataset_key", "-uploaded_at")
+        .only("dataset_key", "status", "uploaded_at", "target_client_code")
+    ):
+        latest.setdefault(job.dataset_key, job)
+    return [
+        (group, [(d, latest.get(d.key)) for d in datasets])
+        for group, datasets in grouped_for_scope(scope)
+    ]
+
+
 @login_required
 def masterdata_list(request, client_code=None):
     client = _require_admin(request)
@@ -141,8 +174,8 @@ def masterdata_list(request, client_code=None):
         history = MasterDataImport.objects.filter(client=client).order_by("-uploaded_at")[:20]
 
     ctx = {
-        "client_datasets": grouped_for_scope("client"),
-        "global_datasets": grouped_for_scope("global"),
+        "client_datasets": _grouped_last_imports("client", request.user),
+        "global_datasets": _grouped_last_imports("global", request.user),
         "shows_global_master_data": shows_global,
         "history": history,
         "active_nav": "masterdata",
@@ -160,8 +193,8 @@ def masterdata_upload(request, client_code=None):
 
     if dataset is None:
         ctx = {
-            "client_datasets": grouped_for_scope("client"),
-            "global_datasets": grouped_for_scope("global"),
+            "client_datasets": _grouped_last_imports("client", request.user),
+            "global_datasets": _grouped_last_imports("global", request.user),
             "shows_global_master_data": shows_global,
         }
         return render(request, "masterdata/masterdata_list.html", ctx)
