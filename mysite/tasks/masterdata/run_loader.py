@@ -92,9 +92,10 @@ def _run(job: MasterDataImport):
         job.save(update_fields=["status", "error_log"])
         return
 
-    # ── 2. Validate scope (client admins may only touch their own client) ─
+    # ── 2. Validate scope (every row must belong to the target client) ────
     if dataset.scope == "client":
-        errors = _validate_scope(dataset, client, files[0][1])
+        expected_code = job.target_client_code or (client.client_code if client else "")
+        errors = _validate_scope(dataset, expected_code, files[0][1])
         if errors:
             job.status = "failed"
             job.error_log = "\n".join(errors)
@@ -200,15 +201,16 @@ def _validate_columns(dataset, files) -> list:
     return errors
 
 
-def _validate_scope(dataset, client: Client, payload: bytes) -> list:
+def _validate_scope(dataset, expected_code: str, payload: bytes) -> list:
+    """Every row's client column(s) must equal the import's target client code."""
     errors = []
     rows = _dict_rows(payload)
     for i, row in enumerate(rows, start=2):
         row_errs = []
         for col in dataset.client_columns:
             value = (row.get(col) or "").strip().lower()
-            if value != client.client_code:
-                row_errs.append(f"'{col}' = '{value}' (expected '{client.client_code}')")
+            if value != expected_code:
+                row_errs.append(f"'{col}' = '{value}' (expected '{expected_code}')")
         if row_errs:
             errors.append(f"Row {i}: " + "; ".join(row_errs))
             if len(errors) >= MAX_SCOPE_ERRS:

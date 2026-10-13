@@ -17,6 +17,36 @@
         {% if dataset.description %}— {{ dataset.description }}{% endif %}
     </div>
 
+    {% if shows_global_master_data %}
+    {# ── Target client (bahushira operator only) ─────────────────────── #}
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">{% trans "Target client" %}</span>
+        </label>
+        <input type="text" name="target_client"
+               value="{{ target_client_code|default:client.client_code }}"
+               list="masterdata-client-list"
+               class="input input-bordered input-sm
+                      {% if errors.target_client %}input-error{% endif %}"
+               autocomplete="off" required>
+        <datalist id="masterdata-client-list">
+            {% for c in client_choices %}
+            <option value="{{ c.client_code }}">{{ c.client_code }} — {{ c.name }}</option>
+            {% endfor %}
+        </datalist>
+        {% if errors.target_client %}
+        <div class="alert alert-error py-1 mt-1 text-xs"><span>{{ errors.target_client }}</span></div>
+        {% endif %}
+        <label class="label">
+            <span class="label-text text-xs text-base-content/50">
+                {% trans "Data is written for this client — the client_code column in the file must match. Type a new code to provision a client via the Client (03client) dataset." %}
+            </span>
+        </label>
+    </div>
+    {% else %}
+    <input type="hidden" name="target_client" value="{{ client.client_code }}">
+    {% endif %}
+
     {% if errors.file %}
     <div class="alert alert-error py-2 text-sm"><span>{{ errors.file }}</span></div>
     {% endif %}

@@ -28,7 +28,16 @@ class MasterDataImport(models.Model):
         blank=True,
         on_delete=models.CASCADE,
         related_name="master_data_imports",
-        help_text=_("Null for global (superuser) uploads."),
+        help_text=_("The client whose data this import targets. Null for global "
+                    "(superuser) uploads and for 03client uploads that provision "
+                    "a brand-new client."),
+    )
+    target_client_code = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text=_("Canonical (lowercase) client code this client-scoped import "
+                    "targets. Used when job.client is null (new-client uploads) "
+                    "and for scope validation."),
     )
     dataset_key = models.CharField(max_length=64)
     scope = models.CharField(max_length=16, choices=SCOPE_CHOICES, default="client")

@@ -63,6 +63,7 @@ db.sqlite3-journal
 
 # Runtime uploads / artifacts (actuals import staging + template download caches)
 demand/actuals_imports/
+masterdata_imports/
 
 # Flask stuff:
 instance/

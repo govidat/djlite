@@ -20,6 +20,7 @@
         <tr>
           <th>{% trans "Dataset" %}</th>
           <th>{% trans "Scope" %}</th>
+          {% if shows_global_master_data %}<th>{% trans "Client" %}</th>{% endif %}
           <th>{% trans "Status" %}</th>
           <th>{% trans "Rows" %}</th>
           <th>{% trans "Uploaded by" %}</th>
@@ -31,6 +32,7 @@
         <tr>
           <td><code>{{ job.dataset_key }}</code></td>
           <td>{{ job.scope }}</td>
+          {% if shows_global_master_data %}<td>{{ job.target_client_code|default:job.client.client_code|default:"global" }}</td>{% endif %}
           <td>
             <span class="badge badge-sm
               {% if job.status == 'done' %}badge-success
@@ -45,7 +47,7 @@
         </tr>
         {% if job.summary %}
         <tr class="!bg-transparent">
-          <td colspan="6" class="!pt-0">
+          <td colspan="{% if shows_global_master_data %}7{% else %}6{% endif %}" class="!pt-0">
             <pre class="text-[10px] text-base-content/50 whitespace-pre-wrap">{{ job.summary }}</pre>
             {% if job.error_log %}
             <pre class="text-[10px] text-error whitespace-pre-wrap">{{ job.error_log }}</pre>

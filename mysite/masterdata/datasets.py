@@ -291,7 +291,9 @@ DATASETS = [
         order=5,
         model_label="mysite.Client",
         natural_key=(NK("client_code", "client_code", "lower"),),
-        description="Only the acting client's own row can be updated.",
+        description="Acting client's own row, or any client when uploaded by the "
+                    "bahushira operator (type the new client's code as the target "
+                    "to provision it).",
     ),
     Dataset(
         key="03Atheme",

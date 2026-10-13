@@ -21,13 +21,12 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from mysite.admin.base import _user_has_admin_role
 from mysite.masterdata.datasets import dependent_datasets, get_dataset, grouped_for_scope
-from mysite.models import MasterDataImport
+from mysite.models import Client, MasterDataImport
 from mysite.tasks.masterdata.run_loader import _normalise, count_overlaps
 
 logger = logging.getLogger(__name__)
@@ -81,11 +80,52 @@ def _store(raw: bytes, client_code: str, original_name: str) -> str:
 
 def _job_for_user(request, job_id):
     job = get_object_or_404(MasterDataImport, pk=job_id)
+    if _shows_global(request):
+        return job
     if job.client and job.client_id != request.client.pk:
         raise PermissionDenied("Not your client's import.")
-    if job.client is None and not _shows_global(request):
+    if job.client is None:
         raise PermissionDenied("No access to global imports.")
     return job
+
+
+def _posted_target_code(request, dataset, shows_global) -> str:
+    """Client code the form says to target (or the acting client by default)."""
+    if dataset.is_global or not shows_global:
+        return request.client.client_code
+    return (request.POST.get("target_client") or request.client.client_code).strip().lower()
+
+
+def _resolve_target(request, dataset, client, shows_global):
+    """Resolve the import's target client -> (client, code, error).
+
+    A client admin (or superuser outside bahushira) always targets the acting
+    client. The bahushira superuser may target any existing client, or type a
+    brand-new code — allowed only for the 03client dataset that provisions it.
+    """
+    if dataset.is_global or not shows_global:
+        return client, client.client_code, ""
+    code = _posted_target_code(request, dataset, shows_global)
+    target = Client.objects.filter(client_code=code).first()
+    if target is None:
+        if dataset.key == "03client":
+            return None, code, ""
+        return None, "", (
+            f'Unknown client code "{code}". '
+            "Create it first via the Client (03client) dataset."
+        )
+    return target, target.client_code, ""
+
+
+def _upload_form_ctx(dataset, shows_global, request, **extra):
+    ctx = {
+        "dataset": dataset,
+        "shows_global_master_data": shows_global,
+        "client_choices": list(Client.objects.all().order_by("client_code")),
+        "target_client_code": _posted_target_code(request, dataset, shows_global),
+    }
+    ctx.update(extra)
+    return ctx
 
 
 # ── Pages ─────────────────────────────────────────────────────────────────────
@@ -95,10 +135,10 @@ def masterdata_list(request, client_code=None):
     client = _require_admin(request)
     shows_global = _shows_global(request)
 
-    q = Q(client=client)
     if shows_global:
-        q |= Q(client__isnull=True, scope="global")
-    history = MasterDataImport.objects.filter(q).order_by("-uploaded_at")[:20]
+        history = MasterDataImport.objects.all().order_by("-uploaded_at")[:20]
+    else:
+        history = MasterDataImport.objects.filter(client=client).order_by("-uploaded_at")[:20]
 
     ctx = {
         "client_datasets": grouped_for_scope("client"),
@@ -132,10 +172,7 @@ def masterdata_upload(request, client_code=None):
     if request.method == "POST":
         return _handle_upload(request, client, shows_global, dataset, dataset_key)
 
-    ctx = {
-        "dataset": dataset,
-        "shows_global_master_data": shows_global,
-    }
+    ctx = _upload_form_ctx(dataset, shows_global, request)
     if _is_htmx(request):
         return render(request, "masterdata/partials/upload_form.html", ctx)
     return render(request, "masterdata/masterdata_upload.html", ctx)
@@ -157,11 +194,25 @@ def _handle_upload(request, client, shows_global, dataset, dataset_key):
         return render(
             request,
             "masterdata/partials/upload_form.html",
-            {"dataset": dataset, "shows_global_master_data": shows_global},
+            _upload_form_ctx(dataset, shows_global, request),
         )
+
+    # ── Resolve the client whose data this import targets ────────────────
+    target_client, target_code, target_error = _resolve_target(
+        request, dataset, client, shows_global
+    )
 
     # ── Pending-file actions (from the overlap panel) ────────────────────
     if action in ("override", "delete_and_reload") and pending_file:
+        if target_error:
+            return render(
+                request,
+                "masterdata/partials/upload_form.html",
+                _upload_form_ctx(
+                    dataset, shows_global, request, errors={"target_client": target_error}
+                ),
+                status=400,
+            )
         if action == "delete_and_reload" and not request.POST.get("confirmed"):
             dependents = dependent_datasets(dataset)
             if dependents:
@@ -174,10 +225,12 @@ def _handle_upload(request, client, shows_global, dataset, dataset_key):
                         "pending_file": pending_file,
                         "pending_file_b": pending_file_b,
                         "shows_global_master_data": shows_global,
+                        "target_client": target_code,
                     },
                 )
         job = MasterDataImport.objects.create(
-            client=None if dataset.is_global else client,
+            client=None if dataset.is_global else target_client,
+            target_client_code="" if dataset.is_global else target_code,
             dataset_key=dataset.key,
             scope=dataset.scope,
             uploaded_by=request.user,
@@ -203,12 +256,14 @@ def _handle_upload(request, client, shows_global, dataset, dataset_key):
             errors["file_b"] = "This dataset needs a second (text) file."
         elif os.path.splitext(file_b.name)[1].lower() not in ALLOWED_EXT:
             errors["file_b"] = "Unsupported file type for the second file."
+    if target_error:
+        errors["target_client"] = target_error
 
     if errors:
         return render(
             request,
             "masterdata/partials/upload_form.html",
-            {"dataset": dataset, "errors": errors, "shows_global_master_data": shows_global},
+            _upload_form_ctx(dataset, shows_global, request, errors=errors),
             status=400,
         )
 
@@ -216,7 +271,7 @@ def _handle_upload(request, client, shows_global, dataset, dataset_key):
 
     if dataset.multi_file:
         raw_b = file_b.read()
-        save_path_b = _store(raw_b, client.client_code, file_b.name)
+        save_path_b = _store(raw_b, target_code, file_b.name)
         pending_file_b = save_path_b
     else:
         raw_b = None
@@ -226,12 +281,12 @@ def _handle_upload(request, client, shows_global, dataset, dataset_key):
 
     overlap = count_overlaps(
         dataset, dataset.scope,
-        None if dataset.is_global else client,
+        None if dataset.is_global else target_client,
         norm_a,
     )
 
     if overlap:
-        save_path = _store(raw_a, client.client_code, file_a.name)
+        save_path = _store(raw_a, target_code, file_a.name)
         return render(
             request,
             "masterdata/partials/overlap.html",
@@ -242,15 +297,17 @@ def _handle_upload(request, client, shows_global, dataset, dataset_key):
                 "pending_file": save_path,
                 "pending_file_b": save_path_b,
                 "shows_global_master_data": shows_global,
+                "target_client": target_code,
             },
         )
 
     job = MasterDataImport.objects.create(
-        client=None if dataset.is_global else client,
+        client=None if dataset.is_global else target_client,
+        target_client_code="" if dataset.is_global else target_code,
         dataset_key=dataset.key,
         scope=dataset.scope,
         uploaded_by=request.user,
-        file_name=_store(raw_a, client.client_code, file_a.name),
+        file_name=_store(raw_a, target_code, file_a.name),
         file_name_b=save_path_b or "",
         delete_existing=False,
         status="pending",
@@ -272,10 +329,10 @@ def masterdata_history(request, client_code=None):
     """Full history list (used from the list page 'view all' link)."""
     client = _require_admin(request)
     shows_global = _shows_global(request)
-    q = Q(client=client)
     if shows_global:
-        q |= Q(client__isnull=True, scope="global")
-    history = MasterDataImport.objects.filter(q).order_by("-uploaded_at")
+        history = MasterDataImport.objects.all().order_by("-uploaded_at")
+    else:
+        history = MasterDataImport.objects.filter(client=client).order_by("-uploaded_at")
     return render(
         request,
         "masterdata/masterdata_history.html",

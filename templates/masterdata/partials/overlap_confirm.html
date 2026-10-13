@@ -25,6 +25,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="delete_and_reload">
             <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+            <input type="hidden" name="target_client" value="{{ target_client|default:client.client_code }}">
             <input type="hidden" name="pending_file" value="{{ pending_file }}">
             <input type="hidden" name="pending_file_b" value="{{ pending_file_b }}">
             <input type="hidden" name="confirmed" value="1">
@@ -39,6 +40,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="cancel">
             <input type="hidden" name="dataset_key" value="{{ dataset.key }}">
+            <input type="hidden" name="target_client" value="{{ target_client|default:client.client_code }}">
             <input type="hidden" name="pending_file" value="{{ pending_file }}">
             <input type="hidden" name="pending_file_b" value="{{ pending_file_b }}">
             <button type="submit" class="btn btn-ghost btn-sm w-full">

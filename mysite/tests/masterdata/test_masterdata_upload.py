@@ -319,3 +319,166 @@ class TestStatusAndTemplate:
     def test_global_template_denied_for_client_admin(self, web_client, client_obj):
         resp = web_client.get(_template_url(client_obj, "01globalval"), {"dataset": "01globalval"})
         assert resp.status_code == 403
+
+
+# ── Bahushira operator: upload data for other clients ───────────────────────
+
+def _03client_csv(client_code):
+    header = ("client_code,language_list,theme_list,nb_title_svg_pre,nb_title_svg_suf,"
+              "name_en,name_fr,name_hi,name_ta,nb_title_en,nb_title_fr,nb_title_hi,"
+              "nb_title_ta,default_language,parent_id")
+    return (header + f"\n{client_code},,,,,\"New {client_code}\",,,,New,,,,en,\n").encode("utf-8")
+
+
+@pytest.mark.django_db
+class TestSuperuserTargetUpload:
+
+    def _operator(self, superuser):
+        from django.test import Client
+        c = Client()
+        c.force_login(superuser)
+        return c
+
+    def _upload(self, operator, bahushira_obj, data):
+        return operator.post(
+            reverse("masterdata_ui:masterdata_upload",
+                    kwargs={"client_code": bahushira_obj.client_code}),
+            data,
+        )
+
+    def test_operator_upload_targets_other_client(self, superuser, bahushira_obj, client_obj,
+                                                 theme_csv, media_tmp):
+        with mock.patch("mysite.masterdata_ui.views._dispatch") as dispatch:
+            resp = self._upload(self._operator(superuser), bahushira_obj, {
+                "action": "upload",
+                "dataset_key": "03Atheme",
+                "target_client": client_obj.client_code,
+                "file": SimpleUploadedFile("themes.csv", theme_csv, content_type="text/csv"),
+            })
+        assert resp.status_code == 200
+        job = MasterDataImport.objects.latest("pk")
+        assert job.client_id == client_obj.pk
+        assert job.target_client_code == "test01"
+        assert job.file_name.startswith("masterdata_imports/test01/")
+        dispatch.assert_called_once_with(job)
+
+    def test_operator_scope_validated_against_target(self, superuser, bahushira_obj, client_obj,
+                                                     admin_user, media_tmp):
+        from mysite.tests.masterdata.conftest import _theme_csv
+        csv_other = _theme_csv("OTHER01")
+        with mock.patch("mysite.masterdata_ui.views._dispatch"):
+            resp = self._upload(self._operator(superuser), bahushira_obj, {
+                "action": "upload",
+                "dataset_key": "03Atheme",
+                "target_client": client_obj.client_code,
+                "file": SimpleUploadedFile("themes.csv", csv_other, content_type="text/csv"),
+            })
+        assert resp.status_code == 200
+        job = MasterDataImport.objects.latest("pk")
+        assert job.target_client_code == "test01"
+
+        from mysite.tasks.masterdata.run_loader import run_masterdata_import
+        run_masterdata_import.run(job.pk)
+        job.refresh_from_db()
+        assert job.status == "failed"
+        assert "'client_code' = 'other01' (expected 'test01')" in job.error_log
+
+    def test_operator_overlap_counted_against_target(self, superuser, bahushira_obj, client_obj,
+                                                    theme_csv, media_tmp):
+        from mysite.models import Theme
+        Theme.objects.create(client=client_obj, theme_code="solar", name="Solar")
+        with mock.patch("mysite.masterdata_ui.views._dispatch") as dispatch:
+            resp = self._upload(self._operator(superuser), bahushira_obj, {
+                "action": "upload",
+                "dataset_key": "03Atheme",
+                "target_client": client_obj.client_code,
+                "file": SimpleUploadedFile("themes.csv", theme_csv, content_type="text/csv"),
+            })
+        assert "Overlapping records detected" in resp.content.decode()
+        assert dispatch.call_count == 0  # bahushira has no themes — overlap is TEST01's
+
+    def test_operator_unknown_target_rejected(self, superuser, bahushira_obj, client_obj,
+                                             theme_csv, media_tmp):
+        resp = self._upload(self._operator(superuser), bahushira_obj, {
+            "action": "upload",
+            "dataset_key": "03Atheme",
+            "target_client": "noclient",
+            "file": SimpleUploadedFile("themes.csv", theme_csv, content_type="text/csv"),
+        })
+        assert resp.status_code == 400
+        assert b"Unknown client code" in resp.content
+        assert not MasterDataImport.objects.exists()
+
+    def test_operator_new_client_allowed_only_for_03client(self, superuser, bahushira_obj,
+                                                          media_tmp):
+        resp = self._upload(self._operator(superuser), bahushira_obj, {
+            "action": "upload",
+            "dataset_key": "03client",
+            "target_client": "newclient",
+            "file": SimpleUploadedFile("03client.csv", _03client_csv("newclient"),
+                                       content_type="text/csv"),
+        })
+        assert resp.status_code == 200
+        job = MasterDataImport.objects.latest("pk")
+        assert job.client is None
+        assert job.target_client_code == "newclient"
+
+    def test_operator_provisions_new_client_end_to_end(self, superuser, bahushira_obj,
+                                                       media_tmp):
+        from mysite.models import Client
+        with mock.patch("mysite.masterdata_ui.views._dispatch"):
+            self._upload(self._operator(superuser), bahushira_obj, {
+                "action": "upload",
+                "dataset_key": "03client",
+                "target_client": "newclient",
+                "file": SimpleUploadedFile("03client.csv", _03client_csv("newclient"),
+                                           content_type="text/csv"),
+            })
+        job = MasterDataImport.objects.latest("pk")
+
+        from mysite.tasks.masterdata.run_loader import run_masterdata_import
+        run_masterdata_import.run(job.pk)
+        job.refresh_from_db()
+        assert job.status == "done"
+        assert Client.objects.filter(client_code="newclient").exists()
+
+    def test_operator_status_poll_cross_client_ok(self, superuser, bahushira_obj,
+                                                  client_obj, admin_user, media_tmp):
+        job = MasterDataImport.objects.create(
+            client=client_obj, target_client_code="test01",
+            dataset_key="03Atheme", scope="client",
+            uploaded_by=admin_user, file_name="x.csv", status="processing",
+        )
+        resp = self._operator(superuser).get(_status_url(bahushira_obj, job))
+        assert resp.status_code == 200
+
+    def test_operator_history_lists_all_clients(self, superuser, bahushira_obj,
+                                               client_obj, admin_user, media_tmp):
+        job = MasterDataImport.objects.create(
+            client=client_obj, target_client_code="test01",
+            dataset_key="03Atheme", scope="client",
+            uploaded_by=admin_user, file_name="x.csv", status="done",
+        )
+        operator = self._operator(superuser)
+        resp = operator.get(reverse("masterdata_ui:masterdata_history",
+                                    kwargs={"client_code": bahushira_obj.client_code}))
+        assert resp.status_code == 200
+        content = resp.content.decode()
+        assert "test01" in content
+        assert f'<code>{job.dataset_key}</code>' in content
+
+    def test_client_admin_target_forced_and_picker_hidden(self, web_client, client_obj,
+                                                         theme_csv, media_tmp):
+        resp = web_client.get(_upload_url(client_obj), {"dataset": "03Atheme"})
+        assert "masterdata-client-list" not in resp.content.decode()
+
+        resp = web_client.post(_upload_url(client_obj), {
+            "action": "override",
+            "dataset_key": "03Atheme",
+            "target_client": "other01",
+            "pending_file": "masterdata_imports/TEST01/forced.csv",
+        })
+        assert resp.status_code == 200
+        job = MasterDataImport.objects.latest("pk")
+        assert job.client_id == client_obj.pk
+        assert job.target_client_code == job.client.client_code
