@@ -13,6 +13,7 @@
 #   * Global datasets (client=null writes) are only reachable by a superuser
 #     signed in under the 'bahushira' client (shows_global_master_data).
 
+import io
 import logging
 import os
 import uuid
@@ -375,7 +376,7 @@ def masterdata_history(request, client_code=None):
 
 @login_required
 def masterdata_template(request, client_code=None):
-    """Stream the sample CSV for a dataset as a download."""
+    """Stream the sample file for a dataset as CSV (default) or .xlsx."""
     _require_admin(request)
     dataset = _get_dataset(request.GET.get("dataset", ""))
     if dataset.is_global and not _shows_global(request):
@@ -386,6 +387,10 @@ def masterdata_template(request, client_code=None):
     except ValueError:
         part = 0
     part = min(max(part, 0), len(dataset.files) - 1)
+
+    fmt = (request.GET.get("format") or "csv").strip().lower()
+    if fmt not in ("csv", "xlsx"):
+        fmt = "csv"
 
     from django.conf import settings
     from pathlib import Path
@@ -401,7 +406,24 @@ def masterdata_template(request, client_code=None):
     for col in columns:
         if col not in df.columns:
             df[col] = ""
+    df = df[columns]
+
+    stem = os.path.splitext(dataset.files[part])[0]
+
+    if fmt == "xlsx":
+        buf = io.BytesIO()
+        df.to_excel(buf, index=False, engine="openpyxl")
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet"
+            ),
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{stem}.xlsx"'
+        return resp
+
     resp = HttpResponse(content_type="text/csv")
     resp["Content-Disposition"] = f'attachment; filename="{dataset.files[part]}"'
-    df[columns].to_csv(resp, index=False)
+    df.to_csv(resp, index=False)
     return resp

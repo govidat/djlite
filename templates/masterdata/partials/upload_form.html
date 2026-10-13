@@ -81,16 +81,27 @@
     {# ── Templates ────────────────────────────────────────────────── #}
     <div class="text-xs text-base-content/50 space-y-0.5">
         {% if dataset.multi_file %}
-            <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&part=0"
-               class="link link-primary">↓ {% trans "Download template (main)" %}</a>
             <span class="block">
+                ↓ {% trans "Download template (main)" %}:
+                <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&part=0"
+                   class="link link-primary">CSV</a>
+                <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&part=0&format=xlsx"
+                   class="link link-primary">XLSX</a>
+            </span>
+            <span class="block">
+                ↓ {% trans "Download template (text)" %}:
                 <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&part=1"
-                   class="link link-primary">↓ {% trans "Download template (text)" %}</a>
+                   class="link link-primary">CSV</a>
+                <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&part=1&format=xlsx"
+                   class="link link-primary">XLSX</a>
             </span>
         {% else %}
             <span>
+                ↓ {% trans "Download template" %}:
                 <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}"
-                   class="link link-primary">↓ {% trans "Download template" %}</a>
+                   class="link link-primary">CSV</a>
+                <a href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ dataset.key }}&format=xlsx"
+                   class="link link-primary">XLSX</a>
                 — {% trans "Use it to keep the column format correct" %}
             </span>
         {% endif %}

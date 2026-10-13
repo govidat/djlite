@@ -316,6 +316,20 @@ class TestStatusAndTemplate:
         assert "theme_code" in header
         assert "client_code" in header
 
+    def test_template_download_xlsx(self, web_client, client_obj):
+        from io import BytesIO
+        import pandas as pd
+        url = _template_url(client_obj, "03Atheme")
+        resp = web_client.get(url, {"dataset": "03Atheme", "format": "xlsx"})
+        assert resp.status_code == 200
+        assert resp["Content-Type"] == (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        assert 'filename="03Atheme.xlsx"' in resp["Content-Disposition"]
+        df = pd.read_excel(BytesIO(resp.content), dtype=str, keep_default_na=False)
+        assert "theme_code" in df.columns
+        assert "client_code" in df.columns
+
     def test_global_template_denied_for_client_admin(self, web_client, client_obj):
         resp = web_client.get(_template_url(client_obj, "01globalval"), {"dataset": "01globalval"})
         assert resp.status_code == 403

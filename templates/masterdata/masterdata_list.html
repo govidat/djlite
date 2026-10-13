@@ -49,12 +49,24 @@
             {% endif %}
           </div>
           {% endif %}
-          <div class="mt-1 space-y-0.5">
+          <div class="mt-1 space-y-0.5 text-xs text-base-content/50">
             {% if d.multi_file %}
-              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">↓ {% trans "Template (main)" %}</a>
-              <a class="link link-primary text-xs block" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1">↓ {% trans "Template (text)" %}</a>
+              <span class="block">
+                ↓ {% trans "Template (main)" %}:
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">CSV</a>
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0&format=xlsx">XLSX</a>
+              </span>
+              <span class="block">
+                ↓ {% trans "Template (text)" %}:
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1">CSV</a>
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1&format=xlsx">XLSX</a>
+              </span>
             {% else %}
-              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}">↓ {% trans "Template" %}</a>
+              <span>
+                ↓ {% trans "Template" %}:
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}">CSV</a>
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&format=xlsx">XLSX</a>
+              </span>
             {% endif %}
           </div>
         </div>
@@ -102,12 +114,24 @@
             {% endif %}
           </div>
           {% endif %}
-          <div class="mt-1 space-y-0.5">
+          <div class="mt-1 space-y-0.5 text-xs text-base-content/50">
             {% if d.multi_file %}
-              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">↓ {% trans "Template (main)" %}</a>
-              <a class="link link-primary text-xs block" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1">↓ {% trans "Template (text)" %}</a>
+              <span class="block">
+                ↓ {% trans "Template (main)" %}:
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0">CSV</a>
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=0&format=xlsx">XLSX</a>
+              </span>
+              <span class="block">
+                ↓ {% trans "Template (text)" %}:
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1">CSV</a>
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&part=1&format=xlsx">XLSX</a>
+              </span>
             {% else %}
-              <a class="link link-primary text-xs" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}">↓ {% trans "Template" %}</a>
+              <span>
+                ↓ {% trans "Template" %}:
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}">CSV</a>
+                <a class="link link-primary" href="{% url 'masterdata_ui:masterdata_template' client_code=client.client_code %}?dataset={{ d.key }}&format=xlsx">XLSX</a>
+              </span>
             {% endif %}
           </div>
         </div>
