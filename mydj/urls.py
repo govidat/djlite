@@ -21,6 +21,15 @@ from django.conf import settings
 #from debug_toolbar.toolbar import debug_toolbar_urls  # debug-toolbar
 
 urlpatterns = [
+
+    path("admin/dj-control-room-base/", include("dj_control_room_base.urls")),  # for base
+    path("admin/dj-redis-panel/", include("dj_redis_panel.urls")),  # for redis panel
+    path("admin/dj-celery-panel/", include("dj_celery_panel.urls")),  # for celery panel
+    path("admin/dj-cache-panel/", include("dj_cache_panel.urls")),  # for cache panel
+    path("admin/dj-urls-panel/", include("dj_urls_panel.urls")),  # for urls panel
+    path("admin/dj-signals-panel/", include("dj_signals_panel.urls")),  # for signals panel    
+    path("admin/dj-control-room/", include("dj_control_room.urls")),  # for the control room
+
     path('admin/', admin.site.urls),
     path("accounts/", include("allauth.urls")),  # allauth
     #path("zapp/", include("zapp.urls")),  # zapp

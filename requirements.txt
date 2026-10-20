@@ -93,4 +93,4 @@ django-celery-results>=2.6.0
 psycopg[binary]>=3.2
 django-ipware>=7.0.1
 geoip2
-
+dj-control-room[all]
