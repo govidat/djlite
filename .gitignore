@@ -211,3 +211,6 @@ marimo/_lsp/
 __marimo__/
 
 tailwind
+specs/GPC/rawdata/
+specs/GPC/
+specs/autocomp/

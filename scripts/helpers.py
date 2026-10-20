@@ -2,7 +2,7 @@ import json
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, date
 
-def clean(value, lower=False, default=None):
+def clean(value, lower=False, default=""):
 
     value = (value or "").strip()
 

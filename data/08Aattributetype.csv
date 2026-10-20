@@ -1,5 +1,4 @@
 client_code,slug,name_en,name_hi,name_fr,name_ta,field_type,gpc_code
-,thread-size,Thread Size,थ्रेड साइज़,,,select,AT001
-,electrode-gap-mm,Electrode Gap (mm),इलेक्ट्रोड गैप (मिमी),,,number,AT002
-,plug-type,Plug Type,प्लग प्रकार,,,select,AT003
-,heat-range,Heat Range,हीट रेंज,,,select,
+,vehicle-segment,Vehicle Segment,,,,select,at-vseg
+,vehicle-type,Vehicle Type,,,,select,at-vtype
+,vehicle-spec,Vehicle Spec,,,,select,at-vspec

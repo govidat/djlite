@@ -433,7 +433,7 @@ DATASETS = [
         columns=((
             "slug", "order", "is_active", "metadata", "taxonomy_slug",
             "name_en", "name_fr", "name_hi", "name_ta", "client_code",
-            "gpc_code", "parent_slug", "global_node_id",
+            "gpc_code", "parent_slug", "global_node_slug",
         ),),
         group=_GROUP_TAXONOMY,
         order=20,

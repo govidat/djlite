@@ -192,7 +192,7 @@ The module generates statistical forecasts, allows business consensus overrides 
 Three independent hierarchies operate in parallel on the same Item and Customer base:
  
 **Product Hierarchy** — extends the existing `Taxonomy` / `TaxonomyNode` system.
-A dedicated Taxonomy slug `product_planning` carries the 3–5 level product grouping used in forecasting (Category → Sub-category → Brand → SKU). This reuses Phase 2 infrastructure without new models. If a separate 'product_planning' is not used then the generic 'gpc' to be used. Alternatively the hierarchy to be used for planning purpose to be part of the Client Master (TBD).
+A dedicated Taxonomy slug `product_planning` carries the 3–5 level product grouping used in forecasting (Category → Sub-category → Brand → SKU). This reuses Phase 2 infrastructure without new models. The planning/product hierarchy is configured per client via `ForecastingConfig.planning_producthierarchy` (default `'gpc'`). Where derived/planning nodes/sub-leaves are needed, they are computed from model values (item attributes/values and taxonomy links) via the planning taxonomy rebuild process (signals/tasks/manual), rather than being pre-uploaded as calculated attribute values. If a separate 'product_planning' taxonomy is not used, the configured slug (default 'gpc') is used.
  
 **Geography / Location Hierarchy** — extends `ClientLocation`.
 `ClientLocation` gains a `parent` self-FK (nullable) enabling a Region → Branch → Location tree. Depth is unrestricted; materialized path is added alongside the FK for efficient subtree queries (same pattern as `TaxonomyNode`).

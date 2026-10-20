@@ -258,17 +258,24 @@ def load_val01(
 
             global_node = None
 
-            global_node_id = clean(
-                row.get("global_node_id")
+            global_node_slug = clean(
+                row.get("global_node_slug")
+                or row.get("global_node_id")  # backward compat
             )
 
-            if global_node_id:
+            if global_node_slug:
 
                 global_node = (
                     TaxonomyNode.objects
-                    .filter(id=global_node_id)
+                    .filter(taxonomy=taxonomy, client=None, slug=global_node_slug)
                     .first()
                 )
+                if not global_node:
+                    global_node = (
+                        TaxonomyNode.objects
+                        .filter(taxonomy=taxonomy, slug=global_node_slug)
+                        .first()
+                    )
 
             # =================================================
             # DEFAULTS
@@ -653,15 +660,19 @@ def load_val01():
 
             global_node = None
 
-            global_node_id = (
-                row.get("global_node_id") or ""
+            global_node_slug = (
+                row.get("global_node_slug") or row.get("global_node_id") or ""
             ).strip()
 
-            if global_node_id:
+            if global_node_slug:
 
                 global_node = TaxonomyNode.objects.filter(
-                    id=global_node_id
+                    taxonomy=taxonomy, client=None, slug=global_node_slug
                 ).first()
+                if not global_node:
+                    global_node = TaxonomyNode.objects.filter(
+                        taxonomy=taxonomy, slug=global_node_slug
+                    ).first()
 
             # -------------------------------------------------
             # CREATE / UPDATE
